@@ -12,7 +12,7 @@
         "changelog": "Fix: with diary-import enabled, the daily sync was posting phantom rewatch entries to Letterboxd for films you had only marked played via diary import (never actually watched on Jellyfin). The runner now suppresses these films until a real Jellyfin playback sets a LastPlayedDate, at which point the rewatch lands on Letterboxd as expected. Docs: install instructions now call out the File Transformation plugin as a prerequisite for the in-sidebar Letterboxd link.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.11.2/jellyfin-plugin-letterboxd-v1.11.2.zip",
-        "checksum": "PLACEHOLDER",
+        "checksum": "9faf5fbbd66a7df1b83822b813f03358",
         "timestamp": "2026-05-13T00:00:00Z"
       },
       {
