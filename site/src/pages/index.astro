@@ -4,6 +4,7 @@ import Icon from '../components/Icon.astro';
 import SyncFlow from '../components/SyncFlow.astro';
 import TransferBento from '../components/TransferBento.astro';
 import DashboardPeek from '../components/DashboardPeek.astro';
+import { latestRelease } from '../lib/releases';
 
 const repoUrl = 'https://github.com/builtbyproxy/jellyfin-plugin-letterboxd';
 const manifestUrl = 'https://raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json';
@@ -11,6 +12,10 @@ const fileTransformationManifestUrl = 'https://www.iamparadox.dev/jellyfin/plugi
 const fileTransformationRepoUrl = 'https://github.com/IAmParadox27/jellyfin-plugin-file-transformation';
 const releasesUrl = `${repoUrl}/releases`;
 const latestReleaseUrl = `${repoUrl}/releases/latest`;
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const localReleasesUrl = `${base}/releases`;
+const latestReleaseAnchor = `${localReleasesUrl}#${latestRelease.anchor}`;
 
 type Feature = { title: string; body: string; icon: string };
 type FeatureGroup = { id: string; label: string; heading: string; intro: string; visual: 'flow' | 'rating' | 'dashboard'; items: Feature[] };
@@ -83,6 +88,7 @@ const featureGroups: FeatureGroup[] = [
         <a href="#features">Features</a>
         <a href="#install">Install</a>
         <a href="#setup">Setup</a>
+        <a href={localReleasesUrl}>Releases</a>
         <a href={repoUrl} rel="noopener">GitHub</a>
       </nav>
     </div>
@@ -118,6 +124,14 @@ const featureGroups: FeatureGroup[] = [
             <span class="copy-text">Copy</span>
           </button>
         </div>
+        <a class="latest-link" href={latestReleaseAnchor}>
+          <span class="latest-dot" aria-hidden="true"></span>
+          <span class="latest-label">Latest</span>
+          <span class="latest-version">v{latestRelease.version}</span>
+          <span class="latest-sep" aria-hidden="true">·</span>
+          <span class="latest-date">{latestRelease.dateLabel}</span>
+          <span class="latest-arrow">What's new <span aria-hidden="true">&rarr;</span></span>
+        </a>
       </div>
 
       <div class="hero-art" aria-hidden="true">
@@ -505,6 +519,49 @@ const featureGroups: FeatureGroup[] = [
     border-color: transparent;
   }
   .copy-icon { font-size: 14px; line-height: 1; }
+
+  .latest-link {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 4px 2px;
+    border-radius: 6px;
+    transition: color 120ms ease;
+  }
+  .latest-link:hover { color: var(--text); text-decoration: none; }
+  .latest-link:hover .latest-arrow { color: var(--lb-green); }
+  .latest-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lb-green);
+    box-shadow: 0 0 8px rgba(0,224,84,0.6);
+    flex: 0 0 auto;
+  }
+  .latest-label {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lb-green);
+  }
+  .latest-version {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .latest-sep { color: var(--border); }
+  .latest-arrow {
+    margin-left: 4px;
+    color: var(--text-dim);
+    transition: color 120ms ease;
+  }
+  @media (max-width: 480px) {
+    .latest-sep, .latest-date { display: none; }
+  }
 
   .hero-art {
     position: relative;

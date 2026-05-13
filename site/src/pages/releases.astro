@@ -1,0 +1,431 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { releases } from '../lib/releases';
+
+const repoUrl = 'https://github.com/builtbyproxy/jellyfin-plugin-letterboxd';
+const manifestUrl = 'https://raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const home = `${base}/`;
+
+type CategoryDef = { key: 'new' | 'improvements' | 'fixes' | 'breaking'; label: string };
+const categoryOrder: CategoryDef[] = [
+  { key: 'breaking', label: 'Breaking' },
+  { key: 'new', label: 'New' },
+  { key: 'improvements', label: 'Improvements' },
+  { key: 'fixes', label: 'Fixes' },
+];
+---
+
+<Layout title="Releases — LetterboxdSync" description="What changed in every release of LetterboxdSync.">
+  <header class="site-header">
+    <div class="container nav">
+      <div class="brand-group">
+        <a class="brand" href={home} aria-label="LetterboxdSync home">
+          <span class="dots" aria-hidden="true">
+            <span class="dot dot-green"></span>
+            <span class="dot dot-blue"></span>
+            <span class="dot dot-orange"></span>
+          </span>
+          <span class="brand-name">LetterboxdSync</span>
+        </a>
+        <span class="brand-by">
+          by <a
+            href="https://lachlanyoung.dev/?utm_source=jellyfin-plugin-letterboxd&utm_medium=site&utm_campaign=author-link"
+            class="brand-author"
+            rel="author"
+            data-plausible-event="Author Link: Click"
+          >Lachlan Young</a>
+        </span>
+      </div>
+      <nav class="nav-links">
+        <a href={`${home}#features`}>Features</a>
+        <a href={`${home}#install`}>Install</a>
+        <a href={`${home}#setup`}>Setup</a>
+        <a href={`${base}/releases`} aria-current="page">Releases</a>
+        <a href={repoUrl} rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="releases-hero">
+    <div class="container">
+      <div class="eyebrow">
+        <span class="eyebrow-dot"></span>
+        Release history
+      </div>
+      <h1>What's <span class="accent">new</span>.</h1>
+      <p class="lede">
+        Every release of LetterboxdSync, newest first. Each entry covers the user-facing changes.
+        Backwards through the project history, all the way to <code>v1.0.0</code>.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href={`${home}#install`}>Install plugin</a>
+        <a class="btn btn-secondary" href={`${repoUrl}/releases`} rel="noopener">View on GitHub</a>
+      </div>
+      <div class="hero-meta">
+        <div class="meta-stat">
+          <span class="meta-num">{releases.length}</span>
+          <span class="meta-label">releases</span>
+        </div>
+        <div class="meta-stat">
+          <span class="meta-num">{releases[0]?.version}</span>
+          <span class="meta-label">latest</span>
+        </div>
+        <div class="meta-stat">
+          <span class="meta-num">{releases[0]?.dateLabel}</span>
+          <span class="meta-label">shipped</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="releases-list">
+    <div class="container">
+      {releases.map((rel, i) => {
+        const isLatest = i === 0;
+        const notes = rel.notes;
+        return (
+          <article class={`release ${isLatest ? 'release-latest' : ''}`} id={rel.anchor}>
+            <div class="release-meta">
+              <div class="version-row">
+                <a class="version" href={`#${rel.anchor}`} aria-label={`Link to ${rel.tag}`}>
+                  <span class="version-v">v</span>{rel.version}
+                </a>
+                {isLatest && <span class="badge badge-latest">Latest</span>}
+              </div>
+              <time class="release-date" datetime={rel.date.toISOString()}>{rel.dateLabel}</time>
+            </div>
+
+            <div class="release-body">
+              {notes ? (
+                <>
+                  <h2 class="release-headline">{notes.headline}</h2>
+                  {notes.summary && <p class="release-summary">{notes.summary}</p>}
+                  {categoryOrder.map(({ key, label }) => {
+                    const items = notes.highlights[key];
+                    if (!items || items.length === 0) return null;
+                    return (
+                      <div class={`category category-${key}`}>
+                        <div class="category-label">
+                          <span class="category-dot" aria-hidden="true"></span>
+                          {label}
+                        </div>
+                        <ul class="category-list">
+                          {items.map((item) => <li>{item}</li>)}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                  {notes.upgradeNotes && (
+                    <div class="upgrade-notes">
+                      <strong>Upgrade notes:</strong> {notes.upgradeNotes}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p class="release-fallback">{rel.changelog}</p>
+              )}
+
+              <div class="release-actions">
+                <a class="action-link" href={rel.githubReleaseUrl} rel="noopener">
+                  View on GitHub <span aria-hidden="true">&rarr;</span>
+                </a>
+                <a class="action-link action-link-muted" href={rel.sourceUrl} rel="noopener">
+                  Download ZIP
+                </a>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="dots dots-sm" aria-hidden="true">
+          <span class="dot dot-green"></span>
+          <span class="dot dot-blue"></span>
+          <span class="dot dot-orange"></span>
+        </span>
+        <span>LetterboxdSync</span>
+      </div>
+      <div class="footer-links">
+        <a href={home}>Home</a>
+        <a href={repoUrl} rel="noopener">GitHub</a>
+        <a href={`${repoUrl}/releases`} rel="noopener">Releases</a>
+        <a href={`${repoUrl}/issues`} rel="noopener">Issues</a>
+        <a href={manifestUrl}>Manifest</a>
+      </div>
+      <div class="footer-meta">
+        <span>Unofficial. Not affiliated with Letterboxd or Jellyfin.</span>
+      </div>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(11,13,16,0.75);
+    backdrop-filter: saturate(140%) blur(10px);
+    -webkit-backdrop-filter: saturate(140%) blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .brand-group { display: inline-flex; align-items: center; gap: 12px; }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .brand:hover { text-decoration: none; }
+  .brand-name { font-size: 15px; }
+  .brand-by { font-size: 13px; color: var(--text-dim); font-weight: 400; }
+  .brand-author { color: var(--text-dim); border-bottom: 1px dotted currentColor; }
+  .brand-author:hover { color: var(--text); text-decoration: none; }
+  @media (max-width: 640px) { .brand-by { display: none; } }
+
+  .dots { display: inline-flex; align-items: center; gap: 4px; }
+  .dots .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  .dots-sm .dot { width: 10px; height: 10px; }
+  .dot-green { background: var(--lb-green); }
+  .dot-blue { background: var(--lb-blue); }
+  .dot-orange { background: var(--lb-orange); }
+
+  .nav-links { display: flex; gap: 22px; font-size: 14px; }
+  .nav-links a { color: var(--text-dim); }
+  .nav-links a:hover { color: var(--text); text-decoration: none; }
+  .nav-links a[aria-current="page"] { color: var(--text); }
+  @media (max-width: 640px) {
+    .nav-links a:nth-child(-n+2) { display: none; }
+  }
+
+  .releases-hero {
+    padding: 80px 0 56px;
+  }
+  @media (max-width: 900px) {
+    .releases-hero { padding: 56px 0 40px; }
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  .eyebrow-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--jf-purple);
+    box-shadow: 0 0 12px var(--jf-purple);
+  }
+
+  .accent {
+    background: linear-gradient(90deg, var(--lb-green), var(--lb-blue) 55%, var(--lb-orange));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .lede { font-size: 1.125rem; max-width: 640px; color: var(--text-dim); }
+
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+
+  .hero-meta {
+    display: flex;
+    gap: 48px;
+    margin-top: 48px;
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .meta-stat { display: flex; flex-direction: column; gap: 4px; }
+  .meta-num { font-size: 1.5rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+  .meta-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em; }
+
+  .releases-list { padding: 64px 0 96px; border-top: 1px solid var(--border); }
+
+  .release {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 48px;
+    padding: 40px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .release:last-child { border-bottom: 0; }
+  .release-latest {
+    background:
+      linear-gradient(180deg, rgba(0,224,84,0.04), transparent 60%);
+    margin: 0 -32px;
+    padding: 40px 32px;
+    border-radius: var(--radius-lg);
+  }
+
+  @media (max-width: 900px) {
+    .release { grid-template-columns: 1fr; gap: 16px; padding: 32px 0; }
+    .release-latest { margin: 0; padding: 32px 0; }
+  }
+
+  .release-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    top: 88px;
+    align-self: start;
+  }
+  @media (max-width: 900px) {
+    .release-meta { position: static; }
+  }
+
+  .version-row { display: inline-flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .version {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+  .version:hover { text-decoration: none; color: var(--lb-green); }
+  .version-v { color: var(--text-dim); font-weight: 500; margin-right: 1px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border: 1px solid;
+  }
+  .badge-latest {
+    color: var(--lb-green);
+    border-color: rgba(0,224,84,0.4);
+    background: rgba(0,224,84,0.08);
+  }
+
+  .release-date { font-size: 13px; color: var(--text-dim); }
+
+  .release-body { min-width: 0; }
+  .release-headline {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 0 12px;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .release-summary { color: var(--text-dim); margin: 0 0 24px; }
+  .release-fallback { color: var(--text-dim); margin: 0 0 24px; line-height: 1.7; }
+
+  .category { margin: 20px 0; }
+  .category-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .category-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .category-new .category-dot { background: var(--lb-green); box-shadow: 0 0 8px rgba(0,224,84,0.5); }
+  .category-improvements .category-dot { background: var(--lb-blue); box-shadow: 0 0 8px rgba(64,188,244,0.5); }
+  .category-fixes .category-dot { background: var(--lb-orange); box-shadow: 0 0 8px rgba(255,128,0,0.5); }
+  .category-breaking .category-dot { background: #ff5252; box-shadow: 0 0 8px rgba(255,82,82,0.5); }
+  .category-new .category-label { color: var(--lb-green); }
+  .category-improvements .category-label { color: var(--lb-blue); }
+  .category-fixes .category-label { color: var(--lb-orange); }
+  .category-breaking .category-label { color: #ff5252; }
+
+  .category-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .category-list li {
+    color: var(--text-dim);
+    line-height: 1.65;
+    padding-left: 20px;
+    position: relative;
+  }
+  .category-list li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.75em;
+    width: 8px;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .upgrade-notes {
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  .upgrade-notes strong { color: var(--text); }
+
+  .release-actions {
+    margin-top: 28px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .action-link {
+    color: var(--lb-green);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .action-link-muted { color: var(--text-dim); }
+  .action-link-muted:hover { color: var(--text); }
+
+  .site-footer { border-top: 1px solid var(--border); padding: 32px 0; }
+  .footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .footer-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 14px; }
+  .footer-links { display: flex; gap: 18px; font-size: 14px; }
+  .footer-links a { color: var(--text-dim); }
+  .footer-links a:hover { color: var(--text); text-decoration: none; }
+  .footer-meta { color: var(--text-dim); font-size: 12px; }
+</style>
