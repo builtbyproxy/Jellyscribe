@@ -6,3 +6,9 @@ obj/
 *.nupkg
 release/
 .gstack/
+
+# Local-only secrets for integration tests. The integration test suite reads
+# Letterboxd credentials from environment variables; never commit them.
+.env
+.env.local
+*.env.local
