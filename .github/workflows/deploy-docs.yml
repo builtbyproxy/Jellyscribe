@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'site/**'
+      - 'manifest.json'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 

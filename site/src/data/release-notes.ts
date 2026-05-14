@@ -10,6 +10,16 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.11.3',
+    headline: 'Plain-English error and docs when Cloudflare 403s with cookies already set',
+    highlights: {
+      improvements: [
+        "The TMDb-lookup 403 exception now names the three real causes (cf_clearance expired, often around 30 minutes; pinned to a different IP than the Jellyfin server; or rejected by Cloudflare's TLS fingerprinting) and points at the README, instead of suggesting raw cookies that the user has already pasted.",
+        "README has a new 'Still 403ing after pasting Raw Cookies and a matching User-Agent' subsection under 'Cloudflare issues' with a concrete fix per cause. Addresses the dead-end case reported in #34.",
+      ],
+    },
+  },
+  {
     version: '1.11.2',
     headline: 'Stop phantom rewatches on diary-imported films',
     highlights: {
