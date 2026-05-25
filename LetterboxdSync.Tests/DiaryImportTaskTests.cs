@@ -106,6 +106,22 @@ public class DiaryImportTaskTests : IDisposable
         Assert.False(LetterboxdSyncRunner.IsRunning);
     }
 
+    // Jellyfin 10.11.9 IUserManager.Users signature change (issue #46): a direct
+    // read throws MissingMethodException on 10.11.9+ because the plugin's binding
+    // is against the 10.11.0 IEnumerable<User> getter signature. The reflection
+    // shim swallows the throw and returns empty, so the scheduled task must
+    // complete the same way it does for a zero-user server.
+    [Fact]
+    public async Task ExecuteAsync_WhenUsersGetterThrows_CompletesWithoutCrash()
+    {
+        _userManager.Users.Returns(_ => throw new MissingMethodException(
+            "Method not found: 'System.Collections.Generic.IEnumerable`1<...User> IUserManager.get_Users()'."));
+
+        await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.False(LetterboxdSyncRunner.IsRunning);
+    }
+
     [Fact]
     public async Task ExecuteAsync_UserHasNoAccount_SkippedSilently()
     {

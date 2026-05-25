@@ -88,6 +88,34 @@ public class WatchlistSyncRunnerTests : IDisposable
         });
     }
 
+    // ----- Jellyfin 10.11.9 IUserManager.Users signature change (issue #46) -----
+    // The scheduled task entry point (RunForAllAsync) and the manual one
+    // (TryRunForUserAsync) must both survive _userManager.Users throwing
+    // MissingMethodException, because that's the production failure mode
+    // on 10.11.9+ when the plugin is compiled against the 10.11.0 SDK.
+
+    [Fact]
+    public async Task RunForAllAsync_WhenUsersGetterThrows_CompletesWithoutCrash()
+    {
+        _userManager.Users.Returns(_ => throw new MissingMethodException(
+            "Method not found: 'System.Collections.Generic.IEnumerable`1<...User> IUserManager.get_Users()'."));
+
+        // Exception must not propagate; scheduled task would otherwise fail with
+        // "Sync Letterboxd watchlist to playlist Failed after 0 minute(s)" in the log.
+        await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_WhenUsersGetterThrows_ReturnsFalse()
+    {
+        _userManager.Users.Returns(_ => throw new MissingMethodException("simulated 10.11.9 ABI break"));
+
+        var ok = await _runner.TryRunForUserAsync("ffffffffffffffffffffffffffffffff",
+            "manual", new Progress<double>(), CancellationToken.None);
+
+        Assert.False(ok);
+    }
+
     // ----- Pre-flight gates -----
 
     [Fact]

@@ -94,6 +94,36 @@ public class LetterboxdSyncRunnerTests : IDisposable
         });
     }
 
+    // ----- Jellyfin 10.11.9 IUserManager.Users signature change (issue #46) -----
+    // Pre-fix: a direct _userManager.Users read on 10.11.9+ throws
+    // MissingMethodException and crashes the scheduled task. Post-fix: the
+    // reflection shim (UserManagerExtensions.GetAllUsers) swallows the throw
+    // and returns empty, so the runner completes with zero pairs to process.
+
+    [Fact]
+    public async Task RunForAllAsync_WhenUsersGetterThrows_CompletesWithoutCrash()
+    {
+        _userManager.Users.Returns(_ => throw new MissingMethodException(
+            "Method not found: 'System.Collections.Generic.IEnumerable`1<...User> IUserManager.get_Users()'."));
+        var progress = new Progress<double>();
+
+        // The exception must not propagate out of the scheduled-task entry point.
+        await _runner.RunForAllAsync(progress, "scheduled", CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_WhenUsersGetterThrows_ReturnsFalse()
+    {
+        _userManager.Users.Returns(_ => throw new MissingMethodException("simulated 10.11.9 ABI break"));
+
+        var ok = await _runner.TryRunForUserAsync("ffffffffffffffffffffffffffffffff",
+            "manual", new Progress<double>(), CancellationToken.None);
+
+        // Empty user list ⇒ user not found ⇒ false. Same outcome as
+        // TryRunForUserAsync_UnknownUser below, but exercised via the throw path.
+        Assert.False(ok);
+    }
+
     // ----- TryRunForUserAsync: pre-flight gates -----
 
     [Fact]
