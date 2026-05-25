@@ -59,28 +59,25 @@ public class LetterboxdController : ControllerBase
     // defensive paths directly. See InternalsVisibleTo in the csproj.
     internal string? GetJellyfinUsername()
     {
-        // Defensive: every reported 500 on /Stats and /History (issue #46) collapsed
-        // into this method's frame. Without the exception type/message we cannot
-        // pin the root cause, but the read endpoints don't need a username to work
-        // (SyncHistory.GetStats/GetPage treat a null username as "no filter"), so
-        // failing closed to null is strictly better than 500ing the dashboard.
+        // Resolution goes through UserManagerExtensions.GetAllUsers (reflection-
+        // based) because Jellyfin 10.11.9 changed IUserManager.Users's return type
+        // and a direct binding throws MissingMethodException on that and later
+        // patches. See UserManagerExtensions and issue #46.
         try
         {
-            if (User is null || _userManager is null) return null;
-
+            if (User is null) return null;
             var userId = GetCurrentUserId();
             if (string.IsNullOrEmpty(userId)) return null;
 
-            // Resolve Jellyfin user ID to username for SyncHistory filtering.
             // SyncHistory stores the Jellyfin username (e.g. "lachlan"), not the Letterboxd username.
-            var users = _userManager.Users;
-            if (users is null) return null;
-
-            var user = users.FirstOrDefault(u => u.Id.ToString("N") == userId);
+            var user = _userManager.GetAllUsers().FirstOrDefault(u => u.Id.ToString("N") == userId);
             return user?.Username;
         }
         catch (Exception ex)
         {
+            // Fail closed: SyncHistory.GetStats/GetPage treat a null username as
+            // "no filter", so the dashboard degrades to unfiltered results rather
+            // than 500. The log line gives us the exception type for diagnostics.
             _logger.LogWarning(ex, "GetJellyfinUsername failed; returning null (history/stats will be unfiltered)");
             return null;
         }
@@ -654,7 +651,7 @@ public class LetterboxdController : ControllerBase
         if (!jellyfinRating.HasValue)
             return;
 
-        var user = _userManager.Users.FirstOrDefault(u => u.Id.ToString("N") == userId);
+        var user = _userManager.GetAllUsers().FirstOrDefault(u => u.Id.ToString("N") == userId);
         if (user == null)
             return;
 

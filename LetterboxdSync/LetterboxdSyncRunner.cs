@@ -56,7 +56,7 @@ public class LetterboxdSyncRunner
         {
             // Fan out across every (user, account) pair. Each account's sync is
             // independent so one failing or rate-limited account never blocks the others.
-            var pairs = _userManager.Users
+            var pairs = _userManager.GetAllUsers()
                 .SelectMany(u => Config.GetEnabledAccountsForUser(u.Id.ToString("N"))
                     .Select(a => (User: u, Account: a)))
                 .ToList();
@@ -100,7 +100,7 @@ public class LetterboxdSyncRunner
 
         try
         {
-            var user = _userManager.Users.FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
+            var user = _userManager.GetAllUsers().FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
             if (user == null)
             {
                 _logger.LogWarning("User {UserId} not found, cannot start sync", userJellyfinId);
