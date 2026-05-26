@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.13.3.0",
+        "changelog": "Maintenance release. Two preventative changes aimed at the next Jellyfin SDK ABI surprise. Dependabot now watches the `Jellyfin.Controller` and `Jellyfin.Model` packages and opens a PR the day a new patch ships, so any breaking ABI change is caught by CI on our timeline rather than via a user bug report (the v1.13.0 fix only existed because Jellyfin 10.11.9's silent removal of `IUserManager.Users` surfaced as bigrichwood's report). And the version-gate CI check now refuses a patch-only version bump when `targetAbi.txt` changes in the same PR, because moving the Jellyfin compatibility floor stops a cohort of users from being offered the next plugin update and that warrants at least a minor bump so the change shows up clearly in the release notes. No plugin behaviour changes.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.3/jellyfin-plugin-letterboxd-v1.13.3.zip",
+        "checksum": "e49de1880d92bd055f53e27ac4d6bb76",
+        "timestamp": "2026-05-26T05:01:58Z"
+      },
+      {
         "version": "1.13.2.0",
         "changelog": "Maintenance release. The manifest changelog field and the letterboxdsync.dev Releases page now match the v1.0–v1.12 single-paragraph user-facing prose style after v1.13.0 (rendered as a multi-paragraph incident report) and v1.13.1 (rendered as the raw conventional-commit subject line) drifted away from it. The release workflow now pulls the manifest changelog from a `## Release notes` section in the merged PR's body via the GitHub API, so the prose that lands in users' plugin catalogs is deliberate and reviewable. Backfills the two missing structured entries on the Releases page and rewrites the two stale manifest entries inline. No plugin behaviour changes.",
         "targetAbi": "10.11.9.0",
