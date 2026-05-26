@@ -1,0 +1,46 @@
+version: 2
+
+# Watch the Jellyfin SDK for ABI surprises (incident: 10.11.9 silently removed
+# IUserManager.Users, broke v1.12.0 on every 10.11.9+ server, only surfaced
+# via user reports). With this in place, Dependabot opens a PR the day a new
+# Jellyfin.Controller / Jellyfin.Model ships, CI runs the test suite against
+# the new ABI, and a human decides whether to take the bump.
+#
+# When merging a Dependabot PR: bump AssemblyVersion / FileVersion in the
+# same branch (push a follow-up commit to the Dependabot PR before merging,
+# or open your own PR that incorporates the bump). version-gate.yml will
+# refuse the merge otherwise.
+#
+# Scoped narrowly to Jellyfin.* for now; expand if other deps start causing
+# surprises. PR commit prefix is "build" so pr-title.yml accepts it.
+
+updates:
+  - package-ecosystem: nuget
+    directory: /LetterboxdSync
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 3
+    allow:
+      - dependency-name: "Jellyfin.*"
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - jellyfin-sdk
+
+  # Tests project: same allowlist, lower frequency. Test-only dep bumps don't
+  # ship to users, so weekly is plenty.
+  - package-ecosystem: nuget
+    directory: /LetterboxdSync.Tests
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    allow:
+      - dependency-name: "Jellyfin.*"
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+      - jellyfin-sdk

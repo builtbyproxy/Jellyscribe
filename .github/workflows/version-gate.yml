@@ -50,3 +50,22 @@ jobs:
           fi
 
           echo "Version bump OK: $MAIN_V -> $PR_V"
+
+          # If targetAbi.txt changed, require at least a minor bump. A bump
+          # in the Jellyfin compatibility floor is a meaningful change for
+          # users (older Jellyfin patches stop being offered the new plugin
+          # version), so it should not hide inside a patch release.
+          PR_ABI=$(cat targetAbi.txt 2>/dev/null | tr -d '[:space:]' || true)
+          MAIN_ABI=$(git show origin/main:targetAbi.txt 2>/dev/null | tr -d '[:space:]' || true)
+          if [ -n "$PR_ABI" ] && [ "$PR_ABI" != "$MAIN_ABI" ]; then
+            echo "targetAbi.txt changed: '$MAIN_ABI' -> '$PR_ABI'"
+            PR_MAJOR=$(echo "$PR_V" | cut -d. -f1)
+            PR_MINOR=$(echo "$PR_V" | cut -d. -f2)
+            MAIN_MAJOR=$(echo "$MAIN_V" | cut -d. -f1)
+            MAIN_MINOR=$(echo "$MAIN_V" | cut -d. -f2)
+            if [ "$PR_MAJOR" -eq "$MAIN_MAJOR" ] && [ "$PR_MINOR" -eq "$MAIN_MINOR" ]; then
+              echo "::error::targetAbi.txt changed ('$MAIN_ABI' -> '$PR_ABI') but version bump is patch-only ($MAIN_V -> $PR_V). Moving the Jellyfin compatibility floor is a meaningful release; bump at least the minor (e.g. ${PR_MAJOR}.$((PR_MINOR + 1)).0.0)."
+              exit 1
+            fi
+            echo "targetAbi shift gated by minor+ bump: OK"
+          fi

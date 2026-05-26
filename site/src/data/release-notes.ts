@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.13.3',
+    headline: 'Maintenance: Dependabot watches the Jellyfin SDK, version-gate links targetAbi to minor bumps',
+    summary:
+      'Two preventative measures aimed at the next ABI surprise. No plugin behaviour changes.',
+    highlights: {
+      improvements: [
+        "Dependabot now opens a PR the day Jellyfin ships a new Jellyfin.Controller / Jellyfin.Model patch, so the next 10.11.x ABI break is caught by CI on our timeline rather than via a user report (incident: v1.13.0 only existed because 10.11.9's silent IUserManager.Users removal surfaced as a bigrichwood bug report).",
+        'version-gate now refuses a patch-only bump when targetAbi.txt changes in the same PR. Moving the Jellyfin compatibility floor stops a cohort of users from being offered the next plugin update; that warrants at least a minor version bump so the change is visible in the release notes.',
+      ],
+    },
+  },
+  {
     version: '1.13.2',
     headline: 'Release notes pipeline: prose-style changelogs back, sourced from the PR body',
     summary:
