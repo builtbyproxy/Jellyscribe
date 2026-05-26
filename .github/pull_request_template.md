@@ -1,5 +1,22 @@
 <!-- Ticket link, e.g. Closes #123. If there isn't one, write "No linked issue." -->
 
+## Release notes
+
+<!--
+The user-facing prose for this release.
+
+Everything between this H2 and the next H2 lands verbatim in manifest.json's
+changelog field and as the GitHub Release body. Write one paragraph, present-
+tense, no internal jargon (no symbol names, no `MissingMethodException`, no
+"PR #50"). Past entries on https://letterboxdsync.dev/releases set the tone.
+
+Don't leave this empty. release.yml falls back to the PR title if the section
+is missing, which is almost never what end-users browsing their plugin catalog
+should see.
+-->
+
+(Replace with one paragraph describing what's in this release for users.)
+
 ## What's broken
 
 <!--

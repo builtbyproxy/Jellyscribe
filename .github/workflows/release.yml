@@ -69,14 +69,50 @@ jobs:
             exit 1
           fi
 
-      - name: Capture release body
+      - name: Extract release body from merged PR
         if: steps.check.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SQUASH_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          # HEAD is the squash-merge commit on main; subject is the PR title
-          # (Conventional Commits), body is whatever was included on merge.
-          git log -1 --format='%B' HEAD > /tmp/release-body.txt
+          set -e
+          # The squash-merge commit subject ends with " (#NN)" where NN is the
+          # PR number. Extract the PR number, fetch the PR body via gh CLI,
+          # and pull out the text between the "## Release notes" header and
+          # the next H2 (or EOF). That section is the user-facing prose that
+          # lands in manifest.json's changelog field and as the GitHub Release
+          # body. The pull_request_template.md primes every PR with the
+          # section so this is the path of least resistance.
+          SUBJECT=$(printf '%s' "$SQUASH_MESSAGE" | head -1)
+          PR=$(printf '%s' "$SUBJECT" | grep -oE '#[0-9]+' | tr -d '#' | tail -1 || true)
+          if [ -z "$PR" ]; then
+            echo "::warning::No PR number in commit subject; using subject as changelog."
+            printf '%s\n' "$SUBJECT" > /tmp/release-body.txt
+          else
+            echo "Fetching PR body for PR #$PR"
+            gh pr view "$PR" --json body --jq .body > /tmp/pr-body.txt
+            python3 << 'PY'
+          import os, re, sys
+          body = open('/tmp/pr-body.txt').read()
+          m = re.search(
+              r'^##\s+Release notes\s*$(.*?)(?=^##\s|\Z)',
+              body, re.MULTILINE | re.DOTALL)
+          notes = m.group(1).strip() if m else ''
+          with open('/tmp/release-body.txt', 'w') as f:
+              if notes:
+                  f.write(notes + '\n')
+              else:
+                  subj = os.environ.get('SQUASH_MESSAGE', '').split('\n', 1)[0]
+                  fallback = re.sub(r' \(#\d+\)$', '', subj)
+                  f.write(fallback + '\n')
+                  sys.stderr.write(
+                      "::warning::No '## Release notes' section in PR body; "
+                      "falling back to PR title. Add the section to keep the "
+                      "manifest changelog consistent with the older releases.\n")
+          PY
+          fi
           echo "--- release body preview ---"
-          head -c 500 /tmp/release-body.txt
+          head -c 800 /tmp/release-body.txt
           echo
 
       - name: Setup .NET
