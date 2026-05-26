@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.13.0.0",
+        "changelog": "Required update for Jellyfin 10.11.9 and newer.\n\nJellyfin 10.11.9 changed the `IUserManager` ABI (the `Users` property was removed, replaced by a `GetUsers()` method). The plugin was compiled against the 10.11.0 SDK, so on Jellyfin 10.11.9 and 10.11.10 every read of the user list throws `MissingMethodException`. Symptoms reported in #46: the in-dashboard Stats and History endpoints return 500, the \"Sync watched movies to Letterboxd\" scheduled task fails immediately, and \"Sync Letterboxd watchlist to playlist\" fails the same way.\n\nThis release recompiles the plugin against `Jellyfin.Controller` / `Jellyfin.Model` 10.11.10 and rewrites the seven `_userManager.Users` call sites against the new `GetUsers()` method. The plugin's behaviour is otherwise unchanged from v1.12.0.\n\nCompatibility: `targetAbi` is now `10.11.9.0`. Jellyfin's plugin catalog will only offer v1.13.0 to servers running Jellyfin 10.11.9 or newer. If you are on Jellyfin 10.11.0 through 10.11.8 you will continue to be served v1.12.0 by the catalog, which still works for you; upgrade Jellyfin if you want future plugin updates.\n\nFixes #46.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.0/jellyfin-plugin-letterboxd-v1.13.0.zip",
+        "checksum": "bdb9fc1d28d712542c063947fc37ae0b",
+        "timestamp": "2026-05-26T00:24:21Z"
+      },
+      {
         "version": "1.12.0.0",
         "changelog": "Multi-account support: one Jellyfin user can now link multiple Letterboxd accounts. Auto-sync (real-time on playback completion and scheduled) fans out across every enabled account, with per-account failures isolated. Manual /Sync, /SyncWatchlist, and /Review endpoints accept an optional letterboxdUsername selector and fan out by default when omitted. Diary import unions played-state across all accounts and merges ratings with the primary account winning conflicts (existing Jellyfin ratings are still preserved). Watchlist playlists are now per-account (default name: 'Letterboxd Watchlist ({letterboxdUsername})', overridable per account). New IsPrimary flag on each account, normalised on save (at most one primary per Jellyfin user). UI: the sidebar 'My Letterboxd' page now has feature parity with the admin page for per-account management (add, remove, test, configure every account belonging to your Jellyfin user without admin access). Review modal exposes a 'Post as' account selector when more than one account is enabled, defaulting to all accounts. Behaviour change: existing single-account users will see a new per-account watchlist playlist created on first sync after upgrade, the old 'Letterboxd Watchlist' playlist is left untouched.",
         "targetAbi": "10.11.0.0",
