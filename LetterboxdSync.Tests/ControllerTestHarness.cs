@@ -137,7 +137,7 @@ internal sealed class ControllerTestHarness : IDisposable
     }
 
     /// <summary>
-    /// Stubs IUserManager.Users with the supplied user list so the controller's
+    /// Stubs IUserManager.GetUsers() with the supplied user list so the controller's
     /// GetJellyfinUsername helper can resolve a user id back to a Username.
     /// </summary>
     public void SetUsers(params (string Id, string Name)[] users)
@@ -153,7 +153,7 @@ internal sealed class ControllerTestHarness : IDisposable
             u.Username.Returns(name);
             list.Add(u);
         }
-        UserManager.Users.Returns(list);
+        UserManager.GetUsers().Returns(list);
     }
 
     /// <summary>

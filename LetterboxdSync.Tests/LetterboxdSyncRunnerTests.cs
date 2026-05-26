@@ -99,7 +99,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     [Fact]
     public async Task TryRunForUserAsync_UnknownUser_ReturnsFalse()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
 
         var ok = await _runner.TryRunForUserAsync("ffffffffffffffffffffffffffffffff",
             "manual", new Progress<double>(), CancellationToken.None);
@@ -111,7 +111,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_NoEnabledAccount_ReturnsFalse()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, enabled: false);
 
         var ok = await _runner.TryRunForUserAsync(userId, "manual",
@@ -124,7 +124,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_EmptyLibrary_ReturnsTrue_NoAuthAttempt()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         // Empty library means SyncOneUserAsync exits before calling the factory.
@@ -149,7 +149,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_DateFilterEliminatesAll_NoAuthAttempt()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, dateFilter: true);
 
         // Library has a movie, but its LastPlayedDate is older than the filter cutoff.
@@ -182,7 +182,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_AuthFails_ReturnsTrueAndLogsError()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var movie = MakeMovie(1233413);
@@ -205,7 +205,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     [Fact]
     public async Task RunForAllAsync_NoUsers_DoesNothing()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
 
         await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
 
@@ -216,7 +216,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task RunForAllAsync_UserWithoutAccount_Skipped()
     {
         var (user, _) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
 
         await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
 
@@ -228,7 +228,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task RunForAllAsync_DisabledAccount_Skipped()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, enabled: false);
 
         await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
@@ -241,7 +241,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     {
         var (a, aId) = MakeUser("alice");
         var (b, bId) = MakeUser("bob");
-        _userManager.Users.Returns(new[] { a, b });
+        _userManager.GetUsers().Returns(new[] { a, b });
         AddAccount(aId);
         AddAccount(bId);
 
@@ -257,7 +257,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     [Fact]
     public async Task RunForAllAsync_ReportsProgress100AtCompletion()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
         var captured = new List<double>();
         var progress = new Progress<double>(v => captured.Add(v));
 
@@ -281,7 +281,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_SingleMovieDuplicate_RecordsSkipNotMark()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var movie = MakeMovie(1233413);
@@ -308,7 +308,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_SingleMovieFreshWatch_CallsMarkAsWatched()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var movie = MakeMovie(1233413);
@@ -336,7 +336,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_LookupThrows_RecordsFailureAndContinues()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var movie = MakeMovie(1233413);
@@ -359,7 +359,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_MovieWithoutTmdb_RecordsSkipped()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         // Movie with no TMDb id can't be matched on Letterboxd; runner records a
@@ -388,7 +388,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
         // and posts a phantom diary entry. With the fix, the diary-import marker
         // gates re-export until a real Jellyfin playback (LastPlayedDate set).
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var movie = MakeMovie(1233413);
@@ -432,7 +432,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
         // on Jellyfin after the import (LastPlayedDate set), the suppression must
         // release so the rewatch lands on Letterboxd.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var movie = MakeMovie(1233413);

@@ -93,7 +93,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     [Fact]
     public async Task TryRunForUserAsync_UnknownUser_ReturnsFalse()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
 
         var ok = await _runner.TryRunForUserAsync("ffffffffffffffffffffffffffffffff",
             "manual", new Progress<double>(), CancellationToken.None);
@@ -105,7 +105,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_NoAccount_ReturnsFalse()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
 
         var ok = await _runner.TryRunForUserAsync(userId, "manual",
             new Progress<double>(), CancellationToken.None);
@@ -117,7 +117,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_WatchlistDisabled_ReturnsFalse()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, watchlistSync: false);
 
         var ok = await _runner.TryRunForUserAsync(userId, "manual",
@@ -130,7 +130,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_AccountDisabled_ReturnsFalse()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, enabled: false, watchlistSync: true);
 
         var ok = await _runner.TryRunForUserAsync(userId, "manual",
@@ -145,7 +145,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_AuthFails_ReturnsTrue_NoLibraryQuery()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
@@ -164,7 +164,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_FetchWatchlistFails_ReturnsTrue()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var service = Substitute.For<ILetterboxdService>();
@@ -186,7 +186,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_EmptyWatchlist_NoPlaylistCreated()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var service = Substitute.For<ILetterboxdService>();
@@ -207,7 +207,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_WatchlistMatchesLibrary_CreatesPlaylist()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var service = Substitute.For<ILetterboxdService>();
@@ -234,7 +234,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     [Fact]
     public async Task RunForAllAsync_NoUsers_DoesNothing()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
 
         await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
 
@@ -245,7 +245,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task RunForAllAsync_UserWithoutWatchlistEnabled_Skipped()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, watchlistSync: false);
 
         await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
@@ -256,7 +256,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     [Fact]
     public async Task RunForAllAsync_ReportsProgressTo100()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
         var captured = new List<double>();
         var progress = new Progress<double>(v => captured.Add(v));
 
@@ -272,7 +272,7 @@ public class WatchlistSyncRunnerTests : IDisposable
         // Letterboxd returns watchlist film, but library has nothing matching → no
         // playlist creation. Exercises the unmatched-films logging branch.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var service = Substitute.For<ILetterboxdService>();
@@ -296,7 +296,7 @@ public class WatchlistSyncRunnerTests : IDisposable
         // the plugin level → CreateJellyseerrClient returns null, we don't try to
         // request. This exercises the IsConfigured guard path.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, autoRequest: true);
 
         var service = Substitute.For<ILetterboxdService>();
@@ -317,7 +317,7 @@ public class WatchlistSyncRunnerTests : IDisposable
         // Library has the watchlisted film and there's already a playlist named
         // "Letterboxd Watchlist" with the right items → no Create or update needed.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
 
         var service = Substitute.For<ILetterboxdService>();
@@ -360,7 +360,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_MirrorWatchlist_AddsMissingFilms()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, mirror: true);
 
         // Plugin-wide Jellyseerr config makes IsConfigured true.
@@ -438,7 +438,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_MirrorWatchlist_NoUserMapping_SkipsMirror()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, mirror: true);
 
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
@@ -481,7 +481,7 @@ public class WatchlistSyncRunnerTests : IDisposable
         // Defensive: if Letterboxd returns an empty list (e.g. watchlist deleted
         // or fetch errored to zero), don't mass-delete the Jellyseerr watchlist.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, mirror: true);
 
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";

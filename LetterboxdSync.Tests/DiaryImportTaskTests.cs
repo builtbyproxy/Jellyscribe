@@ -98,7 +98,7 @@ public class DiaryImportTaskTests : IDisposable
     [Fact]
     public async Task ExecuteAsync_NoUsers_DoesNothing()
     {
-        _userManager.Users.Returns(new List<User>());
+        _userManager.GetUsers().Returns(new List<User>());
 
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
@@ -110,7 +110,7 @@ public class DiaryImportTaskTests : IDisposable
     public async Task ExecuteAsync_UserHasNoAccount_SkippedSilently()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
 
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
@@ -122,7 +122,7 @@ public class DiaryImportTaskTests : IDisposable
     public async Task ExecuteAsync_AccountWithoutDiaryImportFlag_Skipped()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId,
@@ -140,7 +140,7 @@ public class DiaryImportTaskTests : IDisposable
     public async Task ExecuteAsync_AuthFails_SkipsUserButContinues()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId,
@@ -162,7 +162,7 @@ public class DiaryImportTaskTests : IDisposable
     public async Task ExecuteAsync_FetchDiaryFails_SkipsUser()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId,
@@ -185,7 +185,7 @@ public class DiaryImportTaskTests : IDisposable
     public async Task ExecuteAsync_EmptyDiary_DoesNotQueryLibrary()
     {
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId,
@@ -208,7 +208,7 @@ public class DiaryImportTaskTests : IDisposable
     {
         var (user, userId) = MakeUser("lachlan");
         // (already declared above)
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",
@@ -240,7 +240,7 @@ public class DiaryImportTaskTests : IDisposable
     {
         var (user, userId) = MakeUser("lachlan");
         // (already declared above)
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",
@@ -271,7 +271,7 @@ public class DiaryImportTaskTests : IDisposable
     {
         var (user, userId) = MakeUser("lachlan");
         // (already declared above)
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",
@@ -304,7 +304,7 @@ public class DiaryImportTaskTests : IDisposable
     {
         var (user, userId) = MakeUser("lachlan");
         // (already declared above)
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",
@@ -336,7 +336,7 @@ public class DiaryImportTaskTests : IDisposable
     {
         var (user, userId) = MakeUser("lachlan");
         // (already declared above)
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",
@@ -384,7 +384,7 @@ public class DiaryImportTaskTests : IDisposable
         // in SyncHistory so the LetterboxdSyncRunner can recognise it as imported and
         // refuse to re-export it back to Letterboxd as a phantom diary entry.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",
@@ -420,7 +420,7 @@ public class DiaryImportTaskTests : IDisposable
         // If the film was already marked played in Jellyfin (e.g. real playback or a prior
         // import), we don't write a fresh marker. Re-running the import is idempotent.
         var (user, userId) = MakeUser("lachlan");
-        _userManager.Users.Returns(new[] { user });
+        _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = userId, LetterboxdUsername = "u",

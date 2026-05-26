@@ -88,7 +88,7 @@ public class ScheduledTaskTests : IDisposable
         // We can't easily Substitute a concrete LetterboxdSyncRunner, so we use
         // a real one with empty users — the task just calls RunForAllAsync.
         var um = Substitute.For<IUserManager>();
-        um.Users.Returns(Array.Empty<Jellyfin.Database.Implementations.Entities.User>());
+        um.GetUsers().Returns(Array.Empty<Jellyfin.Database.Implementations.Entities.User>());
         var lm = Substitute.For<ILibraryManager>();
         var udm = Substitute.For<IUserDataManager>();
         var task = new SyncTask(MakeSyncRunner(um, lm, udm));
@@ -129,7 +129,7 @@ public class ScheduledTaskTests : IDisposable
     public async Task WatchlistSyncTask_ExecuteAsync_DelegatesToRunner()
     {
         var um = Substitute.For<IUserManager>();
-        um.Users.Returns(Array.Empty<Jellyfin.Database.Implementations.Entities.User>());
+        um.GetUsers().Returns(Array.Empty<Jellyfin.Database.Implementations.Entities.User>());
         var lm = Substitute.For<ILibraryManager>();
         var pm = Substitute.For<IPlaylistManager>();
         var task = new WatchlistSyncTask(MakeWatchlistRunner(um, lm, pm));
