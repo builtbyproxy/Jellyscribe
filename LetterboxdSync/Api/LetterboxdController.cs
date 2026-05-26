@@ -60,9 +60,9 @@ public class LetterboxdController : ControllerBase
         var userId = GetCurrentUserId();
         if (string.IsNullOrEmpty(userId)) return null;
 
-        // Resolve Jellyfin user ID to username for SyncHistory filtering
-        // SyncHistory stores the Jellyfin username (e.g. "lachlan"), not the Letterboxd username
-        var user = _userManager.Users.FirstOrDefault(u => u.Id.ToString("N") == userId);
+        // Resolve Jellyfin user ID to username for SyncHistory filtering.
+        // SyncHistory stores the Jellyfin username (e.g. "lachlan"), not the Letterboxd username.
+        var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId);
         return user?.Username;
     }
 
@@ -634,7 +634,7 @@ public class LetterboxdController : ControllerBase
         if (!jellyfinRating.HasValue)
             return;
 
-        var user = _userManager.Users.FirstOrDefault(u => u.Id.ToString("N") == userId);
+        var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId);
         if (user == null)
             return;
 

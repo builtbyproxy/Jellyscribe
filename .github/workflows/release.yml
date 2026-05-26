@@ -110,9 +110,19 @@ jobs:
           CS="${{ steps.cs.outputs.checksum }}"
           URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/jellyfin-plugin-letterboxd-${TAG}.zip"
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          # Inherit targetAbi from the most recent existing entry so bumping
-          # the Jellyfin ABI floor stays a deliberate edit to manifest.json.
-          ABI=$(jq -r '.[0].versions[0].targetAbi // "10.11.0.0"' manifest.json)
+          # targetAbi is the minimum Jellyfin version the plugin supports.
+          # Source of truth is targetAbi.txt in the repo root, bumped whenever
+          # the dev's Jellyfin.Controller / Jellyfin.Model PackageReference is
+          # raised to a version that introduced ABI changes the plugin now
+          # depends on (e.g. 10.11.9 turned IUserManager.Users into GetUsers).
+          # Fallback to the previous entry's value keeps re-runs idempotent
+          # for releases predating the file.
+          if [ -f targetAbi.txt ]; then
+            ABI=$(tr -d '[:space:]' < targetAbi.txt)
+          else
+            ABI=$(jq -r '.[0].versions[0].targetAbi // "10.11.0.0"' manifest.json)
+          fi
+          echo "targetAbi for this release: $ABI"
           CHANGELOG=$(cat /tmp/changelog.txt)
 
           if jq -e --arg v "$ASSEMBLY" '.[0].versions | any(.version == $v)' manifest.json > /dev/null; then

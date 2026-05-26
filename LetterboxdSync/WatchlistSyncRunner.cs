@@ -53,7 +53,7 @@ public class WatchlistSyncRunner
         {
             using var jellyseerr = CreateJellyseerrClient();
 
-            var pairs = _userManager.Users
+            var pairs = _userManager.GetUsers()
                 .SelectMany(u => Config.GetEnabledAccountsForUser(u.Id.ToString("N"))
                     .Where(a => a.EnableWatchlistSync)
                     .Select(a => (User: u, Account: a)))
@@ -101,7 +101,7 @@ public class WatchlistSyncRunner
 
         try
         {
-            var user = _userManager.Users.FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
+            var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
             if (user == null)
             {
                 _logger.LogWarning("User {UserId} not found, cannot start watchlist sync", userJellyfinId);

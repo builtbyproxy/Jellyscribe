@@ -61,6 +61,7 @@ Steps:
 1. Bump versions on `main`:
    - `Directory.Build.props`, set `<Version>` / `<AssemblyVersion>` / `<FileVersion>`
    - `LetterboxdSync/LetterboxdSync.csproj`, set `<AssemblyVersion>` / `<FileVersion>`
+   - If the `Jellyfin.Controller` / `Jellyfin.Model` PackageReference is bumped and the new SDK introduces an ABI break the plugin now depends on, also bump `targetAbi.txt` to the minimum Jellyfin version that has the new ABI. This is the floor Jellyfin's plugin catalog uses to gate the release: users below it stay on the previous plugin version. Past incident (v1.13.0): Jellyfin 10.11.9 removed `IUserManager.Users` (replaced by `GetUsers()`), so v1.13.0 bumped the SDK to 10.11.10 and `targetAbi.txt` to `10.11.9.0`.
 2. Write the user-facing changelog into `release-notes.md` (or pass `-m` inline). The release workflow uses this verbatim for both the GitHub release body and the `changelog` field in `manifest.json`.
 3. Create an **annotated** tag and push it:
 
