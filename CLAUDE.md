@@ -59,11 +59,13 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Letterb
 1. Open a PR. The PR must:
    - Have a **Conventional Commits** title (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`, `perf:`, `build:`, `style:`). Enforced by `pr-title.yml`.
    - **Bump `AssemblyVersion` / `FileVersion`** in both `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`. Patch bumps (e.g. `1.13.0.0` → `1.13.1.0`) are fine for docs / CI / refactor changes; every PR ships. Enforced by `version-gate.yml`.
+   - Fill in the **`## Release notes`** section in the PR body. `release.yml` extracts text between that heading and the next H2 and uses it verbatim as the manifest changelog field and the GitHub Release body. The PR template primes the section so it's the path of least resistance. Past entries on https://letterboxdsync.dev/releases set the tone: one paragraph, user-facing prose, no symbol names / internal jargon.
+   - Add a structured entry to **`site/src/data/release-notes.ts`** for the new version (headline + summary + categorised highlights). The site renders these on the Releases page above the raw manifest changelog. Same tone as the manifest changelog but split into `new` / `improvements` / `fixes` / `breaking` bullets.
    - If the `Jellyfin.Controller` / `Jellyfin.Model` PackageReference is bumped and the new SDK introduces an ABI break the plugin now depends on, also bump `targetAbi.txt` to the minimum Jellyfin version that has the new ABI. This is the floor Jellyfin's plugin catalog uses to gate the release.
 
-2. Merge with **Squash and merge**. The PR title becomes the squash commit subject, which becomes the GitHub Release body and the `changelog` field in `manifest.json`.
+2. Merge with **Squash and merge**. The squash subject is the PR title with `(#NN)` appended; the release workflow extracts the PR number from that and fetches the PR body via `gh pr view` (the squash commit body itself is not reliable across merge methods).
 
-3. `release.yml` fires automatically on the push to `main`. It reads `AssemblyVersion` from `Directory.Build.props`, checks no tag for that version exists yet (idempotent), builds + tests, packages, creates the GitHub Release, inserts the manifest entry using `targetAbi.txt`, and pushes the auto-commit + tag together.
+3. `release.yml` fires automatically on the push to `main`. It reads `AssemblyVersion` from `Directory.Build.props`, checks no tag for that version exists yet (idempotent), builds + tests, packages, creates the GitHub Release with the PR body's `## Release notes` section, inserts the manifest entry using `targetAbi.txt`, and pushes the auto-commit + tag together.
 
 4. `deploy-docs.yml` fires via `workflow_run` on Release completion, rebuilding letterboxdsync.dev with the fresh manifest. (The `GITHUB_TOKEN`-authenticated auto-commit can't fire push-based workflows, hence the explicit `workflow_run` trigger.)
 
@@ -77,6 +79,7 @@ The version-bump magnitude is the canonical signal, not a `!` in the PR title. G
 - **v1.13.0** was cut manually after the merge, which works but doesn't enforce that *every* merge ships. The version-gate now guarantees a release on every merge.
 - **v1.12.0 and v1.13.0 site staleness**: the manifest auto-commit didn't trigger Deploy site (GitHub token limitation). The `workflow_run` trigger now fires Deploy site after every Release.
 - **v1.13.0 SDK ABI break**: Jellyfin 10.11.9 removed `IUserManager.Users` (replaced by `GetUsers()`), so v1.13.0 bumped the SDK to 10.11.10 and `targetAbi.txt` to `10.11.9.0`. See `feedback_jellyfin_plugin_abi_break` in the user's memory.
+- **v1.13.0 and v1.13.1 changelog drift**: v1.13.0's manifest changelog was written as a multi-paragraph incident report (markdown headings, code backticks, "MissingMethodException", PR refs) instead of the single-paragraph user prose of v1.0–v1.12. v1.13.1's was even worse: just the squash-merge commit subject `ci: enforce version bump on every PR, auto-release on merge, rebuild site on release (#50)`, because the earlier pipeline read `git log -1 --format='%B' HEAD` and `gh pr merge --squash` only puts the PR title there. release.yml now extracts the changelog from a `## Release notes` section in the PR body (via `gh pr view`), with the PR template seeding the section. Backfilled in v1.13.2.
 
 ## OpenSpec
 

@@ -10,6 +10,47 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.13.2',
+    headline: 'Release notes pipeline: prose-style changelogs back, sourced from the PR body',
+    summary:
+      "Restores the v1.0–v1.12 manifest-changelog tone after v1.13.0 and v1.13.1 drifted into incident-report prose and a conventional-commit subject line respectively. Backfills both on letterboxdsync.dev's Releases page.",
+    highlights: {
+      improvements: [
+        "release.yml now fetches the merged PR's body via the GitHub API and extracts text between a '## Release notes' header and the next H2 as the manifest changelog. Falls back to the PR title only if the section is missing.",
+        "New .github/pull_request_template.md primes every PR with the section so it's the path of least resistance.",
+        'Backfills the manifest changelog for v1.13.0 and v1.13.1 to match the single-paragraph user-facing prose of v1.0 through v1.12.',
+        'Backfills letterboxdsync.dev with structured Release notes entries for v1.13.0 and v1.13.1 (previously missing).',
+      ],
+    },
+  },
+  {
+    version: '1.13.1',
+    headline: 'Maintenance: stronger release pipeline',
+    summary: 'No plugin behaviour changes.',
+    highlights: {
+      improvements: [
+        'Every PR now bumps the version (gated by a required CI check) and auto-ships on merge to main, replacing the manual `git tag` step.',
+        'PR titles must follow Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`, `perf:`, `build:`, `style:`). Enforced by CI on every PR.',
+        'letterboxdsync.dev rebuilds on every release via a `workflow_run` trigger, so the Releases page is never stale (the manifest auto-commit otherwise cannot fire push-based workflows).',
+      ],
+    },
+  },
+  {
+    version: '1.13.0',
+    headline: 'Required update for Jellyfin 10.11.9 and newer',
+    summary: 'Fixes #46. Restores sync on the new SDK ABI; no other plugin behaviour changes.',
+    highlights: {
+      fixes: [
+        'Jellyfin 10.11.9 removed the `Users` property from `IUserManager` and replaced it with a `GetUsers()` method. The plugin was compiled against the 10.11.0 SDK, so on Jellyfin 10.11.9 and 10.11.10 every read of the user list threw `MissingMethodException`: the dashboard Stats and History endpoints returned 500, and both scheduled sync tasks failed immediately. Recompiled against 10.11.10 and rewrote all seven `_userManager.Users` call sites to use `GetUsers()`.',
+      ],
+      breaking: [
+        '`targetAbi` is now `10.11.9.0`. The Jellyfin plugin catalog will only offer this release to servers running 10.11.9 or newer; Jellyfin 10.11.0 through 10.11.8 servers stay on v1.12.0 (which still works for them).',
+      ],
+    },
+    upgradeNotes:
+      'If your Jellyfin server is on 10.11.0 through 10.11.8 the catalog will not offer v1.13.0 by design; upgrade Jellyfin to 10.11.9 or newer to receive this and future plugin updates.',
+  },
+  {
     version: '1.12.0',
     headline: 'Multi-account support: one Jellyfin user, many Letterboxd accounts',
     summary: 'Shared TV logins (e.g. two people on the same family Jellyfin profile) can now each have their own Letterboxd diary, ratings, and watchlist.',
