@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.15.2.0",
+        "changelog": "Maintenance: fixes an intermittent CI-only test failure where a background sync spawned by one test could still hold the sync gate when the next test ran. No plugin behaviour changes.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.2/jellyfin-plugin-letterboxd-v1.15.2.zip",
+        "checksum": "d72aa42aa478a16fb2f8ba0b6d0c7ae8",
+        "timestamp": "2026-06-10T10:32:48Z"
+      },
+      {
         "version": "1.15.1.0",
         "changelog": "Documentation: the Releases page on letterboxdsync.dev now has structured highlights for v1.13.4 through v1.15.0. No plugin behaviour changes.",
         "targetAbi": "10.11.9.0",
