@@ -32,6 +32,11 @@ public class LetterboxdController : ControllerBase
     private readonly LetterboxdSyncRunner _syncRunner;
     private readonly WatchlistSyncRunner _watchlistRunner;
 
+    // Holds the most recent fire-and-forget sync task from StartSync/StartWatchlistSync.
+    // Production code never reads it; tests await it so a background sync can't outlive
+    // its test and hold SyncGate while the next test runs.
+    internal Task? LastBackgroundSync { get; private set; }
+
     public LetterboxdController(
         ILogger<LetterboxdController> logger,
         IUserManager userManager,
@@ -104,7 +109,7 @@ public class LetterboxdController : ControllerBase
         }
 
         // Fire and forget. Errors during the run are logged by the runner; the UI polls /Progress.
-        _ = Task.Run(async () =>
+        LastBackgroundSync = Task.Run(async () =>
         {
             try
             {
@@ -155,7 +160,7 @@ public class LetterboxdController : ControllerBase
                 return BadRequest(new { error = "No enabled accounts with watchlist sync turned on for your user" });
         }
 
-        _ = Task.Run(async () =>
+        LastBackgroundSync = Task.Run(async () =>
         {
             try
             {
