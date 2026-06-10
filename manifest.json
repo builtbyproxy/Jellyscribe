@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.14.0.0",
+        "changelog": "fix(sync): skip films with no LastPlayedDate and abandon films after 3 consecutive failures",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.14.0/jellyfin-plugin-letterboxd-v1.14.0.zip",
+        "checksum": "800c5e8927dac554544a57b1c66ce3c0",
+        "timestamp": "2026-06-10T05:30:47Z"
+      },
+      {
         "version": "1.13.4.0",
         "changelog": "test: expand plugin coverage to 89.8% line / 81.4% branch",
         "targetAbi": "10.11.9.0",
