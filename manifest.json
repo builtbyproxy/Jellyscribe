@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.15.0.0",
+        "changelog": "New opt-in per-account setting \"Also backfill requests for already-available watchlist films\": creates attributed Jellyseerr requests for watchlist films that entered the library without one, so \"who requested this?\" is always answerable. Off by default; existing behavior unchanged.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.0/jellyfin-plugin-letterboxd-v1.15.0.zip",
+        "checksum": "3fb3375850e34e4ae023f54467507f14",
+        "timestamp": "2026-06-10T06:27:56Z"
+      },
+      {
         "version": "1.14.1.0",
         "changelog": "build: Bump Jellyfin.Controller and Jellyfin.Model",
         "targetAbi": "10.11.9.0",
