@@ -10,6 +10,26 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.15.2',
+    headline: 'Maintenance: deterministic test teardown for manual-sync endpoints',
+    summary: 'No plugin behaviour changes.',
+    highlights: {
+      improvements: [
+        'Fixes an intermittent CI failure: the manual sync endpoints return 202 and run in the background, and a background sync from one test could still hold the shared sync gate when the next test ran, turning an expected 400 into a 409. The test harness now waits for the spawned sync to finish before the next test starts.',
+      ],
+    },
+  },
+  {
+    version: '1.15.1',
+    headline: 'Maintenance: letterboxdsync.dev release notes backfill',
+    summary: 'No plugin behaviour changes.',
+    highlights: {
+      improvements: [
+        'The Releases page on letterboxdsync.dev now has structured highlights for v1.13.4 through v1.15.0, which had shipped without entries.',
+      ],
+    },
+  },
+  {
     version: '1.15.0',
     headline: 'Jellyseerr request backfill for already-available watchlist films',
     summary:

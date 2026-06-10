@@ -175,6 +175,15 @@ internal sealed class ControllerTestHarness : IDisposable
 
     public void Dispose()
     {
+        // A 202-Accepted endpoint spawns a fire-and-forget sync that acquires the
+        // static SyncGate. Wait it out so it can't still hold (or be about to take)
+        // the gate when the next test runs and get a spurious 409 Conflict.
+        try
+        {
+            Controller.LastBackgroundSync?.Wait(TimeSpan.FromSeconds(30));
+        }
+        catch { /* the task logs its own errors; never fail teardown */ }
+
         try
         {
             if (Directory.Exists(TempDir))
