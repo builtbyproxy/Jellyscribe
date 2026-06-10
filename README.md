@@ -24,9 +24,10 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 - **TMDb matching** — films matched by TMDb ID, so foreign titles and special characters work
 - **Duplicate detection** — won't log the same film twice on the same day
 - **Rewatch detection** — real-time playback automatically marks rewatches
-- **Rating sync** — Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0)
+- **Rating sync, both ways** — Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0), and Letterboxd ratings seed your Jellyfin user ratings
 - **Favorites** — sync Jellyfin favorites as Letterboxd likes
 - **Watchlist sync** — import your Letterboxd watchlist as a Jellyfin playlist
+- **Jellyseerr integration** — auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Jellyseerr, and mirror your Letterboxd watchlist into Jellyseerr
 - **Diary import** — mark Jellyfin movies as played if they're in your Letterboxd diary
 - **Reviews** — write and post reviews to Letterboxd from the plugin dashboard
 - **Dashboard** — sync stats, activity history, and one-click sync from the plugin page
@@ -71,11 +72,17 @@ That's it. Watch a movie and check your Letterboxd diary.
 
 | Setting | Description |
 |---|---|
-| **Enabled** | Must be checked for this account to sync |
+| **Enabled** | Master switch for this account; nothing syncs while unchecked, saved settings are kept |
 | **Favorites as liked** | Marks films as "liked" on Letterboxd if favorited in Jellyfin |
 | **Recently played only** | Limits daily catch-up to films played in the last N days |
-| **Watchlist to playlist** | Creates a "Letterboxd Watchlist" playlist in Jellyfin from your Letterboxd watchlist |
+| **Primary account** | When one Jellyfin user links multiple Letterboxd accounts, the primary wins on rating-import conflicts and is preselected in the review modal |
+| **Watchlist to playlist** | Mirrors your Letterboxd watchlist into a Jellyfin playlist daily; each account gets its own playlist (name configurable) |
+| **Auto-request via Jellyseerr** | Watchlisted films missing from your library are requested in Jellyseerr, attributed to this user's Jellyseerr account (set the Jellyseerr URL and API key above the account list) |
+| **Backfill available requests** | Extends auto-request to films already in the library that have no request record, so films that arrived outside Jellyseerr still show a requester; never triggers re-downloads |
+| **Mirror into Jellyseerr watchlist** | Two-way mirror of your Letterboxd watchlist into your Jellyseerr user's own watchlist (movies only) |
 | **Import diary as played** | Marks Jellyfin movies as played if they appear in your Letterboxd diary |
+| **Skip previously synced** | Uses the plugin's local sync history to skip films already logged without hitting Letterboxd; recommended, especially on large libraries |
+| **Stop on failure** | Halts the run at the first failed film to avoid inflaming rate limits; the rest are picked up next run |
 | **Raw Cookies** | For Cloudflare bypass — see below |
 
 ### Dashboard
@@ -116,6 +123,7 @@ If you've ruled all three out and a single film keeps getting stuck on the TMDb 
 - Jellyfin 10.11+
 - A Letterboxd account
 - [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), required for the Letterboxd link to appear in the Jellyfin sidebar (everything else works without it)
+- Optional: a [Jellyseerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations
 
 ## Building from source
 
