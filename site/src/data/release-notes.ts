@@ -10,6 +10,50 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.15.0',
+    headline: 'Jellyseerr request backfill for already-available watchlist films',
+    summary:
+      'New opt-in per-account setting "Also backfill requests for already-available watchlist films" (off by default; requires Auto-request). Default behaviour is unchanged for everyone who leaves the box off.',
+    highlights: {
+      new: [
+        'Watchlist auto-request already creates attributed Jellyseerr requests for films missing from the library, but a film that is on a watchlist and entered the library through another path (manual Radarr add, an import list, or a deleted request) ended up Available with no request record, untraceable. With backfill on, the whole watchlist is considered and available-but-unrequested titles still get an attributed request, so "who requested this?" is always answerable.',
+        'Per-user dedup: a backfill request is skipped only when the title is blocklisted or this user already has a request for it. Verified against Jellyseerr 3.2.0 that a backfill request on available media succeeds without triggering a re-download.',
+      ],
+    },
+  },
+  {
+    version: '1.14.1',
+    headline: 'Maintenance: Jellyfin SDK 10.11.11',
+    summary: 'No plugin behaviour changes.',
+    highlights: {
+      improvements: [
+        'Jellyfin.Controller and Jellyfin.Model updated from 10.11.10 to 10.11.11 (a one-change upstream patch release; no ABI impact, targetAbi unchanged). First update delivered by the Dependabot watch introduced in v1.13.3.',
+      ],
+    },
+  },
+  {
+    version: '1.14.0',
+    headline: 'Stops phantom daily rewatches and endless retries of permanently-failing films',
+    summary:
+      'Fixes two scheduled-sync dedup bugs reported by a plugin user, one of which re-logged the same film to Letterboxd roughly every other day.',
+    highlights: {
+      fixes: [
+        'Films marked played on Jellyfin with no last-played date (marked watched manually, or before Jellyfin tracked dates) defaulted their viewing date to "today", which drifted every run and slipped past all duplicate checks, posting a phantom rewatch to the Letterboxd diary on a rolling basis. Scheduled sync now skips these films entirely until a real play date exists.',
+        'A film whose sync always fails (for example one Letterboxd cannot match) was re-queued at the head of the queue on every run, forever. Sync now abandons a film after 3 consecutive failures and a successful sync resets the counter.',
+      ],
+    },
+  },
+  {
+    version: '1.13.4',
+    headline: 'Maintenance: test coverage expansion',
+    summary: 'No plugin behaviour changes.',
+    highlights: {
+      improvements: [
+        'Test suite expanded to 89.8% line / 81.4% branch coverage, adding coverage for sync-gate contention, named-account targeting, skip-previously-synced filtering, stop-on-failure, and the local-history duplicate backstop.',
+      ],
+    },
+  },
+  {
     version: '1.13.3',
     headline: 'Maintenance: Dependabot watches the Jellyfin SDK, version-gate links targetAbi to minor bumps',
     summary:
