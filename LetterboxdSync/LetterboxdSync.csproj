@@ -22,7 +22,7 @@
          These MUST equal targetAbi.txt and only move together, deliberately, when we
          need a newer API - never via a routine dependency bump. CI enforces the match. -->
     <PackageReference Include="Jellyfin.Controller" Version="10.11.9" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.9" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.11" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
