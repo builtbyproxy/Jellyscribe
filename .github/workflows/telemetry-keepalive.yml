@@ -1,0 +1,65 @@
+name: Telemetry keep-alive
+
+# Two jobs in one daily cron:
+#  1. Touch the telemetry database so the Supabase free/pro project never idles out;
+#     a paused project does NOT auto-resume, so this run FAILS LOUDLY when the DB is
+#     unreachable — a pause is detected within a day, never discovered months later.
+#  2. Keep THIS workflow alive: GitHub disables cron workflows after 60 days without
+#     repo activity, so when activity is older than 50 days we commit a heartbeat
+#     timestamp to a dedicated non-main branch (never main, where the every-merge-ships
+#     release pipeline would cut a junk release or go red on the version gate).
+
+on:
+  schedule:
+    - cron: "17 16 * * *" # daily, 16:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch telemetry database (loud failure on unreachable)
+        env:
+          SUPABASE_URL: ${{ secrets.TELEMETRY_SUPABASE_URL }}
+          SUPABASE_READ_KEY: ${{ secrets.TELEMETRY_SUPABASE_READ_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_READ_KEY" ]; then
+            echo "::error::Telemetry secrets not configured (TELEMETRY_SUPABASE_URL / TELEMETRY_SUPABASE_READ_KEY)."
+            exit 1
+          fi
+          # One trivial read through PostgREST counts as database activity.
+          curl -fsS --max-time 30 \
+            "$SUPABASE_URL/rest/v1/pings?select=id&limit=1" \
+            -H "apikey: $SUPABASE_READ_KEY" \
+            -H "Authorization: Bearer $SUPABASE_READ_KEY" > /dev/null
+          echo "Database reachable."
+
+      - name: Checkout (full history for activity-age check)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Self-sustain against GitHub's 60-day cron auto-disable
+        run: |
+          set -euo pipefail
+          git fetch origin 'refs/heads/*:refs/remotes/origin/*' --quiet
+          NEWEST=$(git for-each-ref --sort=-committerdate --format='%(committerdate:unix)' refs/remotes/origin | head -1)
+          AGE_DAYS=$(( ( $(date +%s) - NEWEST ) / 86400 ))
+          echo "Most recent repo activity: ${AGE_DAYS} day(s) ago."
+          if [ "$AGE_DAYS" -lt 50 ]; then
+            echo "No heartbeat needed."
+            exit 0
+          fi
+          git config user.name "telemetry-keepalive"
+          git config user.email "actions@github.com"
+          git checkout -B telemetry-heartbeat origin/telemetry-heartbeat 2>/dev/null || git checkout --orphan telemetry-heartbeat
+          git rm -rf --cached . 2>/dev/null || true
+          date -u +%Y-%m-%dT%H:%M:%SZ > heartbeat.txt
+          git add heartbeat.txt
+          git commit -m "telemetry keepalive heartbeat"
+          git push origin telemetry-heartbeat
+          echo "Heartbeat committed to telemetry-heartbeat branch."

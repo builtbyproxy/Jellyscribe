@@ -1,0 +1,170 @@
+name: Telemetry canary
+
+# Daily deterministic regression check over the telemetry fleet — no AI in the loop,
+# so every filed issue is reproducible and arguable. Spec:
+# openspec/changes/add-opt-in-telemetry/specs/fleet-canary/spec.md
+#
+# Definitions (all tunable below):
+#   active     = instance with a weekly ping in the trailing 14 days
+#   eligible   = instance with >= 2 distinct weekly-ping weeks (Sybil gate:
+#                freshly minted UUIDs can't trip the canary)
+#   foreground = versions released in the trailing 14 days (from manifest.json),
+#                pooled — every merge ships, so single versions never accumulate n
+#   baseline   = everything older, pooled, excluding versions referenced by a
+#                still-open canary issue (an unfixed regression can't mask itself)
+#   cohort     = an instance belongs to the version of its most recent ping of ANY
+#                type (transition pings move an instance immediately)
+#   rate       = eligible instances with an error-transition ping in the trailing
+#                7 days / active eligible instances in the cohort
+# Issue gate: both cohorts n >= MIN_N and foreground rate >= RATE_MULTIPLE x baseline.
+# Dedup: open issue labelled telemetry-canary matching (suspect version, category).
+# The same run doubles as the row-growth abuse alarm.
+
+on:
+  schedule:
+    - cron: "47 17 * * *" # daily, 17:47 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  MIN_N: 10
+  RATE_MULTIPLE: 3
+  MAX_TOTAL_ROWS: 1000000
+  MAX_NEW_INSTANCES_PER_DAY: 500
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run checks
+        env:
+          DB_URL: ${{ secrets.TELEMETRY_SUPABASE_DB_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_URL" ]; then
+            echo "::error::TELEMETRY_SUPABASE_DB_URL secret not configured."
+            exit 1
+          fi
+
+          # ---- Growth alarm (abuse detection; loud failure, not an issue) ----
+          read -r TOTAL_ROWS NEW_INSTANCES <<< "$(psql "$DB_URL" -At -F' ' -c "
+            SELECT (SELECT count(*) FROM pings),
+                   (SELECT count(DISTINCT instance_id) FROM pings
+                    WHERE received_at > now() - interval '1 day'
+                      AND instance_id NOT IN (
+                        SELECT DISTINCT instance_id FROM pings
+                        WHERE received_at <= now() - interval '1 day'));")"
+          echo "Total rows: $TOTAL_ROWS; new instances last 24h: $NEW_INSTANCES"
+          if [ "$TOTAL_ROWS" -gt "$MAX_TOTAL_ROWS" ] || [ "$NEW_INSTANCES" -gt "$MAX_NEW_INSTANCES_PER_DAY" ]; then
+            echo "::error::Telemetry growth alarm: rows=$TOTAL_ROWS new_instances_24h=$NEW_INSTANCES exceed bounds."
+            exit 1
+          fi
+
+          # ---- Foreground versions: released in the trailing 14 days, per manifest ----
+          CUTOFF=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          FOREGROUND=$(jq -r --arg cutoff "$CUTOFF" \
+            '.[0].versions[] | select(.timestamp > $cutoff) | .version' manifest.json | sort -u)
+          if [ -z "$FOREGROUND" ]; then
+            echo "No versions released in the trailing 14 days; canary is structurally silent today."
+            exit 0
+          fi
+          FG_SQL=$(echo "$FOREGROUND" | sed "s/.*/'&'/" | paste -sd, -)
+          echo "Foreground versions: $(echo "$FOREGROUND" | paste -sd' ' -)"
+
+          # ---- Baseline exclusions: versions named in open canary issues ----
+          EXCLUDED=$(gh issue list --label telemetry-canary --state open --json title \
+            --jq '.[].title | capture("v(?<v>[0-9.]+)").v' 2>/dev/null | sort -u || true)
+          EX_SQL="''"
+          [ -n "$EXCLUDED" ] && EX_SQL=$(echo "$EXCLUDED" | sed "s/.*/'&'/" | paste -sd, -)
+          echo "Baseline exclusions: ${EXCLUDED:-none}"
+
+          # ---- Cohort rates per category ----
+          QUERY="
+            WITH eligible AS (
+              SELECT instance_id FROM pings WHERE ping_type='weekly'
+              GROUP BY instance_id HAVING count(DISTINCT week) >= 2
+            ),
+            cohort AS (
+              SELECT DISTINCT ON (p.instance_id) p.instance_id, p.plugin_version
+              FROM pings p JOIN eligible e USING (instance_id)
+              WHERE EXISTS (SELECT 1 FROM pings w WHERE w.instance_id = p.instance_id
+                            AND w.ping_type='weekly' AND w.received_at > now() - interval '14 days')
+              ORDER BY p.instance_id, p.received_at DESC
+            ),
+            grouped AS (
+              SELECT instance_id,
+                     CASE WHEN plugin_version IN ($FG_SQL) THEN 'fg'
+                          WHEN plugin_version IN ($EX_SQL) THEN 'excluded'
+                          ELSE 'bg' END AS pool
+              FROM cohort
+            ),
+            tr AS (
+              SELECT DISTINCT t.instance_id, cat.category,
+                     CASE WHEN t.plugin_version IN ($FG_SQL) THEN 'fg'
+                          WHEN t.plugin_version IN ($EX_SQL) THEN 'excluded'
+                          ELSE 'bg' END AS pool,
+                     t.plugin_version
+              FROM pings t
+              JOIN eligible e ON e.instance_id = t.instance_id,
+              LATERAL (VALUES ('cloudflare_403'),('auth_failure'),('tmdb_lookup'),('jellyseerr_error'),('other')) AS cat(category)
+              WHERE t.ping_type='error_transition'
+                AND t.received_at > now() - interval '7 days'
+                AND (t.errors->'state'->>cat.category)::boolean
+            )
+            SELECT json_build_object(
+              'fg_n',  (SELECT count(*) FROM grouped WHERE pool='fg'),
+              'bg_n',  (SELECT count(*) FROM grouped WHERE pool='bg'),
+              'categories', (
+                 SELECT coalesce(json_object_agg(category, json_build_object(
+                   'fg_hits', fg_hits, 'bg_hits', bg_hits, 'suspects', suspects)), '{}'::json)
+                 FROM (
+                   SELECT category,
+                          count(DISTINCT instance_id) FILTER (WHERE pool='fg') AS fg_hits,
+                          count(DISTINCT instance_id) FILTER (WHERE pool='bg') AS bg_hits,
+                          (SELECT json_object_agg(v, c) FROM (
+                             SELECT plugin_version v, count(DISTINCT instance_id) c FROM tr t2
+                             WHERE t2.category = tr.category AND t2.pool='fg'
+                             GROUP BY plugin_version ORDER BY c DESC) s) AS suspects
+                   FROM tr GROUP BY category) per_cat
+              ));"
+          RESULT=$(psql "$DB_URL" -At -c "$QUERY")
+          echo "$RESULT" | jq .
+
+          FG_N=$(echo "$RESULT" | jq '.fg_n')
+          BG_N=$(echo "$RESULT" | jq '.bg_n')
+          if [ "$FG_N" -lt "$MIN_N" ] || [ "$BG_N" -lt "$MIN_N" ]; then
+            echo "Below n gate (fg=$FG_N, bg=$BG_N, need >= $MIN_N each). Silence is correct behaviour."
+            exit 0
+          fi
+
+          # ---- Gate + file per category ----
+          for CAT in $(echo "$RESULT" | jq -r '.categories | keys[]'); do
+            FG_HITS=$(echo "$RESULT" | jq -r ".categories[\"$CAT\"].fg_hits")
+            BG_HITS=$(echo "$RESULT" | jq -r ".categories[\"$CAT\"].bg_hits")
+            # Rates with a half-instance floor on the baseline so a clean baseline
+            # doesn't divide by zero yet still requires a real foreground signal.
+            TRIPPED=$(jq -n --argjson fh "$FG_HITS" --argjson bh "$BG_HITS" \
+              --argjson fn "$FG_N" --argjson bn "$BG_N" --argjson mult "$RATE_MULTIPLE" \
+              '(($fh / $fn) / (([$bh, 0.5] | max) / $bn)) >= $mult and $fh >= 3')
+            [ "$TRIPPED" != "true" ] && continue
+
+            SUSPECT=$(echo "$RESULT" | jq -r ".categories[\"$CAT\"].suspects | to_entries | max_by(.value) | .key")
+            TITLE="Telemetry canary: $CAT regression in v$SUSPECT"
+
+            if gh issue list --label telemetry-canary --state open --search "\"$TITLE\" in:title" --json number --jq 'length' | grep -qv '^0$'; then
+              echo "Dedup: open issue already exists for ($SUSPECT, $CAT)."
+              continue
+            fi
+
+            EVIDENCE=$(echo "$RESULT" | jq -r ".categories[\"$CAT\"].suspects | to_entries | map(\"| \(.key) | \(.value) |\") | join(\"\n\")")
+            gh issue create --label telemetry-canary \
+              --title "$TITLE" \
+              --body "$(printf 'Automated fleet-canary finding. No AI involved; the query below reproduces it.\n\n**Category:** %s\n**Foreground** (versions released in trailing 14 days, pooled): %s of %s active eligible instances hit a %s error-transition in the trailing 7 days.\n**Baseline** (older versions pooled, exclusions applied): %s of %s.\n\n**Per-version evidence (foreground):**\n\n| version | instances |\n|---|---|\n%s\n\nThresholds: n >= %s both cohorts, rate multiple >= %sx.\nQuery: .github/workflows/telemetry-canary.yml\n' "$CAT" "$FG_HITS" "$FG_N" "$CAT" "$BG_HITS" "$BG_N" "$EVIDENCE" "$MIN_N" "$RATE_MULTIPLE")"
+            echo "Filed: $TITLE"
+          done
