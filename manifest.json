@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.15.3.0",
+        "changelog": "Adds the design spec for upcoming anonymous, opt-in usage telemetry (minimal bucketed payload, off by default, one-time prompt, full payload preview) and an automated regression canary. Spec only; no telemetry code or behaviour changes in this release.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.3/jellyfin-plugin-letterboxd-v1.15.3.zip",
+        "checksum": "b443bd5bf714c5a2c3aa3dbb6643c809",
+        "timestamp": "2026-06-11T05:16:06Z"
+      },
+      {
         "version": "1.15.2.0",
         "changelog": "Maintenance: fixes an intermittent CI-only test failure where a background sync spawned by one test could still hold the sync gate when the next test ran. No plugin behaviour changes.",
         "targetAbi": "10.11.9.0",
