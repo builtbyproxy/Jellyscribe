@@ -8,9 +8,17 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.15.3.0",
+        "changelog": "Adds the design spec for upcoming anonymous, opt-in usage telemetry (minimal bucketed payload, off by default, one-time prompt, full payload preview) and an automated regression canary. Spec only; no telemetry code or behaviour changes in this release.",
+        "targetAbi": "10.11.11.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.3/jellyfin-plugin-letterboxd-v1.15.3.zip",
+        "checksum": "b443bd5bf714c5a2c3aa3dbb6643c809",
+        "timestamp": "2026-06-11T05:16:06Z"
+      },
+      {
         "version": "1.15.2.0",
         "changelog": "Maintenance: fixes an intermittent CI-only test failure where a background sync spawned by one test could still hold the sync gate when the next test ran. No plugin behaviour changes.",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.11.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.2/jellyfin-plugin-letterboxd-v1.15.2.zip",
         "checksum": "d72aa42aa478a16fb2f8ba0b6d0c7ae8",
         "timestamp": "2026-06-10T10:32:48Z"
@@ -18,7 +26,7 @@
       {
         "version": "1.15.1.0",
         "changelog": "Documentation: the Releases page on letterboxdsync.dev now has structured highlights for v1.13.4 through v1.15.0. No plugin behaviour changes.",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.11.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.1/jellyfin-plugin-letterboxd-v1.15.1.zip",
         "checksum": "f9c1a9d047181473462a82f91fdef65b",
         "timestamp": "2026-06-10T06:35:09Z"
@@ -26,7 +34,7 @@
       {
         "version": "1.15.0.0",
         "changelog": "New opt-in per-account setting \"Also backfill requests for already-available watchlist films\": creates attributed Jellyseerr requests for watchlist films that entered the library without one, so \"who requested this?\" is always answerable. Off by default; existing behavior unchanged.",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.11.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.0/jellyfin-plugin-letterboxd-v1.15.0.zip",
         "checksum": "3fb3375850e34e4ae023f54467507f14",
         "timestamp": "2026-06-10T06:27:56Z"
@@ -34,7 +42,7 @@
       {
         "version": "1.14.1.0",
         "changelog": "build: Bump Jellyfin.Controller and Jellyfin.Model",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.11.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.14.1/jellyfin-plugin-letterboxd-v1.14.1.zip",
         "checksum": "558a2cdcaeb19d729f6875cb4f1a6d3a",
         "timestamp": "2026-06-10T06:21:04Z"
@@ -42,7 +50,7 @@
       {
         "version": "1.14.0.0",
         "changelog": "fix(sync): skip films with no LastPlayedDate and abandon films after 3 consecutive failures",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.14.0/jellyfin-plugin-letterboxd-v1.14.0.zip",
         "checksum": "800c5e8927dac554544a57b1c66ce3c0",
         "timestamp": "2026-06-10T05:30:47Z"
@@ -50,7 +58,7 @@
       {
         "version": "1.13.4.0",
         "changelog": "test: expand plugin coverage to 89.8% line / 81.4% branch",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.4/jellyfin-plugin-letterboxd-v1.13.4.zip",
         "checksum": "b8bd386fb87c909f247eeea53875570c",
         "timestamp": "2026-06-09T09:02:18Z"
@@ -58,15 +66,15 @@
       {
         "version": "1.13.3.0",
         "changelog": "Maintenance release. Two preventative changes aimed at the next Jellyfin SDK ABI surprise. Dependabot now watches the `Jellyfin.Controller` and `Jellyfin.Model` packages and opens a PR the day a new patch ships, so any breaking ABI change is caught by CI on our timeline rather than via a user bug report (the v1.13.0 fix only existed because Jellyfin 10.11.9's silent removal of `IUserManager.Users` surfaced as bigrichwood's report). And the version-gate CI check now refuses a patch-only version bump when `targetAbi.txt` changes in the same PR, because moving the Jellyfin compatibility floor stops a cohort of users from being offered the next plugin update and that warrants at least a minor bump so the change shows up clearly in the release notes. No plugin behaviour changes.",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.3/jellyfin-plugin-letterboxd-v1.13.3.zip",
         "checksum": "e49de1880d92bd055f53e27ac4d6bb76",
         "timestamp": "2026-05-26T05:01:58Z"
       },
       {
         "version": "1.13.2.0",
-        "changelog": "Maintenance release. The manifest changelog field and the letterboxdsync.dev Releases page now match the v1.0–v1.12 single-paragraph user-facing prose style after v1.13.0 (rendered as a multi-paragraph incident report) and v1.13.1 (rendered as the raw conventional-commit subject line) drifted away from it. The release workflow now pulls the manifest changelog from a `## Release notes` section in the merged PR's body via the GitHub API, so the prose that lands in users' plugin catalogs is deliberate and reviewable. Backfills the two missing structured entries on the Releases page and rewrites the two stale manifest entries inline. No plugin behaviour changes.",
-        "targetAbi": "10.11.9.0",
+        "changelog": "Maintenance release. The manifest changelog field and the letterboxdsync.dev Releases page now match the v1.0\u2013v1.12 single-paragraph user-facing prose style after v1.13.0 (rendered as a multi-paragraph incident report) and v1.13.1 (rendered as the raw conventional-commit subject line) drifted away from it. The release workflow now pulls the manifest changelog from a `## Release notes` section in the merged PR's body via the GitHub API, so the prose that lands in users' plugin catalogs is deliberate and reviewable. Backfills the two missing structured entries on the Releases page and rewrites the two stale manifest entries inline. No plugin behaviour changes.",
+        "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.2/jellyfin-plugin-letterboxd-v1.13.2.zip",
         "checksum": "0b849abb518ebbdf526a90fbd9d1abfd",
         "timestamp": "2026-05-26T01:52:34Z"
@@ -74,7 +82,7 @@
       {
         "version": "1.13.1.0",
         "changelog": "Maintenance release: stronger release pipeline. Every PR now bumps the version (gated by a required CI check) and auto-ships on merge to main, PR titles must follow Conventional Commits, and letterboxdsync.dev rebuilds on every release. No plugin behaviour changes. Past incident behind this work: v1.13.0 was cut manually after merge and the site Releases page was stale through both v1.12.0 and v1.13.0 because the manifest auto-commit could not trigger Deploy site.",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.1/jellyfin-plugin-letterboxd-v1.13.1.zip",
         "checksum": "34e7334045954fa558364fd11be5b73e",
         "timestamp": "2026-05-26T00:53:08Z"
@@ -82,7 +90,7 @@
       {
         "version": "1.13.0.0",
         "changelog": "Required update for Jellyfin 10.11.9 and newer. Jellyfin 10.11.9 removed the Users property from IUserManager and replaced it with a GetUsers() method, so the plugin (compiled against the 10.11.0 SDK) threw MissingMethodException on every user-list read on 10.11.9 and 10.11.10. Symptoms before this fix: the dashboard Stats and History endpoints returned 500, the Sync watched movies to Letterboxd scheduled task failed immediately, and Sync Letterboxd watchlist to playlist failed the same way. Plugin behaviour is otherwise unchanged from v1.12.0. targetAbi is now 10.11.9.0, so Jellyfin 10.11.0 through 10.11.8 servers stay on v1.12.0 via the catalog gate; upgrade Jellyfin to 10.11.9 or newer to receive future plugin updates. Fixes #46.",
-        "targetAbi": "10.11.9.0",
+        "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.0/jellyfin-plugin-letterboxd-v1.13.0.zip",
         "checksum": "bdb9fc1d28d712542c063947fc37ae0b",
         "timestamp": "2026-05-26T00:24:21Z"
