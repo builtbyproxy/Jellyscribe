@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <AssemblyVersion>1.15.3.0</AssemblyVersion>
-    <FileVersion>1.15.3.0</FileVersion>
+    <AssemblyVersion>1.15.4.0</AssemblyVersion>
+    <FileVersion>1.15.4.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -16,8 +16,13 @@
 
   <ItemGroup>
     <PackageReference Include="HtmlAgilityPack" Version="1.6.11" />
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.11" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.11" />
+    <!-- FLOOR POLICY: Jellyfin assemblies carry full per-patch AssemblyVersions, so the
+         SDK version we compile against IS the minimum Jellyfin a release can load on
+         (strict binding; proven live on 10.11.10 with a 10.11.11-built DLL, issue #63).
+         These MUST equal targetAbi.txt and only move together, deliberately, when we
+         need a newer API - never via a routine dependency bump. CI enforces the match. -->
+    <PackageReference Include="Jellyfin.Controller" Version="10.11.9" />
+    <PackageReference Include="Jellyfin.Model" Version="10.11.9" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

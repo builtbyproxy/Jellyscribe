@@ -10,6 +10,20 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.15.4',
+    headline: 'Required update for Jellyfin 10.11.9 and 10.11.10 servers',
+    summary:
+      'Fixes releases v1.14.1 through v1.15.3 failing to load on Jellyfin 10.11.9/10.11.10 (the plugin was compiled against a newer Jellyfin SDK than those servers ship). If your plugin recently showed as disabled or "malfunctioned", update to this version. No feature changes.',
+    highlights: {
+      fixes: [
+        'Jellyfin assemblies carry full per-patch versions, so a plugin compiled against the 10.11.11 SDK silently fails to load on 10.11.10 and older, while the catalog still offered those releases to 10.11.9+ servers. This release is compiled against the 10.11.9 SDK, matching the advertised minimum for the first time, and the catalog metadata for the affected versions has been corrected.',
+        'New build policy, enforced by CI: the plugin is always compiled against the oldest supported Jellyfin SDK, and the minimum only rises deliberately when a newer Jellyfin API is genuinely needed, never via a routine dependency update.',
+      ],
+    },
+    upgradeNotes:
+      'If the plugin is currently disabled on your server: update to v1.15.4 in the catalog (or reinstall), then restart Jellyfin.',
+  },
+  {
     version: '1.15.3',
     headline: 'Maintenance: telemetry design spec',
     summary: 'No plugin behaviour changes.',
