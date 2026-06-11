@@ -69,3 +69,22 @@ jobs:
             fi
             echo "targetAbi shift gated by minor+ bump: OK"
           fi
+
+          # FLOOR POLICY (issue #63): Jellyfin assemblies carry full per-patch
+          # AssemblyVersions, so the SDK package version we compile against IS
+          # the minimum Jellyfin a release can load on, regardless of what
+          # targetAbi claims. The two must therefore always be equal — an SDK
+          # bump without a matching targetAbi raise ships releases that fail to
+          # load on servers the catalog still offers them to.
+          SDK_V=$(grep -oE '<PackageReference Include="Jellyfin.Controller" Version="[^"]+"' LetterboxdSync/LetterboxdSync.csproj | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          SDK_MODEL_V=$(grep -oE '<PackageReference Include="Jellyfin.Model" Version="[^"]+"' LetterboxdSync/LetterboxdSync.csproj | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          ABI_PREFIX=$(echo "$PR_ABI" | sed 's/\.0$//')
+          if [ "$SDK_V" != "$SDK_MODEL_V" ]; then
+            echo "::error::Jellyfin.Controller ($SDK_V) and Jellyfin.Model ($SDK_MODEL_V) versions differ. Pin them together."
+            exit 1
+          fi
+          if [ "$SDK_V" != "$ABI_PREFIX" ]; then
+            echo "::error::Jellyfin SDK version ($SDK_V) does not match targetAbi.txt ($PR_ABI). The SDK we build against is the real minimum Jellyfin version (strict assembly binding), so these must move together: either pin the SDK back to $ABI_PREFIX, or deliberately raise targetAbi.txt to $SDK_V.0 with a minor version bump."
+            exit 1
+          fi
+          echo "SDK floor matches targetAbi: $SDK_V == $PR_ABI"

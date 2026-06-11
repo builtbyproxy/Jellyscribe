@@ -6,10 +6,15 @@ version: 2
 # Jellyfin.Controller / Jellyfin.Model ships, CI runs the test suite against
 # the new ABI, and a human decides whether to take the bump.
 #
-# When merging a Dependabot PR: bump AssemblyVersion / FileVersion in the
-# same branch (push a follow-up commit to the Dependabot PR before merging,
-# or open your own PR that incorporates the bump). version-gate.yml will
-# refuse the merge otherwise.
+# FLOOR POLICY (issue #63): these PRs are a SIGNAL, not something to merge
+# casually. Jellyfin assemblies carry full per-patch AssemblyVersions, so the
+# SDK version we build against is the real minimum Jellyfin a release loads
+# on. Merging an SDK bump = raising the floor = excluding users on older
+# Jellyfin. Only take a bump when we actually need the new API, and raise
+# targetAbi.txt + minor version in the same PR. version-gate.yml refuses
+# any PR where the SDK version != targetAbi.txt, and any targetAbi change
+# without a minor bump, and any PR without a version bump at all. Let the
+# Dependabot PR sit open as a green/red compile signal otherwise.
 #
 # Scoped narrowly to Jellyfin.* for now; expand if other deps start causing
 # surprises. PR commit prefix is "build" so pr-title.yml accepts it.
