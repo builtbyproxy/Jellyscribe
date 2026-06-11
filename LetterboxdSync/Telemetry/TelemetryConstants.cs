@@ -13,7 +13,7 @@ internal static class TelemetryConstants
     /// <summary>Current payload schema version; the ingest Worker rejects unknown versions.</summary>
     public const int SchemaVersion = 1;
 
-    public static string IngestUrl = "https://PENDING-WORKER-SUBDOMAIN.workers.dev";
+    public static string IngestUrl = "https://lbsync-telemetry.lachlanbyoung.workers.dev";
 
-    public static string IngestKey = "PENDING-INGEST-KEY";
+    public static string IngestKey = "81eb48923c912d49ef6f1cd331c0cc8ced6abd46cf1ae96d";
 }
