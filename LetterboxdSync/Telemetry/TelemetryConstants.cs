@@ -1,18 +1,19 @@
 namespace LetterboxdSync;
 
 /// <summary>
-/// Telemetry backend endpoints and the publishable ingest key.
-/// The key is the Supabase anon key: publishable by design (like a Plausible domain),
-/// RLS denies it all direct table access, and /ingest is the sole write path. Its
-/// compromise is bounded to junk rows — never reads, never privacy.
+/// Telemetry backend endpoint and the publishable ingest key.
+/// The backend is a Cloudflare Worker + D1 (see worker/ in the repo); the database is
+/// reachable only through the Worker. The key is publishable by design (like a
+/// Plausible domain): it stops drive-by scanner POSTs, and its extraction from plugin
+/// source is bounded to junk rows — never reads, never privacy.
 /// Mutable (not const) so tests can point the sender at a fake.
 /// </summary>
 internal static class TelemetryConstants
 {
-    /// <summary>Current payload schema version; the ingest function rejects unknown versions.</summary>
+    /// <summary>Current payload schema version; the ingest Worker rejects unknown versions.</summary>
     public const int SchemaVersion = 1;
 
-    public static string IngestUrl = "https://PENDING-PROJECT-REF.supabase.co/functions/v1/ingest";
+    public static string IngestUrl = "https://PENDING-WORKER-SUBDOMAIN.workers.dev";
 
-    public static string AnonKey = "PENDING-ANON-KEY";
+    public static string IngestKey = "PENDING-INGEST-KEY";
 }

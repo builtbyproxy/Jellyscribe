@@ -337,8 +337,7 @@ internal static class TelemetryService
 
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var req = new HttpRequestMessage(HttpMethod.Post, TelemetryConstants.IngestUrl);
-            req.Headers.TryAddWithoutValidation("apikey", TelemetryConstants.AnonKey);
-            req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {TelemetryConstants.AnonKey}");
+            req.Headers.TryAddWithoutValidation("x-lbsync-key", TelemetryConstants.IngestKey);
             req.Content = content;
             using var res = await _http.SendAsync(req).ConfigureAwait(false);
             return res.IsSuccessStatusCode;

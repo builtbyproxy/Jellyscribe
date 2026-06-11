@@ -1,10 +1,10 @@
-## 1. Backend (no plugin release)
+## 1. Backend — Cloudflare Workers + D1 (no plugin release; REVISED from Supabase, see design.md Decision 1)
 
-- [ ] 1.1 Create the Supabase project (or reuse the existing org) and apply the `pings` migration: columns per spec, unique (instance_id, week) where ping_type='weekly', `latest_per_instance` view, RLS deny-all for anon
-- [x] 1.2 Implement the `/ingest` edge function: schema_version + shape validation, 2 KB cap, server-computed UTC `week`, weekly upsert with counter-merging ON CONFLICT, error-transition insert with per-instance daily cap (204 on hit), transient per-IP + global rate limits, service-role write, IP never persisted
-- [ ] 1.3 curl-test the full matrix: valid weekly, duplicate same-week (verify merge), valid transition, capped transition (verify 204), oversized payload, malformed payload, direct table access with anon key (verify RLS denial)
-- [ ] 1.4 Add `.github/workflows/telemetry-keepalive.yml`: daily SELECT, loud failure on unreachable DB, heartbeat commit to `telemetry-heartbeat` branch when repo activity > 50 days old
-- [ ] 1.5 Add the Supabase read key to repo secrets; verify a Supabase MCP query returns the curl-test rows
+- [x] 1.1 Check worker/ into the repo: wrangler.toml (D1 binding), schema.sql (pings table, partial unique weekly index, latest_per_instance view)
+- [x] 1.2 Implement the ingest Worker: key check, schema_version + shape validation, 2 KB cap, server-computed UTC `week`, weekly counter-merging upsert, error-transition insert with per-instance daily cap (204 on hit), transient per-IP + global rate limits, IP never persisted
+- [ ] 1.3 Provision: create D1 database, apply schema.sql, set INGEST_KEY secret, deploy Worker, fill TelemetryConstants URL/key
+- [ ] 1.4 curl-test the full matrix: valid weekly, duplicate same-week (verify merge), valid transition, capped transition (verify 204), oversized payload, malformed payload, missing/bad key (verify 401)
+- [ ] 1.5 Add TELEMETRY_CF_API_TOKEN + TELEMETRY_CF_ACCOUNT_ID repo secrets; verify a wrangler d1 query returns the curl-test rows
 
 ## 2. Plugin release 1 — the pipe (feat: anonymous opt-in telemetry)
 
@@ -27,7 +27,7 @@
 
 ## 4. Canary (no plugin release)
 
-- [x] 4.1 Add `.github/workflows/telemetry-canary.yml`: daily + manual dispatch, SQL checks implementing the cohort definitions (14-day foreground pool, baseline exclusions, any-ping cohort assignment, transition-ping rates), Sybil gate (≥2 weeks history), issue gates (n ≥ 10 both cohorts, ≥3x multiple)
+- [x] 4.1 Add `.github/workflows/telemetry-canary.yml`: daily + manual dispatch, D1 SQL checks implementing the cohort definitions (14-day foreground pool, baseline exclusions, any-ping cohort assignment, transition-ping rates), Sybil gate (≥2 weeks history), issue gates (n ≥ 10 both cohorts, ≥3x multiple), cron self-heartbeat
 - [x] 4.2 Issue template with error category, per-version evidence table, window, and the exact query; dedup on (suspect version, error_category) against open issues
 - [x] 4.3 Row-growth alarm in the same daily query (total rows + new instances outside expected bounds → red run)
 - [ ] 4.4 Dry-run against synthetic data: healthy fleet (silent), real regression (files once, not daily), minted-UUID flood (silent)
