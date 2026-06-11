@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.15.4.0",
+        "changelog": "Fixes the plugin failing to load (showing as disabled) on Jellyfin 10.11.9 and 10.11.10 for versions v1.14.1 through v1.15.3: those releases were compiled against a newer Jellyfin SDK than the advertised minimum. The plugin is now always compiled against the oldest supported Jellyfin SDK, a policy enforced by CI, so the advertised minimum version is the real one. If your plugin recently stopped working, update to this version and restart Jellyfin. No feature changes.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.4/jellyfin-plugin-letterboxd-v1.15.4.zip",
+        "checksum": "e4afef561c03b4786b50c7617f876f26",
+        "timestamp": "2026-06-11T10:28:19Z"
+      },
+      {
         "version": "1.15.3.0",
         "changelog": "Adds the design spec for upcoming anonymous, opt-in usage telemetry (minimal bucketed payload, off by default, one-time prompt, full payload preview) and an automated regression canary. Spec only; no telemetry code or behaviour changes in this release.",
         "targetAbi": "10.11.11.0",
@@ -73,7 +81,7 @@
       },
       {
         "version": "1.13.2.0",
-        "changelog": "Maintenance release. The manifest changelog field and the letterboxdsync.dev Releases page now match the v1.0\u2013v1.12 single-paragraph user-facing prose style after v1.13.0 (rendered as a multi-paragraph incident report) and v1.13.1 (rendered as the raw conventional-commit subject line) drifted away from it. The release workflow now pulls the manifest changelog from a `## Release notes` section in the merged PR's body via the GitHub API, so the prose that lands in users' plugin catalogs is deliberate and reviewable. Backfills the two missing structured entries on the Releases page and rewrites the two stale manifest entries inline. No plugin behaviour changes.",
+        "changelog": "Maintenance release. The manifest changelog field and the letterboxdsync.dev Releases page now match the v1.0–v1.12 single-paragraph user-facing prose style after v1.13.0 (rendered as a multi-paragraph incident report) and v1.13.1 (rendered as the raw conventional-commit subject line) drifted away from it. The release workflow now pulls the manifest changelog from a `## Release notes` section in the merged PR's body via the GitHub API, so the prose that lands in users' plugin catalogs is deliberate and reviewable. Backfills the two missing structured entries on the Releases page and rewrites the two stale manifest entries inline. No plugin behaviour changes.",
         "targetAbi": "10.11.10.0",
         "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.2/jellyfin-plugin-letterboxd-v1.13.2.zip",
         "checksum": "0b849abb518ebbdf526a90fbd9d1abfd",
