@@ -348,6 +348,50 @@ internal static class TelemetryService
         }
     }
 
+    /// <summary>Test seam: replaces the log-bundle send. Args: (url, jsonBody) -> ref code or null.</summary>
+    internal static Func<string, string, Task<string?>>? LogSenderOverride { get; set; }
+
+    /// <summary>
+    /// Uploads a user-initiated diagnostic bundle to the backend's /logs endpoint and
+    /// returns the reference code, or null on failure. Builds the JSON here so the
+    /// instance id, telemetry snapshot, and log lines are assembled in one place.
+    /// </summary>
+    public static async Task<string?> SendLogBundleAsync(
+        string instanceId, string pluginVersion, string telemetrySnapshotJson, string? note, List<string> logLines)
+    {
+        try
+        {
+            var bundle = new
+            {
+                instance_id = instanceId,
+                plugin_version = pluginVersion,
+                jellyfin_version = JellyfinVersion ?? "unknown",
+                telemetry = JsonSerializer.Deserialize<JsonElement>(telemetrySnapshotJson),
+                note,
+                log_lines = logLines
+            };
+            var json = JsonSerializer.Serialize(bundle);
+            var url = TelemetryConstants.IngestUrl.TrimEnd('/') + "/logs";
+
+            if (LogSenderOverride != null)
+                return await LogSenderOverride(url, json).ConfigureAwait(false);
+
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            req.Headers.TryAddWithoutValidation("x-lbsync-key", TelemetryConstants.IngestKey);
+            req.Content = content;
+            using var res = await _http.SendAsync(req).ConfigureAwait(false);
+            if (!res.IsSuccessStatusCode) return null;
+            var body = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.TryGetProperty("ref_code", out var rc) ? rc.GetString() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static void SaveIfDueLocked()
     {
         if (UtcNow - _lastSaveUtc >= TimeSpan.FromSeconds(30)) SaveLocked();
@@ -367,6 +411,7 @@ internal static class TelemetryService
     internal static void ResetForTesting()
     {
         SenderOverride = null;
+        LogSenderOverride = null;
         ClockOverride = null;
         JellyfinVersion = null;
         _lastSaveUtc = DateTime.MinValue;

@@ -10,6 +10,19 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.17.0',
+    headline: 'Send logs to the developer in one click',
+    summary:
+      'A new "Send logs to developer" button on the Logs tab packages your recent plugin logs and uploads them for support, giving you a short reference code to quote in a bug report. Explicit and opt-in per use, with a clear heads-up that logs (unlike telemetry) are not anonymous.',
+    highlights: {
+      new: [
+        'New "Send logs to developer" button on the Logs tab. It bundles the recent Letterboxd Sync log lines already shown there (passwords, cookies, and tokens are never logged) plus an anonymous telemetry snapshot, and returns a reference code like LBX-7Q2F9K to quote when you open a bug report.',
+        'A confirmation step makes the trade-off explicit: logs can contain your Letterboxd username or film titles and are linked to your telemetry ID, so nothing is sent until you confirm. You can add a short note describing what went wrong, and preview exactly what is sent. Works whether or not anonymous telemetry is enabled.',
+        'Uploaded bundles are stored privately and auto-deleted after 90 days.',
+      ],
+    },
+  },
+  {
     version: '1.16.0',
     headline: 'Anonymous opt-in telemetry',
     summary:

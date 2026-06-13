@@ -608,21 +608,35 @@ public class LetterboxdController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult GetLogs([FromQuery] int maxLines = 500)
     {
+        var (all, source, error) = ReadRecentLogLines();
+        if (error != null)
+            return Ok(new { lines = Array.Empty<string>(), source = (string?)null, error });
+
+        var trimmed = all.Count > maxLines ? all.GetRange(all.Count - maxLines, maxLines) : all;
+        return Ok(new { lines = trimmed, totalMatches = all.Count, returned = trimmed.Count, source });
+    }
+
+    /// <summary>
+    /// Reads ALL recent LetterboxdSync-tagged lines from Jellyfin's two newest main
+    /// log files (covering a just-rolled-over file), untrimmed. Shared by the Logs tab
+    /// and the "Send logs to developer" bundle; each caller caps as it sees fit. The
+    /// plugin never logs auth tokens, passwords, cookies, or review text, so these
+    /// lines are safe to share.
+    /// </summary>
+    private (List<string> Lines, string? Source, string? Error) ReadRecentLogLines()
+    {
         try
         {
             var logDir = _appPaths.LogDirectoryPath;
             if (!Directory.Exists(logDir))
-                return Ok(new { lines = Array.Empty<string>(), source = (string?)null, error = "log directory not found" });
+                return (new List<string>(), null, "log directory not found");
 
-            // Look at the two most recent main log files. Cover the case where the
-            // current file just rolled over and recent activity is in the previous one.
             var mainLogs = Directory.GetFiles(logDir, "log_*.log")
                 .OrderByDescending(f => f)
                 .Take(2)
                 .ToList();
-
             if (mainLogs.Count == 0)
-                return Ok(new { lines = Array.Empty<string>(), source = (string?)null, error = "no log files" });
+                return (new List<string>(), null, "no log files");
 
             var lines = new List<string>();
             foreach (var path in mainLogs.AsEnumerable().Reverse())
@@ -640,21 +654,62 @@ public class LetterboxdController : ControllerBase
                 }
             }
 
-            // Cap to last N lines so the response stays small.
-            var trimmed = lines.Count > maxLines ? lines.GetRange(lines.Count - maxLines, maxLines) : lines;
-            return Ok(new
-            {
-                lines = trimmed,
-                totalMatches = lines.Count,
-                returned = trimmed.Count,
-                source = string.Join(", ", mainLogs.Select(Path.GetFileName))
-            });
+            return (lines, string.Join(", ", mainLogs.Select(Path.GetFileName)), null);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("GetLogs failed: {Message}", ex.Message);
-            return Ok(new { lines = Array.Empty<string>(), source = (string?)null, error = ex.Message });
+            _logger.LogWarning("ReadRecentLogLines failed: {Message}", ex.Message);
+            return (new List<string>(), null, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// User-initiated "send logs to developer". Builds a diagnostic bundle (recent
+    /// sanitized log lines + the current telemetry snapshot + versions) and uploads
+    /// it to the private telemetry backend, returning a short reference code the user
+    /// can quote in a bug report. Admin-only. Unlike telemetry this is NOT anonymous
+    /// (logs may contain a Letterboxd username or film titles) and only runs on this
+    /// explicit, disclosed action. Works whether or not telemetry is enabled; if no
+    /// telemetry instance id exists, a one-off id is generated for the bundle.
+    /// </summary>
+    [HttpPost("Telemetry/SendLogs")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> SendLogs([FromBody] SendLogsRequest? request)
+    {
+        var (allLines, _, _) = ReadRecentLogLines();
+        var lines = allLines.Count > 500 ? allLines.GetRange(allLines.Count - 500, 500) : allLines;
+
+        int? libraryCount;
+        try
+        {
+            libraryCount = _libraryManager.GetItemList(new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { BaseItemKind.Movie },
+                Recursive = true
+            }).Count;
+        }
+        catch
+        {
+            libraryCount = null;
+        }
+
+        var telemetrySnapshot = TelemetryService.BuildPayload("logs", libraryCount);
+        var instanceId = Plugin.Instance?.Configuration?.Telemetry?.InstanceId;
+        if (string.IsNullOrEmpty(instanceId))
+            instanceId = Guid.NewGuid().ToString();
+
+        var code = await TelemetryService.SendLogBundleAsync(
+            instanceId,
+            Plugin.Instance?.Version?.ToString() ?? "unknown",
+            telemetrySnapshot,
+            request?.Note,
+            lines).ConfigureAwait(false);
+
+        if (string.IsNullOrEmpty(code))
+            return BadRequest(new { error = "Could not reach the diagnostics endpoint. Check the server's internet connection and try again." });
+
+        return Ok(new { refCode = code, lineCount = lines.Count });
     }
 
     /// <summary>
@@ -705,6 +760,12 @@ public class LetterboxdController : ControllerBase
             _logger.LogWarning("Failed to write Jellyfin rating for TMDb {TmdbId}: {Message}", tmdbId.Value, ex.Message);
         }
     }
+}
+
+public class SendLogsRequest
+{
+    /// <summary>Optional free-text note from the user describing what went wrong.</summary>
+    public string? Note { get; set; }
 }
 
 public class ReviewRequest
