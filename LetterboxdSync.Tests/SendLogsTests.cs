@@ -8,6 +8,7 @@ using LetterboxdSync;
 using LetterboxdSync.Api;
 using LetterboxdSync.Configuration;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Xunit;
 
 namespace LetterboxdSync.Tests;
@@ -92,6 +93,44 @@ public class SendLogsTests : IDisposable
         var attr = method!.GetCustomAttribute<AuthorizeAttribute>();
         Assert.NotNull(attr);
         Assert.Equal("RequiresElevation", attr!.Policy);
+    }
+
+    // ---- Controller endpoint coverage (the HTTP layer where the consent bug lived) ----
+
+    [Fact]
+    public void PreviewLogs_ReturnsFullBundle_IncludingLogLines()
+    {
+        var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");
+        System.IO.File.WriteAllText(logFile,
+            "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.Foo: a diagnostic line\n");
+
+        var result = _h.Controller.PreviewLogs();
+
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("application/json", content.ContentType);
+        // The preview MUST contain the real log lines AND the telemetry snapshot.
+        Assert.Contains("a diagnostic line", content.Content!);
+        Assert.Contains("\"telemetry\"", content.Content!);
+        Assert.Contains("\"log_lines\"", content.Content!);
+    }
+
+    [Fact]
+    public async Task SendLogs_Success_ReturnsRefCode()
+    {
+        var result = await _h.Controller.SendLogs(new SendLogsRequest { Note = "diary broke" });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Contains("LBX-TEST01", System.Text.Json.JsonSerializer.Serialize(ok.Value));
+        var (_, json) = Assert.Single(_sent);
+        Assert.Contains("diary broke", json);
+    }
+
+    [Fact]
+    public async Task SendLogs_BackendUnreachable_ReturnsBadRequest()
+    {
+        TelemetryService.LogSenderOverride = (_, _) => Task.FromResult<string?>(null);
+        var result = await _h.Controller.SendLogs(new SendLogsRequest { Note = null });
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
