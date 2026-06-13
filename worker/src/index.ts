@@ -71,7 +71,9 @@ function genRefCode(): string {
 // 90 days.
 async function handleLogs(req: Request, env: Env): Promise<Response> {
   const raw = await req.text();
-  if (raw.length > MAX_LOG_BYTES) return bad(413, "bundle too large");
+  // Measure actual UTF-8 bytes, not UTF-16 code units, so multibyte content
+  // (accented / CJK film titles) is capped accurately.
+  if (new TextEncoder().encode(raw).length > MAX_LOG_BYTES) return bad(413, "bundle too large");
 
   let p: Record<string, unknown>;
   try {
@@ -83,12 +85,15 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
   if (!Array.isArray(p.log_lines)) return bad(400, "missing log_lines");
 
   // Find a free ref code (collision is astronomically unlikely; check anyway).
-  let code = genRefCode();
-  for (let i = 0; i < 5; i++) {
-    const hit = await env.DB.prepare("SELECT 1 FROM log_bundles WHERE ref_code = ?1").bind(code).first();
-    if (!hit) break;
+  // Re-check after each regenerate so we never fall through to a colliding INSERT.
+  let code = "";
+  let allocated = false;
+  for (let i = 0; i < 6; i++) {
     code = genRefCode();
+    const hit = await env.DB.prepare("SELECT 1 FROM log_bundles WHERE ref_code = ?1").bind(code).first();
+    if (!hit) { allocated = true; break; }
   }
+  if (!allocated) return bad(503, "could not allocate ref code, retry");
 
   const logLines = JSON.stringify((p.log_lines as unknown[]).slice(0, 5000).map((l) => String(l).slice(0, 2000)));
   const telemetry = p.telemetry != null ? JSON.stringify(p.telemetry) : null;
@@ -216,6 +221,10 @@ export default {
   // Daily prune: diagnostic bundles auto-delete after 90 days so user logs are
   // never hoarded. (Telemetry pings are anonymous and kept; bundles are not.)
   async scheduled(_event: ScheduledController, env: Env): Promise<void> {
-    await env.DB.prepare("DELETE FROM log_bundles WHERE received_at < datetime('now','-90 days')").run();
+    // received_at is stored as "YYYY-MM-DDTHH:MM:SSZ"; compare against the same format
+    // (datetime() renders "YYYY-MM-DD HH:MM:SS" and would mis-sort at the T/space char).
+    await env.DB.prepare(
+      "DELETE FROM log_bundles WHERE received_at < strftime('%Y-%m-%dT%H:%M:%SZ','now','-90 days')",
+    ).run();
   },
 };
