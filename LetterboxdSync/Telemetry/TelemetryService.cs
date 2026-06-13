@@ -352,31 +352,38 @@ internal static class TelemetryService
     internal static Func<string, string, Task<string?>>? LogSenderOverride { get; set; }
 
     /// <summary>
-    /// Uploads a user-initiated diagnostic bundle to the backend's /logs endpoint and
-    /// returns the reference code, or null on failure. Builds the JSON here so the
-    /// instance id, telemetry snapshot, and log lines are assembled in one place.
+    /// Assembles the EXACT diagnostic bundle JSON that will be uploaded. Both the
+    /// preview endpoint and the send endpoint call this, so "preview exactly what's
+    /// sent" is literally true: the preview renders this string, the send posts it.
     /// </summary>
-    public static async Task<string?> SendLogBundleAsync(
+    public static string BuildLogBundleJson(
         string instanceId, string pluginVersion, string telemetrySnapshotJson, string? note, List<string> logLines)
+    {
+        var bundle = new
+        {
+            instance_id = instanceId,
+            plugin_version = pluginVersion,
+            jellyfin_version = JellyfinVersion ?? "unknown",
+            telemetry = JsonSerializer.Deserialize<JsonElement>(telemetrySnapshotJson),
+            note,
+            log_lines = logLines
+        };
+        return JsonSerializer.Serialize(bundle, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>
+    /// Uploads a prebuilt bundle JSON (from <see cref="BuildLogBundleJson"/>) to the
+    /// backend's /logs endpoint and returns the reference code, or null on failure.
+    /// </summary>
+    public static async Task<string?> PostLogBundleAsync(string bundleJson)
     {
         try
         {
-            var bundle = new
-            {
-                instance_id = instanceId,
-                plugin_version = pluginVersion,
-                jellyfin_version = JellyfinVersion ?? "unknown",
-                telemetry = JsonSerializer.Deserialize<JsonElement>(telemetrySnapshotJson),
-                note,
-                log_lines = logLines
-            };
-            var json = JsonSerializer.Serialize(bundle);
             var url = TelemetryConstants.IngestUrl.TrimEnd('/') + "/logs";
-
             if (LogSenderOverride != null)
-                return await LogSenderOverride(url, json).ConfigureAwait(false);
+                return await LogSenderOverride(url, bundleJson).ConfigureAwait(false);
 
-            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var content = new StringContent(bundleJson, Encoding.UTF8, "application/json");
             using var req = new HttpRequestMessage(HttpMethod.Post, url);
             req.Headers.TryAddWithoutValidation("x-lbsync-key", TelemetryConstants.IngestKey);
             req.Content = content;

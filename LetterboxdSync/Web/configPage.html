@@ -207,6 +207,7 @@
                             <button type="button" class="lb-btn lb-btn-secondary" id="sendLogsCancel">Cancel</button>
                             <span id="sendLogsStatus" class="c-muted" style="font-size:0.85em;"></span>
                         </div>
+                        <pre id="sendLogsPreviewBox" style="display:none;margin-top:0.8em;background:#0a0a0a;color:#cfcfcf;padding:0.8em;border-radius:6px;max-height:40vh;overflow:auto;font-size:0.72em;line-height:1.4;white-space:pre-wrap;word-break:break-word;border:1px solid rgba(255,255,255,0.06);">Loading...</pre>
                         <div id="sendLogsResult" style="display:none;margin-top:1em;padding:0.8em;background:rgba(0,224,84,0.08);border:1px solid rgba(0,224,84,0.3);border-radius:6px;">
                             <div style="font-weight:600;margin-bottom:0.3em;">Sent. Thank you!</div>
                             <div style="font-size:0.88em;line-height:1.5;">Your reference code:
@@ -437,9 +438,27 @@
                         openSendLogs: function () {
                             document.getElementById('sendLogsStatus').textContent = '';
                             document.getElementById('sendLogsResult').style.display = 'none';
+                            document.getElementById('sendLogsPreviewBox').style.display = 'none';
                             document.getElementById('sendLogsNote').value = '';
                             document.getElementById('sendLogsConfirm').disabled = false;
                             document.getElementById('sendLogsModal').style.display = 'block';
+                        },
+
+                        previewSendLogs: function () {
+                            var box = document.getElementById('sendLogsPreviewBox');
+                            // Toggle off if already showing.
+                            if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+                            box.textContent = 'Loading the exact bundle...';
+                            box.style.display = 'block';
+                            ApiClient.ajax({
+                                url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Telemetry/PreviewLogs'),
+                                type: 'GET', dataType: 'text'
+                            }).then(function (text) {
+                                try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+                                box.textContent = text;
+                            }, function () {
+                                box.textContent = 'Failed to load preview (admin access required).';
+                            });
                         },
 
                         sendLogs: function () {
@@ -1044,7 +1063,7 @@
                             document.getElementById('sendLogsConfirm').addEventListener('click', function () { self.sendLogs(); });
                             document.getElementById('sendLogsCancel').addEventListener('click', function () { document.getElementById('sendLogsModal').style.display = 'none'; });
                             document.getElementById('sendLogsClose').addEventListener('click', function () { document.getElementById('sendLogsModal').style.display = 'none'; });
-                            document.getElementById('sendLogsPreview').addEventListener('click', function (e) { e.preventDefault(); self.openTelemetryPreview(); });
+                            document.getElementById('sendLogsPreview').addEventListener('click', function (e) { e.preventDefault(); self.previewSendLogs(); });
                             document.getElementById('sendLogsCopyCode').addEventListener('click', function () {
                                 var code = document.getElementById('sendLogsRefCode').textContent;
                                 if (navigator.clipboard) navigator.clipboard.writeText(code);

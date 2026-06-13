@@ -46,14 +46,17 @@ public class SendLogsTests : IDisposable
     public async Task SendLogBundle_PostsToLogsEndpoint_WithExpectedShape()
     {
         var snapshot = TelemetryService.BuildPayload("logs", 1200);
-        var code = await TelemetryService.SendLogBundleAsync(
+        var built = TelemetryService.BuildLogBundleJson(
             "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "1.17.0.0", snapshot, "diary sync broke", Lines());
+        var code = await TelemetryService.PostLogBundleAsync(built);
 
         Assert.Equal("LBX-TEST01", code);
-        var (url, json) = Assert.Single(_sent);
+        var (url, sentJson) = Assert.Single(_sent);
         Assert.EndsWith("/logs", url);
+        // Preview integrity: what is built (and previewed) is byte-for-byte what is sent.
+        Assert.Equal(built, sentJson);
 
-        using var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(sentJson);
         var root = doc.RootElement;
         Assert.Equal("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", root.GetProperty("instance_id").GetString());
         Assert.Equal("1.17.0.0", root.GetProperty("plugin_version").GetString());
@@ -61,6 +64,9 @@ public class SendLogsTests : IDisposable
         Assert.Equal(2, root.GetProperty("log_lines").GetArrayLength());
         // The telemetry snapshot is embedded as structured JSON, not a string.
         Assert.Equal(JsonValueKind.Object, root.GetProperty("telemetry").ValueKind);
+        // The preview/bundle MUST contain the actual log text — the consent bug was that
+        // the preview showed only the telemetry snapshot, hiding the log lines.
+        Assert.Contains("Letterboxd login error", built);
     }
 
     [Fact]
@@ -68,8 +74,9 @@ public class SendLogsTests : IDisposable
     {
         TelemetryService.LogSenderOverride = (_, _) => Task.FromResult<string?>(null);
         var snapshot = TelemetryService.BuildPayload("logs", null);
-        var code = await TelemetryService.SendLogBundleAsync(
+        var json = TelemetryService.BuildLogBundleJson(
             "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "1.17.0.0", snapshot, null, Lines());
+        var code = await TelemetryService.PostLogBundleAsync(json);
         Assert.Null(code);
     }
 
@@ -90,8 +97,8 @@ public class SendLogsTests : IDisposable
         // supplies a one-off instance id, and the snapshot reflects disabled state.
         Assert.False(_h.Config.Telemetry.Enabled);
         var snapshot = TelemetryService.BuildPayload("logs", 100);
-        var code = await TelemetryService.SendLogBundleAsync(
-            Guid.NewGuid().ToString(), "1.17.0.0", snapshot, null, Lines());
+        var json = TelemetryService.BuildLogBundleJson(Guid.NewGuid().ToString(), "1.17.0.0", snapshot, null, Lines());
+        var code = await TelemetryService.PostLogBundleAsync(json);
         Assert.Equal("LBX-TEST01", code);
         Assert.Single(_sent);
     }

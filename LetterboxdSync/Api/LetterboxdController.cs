@@ -672,10 +672,12 @@ public class LetterboxdController : ControllerBase
     /// explicit, disclosed action. Works whether or not telemetry is enabled; if no
     /// telemetry instance id exists, a one-off id is generated for the bundle.
     /// </summary>
-    [HttpPost("Telemetry/SendLogs")]
-    [Authorize(Policy = "RequiresElevation")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult> SendLogs([FromBody] SendLogsRequest? request)
+    /// <summary>
+    /// Assembles the exact diagnostic bundle JSON for the calling server. Used by both
+    /// the preview and the send so they cannot diverge: what the preview shows is byte
+    /// for byte what the send uploads (note aside, which the user types in either path).
+    /// </summary>
+    private string BuildLogBundleJson(string? note)
     {
         var (allLines, _, _) = ReadRecentLogLines();
         var lines = allLines.Count > 500 ? allLines.GetRange(allLines.Count - 500, 500) : allLines;
@@ -699,17 +701,39 @@ public class LetterboxdController : ControllerBase
         if (string.IsNullOrEmpty(instanceId))
             instanceId = Guid.NewGuid().ToString();
 
-        var code = await TelemetryService.SendLogBundleAsync(
+        return TelemetryService.BuildLogBundleJson(
             instanceId,
             Plugin.Instance?.Version?.ToString() ?? "unknown",
             telemetrySnapshot,
-            request?.Note,
-            lines).ConfigureAwait(false);
+            note,
+            lines);
+    }
+
+    /// <summary>
+    /// Returns the EXACT bundle that "Send logs to developer" would upload, without
+    /// sending it. Backs the consent modal's "Preview exactly what's sent" so the user
+    /// sees the real log lines and telemetry snapshot, not just the anonymous part.
+    /// </summary>
+    [HttpGet("Telemetry/PreviewLogs")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult PreviewLogs()
+    {
+        return Content(BuildLogBundleJson(null), "application/json");
+    }
+
+    [HttpPost("Telemetry/SendLogs")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> SendLogs([FromBody] SendLogsRequest? request)
+    {
+        var json = BuildLogBundleJson(request?.Note);
+        var code = await TelemetryService.PostLogBundleAsync(json).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(code))
             return BadRequest(new { error = "Could not reach the diagnostics endpoint. Check the server's internet connection and try again." });
 
-        return Ok(new { refCode = code, lineCount = lines.Count });
+        return Ok(new { refCode = code });
     }
 
     /// <summary>

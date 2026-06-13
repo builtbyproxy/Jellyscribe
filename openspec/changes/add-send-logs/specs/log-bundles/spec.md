@@ -2,12 +2,17 @@
 
 ### Requirement: Explicit, disclosed consent before sending
 
-The "Send logs to developer" action SHALL require an explicit click and a confirmation step that discloses, before anything is sent: that the bundle is NOT anonymous and may contain a Letterboxd username or film titles, that it is linked to this instance's telemetry id, and that passwords, cookies, and auth tokens are never logged. A preview of what would be sent MUST be available from the confirmation step.
+The "Send logs to developer" action SHALL require an explicit click and a confirmation step that discloses, before anything is sent: that the bundle is NOT anonymous and may contain a Letterboxd username or film titles, that it is linked to this instance's telemetry id, and that passwords, cookies, and auth tokens are never logged. A preview of what would be sent MUST be available from the confirmation step, and that preview MUST show the COMPLETE bundle — the actual log lines AND the telemetry snapshot — not just the anonymous portion. The preview and the send MUST be assembled by the same code path so the preview cannot diverge from what is uploaded.
 
 #### Scenario: User opens the send dialog
 
 - **WHEN** an admin clicks "Send logs to developer"
 - **THEN** a confirmation modal appears stating the logs are not anonymous and offering a preview, and nothing is uploaded until the admin confirms
+
+#### Scenario: Preview shows the real log lines
+
+- **WHEN** the admin clicks "Preview exactly what's sent"
+- **THEN** the preview renders the exact bundle including the log lines (not only the anonymous telemetry snapshot), byte-for-byte identical to what the send would upload
 
 #### Scenario: User cancels
 
