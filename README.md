@@ -30,6 +30,7 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 - **Jellyseerr integration** — auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Jellyseerr, and mirror your Letterboxd watchlist into Jellyseerr
 - **Diary import** — mark Jellyfin movies as played if they're in your Letterboxd diary
 - **Reviews** — write and post reviews to Letterboxd from the plugin dashboard
+- **Send logs to developer** — one-click diagnostic bundle from the Logs tab, with a full preview of what's sent and a reference code to quote in a bug report
 - **Dashboard** — sync stats, activity history, and one-click sync from the plugin page
 - **Cloudflare resilient** — automatic retry with backoff on rate limits, raw cookie fallback
 - **Retry with backoff** — handles transient Letterboxd errors gracefully
