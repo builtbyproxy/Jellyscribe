@@ -51,7 +51,10 @@ jobs:
         # skip silently here without secrets, but excluding them keeps the run
         # honest about what was exercised. The integration.yml workflow runs them
         # on demand with credentials wired in.
-        run: dotnet test -c Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./TestResults --filter "Category!=Integration"
+        # The junit logger writes relative to the test project unless given an
+        # absolute path, so LogFilePath is pinned to the workspace TestResults dir
+        # to sit alongside the coverage XML. Powers Codecov Test Analytics below.
+        run: dotnet test -c Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./TestResults --logger "junit;LogFilePath=${{ github.workspace }}/TestResults/junit.xml" --filter "Category!=Integration"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -60,3 +63,12 @@ jobs:
           files: ./TestResults/**/coverage.cobertura.xml
           fail_ci_if_error: false
           verbose: true
+
+      - name: Upload test results to Codecov
+        # Codecov Test Analytics: flaky-test detection + failure reporting from the
+        # JUnit XML. Runs even on test failure so failing/flaky runs are reported.
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./TestResults/junit.xml
