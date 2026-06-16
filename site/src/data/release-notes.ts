@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.18.1',
+    headline: 'Internal: test analytics in CI',
+    summary:
+      'No functional changes. CI now uploads JUnit test results to Codecov Test Analytics so flaky tests and failures are tracked across releases. Nothing in the plugin itself changes.',
+    highlights: {
+      improvements: [
+        'CI emits a JUnit test report and uploads it to Codecov Test Analytics for flaky-test detection and failure reporting. Developer-facing only; no change to plugin behaviour.',
+      ],
+    },
+  },
+  {
     version: '1.18.0',
     headline: 'Clearer guidance when Letterboxd login fails',
     summary:
