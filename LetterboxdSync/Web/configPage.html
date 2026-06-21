@@ -89,7 +89,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:1em;margin-bottom:0.5em;flex-wrap:wrap;">
                         <button type="button" class="lb-btn lb-btn-primary" id="runSyncBtn">Run Sync Now</button>
-                        <button type="button" class="lb-btn lb-btn-secondary" id="runWatchlistSyncBtn" title="Pull your Letterboxd watchlist into the Jellyfin playlist (and Jellyseerr if configured)">Sync Watchlist Now</button>
+                        <button type="button" class="lb-btn lb-btn-secondary" id="runWatchlistSyncBtn" title="Pull your Letterboxd watchlist into the Jellyfin playlist (and Seerr if configured)">Sync Watchlist Now</button>
                         <span id="syncStatus" class="c-muted" style="font-size:0.9em;"></span>
                     </div>
                     <div id="syncProgressBar" style="display:none;margin-bottom:1.5em;">
@@ -127,12 +127,12 @@
 
                 <!-- SETTINGS TAB -->
                 <div id="tab-settings" class="lb-tab-content" style="display:none;">
-                    <h3>Jellyseerr Integration <span class="c-muted" style="font-size:0.7em;">(optional)</span></h3>
-                    <p class="c-muted" style="font-size:0.9em;">Auto-request films from a user's Letterboxd watchlist that aren't yet in your Jellyfin library. Requests are attributed to each user's matching Jellyseerr account (matched by Jellyfin User ID).</p>
+                    <h3>Seerr Integration <span class="c-muted" style="font-size:0.7em;">(optional)</span></h3>
+                    <p class="c-muted" style="font-size:0.9em;">Auto-request films from a user's Letterboxd watchlist that aren't yet in your Jellyfin library. Requests are attributed to each user's matching Seerr account (matched by Jellyfin User ID).</p>
                     <div class="lb-account">
-                        <div style="margin-bottom:0.5em;"><label class="lb-field">Jellyseerr URL</label>
+                        <div style="margin-bottom:0.5em;"><label class="lb-field">Seerr URL</label>
                             <input type="text" id="jellyseerrUrl" placeholder="http://192.168.1.122:5055" /></div>
-                        <div style="margin-bottom:0.5em;"><label class="lb-field">Jellyseerr API Key</label>
+                        <div style="margin-bottom:0.5em;"><label class="lb-field">Seerr API Key</label>
                             <input type="password" id="jellyseerrApiKey" placeholder="Settings &rarr; General &rarr; API Key" /></div>
                         <div style="display:flex;gap:0.7em;align-items:center;">
                             <button type="button" class="lb-btn lb-btn-secondary" id="testJellyseerrBtn">Test Connection</button>
@@ -530,16 +530,16 @@
                                 + '<span class="lb-check-desc">Pulls your Letterboxd watchlist daily and mirrors it into a Jellyfin playlist. With multiple accounts, each gets its own playlist named "Letterboxd Watchlist (username)" by default. Adds new films and removes ones taken off Letterboxd. Films not in your library are skipped.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="autoRequestWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Auto-request unmatched watchlist films via Jellyseerr</span>'
-                                + '<span class="lb-check-desc">When a watchlisted film is not in the Jellyfin library, submit a request to Jellyseerr (configure URL + API key above). Requests are attributed to this user\'s Jellyseerr account (matched by Jellyfin User ID). Requires Jellyseerr to be configured. Skips titles Jellyseerr already has pending, processing, or available, so re-runs no longer create duplicates.</span>'
+                                + '<span class="lb-check-title">Auto-request unmatched watchlist films via Seerr</span>'
+                                + '<span class="lb-check-desc">When a watchlisted film is not in the Jellyfin library, submit a request to Seerr (configure URL + API key above). Requests are attributed to this user\'s Seerr account (matched by Jellyfin User ID). Requires Seerr to be configured. Skips titles Seerr already has pending, processing, or available, so re-runs no longer create duplicates.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="backfillAvailableRequests" /><span class="lb-check-text">'
                                 + '<span class="lb-check-title">Also backfill requests for already-available watchlist films</span>'
-                                + '<span class="lb-check-desc">Extends auto-request to films that are already in the library. Creates an attributed Jellyseerr request for any watchlisted film this user has no request for, so films that arrived outside Jellyseerr (manual Radarr add, deleted request) still show a requester. Creates request rows for already-available media; it does not trigger re-downloads. Requires "Auto-request" above.</span>'
+                                + '<span class="lb-check-desc">Extends auto-request to films that are already in the library. Creates an attributed Seerr request for any watchlisted film this user has no request for, so films that arrived outside Seerr (manual Radarr add, deleted request) still show a requester. Creates request rows for already-available media; it does not trigger re-downloads. Requires "Auto-request" above.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="mirrorJellyseerrWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Mirror Letterboxd watchlist into Jellyseerr watchlist</span>'
-                                + '<span class="lb-check-desc">Two-way mirror against your Jellyseerr user\'s own watchlist (the one shown in the Jellyseerr UI). Adds films you\'ve added on Letterboxd, removes films you\'ve taken off. Only touches movies, so manually-added Jellyseerr TV entries are left alone. Requires Jellyseerr to be configured.</span>'
+                                + '<span class="lb-check-title">Mirror Letterboxd watchlist into Seerr watchlist</span>'
+                                + '<span class="lb-check-desc">Two-way mirror against your Seerr user\'s own watchlist (the one shown in the Seerr UI). Adds films you\'ve added on Letterboxd, removes films you\'ve taken off. Only touches movies, so manually-added Seerr TV entries are left alone. Requires Seerr to be configured.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="enableDiaryImport" /><span class="lb-check-text">'
                                 + '<span class="lb-check-title">Import Letterboxd diary as Jellyfin watched</span>'
@@ -688,9 +688,9 @@
                             }).then(function (response) {
                                 response.json().then(function (data) {
                                     if (data.linkedToCurrentUser) {
-                                        statusEl.innerHTML = '<span class="c-green">Connected. Your Jellyfin user is linked to Jellyseerr user ID ' + data.jellyseerrUserId + '.</span>';
+                                        statusEl.innerHTML = '<span class="c-green">Connected. Your Jellyfin user is linked to Seerr user ID ' + data.jellyseerrUserId + '.</span>';
                                     } else {
-                                        statusEl.innerHTML = '<span class="c-blue">Connected, but no Jellyseerr user is linked to your Jellyfin account. Import Jellyfin users in Jellyseerr first.</span>';
+                                        statusEl.innerHTML = '<span class="c-blue">Connected, but no Seerr user is linked to your Jellyfin account. Import Jellyfin users in Seerr first.</span>';
                                     }
                                 });
                             }, function (err) {

@@ -127,7 +127,7 @@ public class LetterboxdController : ControllerBase
     }
 
     /// <summary>
-    /// Trigger a Letterboxd → Jellyfin playlist (and optional Jellyseerr) watchlist sync
+    /// Trigger a Letterboxd → Jellyfin playlist (and optional Seerr) watchlist sync
     /// for the calling user. Same shape as <see cref="StartSync"/>: 202 immediately,
     /// 409 if any sync is in flight, 400 if the user has no watchlist-enabled account.
     /// </summary>
@@ -476,12 +476,12 @@ public class LetterboxdController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> TestJellyseerr([FromBody] JellyseerrTestRequest request)
     {
-        if (!JellyseerrClient.IsConfigured(request.Url, request.ApiKey))
+        if (!SeerrClient.IsConfigured(request.Url, request.ApiKey))
             return BadRequest(new { success = false, error = "URL and API key are required" });
 
         try
         {
-            using var client = new JellyseerrClient(request.Url!, request.ApiKey!, _logger);
+            using var client = new SeerrClient(request.Url!, request.ApiKey!, _logger);
             var userId = await client.GetJellyseerrUserIdAsync(GetCurrentUserId() ?? string.Empty)
                 .ConfigureAwait(false);
             return Ok(new
@@ -493,7 +493,7 @@ public class LetterboxdController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Jellyseerr test failed: {Message}", ex.Message);
+            _logger.LogWarning("Seerr test failed: {Message}", ex.Message);
             return BadRequest(new { success = false, error = ex.Message });
         }
     }

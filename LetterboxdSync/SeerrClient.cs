@@ -11,10 +11,10 @@ using Microsoft.Extensions.Logging;
 namespace LetterboxdSync;
 
 /// <summary>
-/// Lightweight Jellyseerr client for fetching the Jellyfin-user-to-Jellyseerr-user
+/// Lightweight Seerr client for fetching the Jellyfin-user-to-Seerr-user
 /// mapping, creating per-user movie requests, and mirroring a user's watchlist.
 /// </summary>
-public class JellyseerrClient : IDisposable
+public class SeerrClient : IDisposable
 {
     private readonly HttpClient _http;
     private readonly ILogger _logger;
@@ -22,7 +22,7 @@ public class JellyseerrClient : IDisposable
 
     private Dictionary<string, int>? _jellyfinIdToJellyseerrId;
 
-    public JellyseerrClient(string baseUrl, string apiKey, ILogger logger, HttpMessageHandler? handler = null)
+    public SeerrClient(string baseUrl, string apiKey, ILogger logger, HttpMessageHandler? handler = null)
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _logger = logger;
@@ -36,7 +36,7 @@ public class JellyseerrClient : IDisposable
         => !string.IsNullOrWhiteSpace(url) && !string.IsNullOrWhiteSpace(apiKey);
 
     /// <summary>
-    /// Looks up the Jellyseerr user ID corresponding to a Jellyfin user ID (32-char hex).
+    /// Looks up the Seerr user ID corresponding to a Jellyfin user ID (32-char hex).
     /// Returns null if no matching user is found.
     /// </summary>
     public async Task<int?> GetJellyseerrUserIdAsync(string jellyfinUserId)
@@ -82,15 +82,15 @@ public class JellyseerrClient : IDisposable
             if (count < take) break;
         }
 
-        _logger.LogInformation("Jellyseerr user map loaded: {Count} users with linked Jellyfin IDs",
+        _logger.LogInformation("Seerr user map loaded: {Count} users with linked Jellyfin IDs",
             _jellyfinIdToJellyseerrId.Count);
     }
 
     /// <summary>
-    /// Looks up the current MediaStatus for a TMDb movie in Jellyseerr.
-    /// Returns null when Jellyseerr has no record of the title (so it's safe to request),
+    /// Looks up the current MediaStatus for a TMDb movie in Seerr.
+    /// Returns null when Seerr has no record of the title (so it's safe to request),
     /// or when the call fails (caller should fall through to attempting the request and
-    /// let Jellyseerr surface the real error). Status values follow Jellyseerr's enum:
+    /// let Seerr surface the real error). Status values follow Seerr's enum:
     /// 1=UNKNOWN, 2=PENDING, 3=PROCESSING, 4=PARTIALLY_AVAILABLE, 5=AVAILABLE,
     /// 6=BLOCKLISTED, 7=DELETED.
     /// </summary>
@@ -98,8 +98,8 @@ public class JellyseerrClient : IDisposable
         => (await GetMovieInfoAsync(tmdbId).ConfigureAwait(false)).Status;
 
     /// <summary>
-    /// Single movie lookup returning both the Jellyseerr MediaStatus and the set of Jellyseerr
-    /// user IDs that already have a request for the title. Status is null when Jellyseerr has no
+    /// Single movie lookup returning both the Seerr MediaStatus and the set of Seerr
+    /// user IDs that already have a request for the title. Status is null when Seerr has no
     /// record of the title (safe to request) or the call fails; the requester set is empty in
     /// those cases. Status enum: 1=UNKNOWN, 2=PENDING, 3=PROCESSING, 4=PARTIALLY_AVAILABLE,
     /// 5=AVAILABLE, 6=BLOCKLISTED, 7=DELETED.
@@ -113,7 +113,7 @@ public class JellyseerrClient : IDisposable
             using var response = await _http.GetAsync(url).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogDebug("Jellyseerr movie lookup non-success for TMDb {TmdbId}: {Status}",
+                _logger.LogDebug("Seerr movie lookup non-success for TMDb {TmdbId}: {Status}",
                     tmdbId, (int)response.StatusCode);
                 return (null, requesters);
             }
@@ -147,14 +147,14 @@ public class JellyseerrClient : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Jellyseerr movie lookup errored for TMDb {TmdbId}: {Message}",
+            _logger.LogDebug("Seerr movie lookup errored for TMDb {TmdbId}: {Message}",
                 tmdbId, ex.Message);
             return (null, requesters);
         }
     }
 
     /// <summary>
-    /// Outcome of a request attempt. <see cref="AlreadyExists"/> means Jellyseerr already
+    /// Outcome of a request attempt. <see cref="AlreadyExists"/> means Seerr already
     /// had the title in some non-UNKNOWN state (pending, processing, available, blocklisted)
     /// and we did NOT POST a new request; it should not be counted as a fresh request.
     /// </summary>
@@ -166,18 +166,18 @@ public class JellyseerrClient : IDisposable
     }
 
     /// <summary>
-    /// Creates a movie request in Jellyseerr for the given TMDb ID, attributed to the given Jellyseerr user.
+    /// Creates a movie request in Seerr for the given TMDb ID, attributed to the given Seerr user.
     /// <para>
     /// Default (<paramref name="backfillAvailable"/> false): pre-checks media status and skips the POST when
-    /// Jellyseerr already has a record of the title (pending / processing / available), so re-runs don't pile
+    /// Seerr already has a record of the title (pending / processing / available), so re-runs don't pile
     /// up duplicates for films the library already covers.
     /// </para>
     /// <para>
     /// Backfill (<paramref name="backfillAvailable"/> true): skips only when the title is blocklisted or THIS
     /// user already has a request for it. Available titles with no request from this user are still requested —
-    /// Jellyseerr 3.x accepts a request for available media as long as no active request exists, which restores
-    /// an attributed requester trail for films that entered the library outside Jellyseerr. If another user
-    /// holds the single active request, Jellyseerr returns 409 and we report <see cref="RequestResult.AlreadyExists"/>.
+    /// Seerr 3.x accepts a request for available media as long as no active request exists, which restores
+    /// an attributed requester trail for films that entered the library outside Seerr. If another user
+    /// holds the single active request, Seerr returns 409 and we report <see cref="RequestResult.AlreadyExists"/>.
     /// </para>
     /// </summary>
     public async Task<RequestResult> RequestMovieAsync(int tmdbId, int jellyseerrUserId, bool backfillAvailable = false)
@@ -187,7 +187,7 @@ public class JellyseerrClient : IDisposable
         // Never request blocklisted media (6), regardless of mode.
         if (status == 6)
         {
-            _logger.LogDebug("Skipping Jellyseerr request for TMDb {TmdbId}: blocklisted", tmdbId);
+            _logger.LogDebug("Skipping Seerr request for TMDb {TmdbId}: blocklisted", tmdbId);
             return RequestResult.AlreadyExists;
         }
 
@@ -197,7 +197,7 @@ public class JellyseerrClient : IDisposable
             // title is exactly what we want to attribute.
             if (requesters.Contains(jellyseerrUserId))
             {
-                _logger.LogDebug("Skipping Jellyseerr backfill for TMDb {TmdbId}: user {UserId} already has a request",
+                _logger.LogDebug("Skipping Seerr backfill for TMDb {TmdbId}: user {UserId} already has a request",
                     tmdbId, jellyseerrUserId);
                 return RequestResult.AlreadyExists;
             }
@@ -207,7 +207,7 @@ public class JellyseerrClient : IDisposable
             // Re-request DELETED (7); skip everything else above UNKNOWN (1).
             if (status.HasValue && status.Value > 1 && status.Value != 7)
             {
-                _logger.LogDebug("Skipping Jellyseerr request for TMDb {TmdbId}: already has status {Status}",
+                _logger.LogDebug("Skipping Seerr request for TMDb {TmdbId}: already has status {Status}",
                     tmdbId, status.Value);
                 return RequestResult.AlreadyExists;
             }
@@ -222,25 +222,25 @@ public class JellyseerrClient : IDisposable
             return RequestResult.Requested;
 
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        // Belt-and-braces: Jellyseerr returns 409 when an active request already exists; treat as a no-op.
+        // Belt-and-braces: Seerr returns 409 when an active request already exists; treat as a no-op.
         if ((int)response.StatusCode == 409 ||
             responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
             responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
             responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
             responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogDebug("Jellyseerr already has request for TMDb {TmdbId} (user {UserId}): {Body}",
+            _logger.LogDebug("Seerr already has request for TMDb {TmdbId} (user {UserId}): {Body}",
                 tmdbId, jellyseerrUserId, Truncate(responseBody, 200));
             return RequestResult.AlreadyExists;
         }
 
-        _logger.LogWarning("Jellyseerr request failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
+        _logger.LogWarning("Seerr request failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return RequestResult.Failed;
     }
 
     /// <summary>
-    /// Returns the set of TMDb IDs of <paramref name="mediaType"/> currently on the given Jellyseerr
+    /// Returns the set of TMDb IDs of <paramref name="mediaType"/> currently on the given Seerr
     /// user's watchlist. Pages through results until exhausted. Returns an empty set on failure
     /// (caller should treat that as "unknown" and avoid destructive removals).
     /// </summary>
@@ -252,7 +252,7 @@ public class JellyseerrClient : IDisposable
 
         while (page <= totalPages)
         {
-            // Jellyseerr's user/:id/watchlist endpoint paginates with `page=N`. It rejects
+            // Seerr's user/:id/watchlist endpoint paginates with `page=N`. It rejects
             // unknown params with a 400, so do NOT pass take/skip here.
             var url = $"{_baseUrl}/api/v1/user/{jellyseerrUserId}/watchlist?page={page}";
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -262,7 +262,7 @@ public class JellyseerrClient : IDisposable
             if (!response.IsSuccessStatusCode)
             {
                 var errBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                _logger.LogWarning("Jellyseerr watchlist fetch failed for user {UserId}: {Status} {Body}",
+                _logger.LogWarning("Seerr watchlist fetch failed for user {UserId}: {Status} {Body}",
                     jellyseerrUserId, (int)response.StatusCode, Truncate(errBody, 300));
                 return ids;
             }
@@ -313,7 +313,7 @@ public class JellyseerrClient : IDisposable
     }
 
     /// <summary>
-    /// Adds a TMDb title to the given Jellyseerr user's watchlist. Acts as that user via
+    /// Adds a TMDb title to the given Seerr user's watchlist. Acts as that user via
     /// the X-API-User header so the entry is owned by them, not the API key's default admin.
     /// Returns true on success or "already there"; false on transient error.
     /// </summary>
@@ -335,13 +335,13 @@ public class JellyseerrClient : IDisposable
             responseBody.Contains("already on", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        _logger.LogWarning("Jellyseerr watchlist add failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
+        _logger.LogWarning("Seerr watchlist add failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return false;
     }
 
     /// <summary>
-    /// Removes a TMDb title from the given Jellyseerr user's watchlist. Acts as that user
+    /// Removes a TMDb title from the given Seerr user's watchlist. Acts as that user
     /// via the X-API-User header. 404 is treated as success (the entry was already gone).
     /// </summary>
     public async Task<bool> RemoveFromWatchlistAsync(int tmdbId, int jellyseerrUserId, string mediaType = "movie")
@@ -355,7 +355,7 @@ public class JellyseerrClient : IDisposable
             return true;
 
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        _logger.LogWarning("Jellyseerr watchlist remove failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
+        _logger.LogWarning("Seerr watchlist remove failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return false;
     }

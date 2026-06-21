@@ -11,7 +11,7 @@ using Xunit;
 
 namespace LetterboxdSync.Tests;
 
-public class JellyseerrClientTests
+public class SeerrClientTests
 {
     private const string BaseUrl = "http://jellyseerr.test";
     private const string ApiKey = "test-key";
@@ -34,10 +34,10 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7);
 
-        Assert.Equal(JellyseerrClient.RequestResult.Requested, result);
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted, "request endpoint should have been called");
     }
 
@@ -61,10 +61,10 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7);
 
-        Assert.Equal(JellyseerrClient.RequestResult.AlreadyExists, result);
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
         Assert.False(posted, "request endpoint must not be called when media is already known");
     }
 
@@ -86,17 +86,17 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7);
 
-        Assert.Equal(JellyseerrClient.RequestResult.Requested, result);
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted);
     }
 
     [Fact]
     public async Task RequestMovieAsync_PostReturns409_TreatsAsAlreadyExists()
     {
-        // Belt-and-braces: if the status pre-check misses (e.g. 404 lookup) and Jellyseerr
+        // Belt-and-braces: if the status pre-check misses (e.g. 404 lookup) and Seerr
         // does return its own 409, we should still classify it as AlreadyExists so the
         // count of "new requests" stays accurate.
         var handler = new SeerrHandler(req =>
@@ -113,17 +113,17 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7);
 
-        Assert.Equal(JellyseerrClient.RequestResult.AlreadyExists, result);
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
     }
 
     [Fact]
     public async Task RequestMovieAsync_Backfill_AvailableWithNoRequest_PostsAttributedRequest()
     {
         // The backfill case: media is AVAILABLE (status 5) but nobody has a request for it
-        // (entered the library outside Jellyseerr). Backfill mode must still POST so a requester
+        // (entered the library outside Seerr). Backfill mode must still POST so a requester
         // trail exists. Default mode would have skipped on status 5.
         var posted = false;
         var handler = new SeerrHandler(req =>
@@ -140,10 +140,10 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
-        Assert.Equal(JellyseerrClient.RequestResult.Requested, result);
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted, "backfill should request an available title that has no request");
     }
 
@@ -161,10 +161,10 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
-        Assert.Equal(JellyseerrClient.RequestResult.AlreadyExists, result);
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
         Assert.False(posted, "backfill must not duplicate this user's own request");
     }
 
@@ -172,7 +172,7 @@ public class JellyseerrClientTests
     public async Task RequestMovieAsync_Backfill_AvailableButOtherUserRequested_PostsForThisUser()
     {
         // Another user (9) has a request; user 7 still gets their own attributed request when
-        // Jellyseerr accepts it. (If Jellyseerr's single-active-request rule rejects it, the
+        // Seerr accepts it. (If Seerr's single-active-request rule rejects it, the
         // POST 409 path classifies it AlreadyExists — covered separately.)
         var posted = false;
         var handler = new SeerrHandler(req =>
@@ -189,10 +189,10 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
-        Assert.Equal(JellyseerrClient.RequestResult.Requested, result);
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted);
     }
 
@@ -209,17 +209,17 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
-        Assert.Equal(JellyseerrClient.RequestResult.AlreadyExists, result);
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
         Assert.False(posted, "blocklisted media must never be requested");
     }
 
     [Fact]
     public async Task GetUserWatchlistTmdbIdsAsync_PaginatesViaPageParamAndFiltersToMovies()
     {
-        // Jellyseerr paginates the user-watchlist endpoint with `page=N`, NOT take/skip
+        // Seerr paginates the user-watchlist endpoint with `page=N`, NOT take/skip
         // (which it 400s on). Drive two pages, with totalPages=2 telling us when to stop.
         var seenPageQueries = new List<string>();
         var handler = new SeerrHandler(req =>
@@ -243,7 +243,7 @@ public class JellyseerrClientTests
             return JsonResponse("{\"page\":99,\"totalPages\":2,\"results\":[]}");
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var ids = await client.GetUserWatchlistTmdbIdsAsync(7);
 
         Assert.Equal(new HashSet<int> { 1, 2, 4 }, ids);
@@ -257,7 +257,7 @@ public class JellyseerrClientTests
     public async Task GetUserWatchlistTmdbIdsAsync_SendsXApiUserHeader()
     {
         // The endpoint requires acting as the user being queried — without the impersonation
-        // header, Jellyseerr returns the calling key's default user (admin), which silently
+        // header, Seerr returns the calling key's default user (admin), which silently
         // returns the wrong watchlist.
         string? sentHeader = null;
         var handler = new SeerrHandler(req =>
@@ -266,7 +266,7 @@ public class JellyseerrClientTests
             return JsonResponse("{\"page\":1,\"totalPages\":1,\"totalResults\":0,\"results\":[]}");
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         await client.GetUserWatchlistTmdbIdsAsync(42);
         Assert.Equal("42", sentHeader);
     }
@@ -288,7 +288,7 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var ok = await client.AddToWatchlistAsync(42, 9);
 
         Assert.True(ok);
@@ -314,7 +314,7 @@ public class JellyseerrClientTests
             return JsonResponse(@"{ ""results"": [] }");
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var id = await client.GetJellyseerrUserIdAsync("def456");
 
         Assert.Equal(7, id);
@@ -324,11 +324,11 @@ public class JellyseerrClientTests
     public async Task GetJellyseerrUserIdAsync_NormalisesDashesAndCase()
     {
         // Map stores normalised IDs (no dashes, lowercase). Looking up the same user
-        // via either format should resolve to the same Jellyseerr user id.
+        // via either format should resolve to the same Seerr user id.
         var handler = new SeerrHandler(req =>
             JsonResponse(@"{ ""results"": [{ ""id"": 42, ""jellyfinUserId"": ""ABC123"" }] }"));
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
 
         Assert.Equal(42, await client.GetJellyseerrUserIdAsync("ABC123"));
         Assert.Equal(42, await client.GetJellyseerrUserIdAsync("abc-1-2-3"));
@@ -341,7 +341,7 @@ public class JellyseerrClientTests
         var handler = new SeerrHandler(req =>
             JsonResponse(@"{ ""results"": [{ ""id"": 1, ""jellyfinUserId"": ""onlyuser"" }] }"));
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.Null(await client.GetJellyseerrUserIdAsync("missing"));
     }
 
@@ -364,7 +364,7 @@ public class JellyseerrClientTests
             return JsonResponse(@"{ ""results"": [] }");
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
 
         Assert.Equal(1, await client.GetJellyseerrUserIdAsync("u1"));
         Assert.Equal(150, await client.GetJellyseerrUserIdAsync("u150"));
@@ -381,7 +381,7 @@ public class JellyseerrClientTests
     [Fact]
     public async Task GetJellyseerrUserIdAsync_SkipsResultsWithoutJellyfinId()
     {
-        // Jellyseerr admin accounts can have a null jellyfinUserId; they shouldn't
+        // Seerr admin accounts can have a null jellyfinUserId; they shouldn't
         // appear in the map. Looking up a real user should still work.
         var handler = new SeerrHandler(_ =>
             JsonResponse(@"{ ""results"": [
@@ -391,7 +391,7 @@ public class JellyseerrClientTests
                 { ""id"": 4, ""jellyfinUserId"": ""real"" }
             ] }"));
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.Equal(4, await client.GetJellyseerrUserIdAsync("real"));
         Assert.Null(await client.GetJellyseerrUserIdAsync("nonexistent"));
     }
@@ -404,7 +404,7 @@ public class JellyseerrClientTests
             Content = new StringContent("{\"message\":\"already exists on watchlist\"}")
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.True(await client.AddToWatchlistAsync(42, 9));
     }
 
@@ -412,7 +412,7 @@ public class JellyseerrClientTests
     public async Task RemoveFromWatchlistAsync_404IsSuccess()
     {
         var handler = new SeerrHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.True(await client.RemoveFromWatchlistAsync(42, 9));
     }
 
@@ -435,7 +435,7 @@ public class JellyseerrClientTests
             return new HttpResponseMessage(HttpStatusCode.MethodNotAllowed);
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.True(await client.RemoveFromWatchlistAsync(42, 9));
         Assert.Equal("/api/v1/watchlist/42", sentPath);
         Assert.Contains("mediaType=movie", sentQuery);
@@ -451,7 +451,7 @@ public class JellyseerrClientTests
             Content = new StringContent("boom")
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.False(await client.AddToWatchlistAsync(42, 9));
     }
 
@@ -463,7 +463,7 @@ public class JellyseerrClientTests
             Content = new StringContent("boom")
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.False(await client.RemoveFromWatchlistAsync(42, 9));
     }
 
@@ -476,7 +476,7 @@ public class JellyseerrClientTests
             Content = new StringContent("nope")
         });
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var ids = await client.GetUserWatchlistTmdbIdsAsync(9);
         Assert.Empty(ids);
     }
@@ -487,7 +487,7 @@ public class JellyseerrClientTests
         // Network-layer exceptions are swallowed so a status pre-check never breaks a run.
         var handler = new SeerrHandler(_ => throw new HttpRequestException("connection reset"));
 
-        using var client = new JellyseerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         Assert.Null(await client.GetMovieMediaStatusAsync(100));
     }
 

@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.18.2',
+    headline: 'Jellyseerr is now called Seerr',
+    summary:
+      'Jellyseerr and Overseerr have merged into a single project called Seerr. The plugin now uses the new name everywhere you see it, in the settings page, your personal account page, and the documentation, so the labels match what you see in the app you are connecting to. Nothing about the integration changes: your existing Seerr URL, API key, and per-account settings are kept, and there is nothing to reconfigure.',
+    highlights: {
+      improvements: [
+        'The "Jellyseerr integration" settings, the auto-request and watchlist-mirror options, and the connection-test messages now all read "Seerr" to match the renamed project. Your saved URL, API key, and account settings carry over untouched.',
+      ],
+    },
+  },
+  {
     version: '1.18.1',
     headline: 'Internal: test analytics in CI',
     summary:

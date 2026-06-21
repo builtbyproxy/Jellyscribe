@@ -292,7 +292,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     [Fact]
     public async Task TryRunForUserAsync_AutoRequestEnabled_NoJellyseerr_SkipsRequest()
     {
-        // Account has auto-request on, but Jellyseerr URL/key aren't configured at
+        // Account has auto-request on, but Seerr URL/key aren't configured at
         // the plugin level → CreateJellyseerrClient returns null, we don't try to
         // request. This exercises the IsConfigured guard path.
         var (user, userId) = MakeUser("lachlan");
@@ -334,11 +334,11 @@ public class WatchlistSyncRunnerTests : IDisposable
         Assert.True(ok);
     }
 
-    // ----- Mirror to Jellyseerr watchlist -----
+    // ----- Mirror to Seerr watchlist -----
     // Exercises MirrorJellyseerrWatchlistAsync via the JellyseerrClientFactoryOverride.
 
     /// <summary>
-    /// Mock HttpMessageHandler that lets us drive the JellyseerrClient end-to-end
+    /// Mock HttpMessageHandler that lets us drive the SeerrClient end-to-end
     /// without hitting the network. Each test plays out a small request → response
     /// script so we can verify the runner sends the right calls.
     /// </summary>
@@ -363,23 +363,23 @@ public class WatchlistSyncRunnerTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, mirror: true);
 
-        // Plugin-wide Jellyseerr config makes IsConfigured true.
+        // Plugin-wide Seerr config makes IsConfigured true.
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
         Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
 
         var service = Substitute.For<ILetterboxdService>();
-        // LB has only 1233413; Jellyseerr has 550. Mirror should ADD 1233413 and
+        // LB has only 1233413; Seerr has 550. Mirror should ADD 1233413 and
         // REMOVE 550 from the Seerr watchlist (since it's no longer on LB).
         service.GetWatchlistTmdbIdsAsync(Arg.Any<string>())
             .Returns(new List<int> { 1233413 });
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
 
         // Library has nothing (so playlist+request paths short-circuit), but the
-        // mirror flow still runs since Jellyseerr is configured + mirror flag is on.
+        // mirror flow still runs since Seerr is configured + mirror flag is on.
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
 
-        // Jellyseerr scripted responses:
-        //   GET /api/v1/user → maps lachlan's JF id to Jellyseerr id 7
+        // Seerr scripted responses:
+        //   GET /api/v1/user → maps lachlan's JF id to Seerr id 7
         //   GET /api/v1/user/7/watchlist → returns {550}, missing 1233413
         //   POST /api/v1/watchlist (with X-API-User: 7) → success for 1233413
         //   DELETE /api/v1/watchlist/550 → success (550 was on Seerr but not LB)
@@ -397,7 +397,7 @@ public class WatchlistSyncRunnerTests : IDisposable
             }
             if (req.Method == HttpMethod.Get && path.Contains("/api/v1/user/7/watchlist"))
             {
-                // Jellyseerr's watchlist endpoint returns items with tmdbId at the
+                // Seerr's watchlist endpoint returns items with tmdbId at the
                 // top level; not nested under mediaInfo.
                 return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
                 {
@@ -413,7 +413,7 @@ public class WatchlistSyncRunnerTests : IDisposable
         });
 
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             var ok = await _runner.TryRunForUserAsync(userId, "test",
@@ -449,14 +449,14 @@ public class WatchlistSyncRunnerTests : IDisposable
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
 
-        // Jellyseerr returns a user list that doesn't match our Jellyfin user → mapping fails.
+        // Seerr returns a user list that doesn't match our Jellyfin user → mapping fails.
         var handler = new JellyseerrHandler(req =>
             new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new System.Net.Http.StringContent("{\"results\":[]}")
             });
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             var ok = await _runner.TryRunForUserAsync(userId, "test",
@@ -479,7 +479,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_MirrorWatchlist_EmptyLetterboxdList_SkipsToAvoidMassDeletion()
     {
         // Defensive: if Letterboxd returns an empty list (e.g. watchlist deleted
-        // or fetch errored to zero), don't mass-delete the Jellyseerr watchlist.
+        // or fetch errored to zero), don't mass-delete the Seerr watchlist.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, mirror: true);
@@ -509,7 +509,7 @@ public class WatchlistSyncRunnerTests : IDisposable
             };
         });
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             var ok = await _runner.TryRunForUserAsync(userId, "test",
@@ -638,12 +638,12 @@ public class WatchlistSyncRunnerTests : IDisposable
         await service.Received(1).GetWatchlistTmdbIdsAsync("lb-user");
     }
 
-    // ----- Jellyseerr auto-request -----
+    // ----- Seerr auto-request -----
 
     [Fact]
     public async Task TryRunForUserAsync_AutoRequest_RequestsUnmatchedFilm()
     {
-        // Account auto-requests, the watchlist film is NOT in the library, Jellyseerr is
+        // Account auto-requests, the watchlist film is NOT in the library, Seerr is
         // configured → the runner should POST a movie request for the unmatched TMDb id.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
@@ -679,7 +679,7 @@ public class WatchlistSyncRunnerTests : IDisposable
             return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
         });
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             var ok = await _runner.TryRunForUserAsync(userId, "test",
@@ -701,7 +701,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_AutoRequest_TalliesAlreadyExistsFailedAndErrored()
     {
         // Three unmatched films exercise every RequestResult branch plus the per-film
-        // exception catch: one already on Jellyseerr (skipped), one POST that 500s
+        // exception catch: one already on Seerr (skipped), one POST that 500s
         // (Failed), and one whose POST throws (errored). The run must absorb all of it.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
@@ -747,7 +747,7 @@ public class WatchlistSyncRunnerTests : IDisposable
             return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
         });
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             var ok = await _runner.TryRunForUserAsync(userId, "test",
@@ -770,8 +770,8 @@ public class WatchlistSyncRunnerTests : IDisposable
     [Fact]
     public async Task TryRunForUserAsync_JellyseerrUserMapErrors_SkipsGracefully()
     {
-        // The Jellyseerr user-map fetch fails (500). The runner must log and bail out of
-        // the Jellyseerr branch without throwing, posting, or deleting anything.
+        // The Seerr user-map fetch fails (500). The runner must log and bail out of
+        // the Seerr branch without throwing, posting, or deleting anything.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, autoRequest: true);
@@ -787,7 +787,7 @@ public class WatchlistSyncRunnerTests : IDisposable
         var handler = new JellyseerrHandler(_ =>
             new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError));
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             var ok = await _runner.TryRunForUserAsync(userId, "test",
@@ -808,8 +808,8 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_MirrorOnNonPrimaryAccount_SkipsMirror()
     {
         // Two accounts on one Jellyfin user, both with mirror on. Only the primary owns
-        // the Jellyseerr-watchlist destination, so running the secondary must not POST or
-        // DELETE against the Jellyseerr watchlist (would clobber the primary's diff).
+        // the Seerr-watchlist destination, so running the secondary must not POST or
+        // DELETE against the Seerr watchlist (would clobber the primary's diff).
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
 
@@ -847,7 +847,7 @@ public class WatchlistSyncRunnerTests : IDisposable
             };
         });
         WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
-            new JellyseerrClient(url, key, log, handler);
+            new SeerrClient(url, key, log, handler);
         try
         {
             // Target only the non-primary account.

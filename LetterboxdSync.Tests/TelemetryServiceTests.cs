@@ -69,7 +69,7 @@ public class TelemetryServiceTests : IDisposable
     [InlineData("Letterboxd returned 401 for sinners after re-authentication. Session may be permanently invalid.", TelemetryService.CatAuth)]
     [InlineData("returned 403 during login. Likely reCAPTCHA. Provide raw cookies instead.", TelemetryService.CatAuth)]
     [InlineData("Film with TMDb ID 123 not found on Letterboxd.", TelemetryService.CatTmdb)]
-    [InlineData("Jellyseerr request errored", TelemetryService.CatJellyseerr)]
+    [InlineData("Seerr request errored", TelemetryService.CatJellyseerr)]
     [InlineData("something exploded", TelemetryService.CatOther)]
     [InlineData(null, TelemetryService.CatOther)]
     public void Classify_MapsKnownPatterns(string? message, string expected)

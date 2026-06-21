@@ -27,7 +27,7 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 - **Rating sync, both ways** — Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0), and Letterboxd ratings seed your Jellyfin user ratings
 - **Favorites** — sync Jellyfin favorites as Letterboxd likes
 - **Watchlist sync** — import your Letterboxd watchlist as a Jellyfin playlist
-- **Jellyseerr integration** — auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Jellyseerr, and mirror your Letterboxd watchlist into Jellyseerr
+- **Seerr integration** — auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Seerr, and mirror your Letterboxd watchlist into Seerr
 - **Diary import** — mark Jellyfin movies as played if they're in your Letterboxd diary
 - **Reviews** — write and post reviews to Letterboxd from the plugin dashboard
 - **Send logs to developer** — one-click diagnostic bundle from the Logs tab, with a full preview of what's sent and a reference code to quote in a bug report
@@ -78,9 +78,9 @@ That's it. Watch a movie and check your Letterboxd diary.
 | **Recently played only** | Limits daily catch-up to films played in the last N days |
 | **Primary account** | When one Jellyfin user links multiple Letterboxd accounts, the primary wins on rating-import conflicts and is preselected in the review modal |
 | **Watchlist to playlist** | Mirrors your Letterboxd watchlist into a Jellyfin playlist daily; each account gets its own playlist (name configurable) |
-| **Auto-request via Jellyseerr** | Watchlisted films missing from your library are requested in Jellyseerr, attributed to this user's Jellyseerr account (set the Jellyseerr URL and API key above the account list) |
-| **Backfill available requests** | Extends auto-request to films already in the library that have no request record, so films that arrived outside Jellyseerr still show a requester; never triggers re-downloads |
-| **Mirror into Jellyseerr watchlist** | Two-way mirror of your Letterboxd watchlist into your Jellyseerr user's own watchlist (movies only) |
+| **Auto-request via Seerr** | Watchlisted films missing from your library are requested in Seerr, attributed to this user's Seerr account (set the Seerr URL and API key above the account list) |
+| **Backfill available requests** | Extends auto-request to films already in the library that have no request record, so films that arrived outside Seerr still show a requester; never triggers re-downloads |
+| **Mirror into Seerr watchlist** | Two-way mirror of your Letterboxd watchlist into your Seerr user's own watchlist (movies only) |
 | **Import diary as played** | Marks Jellyfin movies as played if they appear in your Letterboxd diary |
 | **Skip previously synced** | Uses the plugin's local sync history to skip films already logged without hitting Letterboxd; recommended, especially on large libraries |
 | **Stop on failure** | Halts the run at the first failed film to avoid inflaming rate limits; the rest are picked up next run |
@@ -159,7 +159,7 @@ Unlike the anonymous telemetry above, **logs are not anonymous** — they can co
 - Jellyfin 10.11+
 - A Letterboxd account
 - [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), required for the Letterboxd link to appear in the Jellyfin sidebar (everything else works without it)
-- Optional: a [Jellyseerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations
+- Optional: a [Seerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations
 
 ## Building from source
 

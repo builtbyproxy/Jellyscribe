@@ -90,7 +90,7 @@
                     <div id="syncControls">
                         <div style="display:flex;align-items:center;gap:1em;margin-bottom:0.5em;flex-wrap:wrap;">
                             <button type="button" class="lb-btn lb-btn-primary" id="runSyncBtn">Run Sync Now</button>
-                            <button type="button" class="lb-btn lb-btn-secondary" id="runWatchlistSyncBtn" title="Pull your Letterboxd watchlist into the Jellyfin playlist (and Jellyseerr if configured)">Sync Watchlist Now</button>
+                            <button type="button" class="lb-btn lb-btn-secondary" id="runWatchlistSyncBtn" title="Pull your Letterboxd watchlist into the Jellyfin playlist (and Seerr if configured)">Sync Watchlist Now</button>
                             <span id="syncStatus" class="c-muted" style="font-size:0.9em;"></span>
                         </div>
                         <div id="syncProgressBar" style="display:none;margin-bottom:1.5em;">
@@ -305,12 +305,12 @@
                                 + '<span class="lb-check-desc">Pulls this account\'s Letterboxd watchlist daily and mirrors it into a Jellyfin playlist. With multiple accounts each gets its own playlist named "Letterboxd Watchlist (username)" by default. Adds new films and removes ones taken off Letterboxd. Films not in your library are skipped.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="autoRequestWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Auto-request unmatched watchlist films via Jellyseerr</span>'
-                                + '<span class="lb-check-desc">When a watchlisted film is not in the Jellyfin library, request it through Jellyseerr. The request is attributed to your Jellyseerr account. Requires Jellyseerr to be configured in the admin plugin settings.</span>'
+                                + '<span class="lb-check-title">Auto-request unmatched watchlist films via Seerr</span>'
+                                + '<span class="lb-check-desc">When a watchlisted film is not in the Jellyfin library, request it through Seerr. The request is attributed to your Seerr account. Requires Seerr to be configured in the admin plugin settings.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="mirrorJellyseerrWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Mirror Letterboxd watchlist into Jellyseerr watchlist</span>'
-                                + '<span class="lb-check-desc">Two-way mirror against your Jellyseerr user\'s own watchlist. Only takes effect on the primary account, since the Jellyseerr watchlist is per-Jellyfin-user (the secondary account\'s flag is silently ignored to avoid the two accounts overwriting each other). Movies only, so manually-added Jellyseerr TV is left alone.</span>'
+                                + '<span class="lb-check-title">Mirror Letterboxd watchlist into Seerr watchlist</span>'
+                                + '<span class="lb-check-desc">Two-way mirror against your Seerr user\'s own watchlist. Only takes effect on the primary account, since the Seerr watchlist is per-Jellyfin-user (the secondary account\'s flag is silently ignored to avoid the two accounts overwriting each other). Movies only, so manually-added Seerr TV is left alone.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="enableDiaryImport" /><span class="lb-check-text">'
                                 + '<span class="lb-check-title">Import Letterboxd diary as Jellyfin watched</span>'
