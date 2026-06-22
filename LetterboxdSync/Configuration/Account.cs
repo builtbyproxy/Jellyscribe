@@ -29,10 +29,10 @@ public class Account
     public bool AutoRequestWatchlist { get; set; }
 
     /// <summary>
-    /// When true, <see cref="AutoRequestWatchlist"/> also creates an attributed Jellyseerr
+    /// When true, <see cref="AutoRequestWatchlist"/> also creates an attributed Seerr
     /// request for watchlisted films that are already in the library / available, as long as
     /// this user has no existing request for them. This backfills a requester trail for films
-    /// that entered the library outside Jellyseerr (manual Radarr add, deleted request, etc.)
+    /// that entered the library outside Seerr (manual Radarr add, deleted request, etc.)
     /// so "who wanted this?" is answerable. Off by default: it creates request rows for
     /// already-available media (harmless for downloads, Radarr already has the file).
     /// </summary>

@@ -70,7 +70,7 @@ public class FilmSummaryHelperTests
     // entries, with the tmdb link pointing at /tv/<id>. TMDb's movie and TV ID
     // namespaces are independent, so e.g. tv/198102 = "Hijack" and movie/198102 =
     // "Cutie Honey Flash". Without the /tv/ guard, watchlisting Hijack on
-    // Letterboxd ends up auto-requesting Cutie Honey in Jellyseerr.
+    // Letterboxd ends up auto-requesting Cutie Honey in Seerr.
     [Fact]
     public void ExtractTmdbIdFromLinks_TvShow_SkipsTvLink()
     {

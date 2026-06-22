@@ -62,7 +62,7 @@ internal static class TelemetryService
             || Contains(m, "Auth failed") || Contains(m, "session may be permanently invalid"))
             return CatAuth;
 
-        if (Contains(m, "Jellyseerr"))
+        if (Contains(m, "Seerr"))
             return CatJellyseerr;
 
         if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403"))
@@ -116,7 +116,7 @@ internal static class TelemetryService
         catch { /* telemetry must never break a sync */ }
     }
 
-    /// <summary>Direct error hook for failure paths that don't record a SyncEvent (auth catches, Jellyseerr aggregates).</summary>
+    /// <summary>Direct error hook for failure paths that don't record a SyncEvent (auth catches, Seerr aggregates).</summary>
     public static void RecordError(string category)
     {
         try

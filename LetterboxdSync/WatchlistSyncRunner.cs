@@ -16,7 +16,7 @@ using Microsoft.Extensions.Logging;
 namespace LetterboxdSync;
 
 /// <summary>
-/// Performs the Letterboxd-watchlist → Jellyfin-playlist → Jellyseerr chain. Used by both
+/// Performs the Letterboxd-watchlist → Jellyfin-playlist → Seerr chain. Used by both
 /// the scheduled <see cref="WatchlistSyncTask"/> and the user-triggered API endpoint, gated
 /// behind <see cref="SyncGate"/> so it serialises with the diary sync.
 /// </summary>
@@ -157,23 +157,23 @@ public class WatchlistSyncRunner
 
     /// <summary>
     /// Test-only override. When set, CreateJellyseerrClient delegates to this so tests
-    /// can inject a JellyseerrClient bound to a mock HttpMessageHandler. Production
+    /// can inject a SeerrClient bound to a mock HttpMessageHandler. Production
     /// never assigns it.
     /// </summary>
-    internal static Func<string, string, ILogger, JellyseerrClient?>? JellyseerrClientFactoryOverride;
+    internal static Func<string, string, ILogger, SeerrClient?>? JellyseerrClientFactoryOverride;
 
-    private JellyseerrClient? CreateJellyseerrClient()
+    private SeerrClient? CreateJellyseerrClient()
     {
-        if (!JellyseerrClient.IsConfigured(Config.JellyseerrUrl, Config.JellyseerrApiKey))
+        if (!SeerrClient.IsConfigured(Config.JellyseerrUrl, Config.JellyseerrApiKey))
             return null;
 
         if (JellyseerrClientFactoryOverride != null)
             return JellyseerrClientFactoryOverride(Config.JellyseerrUrl!, Config.JellyseerrApiKey!, _logger);
 
-        return new JellyseerrClient(Config.JellyseerrUrl!, Config.JellyseerrApiKey!, _logger);
+        return new SeerrClient(Config.JellyseerrUrl!, Config.JellyseerrApiKey!, _logger);
     }
 
-    private async Task SyncOneUserAsync(User user, Account account, JellyseerrClient? jellyseerr, string source, CancellationToken cancellationToken)
+    private async Task SyncOneUserAsync(User user, Account account, SeerrClient? jellyseerr, string source, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting watchlist sync for {Username} (source={Source})", user.Username, source);
         SyncProgress.SetPhase($"Authenticating {user.Username}");
@@ -237,8 +237,8 @@ public class WatchlistSyncRunner
 
         await UpdatePlaylistAsync(user, account, watchlistItemIds, tmdbIds.Count).ConfigureAwait(false);
 
-        // Jellyseerr integration: auto-request unmatched films and/or mirror the
-        // Letterboxd watchlist into the user's Jellyseerr watchlist.
+        // Seerr integration: auto-request unmatched films and/or mirror the
+        // Letterboxd watchlist into the user's Seerr watchlist.
         var jellyseerrWanted = jellyseerr != null && (account.AutoRequestWatchlist || account.MirrorJellyseerrWatchlist);
         if (!jellyseerrWanted) return;
 
@@ -249,37 +249,37 @@ public class WatchlistSyncRunner
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Could not fetch Jellyseerr user map for {Username}: {Message}",
+            _logger.LogWarning("Could not fetch Seerr user map for {Username}: {Message}",
                 user.Username, ex.Message);
             return;
         }
 
         if (jellyseerrUserId == null)
         {
-            _logger.LogWarning("No Jellyseerr user linked to Jellyfin user {Username}; skipping Jellyseerr sync",
+            _logger.LogWarning("No Seerr user linked to Jellyfin user {Username}; skipping Seerr sync",
                 user.Username);
             return;
         }
 
         if (account.MirrorJellyseerrWatchlist)
         {
-            // The Jellyseerr watchlist is keyed by Jellyfin user, not by Letterboxd
+            // The Seerr watchlist is keyed by Jellyfin user, not by Letterboxd
             // account: running the mirror once per account would have each account
-            // overwrite the previous one's diff (toRemove = Jellyseerr - thisAccount
+            // overwrite the previous one's diff (toRemove = Seerr - thisAccount
             // wipes the other accounts' films). Only the primary account owns the
-            // Jellyseerr-watchlist destination so two accounts on one Jellyfin user
+            // Seerr-watchlist destination so two accounts on one Jellyfin user
             // can't clobber each other.
             var primary = Config.GetPrimaryAccountForUser(account.UserJellyfinId);
             if (ReferenceEquals(primary, account))
             {
-                SyncProgress.SetPhase($"Mirroring Jellyseerr watchlist for {user.Username}");
+                SyncProgress.SetPhase($"Mirroring Seerr watchlist for {user.Username}");
                 await MirrorJellyseerrWatchlistAsync(jellyseerr!, jellyseerrUserId.Value, tmdbIds, user.Username!, cancellationToken)
                     .ConfigureAwait(false);
             }
             else
             {
                 _logger.LogInformation(
-                    "Skipping Jellyseerr watchlist mirror for {LbUser}: not the primary account for {Username}",
+                    "Skipping Seerr watchlist mirror for {LbUser}: not the primary account for {Username}",
                     account.LetterboxdUsername, user.Username);
             }
         }
@@ -293,7 +293,7 @@ public class WatchlistSyncRunner
                 ? tmdbIds
                 : tmdbIds.Where(id => !matchedTmdbIds.Contains(id)).ToList();
 
-            SyncProgress.SetPhase($"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Jellyseerr for {user.Username}");
+            SyncProgress.SetPhase($"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr for {user.Username}");
             if (requestIds.Count == 0) return;
 
             var requested = 0;
@@ -307,23 +307,23 @@ public class WatchlistSyncRunner
                     var result = await jellyseerr!.RequestMovieAsync(tmdbId, jellyseerrUserId.Value, account.BackfillAvailableRequests).ConfigureAwait(false);
                     switch (result)
                     {
-                        case JellyseerrClient.RequestResult.Requested: requested++; break;
-                        case JellyseerrClient.RequestResult.AlreadyExists: alreadyExists++; break;
+                        case SeerrClient.RequestResult.Requested: requested++; break;
+                        case SeerrClient.RequestResult.AlreadyExists: alreadyExists++; break;
                         default: failed++; break;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Jellyseerr request errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
+                    _logger.LogWarning("Seerr request errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
                     failed++;
                 }
             }
             _logger.LogInformation(
-                "Jellyseerr auto-request for {Username} ({Mode}): {Requested} new, {Existing} already on Jellyseerr, {Failed} failed of {Total} considered",
+                "Seerr auto-request for {Username} ({Mode}): {Requested} new, {Existing} already on Seerr, {Failed} failed of {Total} considered",
                 user.Username, account.BackfillAvailableRequests ? "backfill" : "unmatched-only",
                 requested, alreadyExists, failed, requestIds.Count);
 
-            // Jellyseerr failures surface as return values, not SyncEvents; count the
+            // Seerr failures surface as return values, not SyncEvents; count the
             // batch once (not per film) so one outage doesn't inflate the error counter.
             if (failed > 0)
                 TelemetryService.RecordError(TelemetryService.CatJellyseerr);
@@ -404,7 +404,7 @@ public class WatchlistSyncRunner
     }
 
     private async Task MirrorJellyseerrWatchlistAsync(
-        JellyseerrClient jellyseerr,
+        SeerrClient jellyseerr,
         int jellyseerrUserId,
         List<int> letterboxdTmdbIds,
         string jellyfinUsername,
@@ -413,7 +413,7 @@ public class WatchlistSyncRunner
         if (letterboxdTmdbIds.Count == 0)
         {
             _logger.LogWarning(
-                "Empty Letterboxd watchlist for {Username}; skipping Jellyseerr mirror to avoid mass-deletion",
+                "Empty Letterboxd watchlist for {Username}; skipping Seerr mirror to avoid mass-deletion",
                 jellyfinUsername);
             return;
         }
@@ -425,7 +425,7 @@ public class WatchlistSyncRunner
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Failed to fetch Jellyseerr watchlist for {Username}: {Message}",
+            _logger.LogWarning("Failed to fetch Seerr watchlist for {Username}: {Message}",
                 jellyfinUsername, ex.Message);
             return;
         }
@@ -448,7 +448,7 @@ public class WatchlistSyncRunner
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Jellyseerr watchlist add errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
+                _logger.LogWarning("Seerr watchlist add errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
                 addFailed++;
             }
         }
@@ -467,13 +467,13 @@ public class WatchlistSyncRunner
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Jellyseerr watchlist remove errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
+                _logger.LogWarning("Seerr watchlist remove errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
                 removeFailed++;
             }
         }
 
         _logger.LogInformation(
-            "Jellyseerr watchlist mirror for {Username}: +{Added} -{Removed} (add failures {AddFailed}, remove failures {RemoveFailed})",
+            "Seerr watchlist mirror for {Username}: +{Added} -{Removed} (add failures {AddFailed}, remove failures {RemoveFailed})",
             jellyfinUsername, added, removed, addFailed, removeFailed);
     }
 }
