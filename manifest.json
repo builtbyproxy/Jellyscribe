@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.18.3.0",
+        "changelog": "test: strip instance_id before payload raw-count assertions to fix random-GUID flake",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.18.3/jellyfin-plugin-letterboxd-v1.18.3.zip",
+        "checksum": "a28858ccb057c1c9b001ac1ed449ae8d",
+        "timestamp": "2026-06-22T03:02:34Z"
+      },
+      {
         "version": "1.18.2.0",
         "changelog": "Jellyseerr and Overseerr have merged into a single project called Seerr. The plugin now uses the new name everywhere you see it, in the settings page, your personal account page, and the documentation, so the labels match what you see in the app you are connecting to. Nothing about the integration changes: your existing Seerr URL, API key, and per-account settings are kept, and there is nothing to reconfigure.",
         "targetAbi": "10.11.9.0",
