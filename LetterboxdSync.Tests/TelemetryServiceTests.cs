@@ -70,6 +70,13 @@ public class TelemetryServiceTests : IDisposable
     [InlineData("returned 403 during login. Likely reCAPTCHA. Provide raw cookies instead.", TelemetryService.CatAuth)]
     [InlineData("Film with TMDb ID 123 not found on Letterboxd.", TelemetryService.CatTmdb)]
     [InlineData("Seerr request errored", TelemetryService.CatJellyseerr)]
+    [InlineData("Letterboxd returned 429 for some-film. Too Many Requests.", TelemetryService.CatRateLimit)]
+    [InlineData("Letterboxd returned 503 for some-film", TelemetryService.CatServerError)]
+    [InlineData("Failed to log some-film after 4 retries.", TelemetryService.CatWriteFailure)]
+    [InlineData("Failed to post review for some-film after 4 attempts", TelemetryService.CatWriteFailure)]
+    [InlineData("Could not resolve film identifiers for /film/some-film/", TelemetryService.CatParse)]
+    [InlineData("data-film-id attribute empty on /film/some-film/", TelemetryService.CatParse)]
+    [InlineData("Letterboxd API token expired. Will re-authenticate on next sync.", TelemetryService.CatAuth)]
     [InlineData("something exploded", TelemetryService.CatOther)]
     [InlineData(null, TelemetryService.CatOther)]
     public void Classify_MapsKnownPatterns(string? message, string expected)
@@ -191,10 +198,19 @@ public class TelemetryServiceTests : IDisposable
     {
         var t = Enable();
         TelemetryService.OnSyncEvent(Evt(SyncStatus.Failed, "Cloudflare is blocking"));
+        // Categories beyond Cloudflare must also clear on recovery; the reset previously
+        // omitted Jellyseerr (and now the rate/server/write/parse buckets), leaving a stuck
+        // failing-state that could never re-fire a transition ping.
+        TelemetryService.OnSyncEvent(Evt(SyncStatus.Failed, "Seerr request errored"));
+        TelemetryService.OnSyncEvent(Evt(SyncStatus.Failed, "Failed to log some-film after 4 retries."));
         Assert.True(t.StateCloudflare);
+        Assert.True(t.StateJellyseerr);
+        Assert.True(t.StateWriteFailure);
 
         TelemetryService.OnSyncEvent(Evt(SyncStatus.Success));
         Assert.False(t.StateCloudflare);
+        Assert.False(t.StateJellyseerr);
+        Assert.False(t.StateWriteFailure);
     }
 
     // ----- Rising edge + daily cap + consolidation -----

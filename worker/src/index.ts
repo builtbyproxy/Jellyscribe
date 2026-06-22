@@ -11,7 +11,8 @@ export interface Env {
   INGEST_KEY: string;
 }
 
-const CATEGORIES = ["cloudflare_403", "auth_failure", "tmdb_lookup", "jellyseerr_error", "other"];
+const CATEGORIES = ["cloudflare_403", "auth_failure", "tmdb_lookup", "jellyseerr_error",
+  "rate_limit", "server_error", "write_failure", "parse_error", "other"];
 const MAX_BODY_BYTES = 2048;
 const MAX_LOG_BYTES = 262144; // 256 KB cap on a diagnostic bundle
 // Crockford base32 minus ambiguous chars, for human-quotable ref codes.
