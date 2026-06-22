@@ -288,11 +288,15 @@ public class TelemetryServiceTests : IDisposable
         Assert.Equal("500-2k", root.GetProperty("buckets").GetProperty("library").GetString());
         Assert.Equal("11-100", root.GetProperty("buckets").GetProperty("syncs_per_week").GetString());
 
-        // The promise, mechanically enforced: no usernames, no raw counts.
-        Assert.DoesNotContain("my-lb-username", json);
-        Assert.DoesNotContain("lachlan", json, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("1234", json);
-        Assert.DoesNotContain("37", json.Replace("schema_version", ""));
+        // The promise, mechanically enforced: no usernames, no raw counts. instance_id is
+        // the one permitted identifier and is a random GUID, so strip its value first —
+        // otherwise a GUID that coincidentally contains "37"/"1234" trips these substring
+        // checks (a flake that depends purely on which GUID was generated).
+        var body = json.Replace(t.InstanceId!, string.Empty);
+        Assert.DoesNotContain("my-lb-username", body);
+        Assert.DoesNotContain("lachlan", body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("1234", body);
+        Assert.DoesNotContain("37", body);
     }
 
     // ----- Preview endpoint policy -----
