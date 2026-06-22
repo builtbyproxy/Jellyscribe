@@ -27,6 +27,10 @@ internal static class TelemetryService
     public const string CatAuth = "auth_failure";
     public const string CatTmdb = "tmdb_lookup";
     public const string CatJellyseerr = "jellyseerr_error";
+    public const string CatRateLimit = "rate_limit";
+    public const string CatServerError = "server_error";
+    public const string CatWriteFailure = "write_failure";
+    public const string CatParse = "parse_error";
     public const string CatOther = "other";
 
     private static readonly object _lock = new();
@@ -48,10 +52,13 @@ internal static class TelemetryService
     // ---------- Classification ----------
 
     /// <summary>
-    /// Maps a failure message onto one of the five error categories. Order matters:
+    /// Maps a failure message onto one of the error categories. Order matters:
     /// auth indicators are checked before the generic 403/Cloudflare bucket because
     /// "401 after re-authentication" and login errors are auth problems even when
-    /// Cloudflare vocabulary appears alongside.
+    /// Cloudflare vocabulary appears alongside. Rate-limit (429) is checked before
+    /// the generic Cloudflare/403 bucket so throttling is reported as throttling, and
+    /// the write/parse buckets sit last so a more specific signal (auth, 429, 5xx,
+    /// TMDb) always wins over the generic "the write failed" / "the page didn't parse".
     /// </summary>
     public static string Classify(string? errorMessage)
     {
@@ -59,17 +66,32 @@ internal static class TelemetryService
         var m = errorMessage;
 
         if (Contains(m, "login error") || Contains(m, "401") || Contains(m, "reCAPTCHA")
-            || Contains(m, "Auth failed") || Contains(m, "session may be permanently invalid"))
+            || Contains(m, "Auth failed") || Contains(m, "session may be permanently invalid")
+            || Contains(m, "token expired"))
             return CatAuth;
 
         if (Contains(m, "Seerr"))
             return CatJellyseerr;
 
+        if (Contains(m, "429") || Contains(m, "Too Many Requests") || Contains(m, "rate limit"))
+            return CatRateLimit;
+
         if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403"))
             return CatCloudflare;
 
+        if (Contains(m, "returned 500") || Contains(m, "returned 502")
+            || Contains(m, "returned 503") || Contains(m, "returned 504"))
+            return CatServerError;
+
         if (Contains(m, "not found on Letterboxd") || Contains(m, "TMDb lookup") || Contains(m, "TMDb ID"))
             return CatTmdb;
+
+        if (Contains(m, "Could not resolve film") || Contains(m, "Could not find film element")
+            || Contains(m, "data-film-id") || Contains(m, "non-film URL"))
+            return CatParse;
+
+        if (Contains(m, "Failed to log") || Contains(m, "Failed to post"))
+            return CatWriteFailure;
 
         return CatOther;
     }
@@ -100,8 +122,12 @@ internal static class TelemetryService
                         // Recovery: a film made it all the way to Letterboxd, so the
                         // pipeline is healthy; flip every category back to clean. The
                         // recovery is visible in the next weekly payload (by design,
-                        // no recovery ping).
-                        d.StateCloudflare = d.StateAuth = d.StateTmdb = d.StateOther = false;
+                        // no recovery ping). Must cover every category, including
+                        // Jellyseerr and the rate/server/write/parse buckets, or a stuck
+                        // failing-state would never clear and never re-fire a transition.
+                        d.StateCloudflare = d.StateAuth = d.StateTmdb = d.StateJellyseerr =
+                            d.StateRateLimit = d.StateServerError = d.StateWriteFailure =
+                            d.StateParse = d.StateOther = false;
                         break;
                     case SyncStatus.Skipped:
                         d.WindowSkipped++;
@@ -140,6 +166,10 @@ internal static class TelemetryService
             case CatAuth: wasFailing = d.StateAuth; d.StateAuth = true; d.WindowErrAuth++; break;
             case CatTmdb: wasFailing = d.StateTmdb; d.StateTmdb = true; d.WindowErrTmdb++; break;
             case CatJellyseerr: wasFailing = d.StateJellyseerr; d.StateJellyseerr = true; d.WindowErrJellyseerr++; break;
+            case CatRateLimit: wasFailing = d.StateRateLimit; d.StateRateLimit = true; d.WindowErrRateLimit++; break;
+            case CatServerError: wasFailing = d.StateServerError; d.StateServerError = true; d.WindowErrServerError++; break;
+            case CatWriteFailure: wasFailing = d.StateWriteFailure; d.StateWriteFailure = true; d.WindowErrWriteFailure++; break;
+            case CatParse: wasFailing = d.StateParse; d.StateParse = true; d.WindowErrParse++; break;
             default: wasFailing = d.StateOther; d.StateOther = true; d.WindowErrOther++; break;
         }
 
@@ -212,7 +242,8 @@ internal static class TelemetryService
                     d.LastWeeklyPingUtc = UtcNow;
                     d.WindowSyncs = d.WindowSkipped = 0;
                     d.WindowErrCloudflare = d.WindowErrAuth = d.WindowErrTmdb =
-                        d.WindowErrJellyseerr = d.WindowErrOther = 0;
+                        d.WindowErrJellyseerr = d.WindowErrRateLimit = d.WindowErrServerError =
+                        d.WindowErrWriteFailure = d.WindowErrParse = d.WindowErrOther = 0;
                     SaveLocked();
                 }
                 logger?.LogInformation("Telemetry: weekly ping sent");
@@ -284,6 +315,10 @@ internal static class TelemetryService
                 auth_failure = d.WindowErrAuth,
                 tmdb_lookup = d.WindowErrTmdb,
                 jellyseerr_error = d.WindowErrJellyseerr,
+                rate_limit = d.WindowErrRateLimit,
+                server_error = d.WindowErrServerError,
+                write_failure = d.WindowErrWriteFailure,
+                parse_error = d.WindowErrParse,
                 other = d.WindowErrOther,
                 state = new
                 {
@@ -291,6 +326,10 @@ internal static class TelemetryService
                     auth_failure = d.StateAuth,
                     tmdb_lookup = d.StateTmdb,
                     jellyseerr_error = d.StateJellyseerr,
+                    rate_limit = d.StateRateLimit,
+                    server_error = d.StateServerError,
+                    write_failure = d.StateWriteFailure,
+                    parse_error = d.StateParse,
                     other = d.StateOther
                 }
             }

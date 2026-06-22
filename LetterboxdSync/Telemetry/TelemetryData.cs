@@ -50,6 +50,10 @@ public class TelemetryData
     public int WindowErrAuth { get; set; }
     public int WindowErrTmdb { get; set; }
     public int WindowErrJellyseerr { get; set; }
+    public int WindowErrRateLimit { get; set; }
+    public int WindowErrServerError { get; set; }
+    public int WindowErrWriteFailure { get; set; }
+    public int WindowErrParse { get; set; }
     public int WindowErrOther { get; set; }
 
     // Per-category failing state for rising-edge transition detection. A category firing
@@ -59,5 +63,9 @@ public class TelemetryData
     public bool StateAuth { get; set; }
     public bool StateTmdb { get; set; }
     public bool StateJellyseerr { get; set; }
+    public bool StateRateLimit { get; set; }
+    public bool StateServerError { get; set; }
+    public bool StateWriteFailure { get; set; }
+    public bool StateParse { get; set; }
     public bool StateOther { get; set; }
 }

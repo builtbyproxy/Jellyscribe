@@ -10,6 +10,20 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.18.3',
+    headline: 'More precise error reporting in telemetry',
+    summary:
+      'If you have opted in to the anonymous telemetry, plugin errors are now sorted into more specific categories instead of a single generic "other" bucket. Rate-limiting, Letterboxd server outages, failed writes back to Letterboxd, and page-parsing problems are each labelled distinctly. This is purely a labelling improvement: no behaviour changes, and nothing new about you or your library is collected.',
+    highlights: {
+      improvements: [
+        'Anonymous telemetry now distinguishes four previously-uncategorised error types: rate-limiting (being throttled by Letterboxd), server errors (Letterboxd returning a 5xx), write failures (a watch or review that could not be logged after retries), and parsing errors (a Letterboxd page that no longer matches what the plugin expects). Previously these all counted as "other".',
+      ],
+      fixes: [
+        'Fixed the error-state recovery so that, after a successful sync, every error category is cleared. One category was previously skipped, which could leave a stale "still failing" flag set.',
+      ],
+    },
+  },
+  {
     version: '1.18.2',
     headline: 'Jellyseerr is now called Seerr',
     summary:
