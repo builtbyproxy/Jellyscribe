@@ -223,6 +223,35 @@ public class LetterboxdLiveTests
         Assert.NotNull(info);
     }
 
+    /// <summary>
+    /// Forces the HTML-scraping path (bypassing the API-first factory) and asserts
+    /// LookupFilmByTmdbIdAsync still resolves a non-empty FilmId from live markup.
+    /// This is the one test that turns red when Letterboxd changes its film-page
+    /// HTML — exactly the regression in issue #79, where the API path masked a
+    /// broken scraper because every other integration test runs on the API path.
+    /// </summary>
+    [SkippableFact]
+    public async Task Scraping_LookupFilmByTmdbId_ResolvesIdentifiersFromLiveMarkup()
+    {
+        var (user, pass, cookies, ua) = RequireCreds();
+        using var service = new ScrapingLetterboxdService(_logger, ua);
+        try
+        {
+            await service.AuthenticateAsync(user, pass, cookies).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Skip.If(true, $"Skipping scraping-path test: scraper auth failed for the test account ({ex.Message}).");
+        }
+
+        var film = await service.LookupFilmByTmdbIdAsync(TmdbPulpFiction).ConfigureAwait(false);
+
+        Assert.NotNull(film);
+        Assert.Contains("pulp-fiction", film.Slug, StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(film.FilmId),
+            "Scraping path must resolve a FilmId from the film page — empty means the markup changed (issue #79).");
+    }
+
     // ----- Write tests with self-cleanup (API path only) -----
 
     /// <summary>

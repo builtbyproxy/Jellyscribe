@@ -175,16 +175,35 @@ public class ScraperTests
     }
 
     [Fact]
-    public void ExtractFilmIdentifiers_EmptyFilmId_Throws()
+    public void ExtractFilmIdentifiers_NoIdentifiersAtAll_Throws()
     {
-        // The element is found but data-film-id is blank → explicit failure rather than
-        // silently returning an empty id that would corrupt later API calls.
+        // The element is found but carries neither a usable filmId nor a productionId
+        // → explicit failure rather than silently returning empty ids that would
+        // corrupt later API calls.
         var html = "<div data-film-slug=\"test\" data-film-id=\"\"></div>";
         var http = new LetterboxdHttpClient(TestLogger);
         var scraper = new LetterboxdScraper(http, TestLogger);
 
         var ex = Assert.Throws<Exception>(() => scraper.ExtractFilmIdentifiers(html, "test"));
-        Assert.Contains("empty", ex.Message);
+        Assert.Contains("identifiers", ex.Message);
+        http.Dispose();
+    }
+
+    [Fact]
+    public void ExtractFilmIdentifiers_NewMarkup_ExtractsBothFromPosteredIdentifier()
+    {
+        // Mid-2026 Letterboxd markup: no data-film-slug / data-film-id; ids live in the
+        // entity-encoded data-postered-identifier JSON on the data-item-link element.
+        var html = "<div class=\"react-component\" data-item-slug=\"spider-man\" " +
+                   "data-item-link=\"/film/spider-man/\" " +
+                   "data-postered-identifier='{&quot;lid&quot;:&quot;2a8i&quot;,&quot;uid&quot;:&quot;film:51561&quot;,&quot;type&quot;:&quot;film&quot;}'></div>";
+        var http = new LetterboxdHttpClient(TestLogger);
+        var scraper = new LetterboxdScraper(http, TestLogger);
+
+        var (filmId, productionId) = scraper.ExtractFilmIdentifiers(html, "spider-man");
+
+        Assert.Equal("51561", filmId);
+        Assert.Equal("2a8i", productionId);
         http.Dispose();
     }
 
