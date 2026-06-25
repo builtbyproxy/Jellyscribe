@@ -313,32 +313,55 @@ public class LetterboxdScraper
         var filmDoc = new HtmlDocument();
         filmDoc.LoadHtml(filmHtml);
 
-        if (string.IsNullOrEmpty(productionId))
+        // Letterboxd dropped the legacy data-film-slug / data-film-id attributes in mid-2026
+        // in favour of data-item-slug / data-item-link plus a data-postered-identifier JSON
+        // blob that carries both ids: {"lid":"2a8i","uid":"film:51561",...}. lid is the
+        // productionId; the numeric tail of uid is the old filmId.
+        var el = filmDoc.DocumentNode.SelectSingleNode($"//div[@data-film-slug='{filmSlug}']")
+              ?? filmDoc.DocumentNode.SelectSingleNode($"//div[@data-item-slug='{filmSlug}']")
+              ?? filmDoc.DocumentNode.SelectSingleNode($"//div[@data-item-link='/film/{filmSlug}/']")
+              ?? filmDoc.DocumentNode.SelectSingleNode("//div[@data-film-id]")
+              ?? filmDoc.DocumentNode.SelectSingleNode("//div[@data-postered-identifier]");
+
+        if (el == null)
+            throw new Exception($"Could not find film element on page /film/{filmSlug}/");
+
+        // Prefer the explicit numeric attribute when present (legacy markup).
+        var filmId = el.GetAttributeValue("data-film-id", string.Empty);
+
+        // Pull missing ids out of the data-postered-identifier JSON — on the element itself
+        // (new markup) or, failing that, the first one on the page (kept for older fixtures).
+        if (string.IsNullOrEmpty(filmId) || string.IsNullOrEmpty(productionId))
         {
-            var posterEl = filmDoc.DocumentNode.SelectSingleNode("//div[@data-postered-identifier]");
+            var posterEl = el.Attributes.Contains("data-postered-identifier")
+                ? el
+                : filmDoc.DocumentNode.SelectSingleNode("//div[@data-postered-identifier]");
             var posterJson = posterEl?.GetAttributeValue("data-postered-identifier", string.Empty);
             if (!string.IsNullOrEmpty(posterJson))
             {
                 try
                 {
-                    using var doc = JsonDocument.Parse(posterJson);
-                    if (doc.RootElement.TryGetProperty("lid", out var lid))
+                    using var doc = JsonDocument.Parse(HtmlEntity.DeEntitize(posterJson));
+                    var root = doc.RootElement;
+                    if (string.IsNullOrEmpty(productionId) && root.TryGetProperty("lid", out var lid))
                         productionId = lid.GetString();
+                    if (string.IsNullOrEmpty(filmId) && root.TryGetProperty("uid", out var uid))
+                    {
+                        var uidStr = uid.GetString();
+                        if (!string.IsNullOrEmpty(uidStr))
+                        {
+                            // uid looks like "film:51561"; the numeric tail is the legacy filmId.
+                            var colon = uidStr.LastIndexOf(':');
+                            filmId = colon >= 0 ? uidStr[(colon + 1)..] : uidStr;
+                        }
+                    }
                 }
                 catch { }
             }
         }
 
-        var el = filmDoc.DocumentNode.SelectSingleNode($"//div[@data-film-slug='{filmSlug}']")
-              ?? filmDoc.DocumentNode.SelectSingleNode($"//div[@data-item-link='/film/{filmSlug}/']")
-              ?? filmDoc.DocumentNode.SelectSingleNode("//div[@data-film-id]");
-
-        if (el == null)
-            throw new Exception($"Could not find film element on page /film/{filmSlug}/");
-
-        var filmId = el.GetAttributeValue("data-film-id", string.Empty);
-        if (string.IsNullOrEmpty(filmId))
-            throw new Exception($"data-film-id attribute empty on /film/{filmSlug}/");
+        if (string.IsNullOrEmpty(filmId) && string.IsNullOrEmpty(productionId))
+            throw new Exception($"Could not resolve film identifiers (filmId/productionId) on /film/{filmSlug}/");
 
         return (filmId, productionId);
     }
