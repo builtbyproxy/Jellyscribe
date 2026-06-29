@@ -43,6 +43,28 @@ CREATE TABLE IF NOT EXISTS log_bundles (
 CREATE INDEX IF NOT EXISTS log_bundles_received ON log_bundles (received_at DESC);
 CREATE INDEX IF NOT EXISTS log_bundles_instance ON log_bundles (instance_id);
 
+-- Install-count telemetry (NOT opt-in, unlike pings). Captures the two signals
+-- that reach every install: the Jellyfin manifest poll (Option A, GET /manifest.json
+-- on the Worker) and the release-asset download (Option B, GET /dl/<tag>/... which
+-- 302s to GitHub). A unique install is approximated by a SHA-256 of
+-- (ip : week : HASH_SALT): weekly-rotating so the same install dedupes WITHIN a
+-- week (giving a WAU-style headcount) but cannot be linked ACROSS weeks. The raw
+-- IP is never stored. IP-based identity is coarse (NAT undercounts, dynamic IPs
+-- overcount), so read these as order-of-magnitude active-install figures, not an
+-- exact roster — the opt-in pings.instance_id remains the only exact per-install id.
+-- version is '' for manifest polls, the release tag (e.g. v1.18.4) for downloads.
+CREATE TABLE IF NOT EXISTS install_hits (
+    week TEXT NOT NULL,
+    ip_hash TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('manifest', 'download')),
+    version TEXT NOT NULL DEFAULT '',
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    hits INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (week, ip_hash, kind, version)
+);
+CREATE INDEX IF NOT EXISTS install_hits_week_kind ON install_hits (week, kind);
+
 -- Active installs by version: latest weekly ping per instance.
 CREATE VIEW IF NOT EXISTS latest_per_instance AS
 SELECT p.instance_id, p.received_at, p.week, p.plugin_version, p.jellyfin_version,
