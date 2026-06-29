@@ -46,7 +46,7 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
    - **URL:** `https://www.iamparadox.dev/jellyfin/plugins/manifest.json`
 3. Add the LetterboxdSync repository:
    - **Name:** `LetterboxdSync`
-   - **URL:** `https://raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json`
+   - **URL:** `https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
 4. Go to **Catalog**, install **File Transformation**, then install **LetterboxdSync**
 5. Restart Jellyfin
 6. Hard-refresh the Jellyfin web UI (Ctrl/Cmd + Shift + R) so the new sidebar link loads

@@ -164,7 +164,10 @@ jobs:
           ASSEMBLY="${{ steps.version.outputs.assembly }}"
           TAG="${{ steps.version.outputs.tag }}"
           CS="${{ steps.cs.outputs.checksum }}"
-          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/jellyfin-plugin-letterboxd-${TAG}.zip"
+          # sourceUrl routes through the lbsync-telemetry Worker (GET /dl/<tag>/...),
+          # which 302s to the real GitHub asset below and counts the download as a
+          # unique-install signal. The release asset itself still lives on GitHub.
+          URL="https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/${TAG}/jellyfin-plugin-letterboxd-${TAG}.zip"
           TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           if [ -f targetAbi.txt ]; then
             ABI=$(tr -d '[:space:]' < targetAbi.txt)

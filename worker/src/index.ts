@@ -9,6 +9,9 @@
 export interface Env {
   DB: D1Database;
   INGEST_KEY: string;
+  // Secret salt for the install-count IP hash. If unset, install counting is
+  // skipped (fail-open) so serving the manifest/redirect is never blocked.
+  HASH_SALT?: string;
 }
 
 const CATEGORIES = ["cloudflare_403", "auth_failure", "tmdb_lookup", "jellyseerr_error",
@@ -120,8 +123,79 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
   });
 }
 
+// ---- Install-count telemetry (GET paths; NOT opt-in, see schema.sql) --------
+// Where the GitHub manifest and release assets live. The download redirect is
+// rebuilt by prefixing GH_RELEASE_BASE onto the validated path, so it can only
+// ever point back into this one repo's releases (no open-redirect).
+const RAW_MANIFEST_URL =
+  "https://raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json";
+const GH_RELEASE_BASE =
+  "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/";
+// Release paths only ever contain tag/file segments like "v1.18.4/jellyfin-plugin-letterboxd-v1.18.4.zip".
+const SAFE_DL_PATH = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
+
+async function sha256hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Record one unique-install hit. instance identity = SHA-256(ip:week:salt), so
+// the raw IP never lands in storage and hashes can't be linked across weeks.
+async function recordInstallHit(env: Env, ip: string, kind: "manifest" | "download", version: string): Promise<void> {
+  if (!env.HASH_SALT) return; // fail-open: counting is best-effort, never blocks serving
+  const week = weekOfUtc(new Date());
+  const ipHash = await sha256hex(`${ip}:${week}:${env.HASH_SALT}`);
+  const now = new Date().toISOString().slice(0, 19) + "Z";
+  await env.DB.prepare(
+    `INSERT INTO install_hits (week, ip_hash, kind, version, first_seen, last_seen, hits)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?5, 1)
+     ON CONFLICT (week, ip_hash, kind, version)
+     DO UPDATE SET hits = hits + 1, last_seen = ?5`,
+  ).bind(week, ipHash, kind, version, now).run();
+}
+
+// GET /manifest.json — proxy the GitHub manifest (Option A) and log a poll.
+// GET /dl/<tag>/<file> — 302 to the GitHub release asset (Option B) and log it.
+// Both are unauthenticated and not strictly rate-limited (legit Jellyfin polls
+// would trip the abuse caps); Cloudflare absorbs volumetric abuse, and unique
+// counts are DISTINCT-by-hash so single-IP spam can't inflate the headcount.
+async function handleGet(req: Request, env: Env, ctx: ExecutionContext, url: URL): Promise<Response> {
+  const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
+  const path = url.pathname;
+  // Only GET is a real install action. HEAD is served (CI link-checkers, monitors
+  // use curl -I) but never counted, so validators can't inflate the headcount.
+  const count = req.method === "GET";
+
+  if (path === "/manifest.json") {
+    if (count) ctx.waitUntil(recordInstallHit(env, ip, "manifest", ""));
+    // Edge-cache the upstream fetch so a GitHub hiccup or a poll storm doesn't
+    // each cost a raw.githubusercontent round-trip.
+    const upstream = await fetch(RAW_MANIFEST_URL, { cf: { cacheTtl: 300, cacheEverything: true } });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+    });
+  }
+
+  if (path.startsWith("/dl/")) {
+    const rel = decodeURIComponent(path.slice("/dl/".length));
+    if (!SAFE_DL_PATH.test(rel)) return bad(400, "bad download path");
+    const version = rel.split("/")[0]; // the release tag, e.g. "v1.18.4"
+    if (count) ctx.waitUntil(recordInstallHit(env, ip, "download", version));
+    return Response.redirect(GH_RELEASE_BASE + rel, 302);
+  }
+
+  return bad(404, "not found");
+}
+
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(req.url);
+
+    // Unauthenticated GET/HEAD endpoints power the install-count telemetry above.
+    // (HEAD is served for link-checkers but not counted; see handleGet.)
+    if (req.method === "GET" || req.method === "HEAD") return handleGet(req, env, ctx, url);
+
     if (req.method !== "POST") return bad(405, "POST only");
 
     // Publishable write key: stops drive-by scanner POSTs, nothing more. Its
@@ -132,7 +206,7 @@ export default {
     if (rateLimited(ip)) return bad(429, "rate limited");
 
     // Diagnostic-bundle upload is a separate path with its own (larger) size cap.
-    if (new URL(req.url).pathname === "/logs") return handleLogs(req, env);
+    if (url.pathname === "/logs") return handleLogs(req, env);
 
     const raw = await req.text();
     if (raw.length > MAX_BODY_BYTES) return bad(413, "payload too large");
@@ -226,6 +300,11 @@ export default {
     // (datetime() renders "YYYY-MM-DD HH:MM:SS" and would mis-sort at the T/space char).
     await env.DB.prepare(
       "DELETE FROM log_bundles WHERE received_at < strftime('%Y-%m-%dT%H:%M:%SZ','now','-90 days')",
+    ).run();
+    // Install-count rows are non-PII (weekly-rotating salted hashes) but pruned
+    // anyway to bound growth; a year of weekly buckets is plenty for trends.
+    await env.DB.prepare(
+      "DELETE FROM install_hits WHERE last_seen < strftime('%Y-%m-%dT%H:%M:%SZ','now','-365 days')",
     ).run();
   },
 };

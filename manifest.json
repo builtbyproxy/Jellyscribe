@@ -11,7 +11,7 @@
         "version": "1.18.4.0",
         "changelog": "Fixes a sync failure introduced when Letterboxd changed their website. Films stopped logging to your diary because the plugin could no longer read each film's identifier from its Letterboxd page. The plugin now reads the new page format, so watched films sync again.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.18.4/jellyfin-plugin-letterboxd-v1.18.4.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.18.4/jellyfin-plugin-letterboxd-v1.18.4.zip",
         "checksum": "65e69d16acf6e4b43fcaa4099f58e22f",
         "timestamp": "2026-06-25T00:05:24Z"
       },
@@ -19,7 +19,7 @@
         "version": "1.18.3.0",
         "changelog": "test: strip instance_id before payload raw-count assertions to fix random-GUID flake",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.18.3/jellyfin-plugin-letterboxd-v1.18.3.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.18.3/jellyfin-plugin-letterboxd-v1.18.3.zip",
         "checksum": "a28858ccb057c1c9b001ac1ed449ae8d",
         "timestamp": "2026-06-22T03:02:34Z"
       },
@@ -27,7 +27,7 @@
         "version": "1.18.2.0",
         "changelog": "Jellyseerr and Overseerr have merged into a single project called Seerr. The plugin now uses the new name everywhere you see it, in the settings page, your personal account page, and the documentation, so the labels match what you see in the app you are connecting to. Nothing about the integration changes: your existing Seerr URL, API key, and per-account settings are kept, and there is nothing to reconfigure.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.18.2/jellyfin-plugin-letterboxd-v1.18.2.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.18.2/jellyfin-plugin-letterboxd-v1.18.2.zip",
         "checksum": "3234932a3abe5fb2fd412341dde41b4c",
         "timestamp": "2026-06-22T02:23:10Z"
       },
@@ -35,7 +35,7 @@
         "version": "1.18.1.0",
         "changelog": "No functional changes. CI now uploads JUnit test results to Codecov Test Analytics so flaky tests and failures are tracked across releases. Nothing in the plugin itself changes.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.18.1/jellyfin-plugin-letterboxd-v1.18.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.18.1/jellyfin-plugin-letterboxd-v1.18.1.zip",
         "checksum": "f3925031cde309eb2a9ceafdb93c017f",
         "timestamp": "2026-06-16T02:49:38Z"
       },
@@ -43,7 +43,7 @@
         "version": "1.18.0.0",
         "changelog": "Letterboxd often blocks plain username/password login with a Cloudflare or reCAPTCHA challenge, and accounts with two-factor authentication can never log in that way at all. This release makes raw cookies the clearly recommended way to authenticate, warns you when you save an account without them, and turns the cryptic two-factor login failure into a message that tells you exactly what to do.\n\n- Raw Cookies are now presented as the recommended way to authenticate, on both the admin settings page and your personal account page, with a short explanation of why password-only login is unreliable.\n- Saving an enabled account that has a password but no raw cookies now shows a non-blocking warning, so you find out before the first sync fails. The save still goes through.\n- Accounts with two-factor authentication enabled now fail login with a clear, actionable message instead of a vague generic error, telling you to add raw cookies (including cf_clearance) or disable 2FA.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.18.0/jellyfin-plugin-letterboxd-v1.18.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.18.0/jellyfin-plugin-letterboxd-v1.18.0.zip",
         "checksum": "51f5c0236474a59574c69f1e5cb63d84",
         "timestamp": "2026-06-16T02:22:08Z"
       },
@@ -51,7 +51,7 @@
         "version": "1.17.0.0",
         "changelog": "**Send your logs to the developer in one click.** Reporting a problem with Letterboxd Sync used to mean digging through Jellyfin's log files and pasting the right lines into a GitHub issue. This release adds a **\"Send logs to developer\"** button to the Logs tab that does it for you.\n\n**What it does**\n- Click the button and the plugin bundles your recent Letterboxd Sync log lines (the same ones already shown on the Logs tab) and uploads them privately, then hands you a short **reference code** like `LBX-7Q2F9K`. Quote that code when you open a GitHub issue and the developer can pull your exact logs, no more copy-pasting walls of text.\n- A confirmation step lets you **preview exactly what will be sent** (the real log lines and a telemetry snapshot, byte-for-byte what gets uploaded) and add a short note describing what went wrong.\n\n**Privacy, stated plainly**\n- Unlike the anonymous weekly telemetry from 1.16.0, **logs are not anonymous**: they can contain your Letterboxd username or film titles, and the bundle is linked to your install's telemetry ID. The dialog says this before you send, nothing leaves your server until you confirm, and passwords, cookies, and auth tokens are never logged.\n- Works whether or not you have anonymous telemetry enabled. Uploaded bundles are stored privately and **auto-deleted after 90 days**.\n\n**Also in this release**\n- **Stronger log access control:** the plugin's log endpoint now requires administrator access. Previously any signed-in Jellyfin user could read the Letterboxd Sync logs (which name every linked Letterboxd account and watched film); on shared or family servers this is now admin-only.\n- Better diagnostics when you do send logs: full multi-line error traces are captured intact (they were previously fragmented), log text is cleaned of stray terminal control codes, and the bundle always records your Jellyfin version.\n\nNothing changes unless you choose to use the new button.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.17.0/jellyfin-plugin-letterboxd-v1.17.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.17.0/jellyfin-plugin-letterboxd-v1.17.0.zip",
         "checksum": "40acc5add83bd50364973407aae6bfd0",
         "timestamp": "2026-06-14T00:02:57Z"
       },
@@ -59,7 +59,7 @@
         "version": "1.16.0.0",
         "changelog": "New: anonymous, opt-in usage telemetry — off by default, enabled via a one-time dashboard banner or Settings. One small bucketed ping a week (versions, enabled features, size buckets; never film titles, usernames, IPs, or exact numbers), a Preview-exact-JSON button showing precisely what's sent, a regenerable random instance ID, and an extra capped ping when errors start occurring so fleet-wide breakage is caught early. Full payload documented in the README. No other behaviour changes.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.16.0/jellyfin-plugin-letterboxd-v1.16.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.16.0/jellyfin-plugin-letterboxd-v1.16.0.zip",
         "checksum": "c10b05242f191c382ad0aa29164d97e7",
         "timestamp": "2026-06-11T21:18:30Z"
       },
@@ -67,7 +67,7 @@
         "version": "1.15.4.0",
         "changelog": "Fixes the plugin failing to load (showing as disabled) on Jellyfin 10.11.9 and 10.11.10 for versions v1.14.1 through v1.15.3: those releases were compiled against a newer Jellyfin SDK than the advertised minimum. The plugin is now always compiled against the oldest supported Jellyfin SDK, a policy enforced by CI, so the advertised minimum version is the real one. If your plugin recently stopped working, update to this version and restart Jellyfin. No feature changes.",
         "targetAbi": "10.11.9.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.4/jellyfin-plugin-letterboxd-v1.15.4.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.15.4/jellyfin-plugin-letterboxd-v1.15.4.zip",
         "checksum": "e4afef561c03b4786b50c7617f876f26",
         "timestamp": "2026-06-11T10:28:19Z"
       },
@@ -75,7 +75,7 @@
         "version": "1.15.3.0",
         "changelog": "Adds the design spec for upcoming anonymous, opt-in usage telemetry (minimal bucketed payload, off by default, one-time prompt, full payload preview) and an automated regression canary. Spec only; no telemetry code or behaviour changes in this release.",
         "targetAbi": "10.11.11.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.3/jellyfin-plugin-letterboxd-v1.15.3.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.15.3/jellyfin-plugin-letterboxd-v1.15.3.zip",
         "checksum": "b443bd5bf714c5a2c3aa3dbb6643c809",
         "timestamp": "2026-06-11T05:16:06Z"
       },
@@ -83,7 +83,7 @@
         "version": "1.15.2.0",
         "changelog": "Maintenance: fixes an intermittent CI-only test failure where a background sync spawned by one test could still hold the sync gate when the next test ran. No plugin behaviour changes.",
         "targetAbi": "10.11.11.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.2/jellyfin-plugin-letterboxd-v1.15.2.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.15.2/jellyfin-plugin-letterboxd-v1.15.2.zip",
         "checksum": "d72aa42aa478a16fb2f8ba0b6d0c7ae8",
         "timestamp": "2026-06-10T10:32:48Z"
       },
@@ -91,7 +91,7 @@
         "version": "1.15.1.0",
         "changelog": "Documentation: the Releases page on letterboxdsync.dev now has structured highlights for v1.13.4 through v1.15.0. No plugin behaviour changes.",
         "targetAbi": "10.11.11.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.1/jellyfin-plugin-letterboxd-v1.15.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.15.1/jellyfin-plugin-letterboxd-v1.15.1.zip",
         "checksum": "f9c1a9d047181473462a82f91fdef65b",
         "timestamp": "2026-06-10T06:35:09Z"
       },
@@ -99,7 +99,7 @@
         "version": "1.15.0.0",
         "changelog": "New opt-in per-account setting \"Also backfill requests for already-available watchlist films\": creates attributed Jellyseerr requests for watchlist films that entered the library without one, so \"who requested this?\" is always answerable. Off by default; existing behavior unchanged.",
         "targetAbi": "10.11.11.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.15.0/jellyfin-plugin-letterboxd-v1.15.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.15.0/jellyfin-plugin-letterboxd-v1.15.0.zip",
         "checksum": "3fb3375850e34e4ae023f54467507f14",
         "timestamp": "2026-06-10T06:27:56Z"
       },
@@ -107,7 +107,7 @@
         "version": "1.14.1.0",
         "changelog": "build: Bump Jellyfin.Controller and Jellyfin.Model",
         "targetAbi": "10.11.11.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.14.1/jellyfin-plugin-letterboxd-v1.14.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.14.1/jellyfin-plugin-letterboxd-v1.14.1.zip",
         "checksum": "558a2cdcaeb19d729f6875cb4f1a6d3a",
         "timestamp": "2026-06-10T06:21:04Z"
       },
@@ -115,7 +115,7 @@
         "version": "1.14.0.0",
         "changelog": "fix(sync): skip films with no LastPlayedDate and abandon films after 3 consecutive failures",
         "targetAbi": "10.11.10.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.14.0/jellyfin-plugin-letterboxd-v1.14.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.14.0/jellyfin-plugin-letterboxd-v1.14.0.zip",
         "checksum": "800c5e8927dac554544a57b1c66ce3c0",
         "timestamp": "2026-06-10T05:30:47Z"
       },
@@ -123,7 +123,7 @@
         "version": "1.13.4.0",
         "changelog": "test: expand plugin coverage to 89.8% line / 81.4% branch",
         "targetAbi": "10.11.10.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.4/jellyfin-plugin-letterboxd-v1.13.4.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.13.4/jellyfin-plugin-letterboxd-v1.13.4.zip",
         "checksum": "b8bd386fb87c909f247eeea53875570c",
         "timestamp": "2026-06-09T09:02:18Z"
       },
@@ -131,7 +131,7 @@
         "version": "1.13.3.0",
         "changelog": "Maintenance release. Two preventative changes aimed at the next Jellyfin SDK ABI surprise. Dependabot now watches the `Jellyfin.Controller` and `Jellyfin.Model` packages and opens a PR the day a new patch ships, so any breaking ABI change is caught by CI on our timeline rather than via a user bug report (the v1.13.0 fix only existed because Jellyfin 10.11.9's silent removal of `IUserManager.Users` surfaced as bigrichwood's report). And the version-gate CI check now refuses a patch-only version bump when `targetAbi.txt` changes in the same PR, because moving the Jellyfin compatibility floor stops a cohort of users from being offered the next plugin update and that warrants at least a minor bump so the change shows up clearly in the release notes. No plugin behaviour changes.",
         "targetAbi": "10.11.10.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.3/jellyfin-plugin-letterboxd-v1.13.3.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.13.3/jellyfin-plugin-letterboxd-v1.13.3.zip",
         "checksum": "e49de1880d92bd055f53e27ac4d6bb76",
         "timestamp": "2026-05-26T05:01:58Z"
       },
@@ -139,7 +139,7 @@
         "version": "1.13.2.0",
         "changelog": "Maintenance release. The manifest changelog field and the letterboxdsync.dev Releases page now match the v1.0–v1.12 single-paragraph user-facing prose style after v1.13.0 (rendered as a multi-paragraph incident report) and v1.13.1 (rendered as the raw conventional-commit subject line) drifted away from it. The release workflow now pulls the manifest changelog from a `## Release notes` section in the merged PR's body via the GitHub API, so the prose that lands in users' plugin catalogs is deliberate and reviewable. Backfills the two missing structured entries on the Releases page and rewrites the two stale manifest entries inline. No plugin behaviour changes.",
         "targetAbi": "10.11.10.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.2/jellyfin-plugin-letterboxd-v1.13.2.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.13.2/jellyfin-plugin-letterboxd-v1.13.2.zip",
         "checksum": "0b849abb518ebbdf526a90fbd9d1abfd",
         "timestamp": "2026-05-26T01:52:34Z"
       },
@@ -147,7 +147,7 @@
         "version": "1.13.1.0",
         "changelog": "Maintenance release: stronger release pipeline. Every PR now bumps the version (gated by a required CI check) and auto-ships on merge to main, PR titles must follow Conventional Commits, and letterboxdsync.dev rebuilds on every release. No plugin behaviour changes. Past incident behind this work: v1.13.0 was cut manually after merge and the site Releases page was stale through both v1.12.0 and v1.13.0 because the manifest auto-commit could not trigger Deploy site.",
         "targetAbi": "10.11.10.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.1/jellyfin-plugin-letterboxd-v1.13.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.13.1/jellyfin-plugin-letterboxd-v1.13.1.zip",
         "checksum": "34e7334045954fa558364fd11be5b73e",
         "timestamp": "2026-05-26T00:53:08Z"
       },
@@ -155,7 +155,7 @@
         "version": "1.13.0.0",
         "changelog": "Required update for Jellyfin 10.11.9 and newer. Jellyfin 10.11.9 removed the Users property from IUserManager and replaced it with a GetUsers() method, so the plugin (compiled against the 10.11.0 SDK) threw MissingMethodException on every user-list read on 10.11.9 and 10.11.10. Symptoms before this fix: the dashboard Stats and History endpoints returned 500, the Sync watched movies to Letterboxd scheduled task failed immediately, and Sync Letterboxd watchlist to playlist failed the same way. Plugin behaviour is otherwise unchanged from v1.12.0. targetAbi is now 10.11.9.0, so Jellyfin 10.11.0 through 10.11.8 servers stay on v1.12.0 via the catalog gate; upgrade Jellyfin to 10.11.9 or newer to receive future plugin updates. Fixes #46.",
         "targetAbi": "10.11.10.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.13.0/jellyfin-plugin-letterboxd-v1.13.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.13.0/jellyfin-plugin-letterboxd-v1.13.0.zip",
         "checksum": "bdb9fc1d28d712542c063947fc37ae0b",
         "timestamp": "2026-05-26T00:24:21Z"
       },
@@ -163,7 +163,7 @@
         "version": "1.12.0.0",
         "changelog": "Multi-account support: one Jellyfin user can now link multiple Letterboxd accounts. Auto-sync (real-time on playback completion and scheduled) fans out across every enabled account, with per-account failures isolated. Manual /Sync, /SyncWatchlist, and /Review endpoints accept an optional letterboxdUsername selector and fan out by default when omitted. Diary import unions played-state across all accounts and merges ratings with the primary account winning conflicts (existing Jellyfin ratings are still preserved). Watchlist playlists are now per-account (default name: 'Letterboxd Watchlist ({letterboxdUsername})', overridable per account). New IsPrimary flag on each account, normalised on save (at most one primary per Jellyfin user). UI: the sidebar 'My Letterboxd' page now has feature parity with the admin page for per-account management (add, remove, test, configure every account belonging to your Jellyfin user without admin access). Review modal exposes a 'Post as' account selector when more than one account is enabled, defaulting to all accounts. Behaviour change: existing single-account users will see a new per-account watchlist playlist created on first sync after upgrade, the old 'Letterboxd Watchlist' playlist is left untouched.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.12.0/jellyfin-plugin-letterboxd-v1.12.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.12.0/jellyfin-plugin-letterboxd-v1.12.0.zip",
         "checksum": "245663be03fc8a3d5853ed50f1f38604",
         "timestamp": "2026-05-14T00:00:00Z"
       },
@@ -171,7 +171,7 @@
         "version": "1.11.3.0",
         "changelog": "Docs: when a Cloudflare 403 happens after you've already pasted Raw Cookies and a matching User-Agent, the plugin error message and README now explain why (cf_clearance is short-lived, pinned to the IP that solved the challenge, and the connection itself is TLS-fingerprinted) and what to try. Addresses the dead-end case reported in #34. No plugin behaviour changes.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.11.3/jellyfin-plugin-letterboxd-v1.11.3.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.11.3/jellyfin-plugin-letterboxd-v1.11.3.zip",
         "checksum": "84b6c81fbddc78da55ecf26c7621ee40",
         "timestamp": "2026-05-14T00:00:00Z"
       },
@@ -179,7 +179,7 @@
         "version": "1.11.2.0",
         "changelog": "Fix: with diary-import enabled, the daily sync was posting phantom rewatch entries to Letterboxd for films you had only marked played via diary import (never actually watched on Jellyfin). The runner now suppresses these films until a real Jellyfin playback sets a LastPlayedDate, at which point the rewatch lands on Letterboxd as expected. Docs: install instructions now call out the File Transformation plugin as a prerequisite for the in-sidebar Letterboxd link.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.11.2/jellyfin-plugin-letterboxd-v1.11.2.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.11.2/jellyfin-plugin-letterboxd-v1.11.2.zip",
         "checksum": "9faf5fbbd66a7df1b83822b813f03358",
         "timestamp": "2026-05-13T00:00:00Z"
       },
@@ -187,7 +187,7 @@
         "version": "1.11.1.0",
         "changelog": "Fix: watchlisting a TV show on Letterboxd no longer auto-requests an unrelated movie in Jellyseerr. TMDb has independent ID namespaces for movies and TV (e.g. tv/198102 = Hijack, movie/198102 = Cutie Honey Flash), and the link extractor was treating every tmdb link as a movie ID. Now skips links whose URL points at /tv/. Adds regression coverage for the mismatch.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.11.1/jellyfin-plugin-letterboxd-v1.11.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.11.1/jellyfin-plugin-letterboxd-v1.11.1.zip",
         "checksum": "62b29e2a46aff18866c2c7630b94c448",
         "timestamp": "2026-05-05T00:00:00Z"
       },
@@ -195,7 +195,7 @@
         "version": "1.11.0.0",
         "changelog": "Bidirectional rating sync: dashboard reviews mirror their star rating into Jellyfin's UserItemData.Rating (always overwrites), and the daily diary import seeds Jellyfin ratings from Letterboxd for films that don't yet have a Jellyfin rating (anti-clobber). Switched the diary import API path from /log-entries to /films?memberRelationship=Watched so films you rated on Letterboxd without logging a watch now sync too. New in-dashboard Logs tab with per-user and free-text filters, copy-to-clipboard, and download-as-.log for support requests. Privacy hardening: review text is no longer logged.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.11.0/jellyfin-plugin-letterboxd-v1.11.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.11.0/jellyfin-plugin-letterboxd-v1.11.0.zip",
         "checksum": "04830cb6788d3cef4bdfe6468f3bcf98",
         "timestamp": "2026-05-05T00:00:00Z"
       },
@@ -203,7 +203,7 @@
         "version": "1.10.1.0",
         "changelog": "Maintenance: bump GitHub Actions runtime versions (checkout v6, setup-dotnet v5, action-gh-release v3) to remain on a supported Node version. No plugin behaviour changes.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.10.1/jellyfin-plugin-letterboxd-v1.10.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.10.1/jellyfin-plugin-letterboxd-v1.10.1.zip",
         "checksum": "c1b34b823027c8416cc52acd49baf77f",
         "timestamp": "2026-05-04T00:00:00Z"
       },
@@ -211,7 +211,7 @@
         "version": "1.10.0.0",
         "changelog": "Mirror Letterboxd watchlist into Jellyseerr's user watchlist (per-account toggle, two-way sync, movies-only so manually-added Jellyseerr TV is safe). On-demand 'Sync Watchlist Now' button on the plugin dashboard so you don't have to wait for the daily run. Pre-flight check against Jellyseerr's media status eliminates duplicate requests on every run (was creating fresh requests for already-pending/processing/available titles). Per-user watchlist sync runner extracted with a shared SyncGate so diary and watchlist syncs serialise.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.10.0/jellyfin-plugin-letterboxd-v1.10.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.10.0/jellyfin-plugin-letterboxd-v1.10.0.zip",
         "checksum": "d54df8743cd86995b1bee1249e415b18",
         "timestamp": "2026-04-30T00:00:00Z"
       },
@@ -219,7 +219,7 @@
         "version": "1.9.1.0",
         "changelog": "Local-history duplicate backstop: refuse to MarkAsWatched when sync history shows a recent successful sync that does not pass the rewatch threshold, fixes the Cloudflare-failed-validator path that was creating real Letterboxd diary duplicates. Paginated dashboard history table (100 per page) now that the 500-entry cap is gone. Addresses #21.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.9.1/jellyfin-plugin-letterboxd-v1.9.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.9.1/jellyfin-plugin-letterboxd-v1.9.1.zip",
         "checksum": "aa95027481de6930d7f901dd7b79fa53",
         "timestamp": "2026-04-30T00:00:00Z"
       },
@@ -227,7 +227,7 @@
         "version": "1.9.0.0",
         "changelog": "Skip already-synced films using local sync history so we don't burn Cloudflare quota on duplicate checks; prioritise previously-failed/skipped films first; per-account stop-on-failure toggle to halt the moment Letterboxd anti-flooding triggers; explicit info-level logging for every skip with reason; non-admin users can now Run Sync Now (triggers their account only). Fixes #20.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.9.0/jellyfin-plugin-letterboxd-v1.9.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.9.0/jellyfin-plugin-letterboxd-v1.9.0.zip",
         "checksum": "77b868d347daa3e5d2e406a84239ec59",
         "timestamp": "2026-04-30T00:00:00Z"
       },
@@ -235,7 +235,7 @@
         "version": "1.8.0.0",
         "changelog": "Jellyseerr auto-request for unmatched watchlist films (per-user attribution via Jellyfin User ID), plus dedup fix so the watchlist playlist no longer accumulates duplicate entries on each run",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.8.0/jellyfin-plugin-letterboxd-v1.8.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.8.0/jellyfin-plugin-letterboxd-v1.8.0.zip",
         "checksum": "e40552a2d9456c6a34ccf23475355b7c",
         "timestamp": "2026-04-26T00:00:00Z"
       },
@@ -243,7 +243,7 @@
         "version": "1.7.0.0",
         "changelog": "Per-account User-Agent override so Cloudflare cookies copied from any browser (Chrome, Safari, etc.) work without UA mismatch",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.7.0/jellyfin-plugin-letterboxd-v1.7.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.7.0/jellyfin-plugin-letterboxd-v1.7.0.zip",
         "checksum": "d6281ab55367c645a3a3ff6bb7c62f5e",
         "timestamp": "2026-04-25T00:00:00Z"
       },
@@ -251,7 +251,7 @@
         "version": "1.6.1.0",
         "changelog": "Fix review posting via official API: resolve film LID from TMDb ID instead of slug (fixes #12)",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.6.1/jellyfin-plugin-letterboxd-v1.6.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.6.1/jellyfin-plugin-letterboxd-v1.6.1.zip",
         "checksum": "87fa9f95e6e57fa16e5b7083ef970876",
         "timestamp": "2026-04-14T00:00:00Z"
       },
@@ -259,7 +259,7 @@
         "version": "1.6.0.0",
         "changelog": "Official Letterboxd API integration (primary) with web scraping fallback, eliminates Cloudflare 403 errors",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.6.0/jellyfin-plugin-letterboxd-v1.6.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.6.0/jellyfin-plugin-letterboxd-v1.6.0.zip",
         "checksum": "5de13fa5256243bb0fc4b81f848cdd13",
         "timestamp": "2026-04-07T00:00:00Z"
       },
@@ -267,7 +267,7 @@
         "version": "1.5.0.0",
         "changelog": "User self-service account setup, sidebar link for all users, test connection button, standalone user page via File Transformation injection",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.5.0/jellyfin-plugin-letterboxd-v1.5.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.5.0/jellyfin-plugin-letterboxd-v1.5.0.zip",
         "checksum": "2a12387b19461de7dd49b4da5f03c513",
         "timestamp": "2026-04-07T00:00:00Z"
       },
@@ -275,7 +275,7 @@
         "version": "1.4.0.0",
         "changelog": "Architecture refactor, TMDb cache, progress dashboard, diary import fix, Cloudflare resilience, watchlist cleanup",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.4.0/jellyfin-plugin-letterboxd-v1.4.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.4.0/jellyfin-plugin-letterboxd-v1.4.0.zip",
         "checksum": "cdef9daa290a58986d20e2760843a3a6",
         "timestamp": "2026-03-31T00:00:00Z"
       },
@@ -283,7 +283,7 @@
         "version": "1.3.0.0",
         "changelog": "Real-time playback sync via PlaybackHandler, automatic session re-auth on 401",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.3.0/jellyfin-plugin-letterboxd-v1.3.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.3.0/jellyfin-plugin-letterboxd-v1.3.0.zip",
         "checksum": "5d6ab49eb7f6dec18d0d5bf63cb0451a",
         "timestamp": "2026-03-26T22:00:00Z"
       },
@@ -291,7 +291,7 @@
         "version": "1.2.1.0",
         "changelog": "Fix sync history persistence across version upgrades",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.2.1/jellyfin-plugin-letterboxd-v1.2.1.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.2.1/jellyfin-plugin-letterboxd-v1.2.1.zip",
         "checksum": "4a9dc0f75d90c945b1aa30e1b353ad63",
         "timestamp": "2026-03-26T01:00:00Z"
       },
@@ -299,7 +299,7 @@
         "version": "1.2.0.0",
         "changelog": "Star ratings in reviews, rewatch date picker, Cloudflare retry on reviews, better error display, sync history persistence fix",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.2.0/jellyfin-plugin-letterboxd-v1.2.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.2.0/jellyfin-plugin-letterboxd-v1.2.0.zip",
         "checksum": "b57832a58c8592ab54b508f2f56af89d",
         "timestamp": "2026-03-26T00:00:00Z"
       },
@@ -307,7 +307,7 @@
         "version": "1.1.0.0",
         "changelog": "Dashboard with sync history, watchlist sync, diary import, reviews, Cloudflare backoff, rating sync, rewatch detection",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.1.0/jellyfin-plugin-letterboxd-v1.1.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.1.0/jellyfin-plugin-letterboxd-v1.1.0.zip",
         "checksum": "99ebc280d1b2929416a71a92764150bc",
         "timestamp": "2026-03-25T12:00:00Z"
       },
@@ -315,7 +315,7 @@
         "version": "1.0.0.0",
         "changelog": "Initial release: real-time sync, scheduled catch-up, multi-user, duplicate detection, retry with backoff",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/v1.0.0/jellyfin-plugin-letterboxd-v1.0.0.zip",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.0.0/jellyfin-plugin-letterboxd-v1.0.0.zip",
         "checksum": "a7051032812f841542d03ccbd0bfe35a",
         "timestamp": "2026-03-25T00:00:00Z"
       }
