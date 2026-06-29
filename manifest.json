@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.18.5.0",
+        "changelog": "No functional changes to syncing. This release adds an anonymous, privacy-preserving install counter so the developer can see roughly how many Jellyfin servers run the plugin. No personal data is collected: your IP address is never stored, and the anonymous weekly fingerprint used to avoid double-counting cannot be traced back to you or linked across weeks.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.18.5/jellyfin-plugin-letterboxd-v1.18.5.zip",
+        "checksum": "0f120d467ec956f5a52e17a57fcd9077",
+        "timestamp": "2026-06-29T04:25:28Z"
+      },
+      {
         "version": "1.18.4.0",
         "changelog": "Fixes a sync failure introduced when Letterboxd changed their website. Films stopped logging to your diary because the plugin could no longer read each film's identifier from its Letterboxd page. The plugin now reads the new page format, so watched films sync again.",
         "targetAbi": "10.11.9.0",
