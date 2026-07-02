@@ -162,9 +162,9 @@ What it's for: deciding what gets built next based on what people actually use, 
 
 ### Install counting (separate from the opt-in telemetry)
 
-The recommended plugin repository URL and the release downloads are served through an edge-cached mirror of the GitHub manifest. The mirror counts each request as an anonymous, weekly-rotating hash of the caller's IP so the project can estimate how many servers run the plugin. This is a plain traffic count, not the telemetry above: no instance ID, no settings, no versions beyond the release being downloaded, and the raw IP is never stored — the hash is salted and cannot be linked across weeks by design.
+The recommended plugin repository URL and the release downloads are served through an edge-cached mirror of the GitHub manifest. The mirror counts each request as an anonymous, weekly-rotating hash of the caller's IP so the project can estimate how many servers run the plugin. This is a plain traffic count, not the telemetry above: no instance ID, no settings, no versions beyond the release being downloaded, and the raw IP is never stored, the hash is salted and cannot be linked across weeks by design.
 
-Since v1.19.0 the plugin also adds the mirror as a second catalog repository entry (named "... (mirror)") alongside your existing GitHub entry, once. Your GitHub entry is never removed, so updates keep working even if the mirror is unreachable. If you prefer not to be counted, delete the mirror entry — the plugin will not re-add it — and both entries serve the identical manifest.
+Since v1.19.0 the plugin also adds the mirror as a second catalog repository entry (named "... (mirror)") alongside your existing GitHub entry, once. Your GitHub entry is never removed, so updates keep working even if the mirror is unreachable. If you prefer not to be counted, delete the mirror entry, the plugin will not re-add it, and both entries serve the identical manifest.
 
 ### Send logs to the developer
 

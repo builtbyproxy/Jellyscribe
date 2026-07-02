@@ -15,7 +15,7 @@ namespace LetterboxdSync;
 /// One-shot startup migration that ADDS the Cloudflare Worker's proxied manifest URL
 /// to the Jellyfin plugin catalog alongside this plugin's existing raw-GitHub entry.
 /// The Worker serves the identical manifest (edge-cached) and counting its polls is
-/// the only way to measure the active install base continuously — downloads already
+/// the only way to measure the active install base continuously, downloads already
 /// route through the Worker, but those are only observable at each release's update
 /// wave.
 ///
@@ -118,7 +118,7 @@ internal static class RepositoryMigrator
     /// <summary>
     /// Appends the proxied-manifest repository entry if the catalog has this plugin's
     /// raw-GitHub entry and no proxied entry yet. Returns whether the configuration
-    /// was modified and needs saving. A catalog without our raw entry is left alone —
+    /// was modified and needs saving. A catalog without our raw entry is left alone , 
     /// sideloaded installs and users who removed the repo get nothing added.
     /// </summary>
     internal static bool TryAddProxiedEntry(ServerConfiguration configuration)

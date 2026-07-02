@@ -28,9 +28,9 @@ Bugs still happen, the [issue tracker](https://github.com/builtbyproxy/jellyfin-
 
 Rather than abstract token counts (tried it, the numbers were noise), here is the concrete output of this human-directs-AI-builds arrangement, as of July 2026:
 
-- **173 commits** since the first one on 2026-03-25
-- **53 merged pull requests**, every one human-reviewed
-- **40 shipped releases** through a fully automated pipeline
+- **175+ commits** since the first one on 2026-03-25
+- **54 merged pull requests**, every one human-reviewed
+- **41 shipped releases** through a fully automated pipeline
 - **~18,000 lines of C#** including **~590 tests**
 - Plus the [letterboxdsync.dev](https://letterboxdsync.dev/) website, the telemetry worker, and the CI/release automation
 
