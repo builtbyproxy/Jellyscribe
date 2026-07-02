@@ -202,7 +202,7 @@ public class GetDiaryFilmEntriesIntegrationTests
 
     /// <summary>
     /// Real shape of the /films?memberRelationship=Watched response we captured
-    /// during the live API probe — three rated films, one unrated, one duplicate
+    /// during the live API probe, three rated films, one unrated, one duplicate
     /// TMDb id (defensive: API has been seen to return dupes after edits).
     /// </summary>
     private const string SampleResponse = @"{
@@ -280,7 +280,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         var entries = await client.GetDiaryFilmEntriesAsync("user");
 
         // The /films endpoint must be called with the Watched relationship and
-        // MemberRelationship include — that's what carries the per-member rating.
+        // MemberRelationship include, that's what carries the per-member rating.
         Assert.NotNull(capturedQuery);
         Assert.Contains("memberRelationship=Watched", capturedQuery);
         Assert.Contains("include=MemberRelationship", capturedQuery);

@@ -7,7 +7,7 @@ using Xunit;
 namespace LetterboxdSync.Tests;
 
 /// <summary>
-/// Tests for LetterboxdSyncRunner.BuildSyncQueue — the pre-flight filter and prioritisation
+/// Tests for LetterboxdSyncRunner.BuildSyncQueue, the pre-flight filter and prioritisation
 /// that runs BEFORE any HTTP traffic. This is the heart of the issue #20 fix: skip what's
 /// already synced locally, retry previously-failed/skipped films first.
 /// </summary>
@@ -85,7 +85,7 @@ public class BuildSyncQueueTests
     public void PreviouslySuccessfulButDifferentDateIsTreatedAsFresh()
     {
         // wasSynced returns false because the date doesn't match (rewatch on a new date),
-        // and lastStatus is Success — that's neither Failed nor Skipped, so the film stays
+        // and lastStatus is Success, that's neither Failed nor Skipped, so the film stays
         // at the regular "never attempted" priority.
         var candidates = new[]
         {
@@ -97,7 +97,7 @@ public class BuildSyncQueueTests
             wasSynced: (_, _, _) => false,
             lastStatus: (_, tid) => tid == 100 ? SyncStatus.Success : null);
 
-        // Both at priority 1 — order should be preserved (stable sort).
+        // Both at priority 1, order should be preserved (stable sort).
         Assert.Equal(new[] { "rewatch", "fresh" }, queue);
     }
 

@@ -32,18 +32,18 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Letterb
 
 `ILetterboxdService` (`ILetterboxdService.cs`) is the seam every caller uses. Two implementations:
 
-- `LetterboxdApiClient` — preferred, talks to Letterboxd's JSON endpoints.
-- `ScrapingLetterboxdService` — fallback, composes `LetterboxdHttpClient` (cookies/CSRF/Cloudflare retry), `LetterboxdAuth` (login + re-auth on 401), `LetterboxdScraper` (HTML parsing, film lookup, diary/watchlist scraping), and `LetterboxdDiary` (diary writes, review posting).
+- `LetterboxdApiClient`, preferred, talks to Letterboxd's JSON endpoints.
+- `ScrapingLetterboxdService`, fallback, composes `LetterboxdHttpClient` (cookies/CSRF/Cloudflare retry), `LetterboxdAuth` (login + re-auth on 401), `LetterboxdScraper` (HTML parsing, film lookup, diary/watchlist scraping), and `LetterboxdDiary` (diary writes, review posting).
 
-`LetterboxdServiceFactory.CreateAuthenticatedAsync` tries the API first and silently falls back to scraping if auth fails. The factory also exposes an `internal static OverrideForTesting` hook used via `InternalsVisibleTo` from `LetterboxdSync.Tests` to inject mock services — production code never touches it.
+`LetterboxdServiceFactory.CreateAuthenticatedAsync` tries the API first and silently falls back to scraping if auth fails. The factory also exposes an `internal static OverrideForTesting` hook used via `InternalsVisibleTo` from `LetterboxdSync.Tests` to inject mock services, production code never touches it.
 
 ### Sync entry points
 
-- `SyncTask` — scheduled, exports recent watches to the Letterboxd diary.
-- `WatchlistSyncTask` / `WatchlistSyncRunner` — imports the user's Letterboxd watchlist as a Jellyfin playlist.
-- `DiaryImportTask` — marks Jellyfin items as played if present in the Letterboxd diary.
-- `PlaybackHandler` — `IHostedService` registered in `ServiceRegistrator`, fires the real-time sync on playback completion.
-- `LetterboxdSyncRunner` — shared engine used by `SyncTask` and `PlaybackHandler`; `SyncGate`, `SyncHistory`, `SyncProgress`, and `TmdbCache` coordinate dedupe, progress UI, and TMDb lookups.
+- `SyncTask`, scheduled, exports recent watches to the Letterboxd diary.
+- `WatchlistSyncTask` / `WatchlistSyncRunner`, imports the user's Letterboxd watchlist as a Jellyfin playlist.
+- `DiaryImportTask`, marks Jellyfin items as played if present in the Letterboxd diary.
+- `PlaybackHandler`, `IHostedService` registered in `ServiceRegistrator`, fires the real-time sync on playback completion.
+- `LetterboxdSyncRunner`, shared engine used by `SyncTask` and `PlaybackHandler`; `SyncGate`, `SyncHistory`, `SyncProgress`, and `TmdbCache` coordinate dedupe, progress UI, and TMDb lookups.
 
 ### Plugin surface
 
@@ -61,7 +61,7 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Letterb
    - **Bump `AssemblyVersion` / `FileVersion`** in both `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`. Patch bumps (e.g. `1.13.0.0` → `1.13.1.0`) are fine for docs / CI / refactor changes; every PR ships. Enforced by `version-gate.yml`.
    - Fill in the **`## Release notes`** section in the PR body. `release.yml` extracts text between that heading and the next H2 and uses it verbatim as the manifest changelog field and the GitHub Release body. The PR template primes the section so it's the path of least resistance. Past entries on https://letterboxdsync.dev/releases set the tone: one paragraph, user-facing prose, no symbol names / internal jargon.
    - Add a structured entry to **`site/src/data/release-notes.ts`** for the new version (headline + summary + categorised highlights). The site renders these on the Releases page above the raw manifest changelog. Same tone as the manifest changelog but split into `new` / `improvements` / `fixes` / `breaking` bullets.
-   - **SDK floor policy (issue #63)**: the `Jellyfin.Controller`/`Jellyfin.Model` PackageReference version MUST equal `targetAbi.txt` — Jellyfin assemblies have per-patch AssemblyVersions, so the SDK we compile against is the real minimum Jellyfin a release can load on. Never bump the SDK routinely (Dependabot PRs are a compile signal, not a merge queue); bump it only when we need a newer API, raising `targetAbi.txt` and the minor version in the same PR. CI enforces the SDK==targetAbi match.
+   - **SDK floor policy (issue #63)**: the `Jellyfin.Controller`/`Jellyfin.Model` PackageReference version MUST equal `targetAbi.txt`, Jellyfin assemblies have per-patch AssemblyVersions, so the SDK we compile against is the real minimum Jellyfin a release can load on. Never bump the SDK routinely (Dependabot PRs are a compile signal, not a merge queue); bump it only when we need a newer API, raising `targetAbi.txt` and the minor version in the same PR. CI enforces the SDK==targetAbi match.
 
 2. Merge with **Squash and merge**. The squash subject is the PR title with `(#NN)` appended; the release workflow extracts the PR number from that and fetches the PR body via `gh pr view` (the squash commit body itself is not reliable across merge methods).
 

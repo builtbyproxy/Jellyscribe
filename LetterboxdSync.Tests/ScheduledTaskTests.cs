@@ -86,7 +86,7 @@ public class ScheduledTaskTests : IDisposable
     public async Task SyncTask_ExecuteAsync_DelegatesToRunner()
     {
         // We can't easily Substitute a concrete LetterboxdSyncRunner, so we use
-        // a real one with empty users — the task just calls RunForAllAsync.
+        // a real one with empty users, the task just calls RunForAllAsync.
         var um = Substitute.For<IUserManager>();
         um.GetUsers().Returns(Array.Empty<Jellyfin.Database.Implementations.Entities.User>());
         var lm = Substitute.For<ILibraryManager>();

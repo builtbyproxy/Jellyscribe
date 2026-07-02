@@ -5,7 +5,7 @@ namespace LetterboxdSync;
 /// The backend is a Cloudflare Worker + D1 (see worker/ in the repo); the database is
 /// reachable only through the Worker. The key is publishable by design (like a
 /// Plausible domain): it stops drive-by scanner POSTs, and its extraction from plugin
-/// source is bounded to junk rows — never reads, never privacy.
+/// source is bounded to junk rows, never reads, never privacy.
 /// Mutable (not const) so tests can point the sender at a fake.
 /// </summary>
 internal static class TelemetryConstants

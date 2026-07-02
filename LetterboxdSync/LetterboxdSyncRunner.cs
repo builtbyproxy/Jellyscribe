@@ -191,7 +191,7 @@ public class LetterboxdSyncRunner
         // which drifts forward on every run and slips past every same-date duplicate check,
         // posting a phantom rewatch to Letterboxd roughly every other day. Wait until Jellyfin
         // records an actual play date. This also closes the import-then-export loop from
-        // issue #32 — DiaryImportTask marks films played without a LastPlayedDate.
+        // issue #32, DiaryImportTask marks films played without a LastPlayedDate.
         var skippedNoPlayDate = 0;
         movies = movies.Where(m =>
         {
@@ -241,7 +241,7 @@ public class LetterboxdSyncRunner
 
         // Filter out anything we already successfully synced for this exact viewing date,
         // so we don't burn Cloudflare quota re-checking films that are definitely on Letterboxd.
-        // Sort what's left so previously-failed/skipped films come first — if rate limits hit,
+        // Sort what's left so previously-failed/skipped films come first, if rate limits hit,
         // we make progress on the backlog instead of repeatedly retrying the same head of queue.
         int preFilterCount = movies.Count;
         int locallySkipped = 0;
@@ -432,7 +432,7 @@ public class LetterboxdSyncRunner
         {
             if (c.TmdbId is not int tid)
             {
-                // No TMDb ID — main loop logs and records an explicit skip event with reason.
+                // No TMDb ID, main loop logs and records an explicit skip event with reason.
                 remaining.Add((c.Item, 1));
                 continue;
             }

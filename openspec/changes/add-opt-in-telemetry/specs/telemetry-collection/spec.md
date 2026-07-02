@@ -61,7 +61,7 @@ Window counters (measured since the last successful weekly ping), the last-succe
 
 ### Requirement: Error-transition pings
 
-When any error category transitions clean → failing, a ping of type `error_transition` carrying the full five-category error-state map SHALL fire, rate-limited to one per instance per day. Further transitions during a spent cap window MUST be queued and sent as one consolidated ping when the window reopens — deferred, never silently dropped client-side. Recovery (failing → clean) does not fire a ping; it is visible in the next weekly payload.
+When any error category transitions clean → failing, a ping of type `error_transition` carrying the full five-category error-state map SHALL fire, rate-limited to one per instance per day. Further transitions during a spent cap window MUST be queued and sent as one consolidated ping when the window reopens, deferred, never silently dropped client-side. Recovery (failing → clean) does not fire a ping; it is visible in the next weekly payload.
 
 #### Scenario: Second category trips during the cap window
 

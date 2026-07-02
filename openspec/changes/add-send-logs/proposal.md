@@ -12,7 +12,7 @@ A one-click "Send logs to developer" closes the loop: telemetry flags the patter
 - Bundle delivery is **push** (every bundle lands so it can be triaged) **plus** the returned ref code (so a user can optionally tie their bundle to a bug report they open).
 
 ### New Capabilities
-- `log-bundles`: the user-initiated diagnostic bundle — what it contains, the consent/disclosure UX, the upload contract, storage, retention, and the ref-code linkage.
+- `log-bundles`: the user-initiated diagnostic bundle, what it contains, the consent/disclosure UX, the upload contract, storage, retention, and the ref-code linkage.
 
 ### Modified Capabilities
 - `telemetry-backend` (from [[add-opt-in-telemetry]]): the Worker gains the `/logs` route, the `log_bundles` table, and a scheduled prune. The anonymous-pings contract is unchanged.

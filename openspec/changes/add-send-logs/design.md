@@ -26,5 +26,5 @@ The `/logs` route reuses the publishable key check, the per-IP and global rate l
 
 ## Deferred
 
-- **AI triage routine** — pull new bundles, analyse each against its instance's telemetry, post a private triage note. Build after capture is proven and bundles exist.
-- **Bundle retrieval tooling** — for now the maintainer reads bundles via a D1 query by ref code; a nicer fetch CLI can follow.
+- **AI triage routine**, pull new bundles, analyse each against its instance's telemetry, post a private triage note. Build after capture is proven and bundles exist.
+- **Bundle retrieval tooling**, for now the maintainer reads bundles via a D1 query by ref code; a nicer fetch CLI can follow.

@@ -17,7 +17,7 @@ are for pre-release sanity checks and reproducing live bugs.
 ## Setup
 
 1. Create or pick a Letterboxd account dedicated to testing (do not use a real
-   personal account — these tests are read-only today, but the credential will
+   personal account, these tests are read-only today, but the credential will
    end up in shell history / env state on whatever machine you run them on).
 2. Export the credentials in the shell that will run `dotnet test`:
 
@@ -25,7 +25,7 @@ are for pre-release sanity checks and reproducing live bugs.
    export LETTERBOXD_TEST_USERNAME="your-test-account"
    export LETTERBOXD_TEST_PASSWORD="your-test-password"
 
-   # Optional — supply if Cloudflare 403s on raw login
+   # Optional, supply if Cloudflare 403s on raw login
    export LETTERBOXD_TEST_RAW_COOKIES="cf_clearance=...; letterboxd.session=..."
    export LETTERBOXD_TEST_USER_AGENT="Mozilla/5.0 ..."
    ```
@@ -76,7 +76,7 @@ To wire up:
 1. Repo Settings → Secrets and variables → Actions → New repository secret
 2. Add `LETTERBOXD_TEST_USERNAME` and `LETTERBOXD_TEST_PASSWORD` (and
    optionally `LETTERBOXD_TEST_RAW_COOKIES` / `LETTERBOXD_TEST_USER_AGENT`)
-3. Push or open a PR — the workflow runs automatically
+3. Push or open a PR, the workflow runs automatically
 
 If the secrets aren't configured (e.g. on a fork PR, where GitHub doesn't
 forward repo secrets), the workflow detects the missing credentials and

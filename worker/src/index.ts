@@ -67,10 +67,10 @@ function genRefCode(): string {
   return `LBX-${s}`;
 }
 
-// POST /logs — accept a user-initiated diagnostic bundle (sanitized log lines +
+// POST /logs, accept a user-initiated diagnostic bundle (sanitized log lines +
 // telemetry snapshot), store it privately in the log_bundles D1 table keyed by a
 // ref code, return the code. Unlike telemetry, a bundle is NOT anonymous (it may
-// carry the user's Letterboxd username or film titles) — but it only arrives on
+// carry the user's Letterboxd username or film titles), but it only arrives on
 // an explicit, disclosed user click. The scheduled() handler prunes bundles after
 // 90 days.
 async function handleLogs(req: Request, env: Env): Promise<Response> {
@@ -154,8 +154,8 @@ async function recordInstallHit(env: Env, ip: string, kind: "manifest" | "downlo
   ).bind(week, ipHash, kind, version, now).run();
 }
 
-// GET /manifest.json — proxy the GitHub manifest (Option A) and log a poll.
-// GET /dl/<tag>/<file> — 302 to the GitHub release asset (Option B) and log it.
+// GET /manifest.json, proxy the GitHub manifest (Option A) and log a poll.
+// GET /dl/<tag>/<file>, 302 to the GitHub release asset (Option B) and log it.
 // Both are unauthenticated and not strictly rate-limited (legit Jellyfin polls
 // would trip the abuse caps); Cloudflare absorbs volumetric abuse, and unique
 // counts are DISTINCT-by-hash so single-IP spam can't inflate the headcount.

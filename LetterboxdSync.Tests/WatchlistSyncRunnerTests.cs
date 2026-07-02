@@ -516,7 +516,7 @@ public class WatchlistSyncRunnerTests : IDisposable
                 new Progress<double>(), CancellationToken.None);
 
             Assert.True(ok);
-            // No add or delete — empty LB means no mirror operations.
+            // No add or delete, empty LB means no mirror operations.
             Assert.DoesNotContain(handler.Calls, r => r.Method == HttpMethod.Post);
             Assert.DoesNotContain(handler.Calls, r => r.Method == HttpMethod.Delete);
         }

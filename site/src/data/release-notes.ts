@@ -10,10 +10,23 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.19.1',
+    headline: 'AI transparency page and a code of conduct that fits',
+    summary:
+      'No functional changes to syncing. The project now documents openly how it is built: a new AI.md page explains that most of the plugin is AI-written under human direction and review, what tooling is used, and the checks every change passes before it ships. The Code of Conduct is rewritten to something honest for a one-person project, and the README links to all of it.',
+    highlights: {
+      improvements: [
+        'New AI transparency page (AI.md in the repository) covering the AI tooling, the human review and CI gates, and the concrete scale of what has been built.',
+        'Code of Conduct rewritten for a solo-maintained project, with reports directed to GitHub issues.',
+        'Documentation cleanup: consistent punctuation across the README, website release notes, and code comments.',
+      ],
+    },
+  },
+  {
     version: '1.19.0',
     headline: 'A faster mirror joins your plugin catalog',
     summary:
-      'A second repository entry for this plugin — an edge-cached mirror of the exact same manifest — is added to your Jellyfin catalog next to the existing GitHub one, a single time. Your GitHub entry is never touched, so updates keep working even if the mirror is unreachable, and if you would rather not have the mirror you can simply delete it: the plugin will not add it back. The mirror counts an anonymous, weekly-rotating hash per request so we can see roughly how many servers run the plugin; no IP addresses or personal data are ever stored, and this is entirely separate from the opt-in telemetry.',
+      'A second repository entry for this plugin, an edge-cached mirror of the exact same manifest, is added to your Jellyfin catalog next to the existing GitHub one, a single time. Your GitHub entry is never touched, so updates keep working even if the mirror is unreachable, and if you would rather not have the mirror you can simply delete it: the plugin will not add it back. The mirror counts an anonymous, weekly-rotating hash per request so we can see roughly how many servers run the plugin; no IP addresses or personal data are ever stored, and this is entirely separate from the opt-in telemetry.',
     highlights: {
       improvements: [
         'The edge-cached manifest mirror is added to your plugin catalog alongside the GitHub entry (named after your existing entry with a "(mirror)" suffix, matching its enabled state). It serves the identical manifest and redirects downloads to the official GitHub releases. This runs once: deleting the mirror entry is respected and it is never re-added.',
@@ -447,7 +460,7 @@ export const releaseNotes: ReleaseNotes[] = [
     headline: 'User self-service account setup and standalone user page',
     highlights: {
       new: [
-        'User self-service account setup — users link their own Letterboxd account without admin help.',
+        'User self-service account setup, users link their own Letterboxd account without admin help.',
         'Sidebar link for all users.',
         'Test connection button on the account form.',
         'Standalone user page via File Transformation injection.',
@@ -475,7 +488,7 @@ export const releaseNotes: ReleaseNotes[] = [
     headline: 'Real-time playback sync',
     highlights: {
       new: [
-        'Real-time playback sync via PlaybackHandler — diary entries land within seconds of credits rolling.',
+        'Real-time playback sync via PlaybackHandler, diary entries land within seconds of credits rolling.',
       ],
       improvements: ['Automatic session re-auth on 401.'],
     },

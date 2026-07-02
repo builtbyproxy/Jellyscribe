@@ -55,7 +55,7 @@ public class SyncHistoryLookupTests
     public void WasSuccessfullySynced_FalseForFailedOrSkippedEntry()
     {
         // The whole point of prioritising these on the next run is that they DID NOT sync
-        // successfully — they must not be treated as already-synced.
+        // successfully, they must not be treated as already-synced.
         var failedOrSkipped = new List<SyncEvent>
         {
             Event(User, FilmA, ViewedToday, SyncStatus.Failed),
@@ -69,7 +69,7 @@ public class SyncHistoryLookupTests
     public void WasSuccessfullySynced_FalseWhenViewingDateDiffers()
     {
         // A successful sync for a previous viewing must not mask a new viewing on a different
-        // date — the user expects the second viewing to land on Letterboxd as its own diary entry.
+        // date, the user expects the second viewing to land on Letterboxd as its own diary entry.
         var events = new List<SyncEvent>
         {
             Event(User, FilmA, ViewedYesterday, SyncStatus.Success)
@@ -81,7 +81,7 @@ public class SyncHistoryLookupTests
     [Fact]
     public void WasSuccessfullySynced_IgnoresOtherUsers()
     {
-        // SyncHistory is shared across users — make sure The Barn's sync doesn't think it
+        // SyncHistory is shared across users, make sure The Barn's sync doesn't think it
         // already happened just because lachlan synced the same film.
         var events = new List<SyncEvent>
         {
@@ -163,7 +163,7 @@ public class SyncHistoryLookupTests
                 recordedAt: new DateTime(2026, 4, 1)),
         };
 
-        // The newer event belongs to the other user — ours is older but is the right answer.
+        // The newer event belongs to the other user, ours is older but is the right answer.
         Assert.Equal(SyncStatus.Failed, SyncHistory.GetLastStatusForFilm(events, User, FilmA));
     }
 

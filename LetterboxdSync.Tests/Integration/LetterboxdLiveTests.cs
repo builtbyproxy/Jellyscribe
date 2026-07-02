@@ -10,7 +10,7 @@ namespace LetterboxdSync.Tests.Integration;
 /// <summary>
 /// Live integration tests against letterboxd.com using a real account. Skipped
 /// unless LETTERBOXD_TEST_USERNAME and LETTERBOXD_TEST_PASSWORD are set on the
-/// environment — see Integration/README.md for setup. Read tests are residue-free;
+/// environment, see Integration/README.md for setup. Read tests are residue-free;
 /// write tests use a self-cleanup helper on LetterboxdApiClient (see
 /// DeleteAllLogEntriesForFilmAsync) so the test account stays predictable across
 /// runs. Network-dependent and slower than the unit suite: run with
@@ -36,7 +36,7 @@ public class LetterboxdLiveTests
     // Stable, well-known films used as fixtures. If Letterboxd ever stops mapping
     // these TMDb IDs we have bigger problems than these tests.
     private const int TmdbPulpFiction = 680;       // movie/680
-    private const int TmdbHijack = 198102;          // tv/198102 — same numeric id as a niche movie; see issue #34
+    private const int TmdbHijack = 198102;          // tv/198102, same numeric id as a niche movie; see issue #34
 
     private static (string user, string pass, string? cookies, string? ua) RequireCreds()
     {
@@ -227,7 +227,7 @@ public class LetterboxdLiveTests
     /// Forces the HTML-scraping path (bypassing the API-first factory) and asserts
     /// LookupFilmByTmdbIdAsync still resolves a non-empty FilmId from live markup.
     /// This is the one test that turns red when Letterboxd changes its film-page
-    /// HTML — exactly the regression in issue #79, where the API path masked a
+    /// HTML, exactly the regression in issue #79, where the API path masked a
     /// broken scraper because every other integration test runs on the API path.
     /// </summary>
     [SkippableFact]
@@ -249,7 +249,7 @@ public class LetterboxdLiveTests
         Assert.NotNull(film);
         Assert.Contains("pulp-fiction", film.Slug, StringComparison.OrdinalIgnoreCase);
         Assert.False(string.IsNullOrWhiteSpace(film.FilmId),
-            "Scraping path must resolve a FilmId from the film page — empty means the markup changed (issue #79).");
+            "Scraping path must resolve a FilmId from the film page, empty means the markup changed (issue #79).");
     }
 
     // ----- Write tests with self-cleanup (API path only) -----

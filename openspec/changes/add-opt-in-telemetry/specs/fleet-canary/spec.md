@@ -2,12 +2,12 @@
 
 ### Requirement: Daily deterministic regression check
 
-A scheduled workflow SHALL run daily (plus manual dispatch) executing deterministic SQL checks — no AI in the loop — comparing error-transition rates between a foreground cohort and a baseline cohort. Daily cadence is required: the check exists to beat human bug reports to fleet-wide breakage.
+A scheduled workflow SHALL run daily (plus manual dispatch) executing deterministic SQL checks, no AI in the loop, comparing error-transition rates between a foreground cohort and a baseline cohort. Daily cadence is required: the check exists to beat human bug reports to fleet-wide breakage.
 
 #### Scenario: Canary run on a healthy fleet
 
 - **WHEN** the daily run finds no cohort pair exceeding the gates
-- **THEN** the workflow succeeds silently — no issue, no noise
+- **THEN** the workflow succeeds silently, no issue, no noise
 
 ### Requirement: Cohort definitions resilient to every-merge releases
 
@@ -35,7 +35,7 @@ No issue SHALL be filed unless both cohorts contain n ≥ 10 instances and the f
 #### Scenario: Below the gate means silence
 
 - **WHEN** the foreground cohort has 7 active instances
-- **THEN** no issue is filed regardless of the rate multiple — silence below the gate is correct behaviour, not failure
+- **THEN** no issue is filed regardless of the rate multiple, silence below the gate is correct behaviour, not failure
 
 ### Requirement: Auto-filed issue contract
 

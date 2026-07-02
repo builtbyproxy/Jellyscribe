@@ -4,7 +4,7 @@ namespace LetterboxdSync.Configuration;
 
 /// <summary>
 /// Persisted telemetry state. Lives inside <see cref="PluginConfiguration"/> so window
-/// counters, error states, and ping timestamps survive container restarts — self-hosters
+/// counters, error states, and ping timestamps survive container restarts, self-hosters
 /// restart constantly, and in-memory-only counters would systematically undercount.
 /// Everything here is local until the admin opts in; nothing is ever sent while
 /// <see cref="Enabled"/> is false.
@@ -26,7 +26,7 @@ public class TelemetryData
 
     /// <summary>
     /// Minute-of-day (0..719 over a 12 h window) this instance starts sending on an eligible
-    /// day — per-instance jitter so the fleet doesn't thunder-herd the ingest endpoint.
+    /// day, per-instance jitter so the fleet doesn't thunder-herd the ingest endpoint.
     /// Generated alongside <see cref="InstanceId"/>.
     /// </summary>
     public int JitterMinutes { get; set; }

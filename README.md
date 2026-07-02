@@ -8,8 +8,9 @@
 [![Downloads](https://img.shields.io/github/downloads/builtbyproxy/jellyfin-plugin-letterboxd/total)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases)
 [![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/builtbyproxy/jellyfin-plugin-letterboxd)
 
-**Website:** [letterboxdsync.dev](https://letterboxdsync.dev/)
-**What's new:** [Release notes for every version](https://letterboxdsync.dev/releases/)
+- **Website:** [letterboxdsync.dev](https://letterboxdsync.dev/)
+- **What's new:** [release notes for every version](https://letterboxdsync.dev/releases/)
+- **Built with AI:** most of this plugin is AI-written, human-reviewed, [full transparency in AI.md](AI.md)
 
 Automatically sync your Jellyfin watch history to your Letterboxd diary. Films are logged in real-time when you finish watching, with a daily scheduled sync as a safety net.
 
@@ -21,31 +22,31 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 
 ### Syncing
 
-- **Real-time sync** — films logged to your diary the moment you finish watching
-- **Daily catch-up** — scheduled task picks up anything missed
-- **Multi-user** — each Jellyfin user can link their own Letterboxd account
-- **TMDb matching** — films matched by TMDb ID, so foreign titles and special characters work
-- **Duplicate detection** — won't log the same film twice on the same day
-- **Rewatch detection** — real-time playback automatically marks rewatches
-- **Date filtering** — limit catch-up syncs to recently watched films
+- **Real-time sync**, films logged to your diary the moment you finish watching
+- **Daily catch-up**, scheduled task picks up anything missed
+- **Multi-user**, each Jellyfin user can link their own Letterboxd account
+- **TMDb matching**, films matched by TMDb ID, so foreign titles and special characters work
+- **Duplicate detection**, won't log the same film twice on the same day
+- **Rewatch detection**, real-time playback automatically marks rewatches
+- **Date filtering**, limit catch-up syncs to recently watched films
 
 ### Ratings, reviews & diary
 
-- **Rating sync, both ways** — Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0), and Letterboxd ratings seed your Jellyfin user ratings
-- **Favorites** — sync Jellyfin favorites as Letterboxd likes
-- **Reviews** — write and post reviews to Letterboxd from the plugin dashboard
-- **Diary import** — mark Jellyfin movies as played if they're in your Letterboxd diary
+- **Rating sync, both ways**, Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0), and Letterboxd ratings seed your Jellyfin user ratings
+- **Favorites**, sync Jellyfin favorites as Letterboxd likes
+- **Reviews**, write and post reviews to Letterboxd from the plugin dashboard
+- **Diary import**, mark Jellyfin movies as played if they're in your Letterboxd diary
 
 ### Watchlist & Seerr
 
-- **Watchlist sync** — import your Letterboxd watchlist as a Jellyfin playlist
-- **Seerr integration** — auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Seerr, and mirror your Letterboxd watchlist into Seerr
+- **Watchlist sync**, import your Letterboxd watchlist as a Jellyfin playlist
+- **Seerr integration**, auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Seerr, and mirror your Letterboxd watchlist into Seerr
 
 ### Dashboard & diagnostics
 
-- **Dashboard** — sync stats, activity history, and one-click sync from the plugin page
-- **Send logs to developer** — one-click diagnostic bundle from the Logs tab, with a full preview of what's sent and a reference code to quote in a bug report
-- **Cloudflare resilient** — automatic retry with backoff on rate limits and transient Letterboxd errors, raw cookie fallback
+- **Dashboard**, sync stats, activity history, and one-click sync from the plugin page
+- **Send logs to developer**, one-click diagnostic bundle from the Logs tab, with a full preview of what's sent and a reference code to quote in a bug report
+- **Cloudflare resilient**, automatic retry with backoff on rate limits and transient Letterboxd errors, raw cookie fallback
 
 ## Install
 
@@ -95,7 +96,7 @@ That's it. Watch a movie and check your Letterboxd diary.
 | **Import diary as played** | Marks Jellyfin movies as played if they appear in your Letterboxd diary |
 | **Skip previously synced** | Uses the plugin's local sync history to skip films already logged without hitting Letterboxd; recommended, especially on large libraries |
 | **Stop on failure** | Halts the run at the first failed film to avoid inflaming rate limits; the rest are picked up next run |
-| **Raw Cookies** | For Cloudflare bypass — see below |
+| **Raw Cookies** | For Cloudflare bypass, see below |
 
 ### Dashboard
 
@@ -132,9 +133,9 @@ If you've ruled all three out and a single film keeps getting stuck on the TMDb 
 
 ## Telemetry
 
-The plugin can send **anonymous, opt-in** usage telemetry. It is **off by default** — nothing is ever sent unless you enable it (one-time dashboard banner or the Settings checkbox).
+The plugin can send **anonymous, opt-in** usage telemetry. It is **off by default**, nothing is ever sent unless you enable it (one-time dashboard banner or the Settings checkbox).
 
-When enabled, one small ping is sent per week, plus one extra ping (capped at one per day) when sync errors start occurring so fleet-wide breakage gets caught early. The full payload is exactly this — you can see your own at any time via **Settings → Anonymous Telemetry → Preview exact JSON**:
+When enabled, one small ping is sent per week, plus one extra ping (capped at one per day) when sync errors start occurring so fleet-wide breakage gets caught early. The full payload is exactly this, you can see your own at any time via **Settings → Anonymous Telemetry → Preview exact JSON**:
 
 ```json
 {
@@ -154,22 +155,22 @@ The precise promise, worded carefully:
 
 - **No IPs, usernames, film titles, library content, or exact counts ever enter the dataset.** Counts are reported in buckets only. (Transport logs at the hosting platform retain caller IPs for the platform's own short retention window, like any HTTPS service; they are never stored in the telemetry dataset.)
 - The instance ID is **random**, generated when you opt in, never derived from your hardware, network, or Jellyfin install. **Regenerate it any time** in Settings: future pings get a fresh identity. Old rows remain (unlinked going forward); at small fleet sizes configuration similarity could in principle still allow correlation, so the honest claim is "unlinked", not "erased".
-- The "Preview exact JSON" modal doubles as a **diagnostic bundle** for bug reports. It contains your instance ID — pasting it into a public issue links that ID to your past pings, which is why the modal offers **Copy + regenerate ID**.
+- The "Preview exact JSON" modal doubles as a **diagnostic bundle** for bug reports. It contains your instance ID, pasting it into a public issue links that ID to your past pings, which is why the modal offers **Copy + regenerate ID**.
 - Disabling telemetry stops all pings immediately.
 
 What it's for: deciding what gets built next based on what people actually use, and an automated canary that compares error rates across releases and files regression issues before bug reports arrive.
 
 ### Install counting (separate from the opt-in telemetry)
 
-The recommended plugin repository URL and the release downloads are served through an edge-cached mirror of the GitHub manifest. The mirror counts each request as an anonymous, weekly-rotating hash of the caller's IP so the project can estimate how many servers run the plugin. This is a plain traffic count, not the telemetry above: no instance ID, no settings, no versions beyond the release being downloaded, and the raw IP is never stored — the hash is salted and cannot be linked across weeks by design.
+The recommended plugin repository URL and the release downloads are served through an edge-cached mirror of the GitHub manifest. The mirror counts each request as an anonymous, weekly-rotating hash of the caller's IP so the project can estimate how many servers run the plugin. This is a plain traffic count, not the telemetry above: no instance ID, no settings, no versions beyond the release being downloaded, and the raw IP is never stored, the hash is salted and cannot be linked across weeks by design.
 
-Since v1.19.0 the plugin also adds the mirror as a second catalog repository entry (named "... (mirror)") alongside your existing GitHub entry, once. Your GitHub entry is never removed, so updates keep working even if the mirror is unreachable. If you prefer not to be counted, delete the mirror entry — the plugin will not re-add it — and both entries serve the identical manifest.
+Since v1.19.0 the plugin also adds the mirror as a second catalog repository entry (named "... (mirror)") alongside your existing GitHub entry, once. Your GitHub entry is never removed, so updates keep working even if the mirror is unreachable. If you prefer not to be counted, delete the mirror entry, the plugin will not re-add it, and both entries serve the identical manifest.
 
 ### Send logs to the developer
 
 When something goes wrong, the **Logs** tab has a **Send logs to developer** button. It packages the recent Letterboxd Sync log lines shown on that tab (passwords, cookies, and auth tokens are never logged) plus an anonymous telemetry snapshot, uploads them privately, and gives you a short **reference code** (e.g. `LBX-7Q2F9K`) to quote if you open a bug report.
 
-Unlike the anonymous telemetry above, **logs are not anonymous** — they can contain your Letterboxd username or film titles, and the bundle is linked to your telemetry instance ID. So it is strictly opt-in per use: a confirmation step spells this out, lets you add a note describing the problem, and offers a preview of exactly what is sent before anything leaves your server. Works whether or not telemetry is enabled. Uploaded bundles are stored privately and auto-deleted after 90 days.
+Unlike the anonymous telemetry above, **logs are not anonymous**, they can contain your Letterboxd username or film titles, and the bundle is linked to your telemetry instance ID. So it is strictly opt-in per use: a confirmation step spells this out, lets you add a note describing the problem, and offers a preview of exactly what is sent before anything leaves your server. Works whether or not telemetry is enabled. Uploaded bundles are stored privately and auto-deleted after 90 days.
 
 ## Requirements
 

@@ -71,7 +71,7 @@ public class DuplicateBackstopTests
     [Fact]
     public void Allows_GenuineRewatchThreeWeeksLater_TreasurePlanetPattern()
     {
-        // Treasure Planet was logged 2026-03-03 (rewatch) and again 2026-03-25 — clearly a
+        // Treasure Planet was logged 2026-03-03 (rewatch) and again 2026-03-25, clearly a
         // legitimate later viewing, must not be suppressed.
         var history = new List<SyncEvent> { SuccessAt(new DateTime(2026, 3, 3)) };
 

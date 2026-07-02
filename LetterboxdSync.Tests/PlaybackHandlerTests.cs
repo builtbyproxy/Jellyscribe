@@ -93,7 +93,7 @@ public class ReauthTests
                 };
             }
 
-            // production-log-entries — first call returns 401, second returns 200
+            // production-log-entries, first call returns 401, second returns 200
             if (request.Method == HttpMethod.Post && path.Contains("production-log-entries"))
             {
                 logEntryCallCount++;
