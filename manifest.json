@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.19.0.0",
+        "changelog": "A second repository entry for this plugin, an edge-cached mirror of the exact same manifest, is added to your Jellyfin catalog next to the existing GitHub one, a single time. Your GitHub entry is never touched, so updates keep working even if the mirror is unreachable, and if you would rather not have the mirror you can simply delete it: the plugin will not add it back. The mirror counts an anonymous, weekly-rotating hash per request so we can see roughly how many servers run the plugin; no IP addresses or personal data are ever stored, and this is entirely separate from the opt-in telemetry. The mirror also no longer caches upstream GitHub errors at the edge, so a brief GitHub hiccup cannot pin a failed response for other users.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.19.0/jellyfin-plugin-letterboxd-v1.19.0.zip",
+        "checksum": "98020e4527692e76362f22dac330d2fd",
+        "timestamp": "2026-07-02T15:42:25Z"
+      },
+      {
         "version": "1.18.5.0",
         "changelog": "No functional changes to syncing. This release adds an anonymous, privacy-preserving install counter so the developer can see roughly how many Jellyfin servers run the plugin. No personal data is collected: your IP address is never stored, and the anonymous weekly fingerprint used to avoid double-counting cannot be traced back to you or linked across weeks.",
         "targetAbi": "10.11.9.0",
