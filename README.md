@@ -19,23 +19,33 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 
 ## Features
 
+### Syncing
+
 - **Real-time sync** — films logged to your diary the moment you finish watching
 - **Daily catch-up** — scheduled task picks up anything missed
 - **Multi-user** — each Jellyfin user can link their own Letterboxd account
 - **TMDb matching** — films matched by TMDb ID, so foreign titles and special characters work
 - **Duplicate detection** — won't log the same film twice on the same day
 - **Rewatch detection** — real-time playback automatically marks rewatches
+- **Date filtering** — limit catch-up syncs to recently watched films
+
+### Ratings, reviews & diary
+
 - **Rating sync, both ways** — Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0), and Letterboxd ratings seed your Jellyfin user ratings
 - **Favorites** — sync Jellyfin favorites as Letterboxd likes
+- **Reviews** — write and post reviews to Letterboxd from the plugin dashboard
+- **Diary import** — mark Jellyfin movies as played if they're in your Letterboxd diary
+
+### Watchlist & Seerr
+
 - **Watchlist sync** — import your Letterboxd watchlist as a Jellyfin playlist
 - **Seerr integration** — auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Seerr, and mirror your Letterboxd watchlist into Seerr
-- **Diary import** — mark Jellyfin movies as played if they're in your Letterboxd diary
-- **Reviews** — write and post reviews to Letterboxd from the plugin dashboard
-- **Send logs to developer** — one-click diagnostic bundle from the Logs tab, with a full preview of what's sent and a reference code to quote in a bug report
+
+### Dashboard & diagnostics
+
 - **Dashboard** — sync stats, activity history, and one-click sync from the plugin page
-- **Cloudflare resilient** — automatic retry with backoff on rate limits, raw cookie fallback
-- **Retry with backoff** — handles transient Letterboxd errors gracefully
-- **Date filtering** — limit catch-up syncs to recently watched films
+- **Send logs to developer** — one-click diagnostic bundle from the Logs tab, with a full preview of what's sent and a reference code to quote in a bug report
+- **Cloudflare resilient** — automatic retry with backoff on rate limits and transient Letterboxd errors, raw cookie fallback
 
 ## Install
 
