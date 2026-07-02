@@ -10,6 +10,33 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.18.5',
+    headline: 'Anonymous install counter',
+    summary:
+      'No functional changes to syncing. This release adds an anonymous, privacy-preserving install counter so the developer can see roughly how many Jellyfin servers run the plugin. No personal data is collected: your IP address is never stored, and the anonymous weekly fingerprint used to avoid double-counting cannot be traced back to you or linked across weeks.',
+    highlights: {
+      new: [
+        'Active installs are now counted from ordinary catalog update checks and release downloads served through an edge mirror of the official manifest. GitHub download totals were useless for this (re-downloads and auto-updates inflate them), and the opt-in telemetry only sees servers that enabled it.',
+        'Uniqueness is approximated with a weekly-rotating anonymous fingerprint: your IP address is used transiently at the edge to compute it and is never stored, and counts cannot be linked across weeks. Unlike the opt-in telemetry, this counting is always on; it carries no other information about you, your server, or your library.',
+      ],
+      improvements: [
+        'Release downloads in the plugin catalog now redirect through the mirror to the identical GitHub release file. Checksums are unchanged, so Jellyfin\'s integrity check on install and update passes exactly as before.',
+      ],
+    },
+  },
+  {
+    version: '1.18.4',
+    headline: 'Sync works again after a Letterboxd page change',
+    summary:
+      'Fixes a sync failure introduced when Letterboxd changed their website. Films stopped logging to your diary because the plugin could no longer read each film\'s identifier from its Letterboxd page. The plugin now reads the new page format, so watched films sync again.',
+    highlights: {
+      fixes: [
+        'Letterboxd removed the film-page attributes the plugin\'s web-scraping fallback used to identify films, moving the identifiers into a new format on the poster element. The plugin now reads the new format (and still understands the old one). Users on the official API path were unaffected; anyone on the scraping fallback had every diary sync fail until this release.',
+        'A live test now exercises the scraping path against the real Letterboxd site, so the next markup change of this kind is caught by CI instead of by user bug reports.',
+      ],
+    },
+  },
+  {
     version: '1.18.3',
     headline: 'More precise error reporting in telemetry',
     summary:
