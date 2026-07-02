@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.19.1.0",
+        "changelog": "No functional changes to syncing. The project now documents openly how it is built: a new AI.md page explains that most of the plugin is AI-written under human direction and review, what tooling is used, and the checks every change passes before it ships. The Code of Conduct is rewritten to something honest for a one-person project, and the README links to all of it.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.19.1/jellyfin-plugin-letterboxd-v1.19.1.zip",
+        "checksum": "39660c701b21a09f491c1c6c805bebed",
+        "timestamp": "2026-07-02T23:25:57Z"
+      },
+      {
         "version": "1.19.0.0",
         "changelog": "A second repository entry for this plugin, an edge-cached mirror of the exact same manifest, is added to your Jellyfin catalog next to the existing GitHub one, a single time. Your GitHub entry is never touched, so updates keep working even if the mirror is unreachable, and if you would rather not have the mirror you can simply delete it: the plugin will not add it back. The mirror counts an anonymous, weekly-rotating hash per request so we can see roughly how many servers run the plugin; no IP addresses or personal data are ever stored, and this is entirely separate from the opt-in telemetry. The mirror also no longer caches upstream GitHub errors at the edge, so a brief GitHub hiccup cannot pin a failed response for other users.",
         "targetAbi": "10.11.9.0",
