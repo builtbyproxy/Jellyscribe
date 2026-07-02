@@ -73,7 +73,7 @@ jobs:
           # FLOOR POLICY (issue #63): Jellyfin assemblies carry full per-patch
           # AssemblyVersions, so the SDK package version we compile against IS
           # the minimum Jellyfin a release can load on, regardless of what
-          # targetAbi claims. The two must therefore always be equal — an SDK
+          # targetAbi claims. The two must therefore always be equal, an SDK
           # bump without a matching targetAbi raise ships releases that fail to
           # load on servers the catalog still offers them to.
           SDK_V=$(grep -oE '<PackageReference Include="Jellyfin.Controller" Version="[^"]+"' LetterboxdSync/LetterboxdSync.csproj | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')

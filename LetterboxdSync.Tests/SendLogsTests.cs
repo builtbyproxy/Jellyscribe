@@ -65,7 +65,7 @@ public class SendLogsTests : IDisposable
         Assert.Equal(2, root.GetProperty("log_lines").GetArrayLength());
         // The telemetry snapshot is embedded as structured JSON, not a string.
         Assert.Equal(JsonValueKind.Object, root.GetProperty("telemetry").ValueKind);
-        // The preview/bundle MUST contain the actual log text — the consent bug was that
+        // The preview/bundle MUST contain the actual log text, the consent bug was that
         // the preview showed only the telemetry snapshot, hiding the log lines.
         Assert.Contains("Letterboxd login error", built);
     }

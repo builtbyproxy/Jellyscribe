@@ -31,8 +31,8 @@
 ## 6. Site: latest-version pill on home page
 
 - [ ] 6.1 In `site/src/pages/index.astro`, import the shared release helper and read the latest version + date
-- [ ] 6.2 Add a "Latest: vX.Y.Z (date) — What's new" element near the existing install pill in the hero, linking to `/releases#vX-Y-Z` (or `#latest`)
-- [ ] 6.3 Ensure the element gracefully renders when `manifest.json.versions` is empty (defensive — should never happen in practice but build shouldn't crash)
+- [ ] 6.2 Add a "Latest: vX.Y.Z (date), What's new" element near the existing install pill in the hero, linking to `/releases#vX-Y-Z` (or `#latest`)
+- [ ] 6.3 Ensure the element gracefully renders when `manifest.json.versions` is empty (defensive, should never happen in practice but build shouldn't crash)
 
 ## 7. Deploy-docs trigger
 

@@ -289,7 +289,7 @@ public class TelemetryServiceTests : IDisposable
         Assert.Equal("11-100", root.GetProperty("buckets").GetProperty("syncs_per_week").GetString());
 
         // The promise, mechanically enforced: no usernames, no raw counts. instance_id is
-        // the one permitted identifier and is a random GUID, so strip its value first —
+        // the one permitted identifier and is a random GUID, so strip its value first , 
         // otherwise a GUID that coincidentally contains "37"/"1234" trips these substring
         // checks (a flake that depends purely on which GUID was generated).
         var body = json.Replace(t.InstanceId!, string.Empty);

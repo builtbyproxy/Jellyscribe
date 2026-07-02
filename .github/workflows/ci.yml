@@ -20,7 +20,7 @@ jobs:
         run: |
           set -e
           if grep -q PLACEHOLDER manifest.json; then
-            echo "::error::manifest.json contains PLACEHOLDER. Manifest entries are inserted by release.yml after a successful build — do not pre-commit them. See CLAUDE.md > Releasing."
+            echo "::error::manifest.json contains PLACEHOLDER. Manifest entries are inserted by release.yml after a successful build, do not pre-commit them. See CLAUDE.md > Releasing."
             exit 1
           fi
           fail=0

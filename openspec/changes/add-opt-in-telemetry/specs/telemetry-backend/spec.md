@@ -25,7 +25,7 @@ The Cloudflare Worker SHALL be the sole write path. It MUST require the publisha
 
 ### Requirement: No client-facing database access
 
-The D1 database SHALL be reachable only through the ingest Worker and scoped Cloudflare API tokens (used by the canary workflow and the maintainer's analysis tooling). The plugin SHALL ship only the ingest URL and the publishable write key, whose compromise is bounded to junk rows — never reads, never privacy.
+The D1 database SHALL be reachable only through the ingest Worker and scoped Cloudflare API tokens (used by the canary workflow and the maintainer's analysis tooling). The plugin SHALL ship only the ingest URL and the publishable write key, whose compromise is bounded to junk rows, never reads, never privacy.
 
 #### Scenario: Extracted key cannot read the dataset
 
@@ -34,7 +34,7 @@ The D1 database SHALL be reachable only through the ingest Worker and scoped Clo
 
 ### Requirement: Always-on backend with loud failure detection
 
-The backend SHALL NOT require keep-alive traffic to stay available (D1 has no idle-pause). The daily canary workflow MUST fail loudly (red run) when the database is unreachable, and MUST keep its own cron schedule alive against GitHub's 60-day auto-disable by committing a heartbeat to a dedicated non-main branch when repo activity is older than 50 days — never to main, where the every-merge-ships pipeline would cut a junk release.
+The backend SHALL NOT require keep-alive traffic to stay available (D1 has no idle-pause). The daily canary workflow MUST fail loudly (red run) when the database is unreachable, and MUST keep its own cron schedule alive against GitHub's 60-day auto-disable by committing a heartbeat to a dedicated non-main branch when repo activity is older than 50 days, never to main, where the every-merge-ships pipeline would cut a junk release.
 
 #### Scenario: Quiet repo for two months
 

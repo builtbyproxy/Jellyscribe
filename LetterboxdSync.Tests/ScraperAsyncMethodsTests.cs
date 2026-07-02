@@ -19,7 +19,7 @@ namespace LetterboxdSync.Tests;
 ///
 /// We pre-seed TmdbCache for the slugs in the test fixtures so the per-slug
 /// resolver short-circuits the cache hit path instead of doing another 2-3s
-/// HTTP round-trip per slug — without this, a 5-film test would take ~20s.
+/// HTTP round-trip per slug, without this, a 5-film test would take ~20s.
 /// </summary>
 [Collection("TmdbCache")]
 public class ScraperAsyncMethodsTests : IDisposable

@@ -182,7 +182,7 @@ public class LetterboxdDiary
             payload["filmId"] = filmId;
 
         var jsonBody = JsonSerializer.Serialize(payload);
-        // Log payload metadata only — never the review text itself, since users
+        // Log payload metadata only, never the review text itself, since users
         // share these logs for support and review drafts can be private.
         _logger.LogInformation(
             "PostReview prepared for {FilmSlug}: hasText={HasText}, textLen={TextLen}, " +

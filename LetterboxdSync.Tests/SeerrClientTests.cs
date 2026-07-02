@@ -173,7 +173,7 @@ public class SeerrClientTests
     {
         // Another user (9) has a request; user 7 still gets their own attributed request when
         // Seerr accepts it. (If Seerr's single-active-request rule rejects it, the
-        // POST 409 path classifies it AlreadyExists — covered separately.)
+        // POST 409 path classifies it AlreadyExists, covered separately.)
         var posted = false;
         var handler = new SeerrHandler(req =>
         {
@@ -249,14 +249,14 @@ public class SeerrClientTests
         Assert.Equal(new HashSet<int> { 1, 2, 4 }, ids);
         Assert.Contains(seenPageQueries, q => q.Contains("page=1"));
         Assert.Contains(seenPageQueries, q => q.Contains("page=2"));
-        // Crucially, no take/skip — those would 400.
+        // Crucially, no take/skip, those would 400.
         Assert.DoesNotContain(seenPageQueries, q => q.Contains("take=") || q.Contains("skip="));
     }
 
     [Fact]
     public async Task GetUserWatchlistTmdbIdsAsync_SendsXApiUserHeader()
     {
-        // The endpoint requires acting as the user being queried — without the impersonation
+        // The endpoint requires acting as the user being queried, without the impersonation
         // header, Seerr returns the calling key's default user (admin), which silently
         // returns the wrong watchlist.
         string? sentHeader = null;
@@ -373,7 +373,7 @@ public class SeerrClientTests
 
         // After the first lookup the map is cached on the client; subsequent lookups
         // shouldn't issue more HTTP calls. The pagination short-circuits when a page
-        // returns fewer than `take` results, so we don't need a fourth empty call —
+        // returns fewer than `take` results, so we don't need a fourth empty call , 
         // total = 3 paged calls.
         Assert.Equal(3, callCount);
     }

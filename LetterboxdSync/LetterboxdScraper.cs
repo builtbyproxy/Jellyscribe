@@ -329,7 +329,7 @@ public class LetterboxdScraper
         // Prefer the explicit numeric attribute when present (legacy markup).
         var filmId = el.GetAttributeValue("data-film-id", string.Empty);
 
-        // Pull missing ids out of the data-postered-identifier JSON — on the element itself
+        // Pull missing ids out of the data-postered-identifier JSON, on the element itself
         // (new markup) or, failing that, the first one on the page (kept for older fixtures).
         if (string.IsNullOrEmpty(filmId) || string.IsNullOrEmpty(productionId))
         {
@@ -397,7 +397,7 @@ public class LetterboxdScraper
 
     private async Task<int?> ResolveTmdbIdFromSlugAsync(string slug)
     {
-        // Check cache first — avoids HTTP request for previously resolved slugs
+        // Check cache first, avoids HTTP request for previously resolved slugs
         var cached = TmdbCache.Get(slug);
         if (cached.HasValue)
         {

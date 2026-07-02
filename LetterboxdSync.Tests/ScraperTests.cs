@@ -22,7 +22,7 @@ public class ScraperTests
         {
             var path = request.RequestUri?.PathAndQuery ?? "";
 
-            // TMDb redirect page — returns HTML with canonical link
+            // TMDb redirect page, returns HTML with canonical link
             if (path.StartsWith("/tmdb/693134"))
             {
                 return new HttpResponseMessage(HttpStatusCode.OK)
@@ -32,7 +32,7 @@ public class ScraperTests
                 };
             }
 
-            // Film page — returns HTML with data-film-id
+            // Film page, returns HTML with data-film-id
             if (path == "/film/dune-part-two/")
             {
                 var res = new HttpResponseMessage(HttpStatusCode.OK)

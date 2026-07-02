@@ -447,7 +447,7 @@ export const releaseNotes: ReleaseNotes[] = [
     headline: 'User self-service account setup and standalone user page',
     highlights: {
       new: [
-        'User self-service account setup — users link their own Letterboxd account without admin help.',
+        'User self-service account setup, users link their own Letterboxd account without admin help.',
         'Sidebar link for all users.',
         'Test connection button on the account form.',
         'Standalone user page via File Transformation injection.',
@@ -475,7 +475,7 @@ export const releaseNotes: ReleaseNotes[] = [
     headline: 'Real-time playback sync',
     highlights: {
       new: [
-        'Real-time playback sync via PlaybackHandler — diary entries land within seconds of credits rolling.',
+        'Real-time playback sync via PlaybackHandler, diary entries land within seconds of credits rolling.',
       ],
       improvements: ['Automatic session re-auth on 401.'],
     },

@@ -222,7 +222,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
 
         await _runner.RunForAllAsync(new Progress<double>(), "scheduled", CancellationToken.None);
 
-        // No factory call — we never had an enabled account to sync.
+        // No factory call, we never had an enabled account to sync.
         _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
     }
 
@@ -352,7 +352,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
             new UserItemData { Key = "k", Played = true, LastPlayedDate = DateTime.UtcNow });
 
         // Letterboxd lookup throws (e.g. Cloudflare 403). Runner should catch,
-        // record a failed sync event, and complete — exception doesn't escape.
+        // record a failed sync event, and complete, exception doesn't escape.
         var service = Substitute.For<ILetterboxdService>();
         service.LookupFilmByTmdbIdAsync(Arg.Any<int>())
             .Returns<Task<FilmResult>>(_ => throw new Exception("Cloudflare 403"));

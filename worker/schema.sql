@@ -51,7 +51,7 @@ CREATE INDEX IF NOT EXISTS log_bundles_instance ON log_bundles (instance_id);
 -- week (giving a WAU-style headcount) but cannot be linked ACROSS weeks. The raw
 -- IP is never stored. IP-based identity is coarse (NAT undercounts, dynamic IPs
 -- overcount), so read these as order-of-magnitude active-install figures, not an
--- exact roster — the opt-in pings.instance_id remains the only exact per-install id.
+-- exact roster, the opt-in pings.instance_id remains the only exact per-install id.
 -- version is '' for manifest polls, the release tag (e.g. v1.18.4) for downloads.
 CREATE TABLE IF NOT EXISTS install_hits (
     week TEXT NOT NULL,

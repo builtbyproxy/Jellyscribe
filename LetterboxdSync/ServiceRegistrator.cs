@@ -8,7 +8,7 @@ public class ServiceRegistrator : IPluginServiceRegistrator
 {
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        // Capture the Jellyfin version at startup so it's available immediately — not
+        // Capture the Jellyfin version at startup so it's available immediately, not
         // only after the daily telemetry task first runs. A diagnostic bundle sent in
         // the first minutes after install (exactly when first-run problems surface)
         // must still know the Jellyfin version.

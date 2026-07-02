@@ -1,8 +1,8 @@
 ## Why
 
-The plugin is at v1.15.2 with its roadmap shipped, and the only usage signal is GitHub release download counts — installs, but nothing about which of the 12 per-account settings people enable, which versions actually run, how often syncs fail in the wild, or at what scale. Roadmap decisions are guesses. The goal is a closed loop: anonymous opt-in usage data lands in a queryable store, the maintainer's AI tooling analyses it over SQL, and insights become GitHub issues and PRs. Because every merge auto-ships a release, the same data doubles as a fleet-wide canary that detects regressions (e.g. a Cloudflare 403 spike on the newest releases) and auto-files evidence-backed issues.
+The plugin is at v1.15.2 with its roadmap shipped, and the only usage signal is GitHub release download counts, installs, but nothing about which of the 12 per-account settings people enable, which versions actually run, how often syncs fail in the wild, or at what scale. Roadmap decisions are guesses. The goal is a closed loop: anonymous opt-in usage data lands in a queryable store, the maintainer's AI tooling analyses it over SQL, and insights become GitHub issues and PRs. Because every merge auto-ships a release, the same data doubles as a fleet-wide canary that detects regressions (e.g. a Cloudflare 403 spike on the newest releases) and auto-files evidence-backed issues.
 
-The audience is self-hosted Jellyfin users — the most telemetry-hostile population there is — so the privacy posture is the feature: opt-in default-off with a one-time prompt (Home Assistant model), a minimal anonymous payload, and radical transparency (exact payload documented in the README, a "preview exact JSON" button in settings).
+The audience is self-hosted Jellyfin users, the most telemetry-hostile population there is, so the privacy posture is the feature: opt-in default-off with a one-time prompt (Home Assistant model), a minimal anonymous payload, and radical transparency (exact payload documented in the README, a "preview exact JSON" button in settings).
 
 ## What Changes
 
@@ -20,7 +20,7 @@ The audience is self-hosted Jellyfin users — the most telemetry-hostile popula
 ### New Capabilities
 - `telemetry-collection`: What the plugin collects, when it sends, the opt-in/consent UX, and the transparency surfaces (preview, README).
 - `telemetry-backend`: The ingest contract, storage schema, key/RLS model, abuse bounds, and keep-alive.
-- `fleet-canary`: The daily regression check — cohort definitions, statistical gates, Sybil resistance, and the auto-filed issue contract.
+- `fleet-canary`: The daily regression check, cohort definitions, statistical gates, Sybil resistance, and the auto-filed issue contract.
 
 ### Modified Capabilities
 <!-- No existing specs in openspec/specs/ to modify. -->

@@ -364,7 +364,7 @@ public class WatchlistSyncRunner
 
         // Source of truth: Playlist.LinkedChildren contains the wrapped media item IDs
         // (the underlying Movie GUIDs). Querying ParentId returns playlist *entries* whose
-        // BaseItem.Id is the entry GUID, not the movie GUID — using that for dedup compared
+        // BaseItem.Id is the entry GUID, not the movie GUID, using that for dedup compared
         // entry IDs against movie IDs and never matched, causing duplicates each run.
         var playlistObj = (Playlist)playlist;
         var existingIds = playlistObj.LinkedChildren

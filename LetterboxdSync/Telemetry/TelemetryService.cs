@@ -19,7 +19,7 @@ namespace LetterboxdSync;
 /// Hard rules enforced here:
 ///  - Every entry point is a no-op while telemetry is disabled or Plugin.Instance is null.
 ///  - Nothing in here may ever throw into a sync path; telemetry failure is always silent.
-///  - The payload contains no IPs, usernames, titles, or raw counts — buckets only.
+///  - The payload contains no IPs, usernames, titles, or raw counts, buckets only.
 /// </summary>
 internal static class TelemetryService
 {
@@ -255,7 +255,7 @@ internal static class TelemetryService
         }
     }
 
-    /// <summary>UTC Monday 00:00 of the week containing <paramref name="utc"/> — matches the ingest function's week computation.</summary>
+    /// <summary>UTC Monday 00:00 of the week containing <paramref name="utc"/>, matches the ingest function's week computation.</summary>
     internal static DateTime WeekStartUtc(DateTime utc)
         => utc.Date.AddDays(-(((int)utc.DayOfWeek + 6) % 7));
 

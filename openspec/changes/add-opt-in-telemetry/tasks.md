@@ -1,4 +1,4 @@
-## 1. Backend — Cloudflare Workers + D1 (no plugin release; REVISED from Supabase, see design.md Decision 1)
+## 1. Backend, Cloudflare Workers + D1 (no plugin release; REVISED from Supabase, see design.md Decision 1)
 
 - [x] 1.1 Check worker/ into the repo: wrangler.toml (D1 binding), schema.sql (pings table, partial unique weekly index, latest_per_instance view)
 - [x] 1.2 Implement the ingest Worker: key check, schema_version + shape validation, 2 KB cap, server-computed UTC `week`, weekly counter-merging upsert, error-transition insert with per-instance daily cap (204 on hit), transient per-IP + global rate limits, IP never persisted
@@ -6,7 +6,7 @@
 - [x] 1.4 curl-test the full matrix: valid weekly, duplicate same-week (verify merge), valid transition, capped transition (verify 204), oversized payload, malformed payload, missing/bad key (verify 401)
 - [ ] 1.5 Add TELEMETRY_CF_API_TOKEN + TELEMETRY_CF_ACCOUNT_ID repo secrets; verify a wrangler d1 query returns the curl-test rows
 
-## 2. Plugin release 1 — the pipe (feat: anonymous opt-in telemetry)
+## 2. Plugin release 1, the pipe (feat: anonymous opt-in telemetry)
 
 - [x] 2.1 Add `TelemetryEnabled` (default false), `TelemetryInstanceId`, persisted window counters, last-successful-ping timestamp, and per-category error-state booleans to PluginConfiguration
 - [x] 2.2 Implement the payload builder: versions, feature-toggle booleans, bucketed counts (accounts 1/2-4/5+, library <500/500-2k/2k-10k/10k+, syncs-per-week 0/1-10/11-100/100+), per-period error-category counts
@@ -18,7 +18,7 @@
 - [x] 2.8 Tests: payload bucketing, week-gate, transition state machine (rising edge, cap, consolidation, restart persistence), preview auth; verify a real ping from the maintainer's server lands and is queryable via MCP
 - [ ] 2.9 Version bump + release notes per the release process
 
-## 3. Plugin release 2 — the prompt (feat: telemetry opt-in banner)
+## 3. Plugin release 2, the prompt (feat: telemetry opt-in banner)
 
 - [ ] 3.1 Draft the banner copy (3-4 sentences) and get reactions from real users (GitHub Discussions or the r/jellyfin thread) before shipping
 - [x] 3.2 One-time dismissible banner on the dashboard tab: Enable / No thanks, "see exactly what's sent" link opening the preview modal, dismissed-forever state in configuration
