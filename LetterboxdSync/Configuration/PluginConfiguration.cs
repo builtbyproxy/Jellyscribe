@@ -23,4 +23,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// while disabled. See <see cref="TelemetryData"/> for what persists and why.
     /// </summary>
     public TelemetryData Telemetry { get; set; } = new();
+
+    /// <summary>
+    /// One-shot guard for the catalog migration that adds the proxied (edge-cached)
+    /// plugin repository entry alongside the GitHub one (v1.19.0). Set after the
+    /// first attempt so a user who deletes the added entry is never overridden.
+    /// </summary>
+    public bool CatalogMigrationDone { get; set; }
 }

@@ -169,8 +169,11 @@ async function handleGet(req: Request, env: Env, ctx: ExecutionContext, url: URL
   if (path === "/manifest.json") {
     if (count) ctx.waitUntil(recordInstallHit(env, ip, "manifest", ""));
     // Edge-cache the upstream fetch so a GitHub hiccup or a poll storm doesn't
-    // each cost a raw.githubusercontent round-trip.
-    const upstream = await fetch(RAW_MANIFEST_URL, { cf: { cacheTtl: 300, cacheEverything: true } });
+    // each cost a raw.githubusercontent round-trip. Success-only: a plain cacheTtl
+    // would pin a transient GitHub 500/429 at the edge for 5 minutes fleet-wide.
+    const upstream = await fetch(RAW_MANIFEST_URL, {
+      cf: { cacheTtlByStatus: { "200-299": 300, "400-599": 0 }, cacheEverything: true },
+    });
     return new Response(upstream.body, {
       status: upstream.status,
       headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
