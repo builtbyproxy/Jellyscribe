@@ -10,4 +10,4 @@ Something to report? [Open an issue](https://github.com/builtbyproxy/jellyfin-pl
 
 ## AI-assisted development
 
-You should also know that this project is **heavily written with AI** — the maintainer directs and reviews, AI coding agents write most of the code. The full accounting (tooling, review process, and live token counts) is in [AI.md](AI.md).
+You should also know that this project is **heavily written with AI**, the maintainer directs and reviews, AI coding agents write most of the code. The full accounting (tooling, review process, and live token counts) is in [AI.md](AI.md).
