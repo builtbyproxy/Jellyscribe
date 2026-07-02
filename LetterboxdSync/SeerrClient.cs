@@ -174,7 +174,7 @@ public class SeerrClient : IDisposable
     /// </para>
     /// <para>
     /// Backfill (<paramref name="backfillAvailable"/> true): skips only when the title is blocklisted or THIS
-    /// user already has a request for it. Available titles with no request from this user are still requested , 
+    /// user already has a request for it. Available titles with no request from this user are still requested,
     /// Seerr 3.x accepts a request for available media as long as no active request exists, which restores
     /// an attributed requester trail for films that entered the library outside Seerr. If another user
     /// holds the single active request, Seerr returns 409 and we report <see cref="RequestResult.AlreadyExists"/>.

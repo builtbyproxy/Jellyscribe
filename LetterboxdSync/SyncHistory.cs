@@ -257,7 +257,7 @@ public static class SyncHistory
     /// <summary>
     /// Number of consecutive Failed events at the tail of this user/film's history
     /// (most recent first), stopping at the first non-Failed event. The runner uses this
-    /// to abandon a film that fails on every run instead of retrying it indefinitely , 
+    /// to abandon a film that fails on every run instead of retrying it indefinitely,
     /// BuildSyncQueue otherwise pushes previously-failed films to the head of the queue.
     /// </summary>
     public static int GetConsecutiveFailureCount(string username, int tmdbId)

@@ -118,7 +118,7 @@ internal static class RepositoryMigrator
     /// <summary>
     /// Appends the proxied-manifest repository entry if the catalog has this plugin's
     /// raw-GitHub entry and no proxied entry yet. Returns whether the configuration
-    /// was modified and needs saving. A catalog without our raw entry is left alone , 
+    /// was modified and needs saving. A catalog without our raw entry is left alone,
     /// sideloaded installs and users who removed the repo get nothing added.
     /// </summary>
     internal static bool TryAddProxiedEntry(ServerConfiguration configuration)

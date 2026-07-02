@@ -10,16 +10,15 @@ Nearly all of the code in this repository (the plugin, the tests, the website, t
 
 - **[Claude Code](https://claude.com/claude-code)** (Anthropic's coding agent) is the primary tool, used interactively from the terminal against this repo. Recorded sessions ran on Claude Opus-class models (`claude-opus-4-8` in the currently retained transcripts); earlier development used contemporary Claude 4-family models.
 - **[OpenSpec](openspec/)** for spec-driven development: non-trivial changes get an AI-drafted proposal, design, and task breakdown under `openspec/changes/` before any code is written. Past proposals are archived in the repo, so you can read exactly how features were designed.
-- **Repo-local agent config**: custom skills and commands the agent uses when working in this repo.
-- Additional agent tooling (skill suites for shipping, review, and QA workflows) runs on the maintainer's machine and isn't checked in.
+- Additional agent tooling (custom skills, commands, and workflow suites for shipping, review, and QA) runs on the maintainer's machine and isn't checked in; the checked-in guidance the agent works from is [`CLAUDE.md`](CLAUDE.md).
 
 ## What keeps the quality honest
 
 AI writes the code; these gates decide whether it ships:
 
-- **Every change goes through a pull request** with a human-reviewed diff, nothing lands on `main` directly except documentation.
-- **CI on every PR**: full build, ~590 unit and live-integration tests, coverage tracking via Codecov, manifest integrity validation, and a version gate.
-- **Live integration tests** run against the real Letterboxd site, so "the AI's fixture was wrong" gets caught before release (a lesson learned, see the v1.18.4 release notes).
+- **Plugin code ships through pull requests** with a human-reviewed diff, enforced by CI since the automated release pipeline landed in May 2026 (early development pushed straight to `main`, as the commit history shows). Documentation and repo housekeeping still land on `main` directly.
+- **CI on every PR**: full build, ~590 unit tests, coverage tracking via Codecov, manifest integrity validation, and a version gate. PRs that touch plugin code additionally run live integration tests against the real Letterboxd site.
+- **Live integration tests** hit the real Letterboxd site, so "the AI's fixture was wrong" gets caught before release (a lesson learned, see the v1.18.4 release notes).
 - **Every merge ships a release**, so mistakes are small, attributable, and quickly reverted. Incidents and their prevention are documented in the repo's `CLAUDE.md`.
 
 Bugs still happen, the [issue tracker](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/issues) and [release history](https://letterboxdsync.dev/releases/) don't hide them.

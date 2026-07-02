@@ -373,7 +373,7 @@ public class SeerrClientTests
 
         // After the first lookup the map is cached on the client; subsequent lookups
         // shouldn't issue more HTTP calls. The pagination short-circuits when a page
-        // returns fewer than `take` results, so we don't need a fourth empty call , 
+        // returns fewer than `take` results, so we don't need a fourth empty call,
         // total = 3 paged calls.
         Assert.Equal(3, callCount);
     }
