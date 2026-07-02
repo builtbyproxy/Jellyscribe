@@ -5,10 +5,10 @@ name: Integration tests (live Letterboxd)
 # Cost is low but non-zero (Cloudflare quota, brief diary residue mid-run).
 #
 # Secrets used (configure under Settings → Secrets and variables → Actions):
-#   LETTERBOXD_TEST_USERNAME   , required to actually run the tests
-#   LETTERBOXD_TEST_PASSWORD   , required to actually run the tests
+#   LETTERBOXD_TEST_USERNAME, required to actually run the tests
+#   LETTERBOXD_TEST_PASSWORD, required to actually run the tests
 #   LETTERBOXD_TEST_RAW_COOKIES, optional, only if Cloudflare 403s without them
-#   LETTERBOXD_TEST_USER_AGENT , optional, must match the browser the cookies came from
+#   LETTERBOXD_TEST_USER_AGENT, optional, must match the browser the cookies came from
 #
 # Fork PRs do not have access to repo secrets and would otherwise fail the
 # workflow. The job below detects missing credentials up front and skips

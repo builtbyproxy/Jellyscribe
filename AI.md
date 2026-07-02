@@ -29,7 +29,7 @@ Rather than abstract token counts (tried it, the numbers were noise), here is th
 
 - **175+ commits** since the first one on 2026-03-25
 - **54 merged pull requests**, every one human-reviewed
-- **41 shipped releases** through a fully automated pipeline
+- **41 shipped releases**, every merge auto-ships through the release pipeline since May 2026 (earlier releases were tagged by hand)
 - **~18,000 lines of C#** including **~590 tests**
 - Plus the [letterboxdsync.dev](https://letterboxdsync.dev/) website, the telemetry worker, and the CI/release automation
 
