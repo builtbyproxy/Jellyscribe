@@ -10,7 +10,7 @@ Nearly all of the code in this repository (the plugin, the tests, the website, t
 
 - **[Claude Code](https://claude.com/claude-code)** (Anthropic's coding agent) is the primary tool — used interactively from the terminal against this repo. Recorded sessions ran on Claude Opus-class models (`claude-opus-4-8` in the currently retained transcripts); earlier development used contemporary Claude 4-family models.
 - **[OpenSpec](openspec/)** for spec-driven development: non-trivial changes get an AI-drafted proposal, design, and task breakdown under `openspec/changes/` before any code is written. Past proposals are archived in the repo, so you can read exactly how features were designed.
-- **Repo-local agent config** in [`.claude/`](.claude/): custom skills and commands the agent uses when working here, plus the hook that keeps the usage numbers below current.
+- **Repo-local agent config**: custom skills and commands the agent uses when working in this repo.
 - Additional agent tooling (skill suites for shipping, review, and QA workflows) runs on the maintainer's machine and isn't checked in.
 
 ## What keeps the quality honest
@@ -24,25 +24,17 @@ AI writes the code; these gates decide whether it ships:
 
 Bugs still happen — the [issue tracker](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/issues) and [release history](https://letterboxdsync.dev/releases/) don't hide them.
 
-## Token usage
+## The scale of it
 
-These numbers are generated from Claude Code's local session transcripts by [`scripts/update-ai-usage.py`](scripts/update-ai-usage.py), which runs automatically at the end of every agent session in this repo (see [`.claude/settings.json`](.claude/settings.json)) and folds each session into a committed ledger at [`docs/ai-usage.json`](docs/ai-usage.json).
+Rather than abstract token counts (tried it — the numbers were noise), here is the concrete output of this human-directs-AI-builds arrangement, as of July 2026:
 
-<!-- AI-USAGE:START -->
-_Tracked since **2026-06-29** across **1** recorded session(s); last updated **2026-07-02** (UTC). Counts are a floor — see the caveats below the table._
+- **173 commits** since the first one on 2026-03-25
+- **53 merged pull requests**, every one human-reviewed
+- **40 shipped releases** through a fully automated pipeline
+- **~18,000 lines of C#** including **~590 tests**
+- Plus the [letterboxdsync.dev](https://letterboxdsync.dev/) website, the telemetry worker, and the CI/release automation
 
-| Model | Input | Output | Cache write | Cache read |
-|---|---:|---:|---:|---:|
-| `claude-opus-4-8` | 43,434 | 21,393 | 130,386 | 2,139,019 |
-| **Total** | **43,434** | **21,393** | **130,386** | **2,139,019** |
-<!-- AI-USAGE:END -->
-
-Caveats, so the numbers aren't oversold:
-
-- **Tracking began 2026-06-29.** The project started 2026-03-25 and has 170+ commits; transcripts from the first three months were pruned before tracking existed, so the true lifetime totals are much higher than shown.
-- Sessions run from outside this repo's directory (e.g. one-off fixes made from another project) aren't captured. The numbers are a floor, not a total.
-- **Cache reads dominate** and are the cheapest kind of token — they're the agent re-reading its own context, not fresh work. "Output" is the closest proxy for text/code actually produced.
-- Tokens measure conversation volume, not shipped code. A long debugging session can burn millions of tokens and produce a two-line fix.
+All of it AI-written in roughly three months of evenings, by one person who reviews everything and writes almost none of it by hand. The [commit history](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/commits/main) and [merged PRs](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/pulls?q=is%3Apr+is%3Amerged) are the receipts.
 
 ## Questions
 

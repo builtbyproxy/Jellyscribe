@@ -10,8 +10,7 @@ release/
 # Editor / agent scratch directories that get auto-generated alongside the
 # project; never useful in version control.
 .baselines/
-.claude/*
-!.claude/settings.json
+.claude/
 .cursor/
 TestResults/
 
