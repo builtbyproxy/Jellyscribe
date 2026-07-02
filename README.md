@@ -191,4 +191,4 @@ PRs welcome. A few conventions:
 
 ## License
 
-MIT
+[MIT](LICENSE)
