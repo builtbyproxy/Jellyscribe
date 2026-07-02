@@ -15,7 +15,7 @@ Automatically sync your Jellyfin watch history to your Letterboxd diary. Films a
 
 Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 
-<img width="2430" height="1432" alt="CleanShot 2026-03-25 at 23 34 29@2x" src="https://github.com/user-attachments/assets/19f74448-93b9-4ad2-b02b-bfb0c35d0706" />
+<img alt="Letterboxd Sync dashboard inside the Jellyfin admin UI, showing sync stats and recent activity" src="docs/images/dashboard.png" />
 
 ## Features
 
