@@ -10,6 +10,7 @@
 
 **Website:** [letterboxdsync.dev](https://letterboxdsync.dev/)
 **What's new:** [Release notes for every version](https://letterboxdsync.dev/releases/)
+**Built with AI:** most of this plugin is AI-written, human-reviewed — [full transparency in AI.md](AI.md)
 
 Automatically sync your Jellyfin watch history to your Letterboxd diary. Films are logged in real-time when you finish watching, with a daily scheduled sync as a safety net.
 

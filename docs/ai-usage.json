@@ -1,0 +1,17 @@
+{
+  "sessions": {
+    "e34327a9-7042-4283-bb5e-084a0bad2390": {
+      "first_ts": "2026-06-29T10:28:31.480Z",
+      "last_ts": "2026-06-29T10:33:22.470Z",
+      "models": {
+        "claude-opus-4-8": {
+          "cache_read": 2139019,
+          "cache_write": 130386,
+          "input": 43434,
+          "output": 21393
+        }
+      }
+    }
+  },
+  "tracked_since": "2026-06-29"
+}
