@@ -2,21 +2,32 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LetterboxdSync.Configuration;
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Model.Configuration;
+using MediaBrowser.Model.Updates;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace LetterboxdSync;
 
 /// <summary>
-/// One-shot startup migration that rewrites this plugin's catalog repository entry
-/// from the raw GitHub manifest URL to the Cloudflare Worker's proxied manifest URL.
+/// One-shot startup migration that ADDS the Cloudflare Worker's proxied manifest URL
+/// to the Jellyfin plugin catalog alongside this plugin's existing raw-GitHub entry.
 /// The Worker serves the identical manifest (edge-cached) and counting its polls is
 /// the only way to measure the active install base continuously — downloads already
 /// route through the Worker, but those are only observable at each release's update
-/// wave. Only our own repository entry is ever touched; any other catalog entry the
-/// user has configured is left alone.
+/// wave.
+///
+/// Deliberate properties, in order of importance:
+/// - The GitHub entry is NEVER removed or rewritten: it stays as a working fallback
+///   update path if the Worker is unreachable (workers.dev is blocked in some
+///   networks) or ever goes away.
+/// - The migration runs ONCE per install (guarded by
+///   <see cref="PluginConfiguration.CatalogMigrationDone"/>): a user who deletes the
+///   added entry has opted out and is never overridden on a later boot.
+/// - Only our own repository entries are considered; every other catalog entry the
+///   user has configured is left alone.
 /// </summary>
 public class RepositoryMigrationService : IHostedService
 {
@@ -31,22 +42,56 @@ public class RepositoryMigrationService : IHostedService
         _logger = logger;
     }
 
+    // Test seams; production defaults reach the Plugin singleton (same pattern as
+    // LetterboxdServiceFactory.OverrideForTesting).
+    internal Func<PluginConfiguration?> GetPluginConfiguration { get; set; } =
+        () => Plugin.Instance?.Configuration;
+
+    internal Action SavePluginConfiguration { get; set; } =
+        () => Plugin.Instance?.SaveConfiguration();
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         // Best-effort: a failure here must never affect plugin (or server) startup.
         try
         {
-            if (RepositoryMigrator.TryMigrate(_configurationManager.Configuration))
+            var pluginConfiguration = GetPluginConfiguration();
+            if (pluginConfiguration is null || pluginConfiguration.CatalogMigrationDone)
+                return Task.CompletedTask;
+
+            var configuration = _configurationManager.Configuration;
+            var original = configuration.PluginRepositories;
+            if (RepositoryMigrator.TryAddProxiedEntry(configuration))
             {
-                _configurationManager.SaveConfiguration();
+                try
+                {
+                    _configurationManager.SaveConfiguration();
+                }
+                catch
+                {
+                    // TryAddProxiedEntry never mutates the original entries, so
+                    // restoring the original array fully undoes the migration in
+                    // memory. Without this, a later unrelated SaveConfiguration by
+                    // the server would persist a half-failed migration. The flag
+                    // below stays unset, so the migration retries next boot.
+                    configuration.PluginRepositories = original;
+                    throw;
+                }
+
                 _logger.LogInformation(
-                    "Migrated LetterboxdSync plugin repository to {Url}",
+                    "Added proxied LetterboxdSync catalog entry {Url} alongside the existing GitHub entry",
                     RepositoryMigrator.ProxiedManifestUrl);
             }
+
+            // One-shot, even when there was nothing to add: never re-run, so a user
+            // who later deletes the proxied entry (or their raw entry) is not
+            // second-guessed on every boot.
+            pluginConfiguration.CatalogMigrationDone = true;
+            SavePluginConfiguration();
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "LetterboxdSync repository migration failed; leaving catalog entry unchanged");
+            _logger.LogWarning(ex, "LetterboxdSync repository migration failed; catalog left unchanged");
         }
 
         return Task.CompletedTask;
@@ -58,6 +103,9 @@ public class RepositoryMigrationService : IHostedService
 /// <summary>
 /// Pure migration logic, separated from the hosted service so tests can exercise it
 /// against a plain <see cref="ServerConfiguration"/> without a running server.
+/// Assigns a NEW array and never mutates the pre-existing <see cref="RepositoryInfo"/>
+/// objects, so a caller that snapshots the original array can fully revert by
+/// assigning it back (see the save-failure path above).
 /// </summary>
 internal static class RepositoryMigrator
 {
@@ -68,30 +116,40 @@ internal static class RepositoryMigrator
         "https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json";
 
     /// <summary>
-    /// Rewrites the raw-GitHub repository entry to the proxied URL, or removes it if the
-    /// proxied entry already exists (avoids a duplicate catalog source). Returns whether
-    /// the configuration was modified and needs saving.
+    /// Appends the proxied-manifest repository entry if the catalog has this plugin's
+    /// raw-GitHub entry and no proxied entry yet. Returns whether the configuration
+    /// was modified and needs saving. A catalog without our raw entry is left alone —
+    /// sideloaded installs and users who removed the repo get nothing added.
     /// </summary>
-    internal static bool TryMigrate(ServerConfiguration configuration)
+    internal static bool TryAddProxiedEntry(ServerConfiguration configuration)
     {
         var repositories = configuration.PluginRepositories;
         if (repositories is null || repositories.Length == 0)
             return false;
 
-        var oldEntries = repositories.Where(r => UrlEquals(r.Url, RawGitHubManifestUrl)).ToArray();
-        if (oldEntries.Length == 0)
+        if (repositories.Any(r => r is not null && UrlEquals(r.Url, ProxiedManifestUrl)))
             return false;
 
-        if (repositories.Any(r => UrlEquals(r.Url, ProxiedManifestUrl)))
-        {
-            configuration.PluginRepositories = repositories.Except(oldEntries).ToArray();
-            return true;
-        }
+        var rawEntries = repositories
+            .Where(r => r is not null && UrlEquals(r.Url, RawGitHubManifestUrl))
+            .ToArray();
+        if (rawEntries.Length == 0)
+            return false;
 
-        // Rewrite in place, keeping the user's chosen display name and enabled state.
-        foreach (var entry in oldEntries)
-            entry.Url = ProxiedManifestUrl;
+        var baseName = rawEntries
+            .Select(r => r.Name)
+            .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? "Letterboxd Sync";
 
+        configuration.PluginRepositories = repositories
+            .Append(new RepositoryInfo
+            {
+                Name = baseName + " (mirror)",
+                Url = ProxiedManifestUrl,
+                // An enabled raw entry never gains a disabled mirror; a fully
+                // disabled raw entry gets an equally disabled mirror.
+                Enabled = rawEntries.Any(r => r.Enabled),
+            })
+            .ToArray();
         return true;
     }
 

@@ -11,12 +11,13 @@ export type ReleaseNotes = {
 export const releaseNotes: ReleaseNotes[] = [
   {
     version: '1.19.0',
-    headline: 'Plugin catalog entry moves to a faster mirror',
+    headline: 'A faster mirror joins your plugin catalog',
     summary:
-      'The plugin repository entry in your Jellyfin catalog is updated automatically to point at our edge-cached mirror of the exact same manifest. Updates and downloads are unchanged (the mirror redirects to the official GitHub releases), and nothing needs to be done on your side. As with downloads, the mirror counts an anonymous, weekly-rotating hash per poll so we can see roughly how many servers run the plugin; no IP addresses or personal data are ever stored, and this is separate from the opt-in telemetry.',
+      'A second repository entry for this plugin — an edge-cached mirror of the exact same manifest — is added to your Jellyfin catalog next to the existing GitHub one, a single time. Your GitHub entry is never touched, so updates keep working even if the mirror is unreachable, and if you would rather not have the mirror you can simply delete it: the plugin will not add it back. The mirror counts an anonymous, weekly-rotating hash per request so we can see roughly how many servers run the plugin; no IP addresses or personal data are ever stored, and this is entirely separate from the opt-in telemetry.',
     highlights: {
       improvements: [
-        'Your Jellyfin plugin catalog entry for Letterboxd Sync is migrated automatically from the raw GitHub manifest URL to an edge-cached mirror serving the identical manifest. Update checks get faster and more reliable, and the maintainer gets an anonymous count of active installs. If you had renamed or disabled the repository entry, your name and setting are kept.',
+        'The edge-cached manifest mirror is added to your plugin catalog alongside the GitHub entry (named after your existing entry with a "(mirror)" suffix, matching its enabled state). It serves the identical manifest and redirects downloads to the official GitHub releases. This runs once: deleting the mirror entry is respected and it is never re-added.',
+        'The mirror no longer caches upstream GitHub errors at the edge, so a brief GitHub hiccup cannot pin a failed manifest response for other users.',
       ],
     },
   },
