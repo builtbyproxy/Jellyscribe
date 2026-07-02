@@ -10,6 +10,19 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.19.1',
+    headline: 'AI transparency page and a code of conduct that fits',
+    summary:
+      'No functional changes to syncing. The project now documents openly how it is built: a new AI.md page explains that most of the plugin is AI-written under human direction and review, what tooling is used, and the checks every change passes before it ships. The Code of Conduct is rewritten to something honest for a one-person project, and the README links to all of it.',
+    highlights: {
+      improvements: [
+        'New AI transparency page (AI.md in the repository) covering the AI tooling, the human review and CI gates, and the concrete scale of what has been built.',
+        'Code of Conduct rewritten for a solo-maintained project, with reports directed to GitHub issues.',
+        'Documentation cleanup: consistent punctuation across the README, website release notes, and code comments.',
+      ],
+    },
+  },
+  {
     version: '1.19.0',
     headline: 'A faster mirror joins your plugin catalog',
     summary:
