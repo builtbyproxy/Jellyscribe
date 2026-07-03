@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.19.2.0",
+        "changelog": "Your Letterboxd password, session cookies, and Seerr API key are now encrypted before they are written to disk, instead of sitting in the plugin config file as plaintext. Nothing changes about how you use the plugin: existing saved credentials are picked up and upgraded automatically the next time they are saved, no re-entry needed.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.19.2/jellyfin-plugin-letterboxd-v1.19.2.zip",
+        "checksum": "940620970d255dce0995c02b8946fb6c",
+        "timestamp": "2026-07-03T02:14:42Z"
+      },
+      {
         "version": "1.19.1.0",
         "changelog": "No functional changes to syncing. The project now documents openly how it is built: a new AI.md page explains that most of the plugin is AI-written under human direction and review, what tooling is used, and the checks every change passes before it ships. The Code of Conduct is rewritten to something honest for a one-person project, and the README links to all of it.",
         "targetAbi": "10.11.9.0",
