@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using System.Xml.Serialization;
+using LetterboxdSync.Security;
 
 namespace LetterboxdSync.Configuration;
 
@@ -8,9 +11,37 @@ public class Account
 
     public string LetterboxdUsername { get; set; } = string.Empty;
 
+    [XmlIgnore]
     public string LetterboxdPassword { get; set; } = string.Empty;
 
+    /// <summary>
+    /// XML-serialized, encrypted form of <see cref="LetterboxdPassword"/> (see
+    /// <see cref="SecretProtector"/>). Exists only so the on-disk config file never holds
+    /// the password in plaintext; JsonIgnore keeps it out of the admin config page's
+    /// GET/PUT JSON round-trip (configPage.js echoes that payload back verbatim on save,
+    /// which would otherwise clobber a freshly-typed password with stale ciphertext).
+    /// Nothing outside this class and tests should read or write it directly, use
+    /// <see cref="LetterboxdPassword"/>.
+    /// </summary>
+    [XmlElement("LetterboxdPassword")]
+    [JsonIgnore]
+    public string LetterboxdPasswordProtected
+    {
+        get => SecretProtector.Protect(LetterboxdPassword) ?? string.Empty;
+        set => LetterboxdPassword = SecretProtector.Unprotect(value) ?? string.Empty;
+    }
+
+    [XmlIgnore]
     public string? RawCookies { get; set; }
+
+    /// <summary>Encrypted on-disk form of <see cref="RawCookies"/>. See <see cref="LetterboxdPasswordProtected"/>.</summary>
+    [XmlElement("RawCookies")]
+    [JsonIgnore]
+    public string? RawCookiesProtected
+    {
+        get => SecretProtector.Protect(RawCookies);
+        set => RawCookies = SecretProtector.Unprotect(value);
+    }
 
     public string? UserAgent { get; set; }
 

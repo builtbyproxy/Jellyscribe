@@ -37,9 +37,12 @@ public class AccountUpdateRequestTests
     public void AllAccountFieldsAreMapped()
     {
         // Every writable field on Account (except UserJellyfinId) should have
-        // a corresponding field on AccountUpdateRequest
+        // a corresponding field on AccountUpdateRequest. The *Protected shadow
+        // properties (SecretProtector's encrypted-at-rest XML view of
+        // LetterboxdPassword/RawCookies) are storage plumbing, not part of the
+        // request contract, and are deliberately excluded.
         var accountProps = typeof(Account).GetProperties()
-            .Where(p => p.Name != "UserJellyfinId")
+            .Where(p => p.Name != "UserJellyfinId" && !p.Name.EndsWith("Protected", System.StringComparison.Ordinal))
             .Select(p => p.Name)
             .ToHashSet();
 
