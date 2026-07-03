@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.19.2',
+    headline: 'Stored credentials are now encrypted at rest',
+    summary:
+      'Your Letterboxd password, session cookies, and Seerr API key are now encrypted before they are written to disk, instead of sitting in the plugin config file as plaintext. Nothing changes about how you use the plugin: existing saved credentials are picked up and upgraded automatically the next time they are saved, no re-entry needed.',
+    highlights: {
+      improvements: [
+        'Letterboxd password, raw cookies, and Seerr API key are encrypted at rest using ASP.NET Core Data Protection, with the key kept alongside the plugin’s other data files.',
+        'Existing plaintext values from earlier versions are read normally and silently upgraded to encrypted on the next save.',
+      ],
+    },
+  },
+  {
     version: '1.19.1',
     headline: 'AI transparency page and a code of conduct that fits',
     summary:

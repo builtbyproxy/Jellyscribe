@@ -1,4 +1,7 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using System.Xml.Serialization;
+using LetterboxdSync.Security;
 using MediaBrowser.Model.Plugins;
 
 namespace LetterboxdSync.Configuration;
@@ -16,7 +19,17 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     /// Seerr API key (Settings → General → API Key in Seerr).
     /// </summary>
+    [XmlIgnore]
     public string? JellyseerrApiKey { get; set; }
+
+    /// <summary>Encrypted on-disk form of <see cref="JellyseerrApiKey"/>. See <see cref="Configuration.Account.LetterboxdPasswordProtected"/> for why this is JsonIgnore'd.</summary>
+    [XmlElement("JellyseerrApiKey")]
+    [JsonIgnore]
+    public string? JellyseerrApiKeyProtected
+    {
+        get => SecretProtector.Protect(JellyseerrApiKey);
+        set => JellyseerrApiKey = SecretProtector.Unprotect(value);
+    }
 
     /// <summary>
     /// Anonymous opt-in usage telemetry state. Off by default; nothing is ever sent
