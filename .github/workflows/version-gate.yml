@@ -1,11 +1,20 @@
 name: Version Gate
 
-# Every PR to main must bump Directory.Build.props's AssemblyVersion. Without
-# this gate, a PR could land on main without a corresponding release (the
-# Release workflow short-circuits when a tag for the current version already
-# exists), leaving the change un-shipped and users unaware. Patch-level bumps
-# are fine for docs / CI / refactor changes; magnitude is a human judgement
-# call, the gate only enforces "something changed".
+# Every PR that changes what ships must bump Directory.Build.props's
+# AssemblyVersion. Without this gate, a PR could land on main without a
+# corresponding release (the Release workflow short-circuits when a tag for
+# the current version already exists), leaving the change un-shipped and
+# users unaware. Patch-level bumps are fine for CI / refactor changes;
+# magnitude is a human judgement call, the gate only enforces "something
+# changed".
+#
+# DOCS-ONLY EXEMPTION: a PR whose entire diff sits in non-shipping paths
+# (markdown, docs/, openspec/, site/, worker/, .github/) may merge WITHOUT a
+# bump, in which case no release happens (release.yml sees the existing tag
+# and stops) and the site still redeploys via deploy-docs.yml's push-paths
+# trigger. A version-bumped docs PR is still allowed when a release is
+# actually wanted. manifest.json is deliberately NOT exempt: it is release
+# plumbing and only release.yml should write it.
 
 on:
   pull_request:
@@ -34,6 +43,28 @@ jobs:
           if [ -z "$PR_V" ] || [ -z "$MAIN_V" ]; then
             echo "::error::Could not read AssemblyVersion from one of the files."
             exit 1
+          fi
+
+          # Docs-only exemption (see header). Anything outside the allowlist
+          # (plugin source, tests, project files, manifest.json, targetAbi.txt)
+          # keeps the full gate.
+          CHANGED=$(git diff --name-only "origin/main...HEAD")
+          echo "Changed files:"
+          echo "$CHANGED"
+          DOCS_ONLY=true
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              *.md) ;;
+              docs/*|openspec/*|site/*|worker/*|.github/*) ;;
+              LICENSE|.gitignore|codecov.yml) ;;
+              *) DOCS_ONLY=false; break ;;
+            esac
+          done <<< "$CHANGED"
+
+          if [ "$DOCS_ONLY" = true ] && [ "$PR_V" = "$MAIN_V" ]; then
+            echo "Docs-only diff with no version bump: merging this PR ships no release, and that is correct. Skipping the release checks."
+            exit 0
           fi
 
           if [ "$PR_V" = "$MAIN_V" ]; then
