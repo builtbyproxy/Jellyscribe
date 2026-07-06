@@ -174,7 +174,8 @@ Unlike the anonymous telemetry above, **logs are not anonymous**, they can conta
 
 ## Requirements
 
-- Jellyfin 10.11+
+- Jellyfin 10.11+ (current releases are also known to run on the Jellyfin 12.0 release candidates; official 12.0 support will be declared once 12.0 stable ships and passes verification, see `openspec/changes/add-jellyfin-12-support/`)
+  - Migrating your server to Jellyfin 12? It is safe to follow Jellyfin's advice and remove the plugin first: your accounts, settings, and sync history all survive a reinstall from the catalog.
 - A Letterboxd account
 - [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), required for the Letterboxd link to appear in the Jellyfin sidebar (everything else works without it)
 - Optional: a [Seerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations

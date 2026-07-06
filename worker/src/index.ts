@@ -14,6 +14,8 @@ export interface Env {
   HASH_SALT?: string;
 }
 
+// Adding a category? The fleet-monitoring workflows in the maintainer's private
+// ops repo mirror this list (ERROR_CATEGORIES) and must be updated in lockstep.
 const CATEGORIES = ["cloudflare_403", "auth_failure", "tmdb_lookup", "jellyseerr_error",
   "rate_limit", "server_error", "write_failure", "parse_error", "other"];
 const MAX_BODY_BYTES = 2048;
