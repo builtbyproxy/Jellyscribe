@@ -145,7 +145,7 @@ When enabled, one small ping is sent per week, plus one extra ping (capped at on
   "plugin_version": "1.16.0.0",
   "jellyfin_version": "10.11.11",
   "features": { "watchlist_sync": true, "diary_import": false, "...": "booleans of which settings are enabled" },
-  "buckets": { "accounts": "1", "library": "2k-10k", "syncs_per_week": "1-10" },
+  "buckets": { "accounts": "1", "library": "2k-10k", "syncs_per_week": "1-10", "syncs_ever": "11-100" },
   "errors": { "cloudflare_403": 0, "auth_failure": 0, "tmdb_lookup": 0, "jellyseerr_error": 0, "other": 0,
               "state": { "cloudflare_403": false, "...": "which error types are currently occurring" } }
 }

@@ -128,6 +128,7 @@ public class TelemetryServiceTests : IDisposable
     {
         var t = Enable();
         t.WindowSyncs = 12;
+        t.LifetimeSyncs = 150;
         t.WindowErrCloudflare = 3;
         t.LastWeeklyPingUtc = new DateTime(2026, 6, 8, 2, 0, 0, DateTimeKind.Utc);
         var now = new DateTime(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc); // next Monday
@@ -139,12 +140,34 @@ public class TelemetryServiceTests : IDisposable
         using var doc = JsonDocument.Parse(ping.Json);
         Assert.Equal("weekly", doc.RootElement.GetProperty("ping_type").GetString());
         Assert.Equal("11-100", doc.RootElement.GetProperty("buckets").GetProperty("syncs_per_week").GetString());
+        Assert.Equal("100+", doc.RootElement.GetProperty("buckets").GetProperty("syncs_ever").GetString());
         Assert.Equal("500-2k", doc.RootElement.GetProperty("buckets").GetProperty("library").GetString());
         Assert.Equal(3, doc.RootElement.GetProperty("errors").GetProperty("cloudflare_403").GetInt32());
-        // Window resets after a successful send.
+        // Window resets after a successful send; the lifetime counter never does.
         Assert.Equal(0, t.WindowSyncs);
+        Assert.Equal(150, t.LifetimeSyncs);
         Assert.Equal(0, t.WindowErrCloudflare);
         Assert.Equal(now, t.LastWeeklyPingUtc);
+    }
+
+    [Fact]
+    public async Task RunScheduled_QuietWeek_StillReportsLifetimeBucket()
+    {
+        // The reason syncs_ever exists: a healthy-but-idle instance reports
+        // syncs_per_week "0" and a non-zero lifetime bucket, while a
+        // never-activated install reports "0" on both.
+        var t = Enable();
+        t.WindowSyncs = 0;
+        t.LifetimeSyncs = 5;
+        t.LastWeeklyPingUtc = new DateTime(2026, 6, 8, 2, 0, 0, DateTimeKind.Utc);
+        TelemetryService.ClockOverride = () => new DateTime(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc);
+
+        await TelemetryService.RunScheduledAsync(libraryCount: 100, logger: null);
+
+        var ping = Assert.Single(_sent);
+        using var doc = JsonDocument.Parse(ping.Json);
+        Assert.Equal("0", doc.RootElement.GetProperty("buckets").GetProperty("syncs_per_week").GetString());
+        Assert.Equal("1-10", doc.RootElement.GetProperty("buckets").GetProperty("syncs_ever").GetString());
     }
 
     [Fact]
@@ -190,6 +213,7 @@ public class TelemetryServiceTests : IDisposable
         // Counters live on the PluginConfiguration object, i.e. they survive restarts
         // by construction (config persistence), not in TelemetryService memory.
         Assert.Equal(2, t.WindowSyncs);
+        Assert.Equal(2, t.LifetimeSyncs);
         Assert.Equal(1, t.WindowSkipped);
     }
 

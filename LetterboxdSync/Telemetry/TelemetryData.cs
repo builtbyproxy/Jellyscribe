@@ -42,6 +42,15 @@ public class TelemetryData
     /// </summary>
     public bool TransitionQueued { get; set; }
 
+    /// <summary>
+    /// Lifetime successful-sync counter. Unlike the window counters below it is NEVER
+    /// reset: the syncs_ever bucket it feeds exists to distinguish "installed but never
+    /// completed a sync" (an activation failure) from "no syncs this window" (a quiet
+    /// week), which syncs_per_week alone cannot. Leaves the box only as a coarse bucket
+    /// (0 / 1-10 / 11-100 / 100+), same as every other count.
+    /// </summary>
+    public int LifetimeSyncs { get; set; }
+
     // Window counters, measured since the last successful weekly ping (never cumulative,
     // so canary rates are per-period by construction). Reset on successful weekly ping.
     public int WindowSyncs { get; set; }

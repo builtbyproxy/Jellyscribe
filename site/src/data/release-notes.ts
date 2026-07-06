@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.19.3',
+    headline: 'Telemetry can now tell a quiet week from a plugin that never worked',
+    summary:
+      'A small improvement to the opt-in anonymous telemetry: alongside the existing per-week sync bucket, the weekly ping now includes a lifetime sync bucket. Until now, an instance reporting zero syncs in a week was indistinguishable from one where syncing never worked at all; the lifetime bucket separates the two, so setup problems can be spotted and fixed. Same privacy rules as everything else: a coarse bucket only (0, 1-10, 11-100, 100+), never exact numbers, and nothing is sent unless you opted in.',
+    highlights: {
+      improvements: [
+        'Weekly telemetry pings gain a syncs_ever bucket: the lifetime count of successful syncs, reported in the same coarse buckets as all other counts. This distinguishes a healthy-but-idle instance from an install where syncing has never succeeded.',
+      ],
+    },
+  },
+  {
     version: '1.19.2',
     headline: 'Stored credentials are now encrypted at rest',
     summary:

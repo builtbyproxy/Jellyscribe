@@ -119,6 +119,7 @@ internal static class TelemetryService
                     case SyncStatus.Success:
                     case SyncStatus.Rewatch:
                         d.WindowSyncs++;
+                        d.LifetimeSyncs++;
                         // Recovery: a film made it all the way to Letterboxd, so the
                         // pipeline is healthy; flip every category back to clean. The
                         // recovery is visible in the next weekly payload (by design,
@@ -307,7 +308,8 @@ internal static class TelemetryService
             {
                 accounts = BucketAccounts(enabled.Count),
                 library = libraryCount.HasValue ? BucketLibrary(libraryCount.Value) : "unknown",
-                syncs_per_week = BucketSyncs(d.WindowSyncs)
+                syncs_per_week = BucketSyncs(d.WindowSyncs),
+                syncs_ever = BucketSyncs(d.LifetimeSyncs)
             },
             errors = new
             {
