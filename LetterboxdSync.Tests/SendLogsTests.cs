@@ -133,6 +133,60 @@ public class SendLogsTests : IDisposable
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    // ---- Empty-capture visibility (LBX-C1EP38: a real user's bundle arrived with
+    // log_lines = [] and nothing in it explained why; the send also reported plain
+    // success, so the user never knew their diagnostics were blank) ----
+
+    [Fact]
+    public async Task SendLogs_EmptyCapture_WarnsUser_AndBundleCarriesCollectorMeta()
+    {
+        // No log files exist in the harness log dir: the collector matches nothing.
+        var result = await _h.Controller.SendLogs(new SendLogsRequest { Note = null });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        Assert.Contains("LBX-TEST01", response);
+        // The user is told the bundle is empty instead of getting a bare success.
+        Assert.Contains("\"warning\"", response);
+        Assert.DoesNotContain("\"warning\":null", response);
+
+        // The uploaded bundle explains itself: collector status travels with it, so an
+        // empty capture is distinguishable (server-side) from a broken collector.
+        var (_, json) = Assert.Single(_sent);
+        Assert.Contains("[meta] collector:", json);
+        Assert.Contains("matched=0", json);
+    }
+
+    [Fact]
+    public async Task SendLogs_WithMatchingLines_DoesNotWarn()
+    {
+        var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");
+        System.IO.File.WriteAllText(logFile,
+            "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.Foo: a diagnostic line\n");
+
+        var result = await _h.Controller.SendLogs(new SendLogsRequest { Note = null });
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = System.Text.Json.JsonSerializer.Serialize(ok.Value);
+        Assert.Contains("LBX-TEST01", response);
+        Assert.Contains("\"warning\":null", response);
+
+        var (_, json) = Assert.Single(_sent);
+        Assert.Contains("a diagnostic line", json);
+        Assert.Contains("matched=1", json);
+    }
+
+    [Fact]
+    public void PreviewLogs_EmptyCapture_ShowsCollectorMeta()
+    {
+        // The preview must show the same truth the send uploads: with nothing matched,
+        // the user sees matched=0 in the consent modal instead of a bare empty array.
+        var result = _h.Controller.PreviewLogs();
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Contains("[meta] collector:", content.Content!);
+        Assert.Contains("matched=0", content.Content!);
+    }
+
     [Fact]
     public async Task SendLogBundle_WorksWithTelemetryDisabled()
     {
