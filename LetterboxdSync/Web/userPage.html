@@ -18,7 +18,7 @@
                     --ws-film-soft: rgba(0,224,84,.13); --ws-tv-soft: rgba(45,212,191,.14); --ws-primary-soft: rgba(91,140,255,.16);
                     --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55);
                     --ws-mono: ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,monospace;
-                    --ws-r: 12px; color: var(--ws-text); font-size: 14px; line-height: 1.5;
+                    --ws-r: 12px; color: var(--ws-text); font-size: 14px; line-height: 1.5; background: var(--ws-bg);
                 }
                 @media (prefers-color-scheme: light) {
                     #letterboxdUserPage {
@@ -115,8 +115,10 @@
                 #letterboxdUserPage .ws-checks .desc { display: block; color: var(--ws-faint); font-size: 11.5px; }
                 #letterboxdUserPage .ws-modal-ov { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; }
                 #letterboxdUserPage .ws-modal-ov.show { display: grid; place-items: center; padding: 20px; }
-                #letterboxdUserPage .ws-modal { background: var(--ws-surface); border: 1px solid var(--ws-border-strong); border-radius: 14px; padding: 22px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); }
-                #letterboxdUserPage .ws-modal h3 { margin: 0 0 14px; font-size: 16px; }
+                #letterboxdUserPage .ws-modal { position: relative; background: var(--ws-surface); border: 1px solid var(--ws-border-strong); border-radius: 14px; padding: 22px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); }
+                #letterboxdUserPage .ws-modal h3 { margin: 0 0 14px; font-size: 16px; padding-right: 36px; }
+                #letterboxdUserPage .ws-modal-x { position: absolute; top: 12px; right: 14px; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-size: 21px; line-height: 1; cursor: pointer; display: grid; place-items: center; z-index: 2; }
+                #letterboxdUserPage .ws-modal-x:hover { color: var(--ws-text); border-color: var(--ws-faint); }
                 #letterboxdUserPage .ws-row { margin-bottom: 12px; }
                 #letterboxdUserPage .ws-star { cursor: pointer; font-size: 1.6em; user-select: none; color: var(--ws-faint); }
                 #letterboxdUserPage .ws-star.filled { color: var(--ws-warn); }
@@ -187,6 +189,7 @@
                 </div>
 
                 <div class="ws-modal-ov" id="acctModal"><div class="ws-modal">
+                    <button type="button" class="ws-modal-x" aria-label="Close">&times;</button>
                     <h3 id="acctModalTitle">Link a diary</h3>
                     <div class="ws-row"><label class="ws-field">Service</label><select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
                     <div class="ws-row"><label class="ws-field" id="mUserLabel">Email or username</label><input type="text" class="ws-input" id="mUsername" /></div>
@@ -199,6 +202,7 @@
                 </div></div>
 
                 <div class="ws-modal-ov" id="reviewModal"><div class="ws-modal">
+                    <button type="button" class="ws-modal-x" aria-label="Close">&times;</button>
                     <h3 id="reviewTitle">Write review</h3>
                     <textarea id="reviewText" rows="4" class="ws-input" placeholder="Write your review…"></textarea>
                     <div class="ws-row" style="margin-top:12px;"><label class="ws-field">Rating</label><div id="starRating"><span class="ws-star" data-val="1">&#9734;</span><span class="ws-star" data-val="2">&#9734;</span><span class="ws-star" data-val="3">&#9734;</span><span class="ws-star" data-val="4">&#9734;</span><span class="ws-star" data-val="5">&#9734;</span><span id="ratingLabel" class="ws-muted" style="margin-left:8px;font-size:12px;">No rating</span></div><input type="hidden" id="reviewRating" value="" /></div>
@@ -249,6 +253,7 @@
                             document.getElementById('reviewCancel').addEventListener('click', function () { document.getElementById('reviewModal').classList.remove('show'); });
                             document.getElementById('reviewSubmit').addEventListener('click', function () { self.submitReview(); });
                             ['acctModal', 'reviewModal'].forEach(function (id) { document.getElementById(id).addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); }); });
+                            document.querySelectorAll('.ws-modal-x').forEach(function (x) { x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); }); });
                             document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); });
                             document.querySelectorAll('#starRating .ws-star').forEach(function (star) { star.addEventListener('click', function () { var val = parseFloat(this.getAttribute('data-val')); document.getElementById('reviewRating').value = val; document.getElementById('ratingLabel').textContent = val + ' / 5'; document.querySelectorAll('#starRating .ws-star').forEach(function (s) { var sv = parseFloat(s.getAttribute('data-val')); s.classList.toggle('filled', sv <= val); s.innerHTML = sv <= val ? '&#9733;' : '&#9734;'; }); }); });
                         },
