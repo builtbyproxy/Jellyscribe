@@ -122,7 +122,31 @@
                 #letterboxdUserPage .ws-star.filled { color: var(--ws-warn); }
                 #letterboxdUserPage .ws-muted { color: var(--ws-muted); } #letterboxdUserPage .ws-green { color: var(--ws-ok); } #letterboxdUserPage .ws-red { color: var(--ws-crit); }
                 #letterboxdUserPage a.ws-link { color: var(--ws-primary); }
-                @media (max-width: 820px) { #letterboxdUserPage .ws { grid-template-columns: 1fr; } #letterboxdUserPage .ws-rail { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--ws-border); height: auto; position: static; } #letterboxdUserPage .ws-nav { flex-direction: row; } }
+                @media (max-width: 820px) {
+                    #letterboxdUserPage .ws { grid-template-columns: 1fr; min-height: 0; overflow: visible; }
+                    #letterboxdUserPage .ws-rail { flex-direction: column; align-items: stretch; gap: 10px; border-right: 0; border-bottom: 1px solid var(--ws-border); height: auto; position: static; padding: 12px 12px 0; }
+                    #letterboxdUserPage .ws-nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+                    #letterboxdUserPage .ws-nav::-webkit-scrollbar { display: none; }
+                    #letterboxdUserPage .ws-navlabel { display: none; }
+                    #letterboxdUserPage .ws-nav a { white-space: nowrap; padding: 8px 13px; flex: 0 0 auto; }
+                    #letterboxdUserPage .ws-main { padding: 16px 13px 34px; }
+                    #letterboxdUserPage .ws-head { flex-direction: column; align-items: stretch; gap: 12px; }
+                    #letterboxdUserPage .ws-head h1 { font-size: 18px; }
+                    #letterboxdUserPage .ws-head .ws-btn { flex: 1; justify-content: center; }
+                    #letterboxdUserPage .ws-tiles { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+                    #letterboxdUserPage .ws-tile { padding: 12px 13px; }
+                    #letterboxdUserPage .ws-tile .n { font-size: 21px; }
+                    #letterboxdUserPage .ws-cardgrid { grid-template-columns: 1fr; }
+                    #letterboxdUserPage .ws-table thead th, #letterboxdUserPage .ws-table tbody td { padding: 10px 11px; }
+                    #letterboxdUserPage .ws-table th:nth-child(3), #letterboxdUserPage .ws-table td:nth-child(3) { display: none; }
+                    #letterboxdUserPage .ws-titlecell { gap: 8px; }
+                    #letterboxdUserPage .ws-modal-ov.show { padding: 10px; align-items: flex-start; }
+                    #letterboxdUserPage .ws-modal { padding: 16px; max-width: none; margin-top: 6px; }
+                }
+                @media (max-width: 540px) {
+                    #letterboxdUserPage .ws-table th:nth-child(4), #letterboxdUserPage .ws-table td:nth-child(4) { display: none; }
+                    #letterboxdUserPage .ws-tile .n { font-size: 19px; }
+                }
                 </style>
 
                 <div class="ws">

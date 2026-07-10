@@ -142,9 +142,29 @@
                 #letterboxdSyncConfigPage .ws-logs { font-family: var(--ws-mono); font-size: 12px; line-height: 1.6; color: var(--ws-muted); white-space: pre-wrap; word-break: break-word; padding: 16px; max-height: 60vh; overflow: auto; }
                 #letterboxdSyncConfigPage a.ws-link { color: var(--ws-primary); }
                 @media (max-width: 820px) {
-                    #letterboxdSyncConfigPage .ws { grid-template-columns: 1fr; }
-                    #letterboxdSyncConfigPage .ws-rail { flex-direction: row; flex-wrap: wrap; align-items: center; border-right: 0; border-bottom: 1px solid var(--ws-border); }
-                    #letterboxdSyncConfigPage .ws-nav { flex-direction: row; flex-wrap: wrap; }
+                    #letterboxdSyncConfigPage .ws { grid-template-columns: 1fr; min-height: 0; overflow: visible; }
+                    #letterboxdSyncConfigPage .ws-rail { flex-direction: column; align-items: stretch; gap: 10px; border-right: 0; border-bottom: 1px solid var(--ws-border); height: auto; position: static; padding: 12px 12px 0; }
+                    #letterboxdSyncConfigPage .ws-nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+                    #letterboxdSyncConfigPage .ws-nav::-webkit-scrollbar { display: none; }
+                    #letterboxdSyncConfigPage .ws-navlabel { display: none; }
+                    #letterboxdSyncConfigPage .ws-nav a { white-space: nowrap; padding: 8px 13px; flex: 0 0 auto; }
+                    #letterboxdSyncConfigPage .ws-main { padding: 16px 13px 34px; }
+                    #letterboxdSyncConfigPage .ws-head { flex-direction: column; align-items: stretch; gap: 12px; }
+                    #letterboxdSyncConfigPage .ws-head h1 { font-size: 18px; }
+                    #letterboxdSyncConfigPage .ws-head .ws-btn { flex: 1; justify-content: center; }
+                    #letterboxdSyncConfigPage .ws-tiles { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+                    #letterboxdSyncConfigPage .ws-tile { padding: 12px 13px; }
+                    #letterboxdSyncConfigPage .ws-tile .n { font-size: 21px; }
+                    #letterboxdSyncConfigPage .ws-cardgrid { grid-template-columns: 1fr; }
+                    #letterboxdSyncConfigPage .ws-table thead th, #letterboxdSyncConfigPage .ws-table tbody td { padding: 10px 11px; }
+                    #letterboxdSyncConfigPage .ws-table th:nth-child(3), #letterboxdSyncConfigPage .ws-table td:nth-child(3) { display: none; }
+                    #letterboxdSyncConfigPage .ws-titlecell { gap: 8px; }
+                    #letterboxdSyncConfigPage .ws-modal-ov.show { padding: 10px; align-items: flex-start; }
+                    #letterboxdSyncConfigPage .ws-modal { padding: 16px; max-width: none; margin-top: 6px; }
+                }
+                @media (max-width: 540px) {
+                    #letterboxdSyncConfigPage .ws-table th:nth-child(4), #letterboxdSyncConfigPage .ws-table td:nth-child(4) { display: none; }
+                    #letterboxdSyncConfigPage .ws-tile .n { font-size: 19px; }
                 }
                 </style>
 
