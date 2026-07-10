@@ -240,6 +240,37 @@ public class SeerrClient : IDisposable
     }
 
     /// <summary>
+    /// Requests a TV series on Seerr (the TV counterpart to <see cref="RequestMovieAsync"/>).
+    /// Requests the given season numbers, or all seasons when none are specified. 409 /
+    /// already-exists responses are treated as a no-op.
+    /// </summary>
+    public async Task<RequestResult> RequestSeriesAsync(int tmdbId, int jellyseerrUserId, IReadOnlyList<int> seasonNumbers)
+    {
+        var url = $"{_baseUrl}/api/v1/request";
+        var seasonsJson = seasonNumbers.Count > 0 ? "[" + string.Join(",", seasonNumbers) + "]" : "\"all\"";
+        var body = $"{{\"mediaType\":\"tv\",\"mediaId\":{tmdbId},\"userId\":{jellyseerrUserId},\"seasons\":{seasonsJson}}}";
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+
+        using var response = await _http.PostAsync(url, content).ConfigureAwait(false);
+        if (response.IsSuccessStatusCode)
+            return RequestResult.Requested;
+
+        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if ((int)response.StatusCode == 409 ||
+            responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
+            responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
+            responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
+            responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase))
+        {
+            return RequestResult.AlreadyExists;
+        }
+
+        _logger.LogWarning("Seerr TV request failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
+            tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
+        return RequestResult.Failed;
+    }
+
+    /// <summary>
     /// Returns the set of TMDb IDs of <paramref name="mediaType"/> currently on the given Seerr
     /// user's watchlist. Pages through results until exhausted. Returns an empty set on failure
     /// (caller should treat that as "unknown" and avoid destructive removals).

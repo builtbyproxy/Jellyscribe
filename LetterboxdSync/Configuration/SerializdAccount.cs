@@ -61,4 +61,7 @@ public class SerializdAccount
 
     /// <summary>Reverse import: mark Jellyfin episodes played if they're on the Serializd diary. Mirrors <see cref="Account.EnableDiaryImport"/>.</summary>
     public bool EnableDiaryImport { get; set; }
+
+    /// <summary>Auto-request watchlisted shows missing from the library via Seerr (TV). Mirrors <see cref="Account.AutoRequestWatchlist"/>.</summary>
+    public bool AutoRequestWatchlist { get; set; }
 }

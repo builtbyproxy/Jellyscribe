@@ -679,6 +679,10 @@
                                 + '<span class="lb-check-title">Mirror Serializd watchlist as a Jellyfin collection + playlist</span>'
                                 + '<span class="lb-check-desc">Pulls your Serializd watchlist daily into a "Serializd Watchlist" collection (shows) and playlist (the episodes of the watchlisted seasons). Only shows already in your library are added.</span>'
                                 + '</span></label>'
+                                + '<label><input type="checkbox" class="szAutoRequestWatchlist" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Auto-request unmatched watchlist shows via Seerr</span>'
+                                + '<span class="lb-check-desc">When a watchlisted show is not in the Jellyfin library, submit a TV request to Seerr (configure URL + API key in Settings), attributed to this user\'s Seerr account. Requests the watchlisted seasons.</span>'
+                                + '</span></label>'
                                 + '<label><input type="checkbox" class="szSkipPreviouslySynced" /><span class="lb-check-text">'
                                 + '<span class="lb-check-title">Skip episodes already synced locally</span>'
                                 + '<span class="lb-check-desc">Use the plugin\'s own sync history to skip episodes already logged, so we don\'t re-hit Serializd for them. Recommended (leaving it off can create duplicate diary entries).</span>'
@@ -719,6 +723,7 @@
                                 entry.querySelector('.szSkipPreviouslySynced').checked = account.SkipPreviouslySynced !== false;
                                 entry.querySelector('.szStopOnFailure').checked = account.StopOnFailure === true;
                                 entry.querySelector('.szEnableDiaryImport').checked = account.EnableDiaryImport === true;
+                                entry.querySelector('.szAutoRequestWatchlist').checked = account.AutoRequestWatchlist === true;
                                 if (account.EnableDateFilter) entry.querySelector('.dateFilterDaysContainer').style.display = '';
                             } else {
                                 entry.querySelector('.szEnabled').checked = true;
@@ -746,7 +751,8 @@
                                     SyncWatchlist: entry.querySelector('.szSyncWatchlist').checked,
                                     SkipPreviouslySynced: entry.querySelector('.szSkipPreviouslySynced').checked,
                                     StopOnFailure: entry.querySelector('.szStopOnFailure').checked,
-                                    EnableDiaryImport: entry.querySelector('.szEnableDiaryImport').checked
+                                    EnableDiaryImport: entry.querySelector('.szEnableDiaryImport').checked,
+                                    AutoRequestWatchlist: entry.querySelector('.szAutoRequestWatchlist').checked
                                 });
                             });
                             return accounts;

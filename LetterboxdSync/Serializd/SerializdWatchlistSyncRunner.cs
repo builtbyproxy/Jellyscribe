@@ -159,6 +159,47 @@ public class SerializdWatchlistSyncRunner
 
         await ReconcileCollectionAsync(user, desiredShows).ConfigureAwait(false);
         await ReconcilePlaylistAsync(user, desiredEpisodes).ConfigureAwait(false);
+
+        if (account.AutoRequestWatchlist)
+            await RequestUnmatchedViaSeerrAsync(account, entries, seriesByTmdb, user, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task RequestUnmatchedViaSeerrAsync(SerializdAccount account, List<SerializdWatchlistEntry> entries,
+        Dictionary<string, BaseItem> seriesByTmdb, User user, CancellationToken cancellationToken)
+    {
+        var cfg = Config;
+        if (!SeerrClient.IsConfigured(cfg.JellyseerrUrl, cfg.JellyseerrApiKey))
+        {
+            _logger.LogWarning("Serializd watchlist: AutoRequest is on but Seerr isn't configured; skipping for {Username}", user.Username);
+            return;
+        }
+
+        using var seerr = new SeerrClient(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger);
+        var seerrUserId = await seerr.GetJellyseerrUserIdAsync(account.UserJellyfinId).ConfigureAwait(false);
+        if (seerrUserId == null)
+        {
+            _logger.LogWarning("Serializd watchlist: no Seerr user linked to {Username}; skipping auto-request", user.Username);
+            return;
+        }
+
+        int requested = 0, existing = 0, failed = 0;
+        foreach (var entry in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (seriesByTmdb.ContainsKey(entry.ShowTmdbId.ToString())) continue; // already in the library
+
+            var result = await seerr.RequestSeriesAsync(entry.ShowTmdbId, seerrUserId.Value, entry.SeasonNumbers).ConfigureAwait(false);
+            switch (result)
+            {
+                case SeerrClient.RequestResult.Requested: requested++; break;
+                case SeerrClient.RequestResult.AlreadyExists: existing++; break;
+                default: failed++; break;
+            }
+        }
+
+        if (requested + existing + failed > 0)
+            _logger.LogInformation("Serializd watchlist Seerr auto-request for {Username}: {Requested} new, {Existing} already on Seerr, {Failed} failed",
+                user.Username, requested, existing, failed);
     }
 
     private async Task ReconcileCollectionAsync(User user, HashSet<Guid> desired)
