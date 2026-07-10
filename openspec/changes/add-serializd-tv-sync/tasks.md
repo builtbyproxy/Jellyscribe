@@ -128,7 +128,13 @@ reversibly (create → read → delete) at both show and episode level with a pa
       `is_log:false` confirmed to set a rating/like *without* a Diary row). Catch-up
       syncs rated/favorited series among the watched set, deduped by `showmeta` kind.
       Limitation: create-once (a later rating change won't re-sync until an update path).
-- [x] 7.6 Serializd watchlist → Jellyfin **collection** (BoxSet, not a playlist: a Series
+- [x] 7.6 Serializd watchlist → Jellyfin **collection + playlist** (parity). A collection
+      (BoxSet) of the watchlisted **shows** (browse) PLUS a playlist of the **episodes of the
+      specific watchlisted seasons** (play-queue; season-accuracy lives here since playlists
+      are episode-level). `GetWatchlistAsync` returns per-show season numbers (resolving
+      `seasonIds`→numbers via the show map). Both reconcile add+remove. Verified live: 3 shows
+      in the collection; playlist = The Bear S5 (8) + DTF St. Louis S1 (6) + Clarkson's S4 (2)
+      = 16 eps, no strays; S5 of Clarkson's correctly absent (not in library yet). ~~(BoxSet, not a playlist: a Series
       added to a Video playlist expands into its episodes). `GetWatchlistShowTmdbIdsAsync`
       paginates `/user/{username}/watchlistpage_v2` (item `showId` = TMDb; username resolved
       via `/validateauthtoken`); `SerializdWatchlistSyncRunner` matches shows to library
