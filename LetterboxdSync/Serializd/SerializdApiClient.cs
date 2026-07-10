@@ -187,8 +187,8 @@ public class SerializdApiClient : ISerializdService
             ["allows_comments"] = true,
             ["like"] = false,
         };
-        if (rating is > 0)
-            payload["rating"] = Math.Clamp(rating.Value, 1, 10);
+        // rating is required by /show/reviews/add (omitting it returns HTTP 500); 0 = unrated.
+        payload["rating"] = rating is > 0 ? Math.Clamp(rating.Value, 1, 10) : 0;
 
         var body = JsonSerializer.Serialize(payload);
         using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
@@ -285,8 +285,8 @@ public class SerializdApiClient : ISerializdService
             ["allows_comments"] = true,
             ["like"] = like,
         };
-        if (rating is > 0)
-            payload["rating"] = Math.Clamp(rating.Value, 1, 10);
+        // rating is required by /show/reviews/add (omitting it returns HTTP 500); 0 = unrated.
+        payload["rating"] = rating is > 0 ? Math.Clamp(rating.Value, 1, 10) : 0;
 
         var body = JsonSerializer.Serialize(payload);
         using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);

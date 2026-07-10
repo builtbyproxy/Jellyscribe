@@ -157,8 +157,9 @@ public class SerializdApiClientTests
     }
 
     [Fact]
-    public async Task CreateEpisodeLog_OmitsRatingWhenUnrated()
+    public async Task CreateEpisodeLog_UnratedSendsRatingZero_NotOmitted()
     {
+        // Omitting rating 500s on the real API, so an unrated log must send rating:0.
         string body = string.Empty;
         var handler = new ApiMockHandler(req =>
         {
@@ -172,7 +173,7 @@ public class SerializdApiClientTests
         await client.AuthenticateAsync("me@example.com", "pw");
         await client.CreateEpisodeLogAsync(1396, 3572, 4, DateTime.UtcNow, rating: null, isRewatch: false);
 
-        Assert.DoesNotContain("\"rating\"", body);
+        Assert.Contains("\"rating\":0", body);
     }
 
     [Fact]
