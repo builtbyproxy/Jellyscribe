@@ -148,7 +148,7 @@
                     #letterboxdSyncConfigPage .ws-nav::-webkit-scrollbar { display: none; }
                     #letterboxdSyncConfigPage .ws-navlabel { display: none; }
                     #letterboxdSyncConfigPage .ws-nav a { white-space: nowrap; padding: 8px 13px; flex: 0 0 auto; }
-                    #letterboxdSyncConfigPage .ws-main { padding: 16px 13px 34px; }
+                    #letterboxdSyncConfigPage .ws-main { padding: 16px 13px 34px; overflow-x: hidden; }
                     #letterboxdSyncConfigPage .ws-head { flex-direction: column; align-items: stretch; gap: 12px; }
                     #letterboxdSyncConfigPage .ws-head h1 { font-size: 18px; }
                     #letterboxdSyncConfigPage .ws-head .ws-btn { flex: 1; justify-content: center; }
@@ -310,8 +310,16 @@
                         actOffset: 0, actTotal: 0,
                         editing: null,
 
+                        ensureViewport: function () {
+                            try {
+                                var vp = document.querySelector('meta[name="viewport"]');
+                                if (!vp) { vp = document.createElement('meta'); vp.setAttribute('name', 'viewport'); (document.head || document.documentElement).appendChild(vp); }
+                                if (!/width\s*=\s*device-width/i.test(vp.getAttribute('content') || '')) vp.setAttribute('content', 'width=device-width, initial-scale=1');
+                            } catch (e) {}
+                        },
                         init: function () {
                             var self = this;
+                            self.ensureViewport();
                             self.wireNav();
                             self.wireButtons();
                             ApiClient.getUsers().then(function (u) { self.users = u; return ApiClient.getPluginConfiguration(self.PluginId); })

@@ -129,7 +129,7 @@
                     #letterboxdUserPage .ws-nav::-webkit-scrollbar { display: none; }
                     #letterboxdUserPage .ws-navlabel { display: none; }
                     #letterboxdUserPage .ws-nav a { white-space: nowrap; padding: 8px 13px; flex: 0 0 auto; }
-                    #letterboxdUserPage .ws-main { padding: 16px 13px 34px; }
+                    #letterboxdUserPage .ws-main { padding: 16px 13px 34px; overflow-x: hidden; }
                     #letterboxdUserPage .ws-head { flex-direction: column; align-items: stretch; gap: 12px; }
                     #letterboxdUserPage .ws-head h1 { font-size: 18px; }
                     #letterboxdUserPage .ws-head .ws-btn { flex: 1; justify-content: center; }
@@ -220,8 +220,16 @@
                         post: function (path, body) { return fetch(this.serverUrl + '/' + path, { method: 'POST', headers: { 'Authorization': 'MediaBrowser Token="' + this.token + '"', 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); },
                         put: function (path, body) { return fetch(this.serverUrl + '/' + path, { method: 'PUT', headers: { 'Authorization': 'MediaBrowser Token="' + this.token + '"', 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); },
 
+                        ensureViewport: function () {
+                            try {
+                                var vp = document.querySelector('meta[name="viewport"]');
+                                if (!vp) { vp = document.createElement('meta'); vp.setAttribute('name', 'viewport'); (document.head || document.documentElement).appendChild(vp); }
+                                if (!/width\s*=\s*device-width/i.test(vp.getAttribute('content') || '')) vp.setAttribute('content', 'width=device-width, initial-scale=1');
+                            } catch (e) {}
+                        },
                         init: function () {
                             var self = this;
+                            self.ensureViewport();
                             if (!self.resolveAuth()) { setTimeout(function () { self.init(); }, 400); return; }
                             self.wire();
                             self.loadOverview();
