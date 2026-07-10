@@ -4,6 +4,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using LetterboxdSync.Configuration;
+using LetterboxdSync.Serializd;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Entities;
@@ -58,13 +60,24 @@ public class PlaybackHandler : IHostedService, IDisposable
     // the ISessionManager event raise machinery; production callers still go via OnPlaybackStopped.
     internal async Task HandlePlaybackStoppedAsync(PlaybackStopEventArgs e)
     {
-        if (e.Item == null || !e.Item.IsMovie())
+        if (e.Item == null)
             return;
 
         if (!e.PlayedToCompletion)
             return;
 
         if (e.Users == null || e.Users.Count == 0)
+            return;
+
+        // TV episodes scrobble to Serializd; films fall through to the Letterboxd path below.
+        // The two are fully isolated: a Serializd failure never touches Letterboxd and vice versa.
+        if (e.Item is Episode episode)
+        {
+            await HandleEpisodeAsync(episode, e).ConfigureAwait(false);
+            return;
+        }
+
+        if (!e.Item.IsMovie())
             return;
 
         foreach (var user in e.Users)
@@ -147,6 +160,79 @@ public class PlaybackHandler : IHostedService, IDisposable
                 }
             }
         }
+    }
+
+    // internal so tests can drive the episode path directly, same as HandlePlaybackStoppedAsync.
+    internal async Task HandleEpisodeAsync(Episode episode, PlaybackStopEventArgs e)
+    {
+        var seriesTmdbId = SeriesTmdbIdReader(episode);
+        var epRef = SerializdEpisodeMapper.Build(
+            seriesTmdbId, episode.ParentIndexNumber, episode.IndexNumber, episode.IndexNumberEnd);
+
+        if (epRef == null)
+        {
+            _logger.LogWarning(
+                "Episode {Series} S{Season}E{Episode} lacks a series TMDb id / season / episode number, skipping Serializd sync",
+                episode.SeriesName ?? episode.Name, episode.ParentIndexNumber, episode.IndexNumber);
+            return;
+        }
+
+        foreach (var user in e.Users)
+        {
+            var accounts = Config.GetEnabledSerializdAccountsForUser(user.Id.ToString("N")).ToList();
+            if (accounts.Count == 0)
+                continue;
+
+            foreach (var account in accounts)
+            {
+                try
+                {
+                    using var service = await SerializdServiceFactory
+                        .CreateAuthenticatedAsync(account.Email, account.Password, _logger)
+                        .ConfigureAwait(false);
+
+                    var seasonId = await service
+                        .ResolveSeasonIdAsync(epRef.ShowTmdbId, epRef.SeasonNumber)
+                        .ConfigureAwait(false);
+
+                    if (seasonId == null)
+                    {
+                        _logger.LogWarning(
+                            "Serializd has no season {Season} for TMDb show {TmdbId} ({Series}), skipping",
+                            epRef.SeasonNumber, epRef.ShowTmdbId, episode.SeriesName);
+                        continue;
+                    }
+
+                    await service.LogEpisodesAsync(epRef.ShowTmdbId, seasonId.Value, epRef.EpisodeNumbers)
+                        .ConfigureAwait(false);
+
+                    _logger.LogInformation(
+                        "Logged {Series} S{Season} episodes {Episodes} (TMDb:{TmdbId}) to Serializd for {Username} as {Email}",
+                        episode.SeriesName, epRef.SeasonNumber, string.Join(",", epRef.EpisodeNumbers),
+                        epRef.ShowTmdbId, user.Username, account.Email);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(
+                        "Failed to log {Series} S{Season}E{Episode} (TMDb:{TmdbId}) to Serializd for {Username}: {Message}",
+                        episode.SeriesName, epRef.SeasonNumber, episode.IndexNumber, epRef.ShowTmdbId,
+                        user.Username, ex.Message);
+                }
+            }
+        }
+    }
+
+    // Reads the parent series' TMDb id from an episode. Overridable so tests can supply
+    // it without wiring Jellyfin's library-parent graph (mirrors the factory OverrideForTesting
+    // convention); production always uses DefaultReadSeriesTmdbId.
+    internal static Func<Episode, int?> SeriesTmdbIdReader { get; set; } = DefaultReadSeriesTmdbId;
+
+    private static int? DefaultReadSeriesTmdbId(Episode episode)
+    {
+        // Serializd keys by the SHOW's TMDb id, which lives on the parent Series
+        // (the episode's own ProviderIds carry the episode-level id, which is wrong here).
+        var fromSeries = episode.Series?.GetProviderId(MetadataProvider.Tmdb);
+        return int.TryParse(fromSeries, out var seriesId) ? seriesId : null;
     }
 
     public void Dispose()
