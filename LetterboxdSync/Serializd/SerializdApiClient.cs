@@ -277,6 +277,59 @@ public class SerializdApiClient : ISerializdService
         return numbers;
     }
 
+    public async Task<List<SerializdDiaryEpisode>> GetDiaryEpisodesAsync()
+    {
+        await EnsureUsernameAsync().ConfigureAwait(false);
+        if (string.IsNullOrEmpty(_username))
+            throw new Exception("Serializd username unknown; cannot read diary");
+
+        var result = new List<SerializdDiaryEpisode>();
+        var seen = new HashSet<(int, int, int)>();
+        for (var page = 1; page <= 200; page++)
+        {
+            using var resp = await SendAsync(HttpMethod.Get,
+                $"/user/{Uri.EscapeDataString(_username)}/diary?page={page}").ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) break;
+
+            var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("reviews", out var reviews)
+                || reviews.ValueKind != JsonValueKind.Array || reviews.GetArrayLength() == 0)
+                break;
+
+            foreach (var r in reviews.EnumerateArray())
+            {
+                if (!r.TryGetProperty("showId", out var showEl) || !showEl.TryGetInt32(out var show)) continue;
+                if (!r.TryGetProperty("episodeNumber", out var epEl) || !epEl.TryGetInt32(out var ep) || ep <= 0) continue;
+                if (!r.TryGetProperty("seasonId", out var sidEl) || !sidEl.TryGetInt32(out var seasonId)) continue;
+
+                // Resolve the Serializd seasonId to a season number via the entry's own season list.
+                int? seasonNumber = null;
+                if (r.TryGetProperty("showSeasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var s in seasons.EnumerateArray())
+                    {
+                        if (s.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var sid) && sid == seasonId
+                            && s.TryGetProperty("seasonNumber", out var numEl) && numEl.TryGetInt32(out var num))
+                        {
+                            seasonNumber = num;
+                            break;
+                        }
+                    }
+                }
+
+                if (seasonNumber == null) continue;
+                if (seen.Add((show, seasonNumber.Value, ep)))
+                    result.Add(new SerializdDiaryEpisode(show, seasonNumber.Value, ep));
+            }
+
+            var totalPages = doc.RootElement.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var t) ? t : page;
+            if (page >= totalPages) break;
+        }
+
+        return result;
+    }
+
     /// <summary>Resolves the authenticated user's own username (needed for user-scoped reads) if not already known.</summary>
     private async Task EnsureUsernameAsync()
     {

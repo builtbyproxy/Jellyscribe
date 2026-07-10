@@ -58,4 +58,7 @@ public class SerializdAccount
 
     /// <summary>Primary account for this Jellyfin user (multi-account tie-breaks). Mirrors <see cref="Account.IsPrimary"/>.</summary>
     public bool IsPrimary { get; set; }
+
+    /// <summary>Reverse import: mark Jellyfin episodes played if they're on the Serializd diary. Mirrors <see cref="Account.EnableDiaryImport"/>.</summary>
+    public bool EnableDiaryImport { get; set; }
 }

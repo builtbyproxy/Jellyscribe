@@ -7,6 +7,9 @@ namespace LetterboxdSync.Serializd;
 /// <summary>A show on the Serializd watchlist, with the specific season numbers watchlisted.</summary>
 public sealed record SerializdWatchlistEntry(int ShowTmdbId, IReadOnlyList<int> SeasonNumbers);
 
+/// <summary>An episode-level entry on the Serializd diary (used to mark Jellyfin episodes played).</summary>
+public sealed record SerializdDiaryEpisode(int ShowTmdbId, int SeasonNumber, int EpisodeNumber);
+
 /// <summary>
 /// Business operations against a single authenticated Serializd account. The
 /// factory (<see cref="SerializdServiceFactory"/>) hands back an already-logged-in
@@ -55,4 +58,7 @@ public interface ISerializdService : IDisposable
 
     /// <summary>Writes a show-level review (text + optional rating), the Serializd equivalent of a Letterboxd review.</summary>
     Task CreateShowReviewAsync(int showTmdbId, int? rating, string? reviewText, bool containsSpoiler);
+
+    /// <summary>Reads the authenticated user's Serializd diary as episode-level entries (for import to Jellyfin).</summary>
+    Task<List<SerializdDiaryEpisode>> GetDiaryEpisodesAsync();
 }
