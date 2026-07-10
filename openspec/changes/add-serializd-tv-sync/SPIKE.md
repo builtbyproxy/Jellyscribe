@@ -84,6 +84,27 @@ guessing paths is both unreliable and risks rate-limiting:
    dates *cannot* be migrated, hinting backdate may be limited or unsupported on
    writes. Real-time scrobbling is unaffected either way, since it logs "now".)
 
+**Update (2026-07-10, deeper spike):** narrowed hard but did not crack it.
+- Ruled out (all HTTP 404, no such route): `/review`, `/reviews`,
+  `/review/create`, `/review/log`, `/log_review`, `/reviews/create`,
+  `/review/add_v2`, `/review/submit`, `/log`, `/logs`, `/log/add`, `/logs/add`,
+  `/season_log/add`, `/show_log/add`, `/diary/create`, `/review_v2`,
+  `/review_log`, `/createreview`, `/addreview`, `/rating`, `/rate` (+ more).
+- `/review/*` is a **wildcard READ route** (405, `Allow: GET, HEAD, OPTIONS`),
+  i.e. "view review by id", not the write. So the create endpoint is *not* under
+  `/review/`.
+- The submit logic lives in webpack module **20419** (the `AddReviewPage`
+  component), reachable only via the current build's chunks. `www.serializd.com`
+  fully Cloudflare-challenges **both** curl and a stealth headless browser
+  ("Just a moment…"), so the build manifest / chunk hashes can't be enumerated
+  programmatically. The onrender API host is open, but the *web page* that would
+  reveal the call is not.
+- Confirmed reversibly along the way: `/episode_log/add` + `/watched_v2` are the
+  real write endpoints (used for the "A Discovery of Witches" S1 backfill), and
+  the diary/review *response* objects carry `rating`, `reviewText`,
+  `containsSpoilers`, `backdate`, `isRewatch` — so the create endpoint almost
+  certainly accepts all of these; we just can't see its path/shape.
+
 **How to close them:** one authenticated session in the maintainer's real Chrome
 (bypasses Cloudflare): open a show's add-review page, submit a throwaway review
 with a rating and a past date, read the exact request from the Network tab
