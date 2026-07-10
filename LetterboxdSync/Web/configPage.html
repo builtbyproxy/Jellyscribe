@@ -648,8 +648,8 @@
                                 + '<button type="button" class="lb-btn lb-btn-danger removeSerializdBtn">Remove</button></div>'
                                 + '<div style="margin-bottom:0.5em;"><label class="lb-field">Jellyfin User</label>'
                                 + '<select class="szJellyfinUser">' + this.getUserOptions() + '</select></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Serializd Email</label>'
-                                + '<input type="text" class="szEmail" placeholder="you@example.com" /></div>'
+                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Serializd Email or Username</label>'
+                                + '<input type="text" class="szEmail" placeholder="you@example.com or your username" /></div>'
                                 + '<div style="margin-bottom:0.5em;"><label class="lb-field">Serializd Password</label>'
                                 + '<input type="password" class="szPassword" /></div>'
                                 + '<div class="lb-checks">'
@@ -737,7 +737,7 @@
                             });
                         },
 
-                        saveSettings: function () {
+                        saveSettings: function (suppressCookieWarning) {
                             var self = this;
                             ApiClient.getPluginConfiguration(self.PluginId).then(function (config) {
                                 config.Accounts = self.collectAccounts();
@@ -755,7 +755,7 @@
                                 ApiClient.updatePluginConfiguration(self.PluginId, config).then(function () {
                                     self.lastConfig = config;
                                     Dashboard.processPluginConfigurationUpdateResult();
-                                    if (noCookies > 0) {
+                                    if (!suppressCookieWarning && noCookies > 0) {
                                         Dashboard.alert({
                                             title: 'Saved, but check authentication',
                                             message: (noCookies === 1 ? 'One enabled account has' : noCookies + ' enabled accounts have')
@@ -1164,7 +1164,7 @@
                             document.getElementById('addAccountBtn').addEventListener('click', function () { self.addAccount(null); });
                             document.getElementById('saveBtn').addEventListener('click', function () { self.saveSettings(); });
                             document.getElementById('addSerializdAccountBtn').addEventListener('click', function () { self.addSerializdAccount(null); });
-                            document.getElementById('saveSerializdBtn').addEventListener('click', function () { self.saveSettings(); });
+                            document.getElementById('saveSerializdBtn').addEventListener('click', function () { self.saveSettings(true); });
                             document.getElementById('testJellyseerrBtn').addEventListener('click', function () { self.testJellyseerr(); });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
                             document.getElementById('runWatchlistSyncBtn').addEventListener('click', function () { self.runWatchlistSync(); });
