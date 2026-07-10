@@ -57,6 +57,9 @@ public static class SerializdSyncHistory
     /// <summary>A dated Diary log entry (show/reviews/add, is_log).</summary>
     public const string KindLog = "log";
 
+    /// <summary>Show-level rating/like sync (one per show; season+episode are 0 sentinels).</summary>
+    public const string KindShowMeta = "showmeta";
+
     private static string Key(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind)
     {
         var baseKey = $"{userJellyfinId}|{showTmdbId}|{seasonNumber}|{episodeNumber}";

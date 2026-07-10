@@ -238,6 +238,52 @@ public class SerializdSyncRunner
         if (logged > 0)
             _logger.LogInformation("Serializd catch-up: created {Count} dated diary logs for {Username} as {Email}",
                 logged, user.Username, account.Email);
+
+        // 3. Show-level rating + favorite (like) sync, one entry per rated/favorited series
+        //    among the shows we're tracking. is_log:false so it doesn't clutter the Diary.
+        await SyncShowMetaAsync(user, userId, records, service, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task SyncShowMetaAsync(User user, string userId, List<EpisodePlay> records,
+        ISerializdService service, CancellationToken cancellationToken)
+    {
+        var watchedShows = new HashSet<int>();
+        foreach (var r in records)
+            watchedShows.Add(r.Show);
+        if (watchedShows.Count == 0)
+            return;
+
+        var seriesList = _libraryManager.GetItemList(new InternalItemsQuery(user)
+        {
+            IncludeItemTypes = new[] { BaseItemKind.Series },
+            IsVirtualItem = false,
+        });
+
+        foreach (var s in seriesList)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!int.TryParse(s.GetProviderId(MetadataProvider.Tmdb), out var tmdb)) continue;
+            if (!watchedShows.Contains(tmdb)) continue;
+
+            var ud = _userDataManager.GetUserData(user, s);
+            var rating = SerializdRating.FromJellyfin(ud?.Rating);
+            var favorite = ud?.IsFavorite ?? false;
+            if (rating == null && !favorite) continue;                 // nothing to sync
+            if (SerializdSyncHistory.Has(userId, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta)) continue;
+
+            try
+            {
+                await service.SetShowMetaAsync(tmdb, rating, favorite).ConfigureAwait(false);
+                SerializdSyncHistory.Record(userId, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta);
+                _logger.LogInformation("Serializd: set show meta for TMDb {Show} (rating={Rating}, like={Like}) for {Username}",
+                    tmdb, rating, favorite, user.Username);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Serializd: failed setting show meta for TMDb {Show} for {Username}: {Message}",
+                    tmdb, user.Username, ex.Message);
+            }
+        }
     }
 
     private readonly record struct EpisodePlay(int Show, int Season, int Episode, DateTime WatchedAtUtc, int? Rating);

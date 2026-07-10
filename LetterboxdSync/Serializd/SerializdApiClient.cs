@@ -215,6 +215,36 @@ public class SerializdApiClient : ISerializdService
         }
     }
 
+    public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
+    {
+        // Whole-show entry, is_log:false so it's a rating/like rather than a Diary row.
+        // season_id/episode_number are sent as null (the API requires the keys present).
+        var payload = new Dictionary<string, object?>
+        {
+            ["show_id"] = showTmdbId,
+            ["season_id"] = null,
+            ["episode_number"] = null,
+            ["review_text"] = string.Empty,
+            ["contains_spoiler"] = false,
+            ["backdate"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+            ["is_log"] = false,
+            ["is_rewatch"] = false,
+            ["tags"] = Array.Empty<string>(),
+            ["allows_comments"] = true,
+            ["like"] = like,
+        };
+        if (rating is > 0)
+            payload["rating"] = Math.Clamp(rating.Value, 1, 10);
+
+        var body = JsonSerializer.Serialize(payload);
+        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            throw new Exception($"Serializd show-meta ({showTmdbId}) failed ({(int)resp.StatusCode}): {err}");
+        }
+    }
+
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path,
         string? body = null, bool authenticated = true, bool isRetry = false)
     {

@@ -34,4 +34,13 @@ public interface ISerializdService : IDisposable
 
     /// <summary>Removes the given episode numbers from watched (used by tests to clean up).</summary>
     Task UnlogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers);
+
+    /// <summary>
+    /// Sets show-level metadata: the user's rating and/or a like (heart), as a non-diary
+    /// entry (<c>is_log:false</c>, so it shows as "your rating"/like on the show without
+    /// adding a Diary row). Used to mirror a Jellyfin series rating + favorite.
+    /// </summary>
+    /// <param name="rating">Serializd rating 1..10, or null to leave unrated.</param>
+    /// <param name="like">True to heart the show (Jellyfin favorite).</param>
+    Task SetShowMetaAsync(int showTmdbId, int? rating, bool like);
 }

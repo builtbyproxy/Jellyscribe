@@ -176,6 +176,33 @@ public class SerializdApiClientTests
     }
 
     [Fact]
+    public async Task SetShowMeta_PostsShowLevelRatingAndLike_NotADiaryLog()
+    {
+        string? path = null;
+        string body = string.Empty;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            path = req.RequestUri.AbsolutePath;
+            body = ReadBody(req);
+            return Json(HttpStatusCode.OK, "{\"id\":9}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.SetShowMetaAsync(77236, rating: 9, like: true);
+
+        Assert.EndsWith("/show/reviews/add", path);
+        Assert.Contains("\"show_id\":77236", body);
+        Assert.Contains("\"season_id\":null", body);
+        Assert.Contains("\"episode_number\":null", body);
+        Assert.Contains("\"is_log\":false", body); // rating/like, not a Diary row
+        Assert.Contains("\"like\":true", body);
+        Assert.Contains("\"rating\":9", body);
+    }
+
+    [Fact]
     public async Task ExpiredToken_ReAuthenticatesAndRetries()
     {
         int logins = 0, addAttempts = 0;
