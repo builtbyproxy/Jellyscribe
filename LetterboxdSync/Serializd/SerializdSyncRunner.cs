@@ -168,13 +168,22 @@ public class SerializdSyncRunner
                 records.Add(new EpisodePlay(epRef.ShowTmdbId, epRef.SeasonNumber, n, watchedAt, rating, ep.SeriesName ?? string.Empty));
         }
 
-        // Anything new to do? (either watched-marking or a dated log)
-        var needsWatched = GroupNewEpisodes(
-            records.Select(r => (r.Show, r.Season, r.Episode)),
-            (s, se, e) => SerializdSyncHistory.Has(userId, s, se, e, SerializdSyncHistory.KindWatched));
-        var needsLog = records
-            .Where(r => !SerializdSyncHistory.Has(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog))
-            .ToList();
+        // Date filter: limit the catch-up to episodes watched within the look-back window.
+        if (account.EnableDateFilter)
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-Math.Max(1, account.DateFilterDays));
+            records = records.Where(r => r.WatchedAtUtc >= cutoff).ToList();
+        }
+
+        // "Skip previously synced" (default on) short-circuits via the local dedup history.
+        // When off, everything is re-sent (which re-logs, i.e. can create duplicate diary rows).
+        bool AlreadyWatched(int s, int se, int e) =>
+            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, s, se, e, SerializdSyncHistory.KindWatched);
+        bool AlreadyLogged(EpisodePlay r) =>
+            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
+
+        var needsWatched = GroupNewEpisodes(records.Select(r => (r.Show, r.Season, r.Episode)), AlreadyWatched);
+        var needsLog = records.Where(r => !AlreadyLogged(r)).ToList();
 
         if (needsWatched.Count == 0 && needsLog.Count == 0)
         {
@@ -253,6 +262,12 @@ public class SerializdSyncRunner
                     Error = ex.Message,
                     Source = source,
                 });
+
+                if (account.StopOnFailure)
+                {
+                    _logger.LogWarning("Serializd catch-up: stopping on first failure for {Username} (StopOnFailure)", user.Username);
+                    break;
+                }
             }
         }
 
@@ -262,11 +277,11 @@ public class SerializdSyncRunner
 
         // 3. Show-level rating + favorite (like) sync, one entry per rated/favorited series
         //    among the shows we're tracking. is_log:false so it doesn't clutter the Diary.
-        await SyncShowMetaAsync(user, userId, records, service, cancellationToken).ConfigureAwait(false);
+        await SyncShowMetaAsync(user, userId, records, account, service, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SyncShowMetaAsync(User user, string userId, List<EpisodePlay> records,
-        ISerializdService service, CancellationToken cancellationToken)
+        SerializdAccount account, ISerializdService service, CancellationToken cancellationToken)
     {
         var watchedShows = new HashSet<int>();
         foreach (var r in records)
@@ -288,7 +303,8 @@ public class SerializdSyncRunner
 
             var ud = _userDataManager.GetUserData(user, s);
             var rating = SerializdRating.FromJellyfin(ud?.Rating);
-            var favorite = ud?.IsFavorite ?? false;
+            // Favourite → like only when the account opts in (parity with Letterboxd SyncFavorites).
+            var favorite = account.SyncFavorites && (ud?.IsFavorite ?? false);
             if (rating == null && !favorite) continue;                 // nothing to sync
             if (SerializdSyncHistory.Has(userId, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta)) continue;
 

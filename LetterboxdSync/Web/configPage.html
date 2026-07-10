@@ -661,12 +661,36 @@
                                 + '<div class="lb-checks">'
                                 + '<label><input type="checkbox" class="szEnabled" /><span class="lb-check-text">'
                                 + '<span class="lb-check-title">Enabled</span>'
-                                + '<span class="lb-check-desc">When on, finished TV episodes for this Jellyfin user are logged to this Serializd account in real time. Saved settings are kept when off.</span>'
+                                + '<span class="lb-check-desc">Master switch for this account. When unchecked, no scrobble, watchlist, or rating sync runs for this user. Saved settings are kept.</span>'
+                                + '</span></label>'
+                                + '<label><input type="checkbox" class="szSyncFavorites" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Mark Jellyfin favourites as liked on Serializd</span>'
+                                + '<span class="lb-check-desc">When a show is in your Jellyfin favourites, it gets the heart (liked) on Serializd. Otherwise it syncs as a plain watch/rating.</span>'
+                                + '</span></label>'
+                                + '<label><input type="checkbox" class="szEnableDateFilter" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Only sync recently played episodes</span>'
+                                + '<span class="lb-check-desc">Limit the catch-up to episodes watched within the last N days (set below). Useful on first run if you don\'t want to backfill years of history into your Serializd diary.</span>'
+                                + '</span></label>'
+                                + '<label><input type="checkbox" class="szIsPrimary" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Primary account</span>'
+                                + '<span class="lb-check-desc">When a Jellyfin user has more than one Serializd account linked, the primary one wins on tie-breaks. Only one primary per Jellyfin user is kept.</span>'
                                 + '</span></label>'
                                 + '<label><input type="checkbox" class="szSyncWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Mirror Serializd watchlist as a Jellyfin playlist</span>'
-                                + '<span class="lb-check-desc">Pulls your Serializd watchlist daily into a Jellyfin playlist called "Serializd Watchlist". Only shows already in your library are added.</span>'
-                                + '</span></label></div>'
+                                + '<span class="lb-check-title">Mirror Serializd watchlist as a Jellyfin collection + playlist</span>'
+                                + '<span class="lb-check-desc">Pulls your Serializd watchlist daily into a "Serializd Watchlist" collection (shows) and playlist (the episodes of the watchlisted seasons). Only shows already in your library are added.</span>'
+                                + '</span></label>'
+                                + '<label><input type="checkbox" class="szSkipPreviouslySynced" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Skip episodes already synced locally</span>'
+                                + '<span class="lb-check-desc">Use the plugin\'s own sync history to skip episodes already logged, so we don\'t re-hit Serializd for them. Recommended (leaving it off can create duplicate diary entries).</span>'
+                                + '</span></label>'
+                                + '<label><input type="checkbox" class="szStopOnFailure" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Stop sync immediately on first failure</span>'
+                                + '<span class="lb-check-desc">Halt this user\'s catch-up the moment an episode fails. Remaining episodes are picked up on the next run.</span>'
+                                + '</span></label>'
+                                + '</div>'
+                                + '<div class="dateFilterDaysContainer" style="display:none;margin-top:0.5em;">'
+                                + '<label class="lb-field">Days to look back</label>'
+                                + '<input type="number" class="szDateFilterDays" min="1" max="365" value="7" /></div>'
                                 + '<div style="display:flex;gap:0.7em;align-items:center;margin-top:0.6em;">'
                                 + '<button type="button" class="lb-btn lb-btn-secondary verifySerializdBtn">Verify login</button>'
                                 + '<span class="szVerifyStatus c-muted" style="font-size:0.85em;"></span></div>'
@@ -683,10 +707,21 @@
                                 entry.querySelector('.szEmail').value = account.Email || '';
                                 entry.querySelector('.szPassword').value = account.Password || '';
                                 entry.querySelector('.szEnabled').checked = account.Enabled !== false;
+                                entry.querySelector('.szSyncFavorites').checked = account.SyncFavorites === true;
+                                entry.querySelector('.szEnableDateFilter').checked = account.EnableDateFilter === true;
+                                entry.querySelector('.szDateFilterDays').value = account.DateFilterDays || 7;
+                                entry.querySelector('.szIsPrimary').checked = account.IsPrimary === true;
                                 entry.querySelector('.szSyncWatchlist').checked = account.SyncWatchlist === true;
+                                entry.querySelector('.szSkipPreviouslySynced').checked = account.SkipPreviouslySynced !== false;
+                                entry.querySelector('.szStopOnFailure').checked = account.StopOnFailure === true;
+                                if (account.EnableDateFilter) entry.querySelector('.dateFilterDaysContainer').style.display = '';
                             } else {
                                 entry.querySelector('.szEnabled').checked = true;
+                                entry.querySelector('.szSkipPreviouslySynced').checked = true;
                             }
+                            entry.querySelector('.szEnableDateFilter').addEventListener('change', function () {
+                                entry.querySelector('.dateFilterDaysContainer').style.display = this.checked ? '' : 'none';
+                            });
                             entry.querySelector('.removeSerializdBtn').addEventListener('click', function () { entry.remove(); });
                             entry.querySelector('.verifySerializdBtn').addEventListener('click', function () { self.verifySerializd(entry); });
                         },
@@ -699,7 +734,13 @@
                                     Email: entry.querySelector('.szEmail').value.trim(),
                                     Password: entry.querySelector('.szPassword').value,
                                     Enabled: entry.querySelector('.szEnabled').checked,
-                                    SyncWatchlist: entry.querySelector('.szSyncWatchlist').checked
+                                    SyncFavorites: entry.querySelector('.szSyncFavorites').checked,
+                                    EnableDateFilter: entry.querySelector('.szEnableDateFilter').checked,
+                                    DateFilterDays: parseInt(entry.querySelector('.szDateFilterDays').value, 10) || 7,
+                                    IsPrimary: entry.querySelector('.szIsPrimary').checked,
+                                    SyncWatchlist: entry.querySelector('.szSyncWatchlist').checked,
+                                    SkipPreviouslySynced: entry.querySelector('.szSkipPreviouslySynced').checked,
+                                    StopOnFailure: entry.querySelector('.szStopOnFailure').checked
                                 });
                             });
                             return accounts;

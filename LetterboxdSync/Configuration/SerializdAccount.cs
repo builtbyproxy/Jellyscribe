@@ -38,6 +38,24 @@ public class SerializdAccount
 
     public bool Enabled { get; set; }
 
-    /// <summary>Opt-in: mirror this account's Serializd watchlist into a Jellyfin playlist ("Serializd Watchlist").</summary>
+    /// <summary>Mark shows that are Jellyfin favourites as liked (hearted) on Serializd. Mirrors <see cref="Account.SyncFavorites"/>.</summary>
+    public bool SyncFavorites { get; set; }
+
+    /// <summary>Limit the catch-up to episodes watched within the last <see cref="DateFilterDays"/> days. Mirrors <see cref="Account.EnableDateFilter"/>.</summary>
+    public bool EnableDateFilter { get; set; }
+
+    /// <summary>Look-back window (days) for <see cref="EnableDateFilter"/>. Mirrors <see cref="Account.DateFilterDays"/>.</summary>
+    public int DateFilterDays { get; set; } = 7;
+
+    /// <summary>Opt-in: mirror this account's Serializd watchlist into a Jellyfin collection + playlist. Mirrors <see cref="Account.EnableWatchlistSync"/>.</summary>
     public bool SyncWatchlist { get; set; }
+
+    /// <summary>Skip episodes already logged locally (the dedup history), so the catch-up doesn't re-log them. Mirrors <see cref="Account.SkipPreviouslySynced"/>.</summary>
+    public bool SkipPreviouslySynced { get; set; } = true;
+
+    /// <summary>Halt this account's catch-up on the first failure. Mirrors <see cref="Account.StopOnFailure"/>.</summary>
+    public bool StopOnFailure { get; set; }
+
+    /// <summary>Primary account for this Jellyfin user (multi-account tie-breaks). Mirrors <see cref="Account.IsPrimary"/>.</summary>
+    public bool IsPrimary { get; set; }
 }

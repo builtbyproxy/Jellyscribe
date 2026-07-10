@@ -21,6 +21,7 @@ public static class SerializdAccountExtensions
             .Where(a => a.Enabled
                 && a.UserJellyfinId == userJellyfinId
                 && !string.IsNullOrWhiteSpace(a.Email))
+            .OrderByDescending(a => a.IsPrimary)   // primary first (parity with Letterboxd)
             .ToList();
     }
 }
