@@ -9,6 +9,11 @@
         <div data-role="content">
             <div class="content-primary">
                 <style>
+                /* Neutralise the host document's default chrome (iframe/body margin + white
+                   background) that frames the app as a light border, most visible on mobile. */
+                html, body { margin: 0 !important; padding: 0 !important; }
+                @media (prefers-color-scheme: dark) { html, body { background-color: #0d1013 !important; } }
+                @media (prefers-color-scheme: light) { html, body { background-color: #f4f6f8 !important; } }
                 #letterboxdUserPage {
                     --ws-bg: #0d1013; --ws-surface: #15181d; --ws-surface-2: #1c2028; --ws-raise: #232833;
                     --ws-border: rgba(255,255,255,.085); --ws-border-strong: rgba(255,255,255,.16);
