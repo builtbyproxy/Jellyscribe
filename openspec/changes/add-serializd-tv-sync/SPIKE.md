@@ -63,7 +63,44 @@ then verified the endpoints ourselves.
   tags/lists/following. Diary + review objects carry `rating`, `reviewText`,
   `containsSpoilers`, `isRewatch`, `episodeNumber`, and a **`backdate`** field.
 
-## Open questions (need a browser network capture to close)
+## Phase 3 endpoints — RESOLVED (2026-07-10, via logged-in network capture)
+
+The diary/rating/review write surface was recovered from the current `_app`
+chunk (`_app-89b85140d2e4b1a0.js`, a curl-fetchable static asset that lists the
+whole API client) and confirmed by a live capture of the web app's "Log/Review"
+button. **`backdate` is writable — you CAN set watch dates.** All bodies snake_case;
+responses camelCase.
+
+**Create — `POST /api/show/reviews/add`**
+```
+{ show_id, season_id (null = whole-show log), review_text (""=none),
+  rating (1..10, half-star granularity: 10 = 5★, 0/omitted = unrated),
+  contains_spoiler, backdate (ISO-8601, e.g. "2026-07-06T20:00:00Z" — this is the
+  watch date), is_log (true = dated diary entry vs a plain rating), is_rewatch,
+  episode_number (null for show/season logs), tags [], allows_comments, like }
+```
+Returns `200` + the created review object incl. `id` (needed for update/delete).
+Confirmed live: `{... "id":75443796, "rating":10, "isLog":true, "backdate":"…Z",
+"showId":136315 …}` for a whole-show log of The Bear rated 5★.
+
+**Edit — `POST /api/show/reviews/update`**
+`{ review_id, review_text, rating, contains_spoiler, backdate, is_log, is_rewatch,
+   episode_number, tags, allows_comments, like }`
+
+**Delete — `POST /api/show/reviews/delete`** → `{ review_id }`
+
+**Rating scale:** Serializd is 1..10 (half-star = 1). Jellyfin ratings are also
+0..10, so it maps almost 1:1 (round, clamp to 1..10, 0 = unrated).
+
+**Other write endpoints discovered in the same chunk (for later):** watchlist
+add/remove (`/api/watchlist_v2`, `/api/watchlist/remove_v2`), currently-watching,
+paused/dropped shows, lists CRUD, follows, and **importers** (`/api/tvtime/import`,
+`/api/trakt/import`).
+
+Phase 3 (rating sync + backdated diary logging + reviews) is now fully unblocked
+and buildable; no further capture needed.
+
+## Original open questions (now answered above)
 
 Two things could not be pinned down from the read libraries or endpoint probing,
 because the relevant route is built dynamically in the minified web bundle and
