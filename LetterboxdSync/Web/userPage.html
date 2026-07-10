@@ -200,8 +200,10 @@
                     <div class="ws-row"><label class="ws-field" id="mUserLabel">Email or username</label><input type="text" class="ws-input" id="mUsername" /></div>
                     <div class="ws-row"><label class="ws-field">Password</label><input type="password" class="ws-input" id="mPassword" /></div>
                     <div class="ws-row" id="mCookieRow" style="display:none;"><label class="ws-field">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span></label><input type="text" class="ws-input" id="mCookies" placeholder="From a signed-in browser (incl. cf_clearance)" /></div>
+                    <div class="ws-row" id="mUserAgentRow" style="display:none;"><label class="ws-field">User-Agent <span class="ws-muted" style="text-transform:none;">(optional)</span></label><input type="text" class="ws-input" id="mUserAgent" placeholder="Mozilla/5.0 …" /></div>
                     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;"><button type="button" class="ws-btn" id="mVerifyBtn">Verify login</button><span id="mVerifyStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
                     <div class="ws-checks" id="mChecks"></div>
+                    <div class="ws-row" id="mWatchNameRow" style="margin-top:12px;"><label class="ws-field">Watchlist name <span class="ws-muted" style="text-transform:none;">(optional)</span></label><input type="text" class="ws-input" id="mWatchName" placeholder="" /></div>
                     <div style="display:flex;gap:10px;margin-top:18px;align-items:center;"><button type="button" class="ws-btn primary" id="mSaveBtn">Save</button><button type="button" class="ws-btn" id="mCancelBtn">Cancel</button><button type="button" class="ws-btn danger" id="mDeleteBtn" style="margin-left:auto;display:none;">Remove</button></div>
                     <div id="mStatus" style="font-size:12.5px;margin-top:8px;"></div>
                 </div></div>
@@ -337,15 +339,17 @@
                                 ['Mark favourites as liked', 'chkFav', !!a.syncFavorites, 'Favourite in Jellyfin → hearted on the diary.'],
                                 ['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
-                                ['Mirror watchlist', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist.' : 'playlist.')],
+                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist.' : 'playlist.')],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.autoRequestWatchlist, 'Missing from the library → request via Seerr.'],
+                                ['Backfill Seerr requests', 'chkBackfill', !!a.backfillAvailableRequests, 'Also attribute a Seerr request for already-available titles.'],
+                                ['Mirror watchlist to Seerr', 'chkMirror', !!a.mirrorJellyseerrWatchlist, 'Push this watchlist into your Seerr watchlist (primary account only).'],
                                 ['Skip already-synced', 'chkSkip', a.skipPreviouslySynced !== false, 'Avoid re-logging via local history.'],
                                 ['Stop on first failure', 'chkStop', !!a.stopOnFailure, 'Halt on the first error.'],
                                 ['Import diary as watched', 'chkImport', !!a.enableDiaryImport, 'Mark Jellyfin played from the diary.']];
                             return rows.map(function (r) { return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>'; }).join('') +
                                 '<div class="ws-row" id="dateDaysRow" style="display:' + (a.enableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.dateFilterDays || 7) + '" /></div>';
                         },
-                        onSvcChange: function () { var svc = document.getElementById('mSvc').value; document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; document.getElementById('mCookieRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; },
+                        onSvcChange: function () { var svc = document.getElementById('mSvc').value; document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; document.getElementById('mCookieRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; document.getElementById('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; var uname = document.getElementById('mUsername').value.trim(); document.getElementById('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : '')); },
                         openAccount: function (ref) {
                             var self = this, svc = ref ? ref.svc : 'serializd', a = null;
                             if (ref) a = (svc === 'serializd' ? self.sz : self.lb)[ref.i];
@@ -355,6 +359,8 @@
                             document.getElementById('mUsername').value = a ? (svc === 'serializd' ? a.email : a.letterboxdUsername) : '';
                             document.getElementById('mPassword').value = a ? (svc === 'serializd' ? (a.password || '') : (a.letterboxdPassword || '')) : '';
                             document.getElementById('mCookies').value = (a && a.rawCookies) || '';
+                            document.getElementById('mUserAgent').value = (a && a.userAgent) || '';
+                            document.getElementById('mWatchName').value = (a && (svc === 'serializd' ? a.watchlistName : a.playlistName)) || '';
                             document.getElementById('mVerifyStatus').textContent = ''; document.getElementById('mStatus').textContent = '';
                             document.getElementById('mDeleteBtn').style.display = a ? '' : 'none';
                             document.getElementById('mChecks').innerHTML = self.checksFor(svc, a);
@@ -365,19 +371,21 @@
                         collectModal: function () {
                             var g = function (id) { return document.getElementById(id); };
                             return { svc: g('mSvc').value, username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mCookies').value,
+                                userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
                                 enabled: g('chkEnabled').checked, fav: g('chkFav').checked, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
-                                primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked };
+                                primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,
+                                backfill: g('chkBackfill').checked, mirror: g('chkMirror').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked };
                         },
                         saveAccount: function () {
                             var self = this, m = self.collectModal();
                             if (!m.username) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Username/email is required.</span>'; return; }
                             document.getElementById('mStatus').textContent = 'Saving…';
                             if (m.svc === 'serializd') {
-                                var item = { email: m.username, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp };
+                                var item = { email: m.username, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp };
                                 if (self.editing) self.sz[self.editing.i] = item; else self.sz.push(item);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function (r) { self.afterSave(r); });
                             } else {
-                                var itemL = { letterboxdUsername: m.username, letterboxdPassword: m.password, rawCookies: m.cookies || null, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp };
+                                var itemL = { letterboxdUsername: m.username, letterboxdPassword: m.password, rawCookies: m.cookies || null, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp };
                                 if (self.editing) self.lb[self.editing.i] = itemL; else self.lb.push(itemL);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function (r) { self.afterSave(r); });
                             }

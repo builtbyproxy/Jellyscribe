@@ -64,4 +64,24 @@ public class SerializdAccount
 
     /// <summary>Auto-request watchlisted shows missing from the library via Seerr (TV). Mirrors <see cref="Account.AutoRequestWatchlist"/>.</summary>
     public bool AutoRequestWatchlist { get; set; }
+
+    /// <summary>
+    /// When true, <see cref="AutoRequestWatchlist"/> also creates an attributed Seerr
+    /// request for watchlisted shows already in the library, so the requester trail is
+    /// answerable for shows that entered outside Seerr. Off by default. Mirrors
+    /// <see cref="Account.BackfillAvailableRequests"/>.
+    /// </summary>
+    public bool BackfillAvailableRequests { get; set; }
+
+    /// <summary>
+    /// Mirror this account's Serializd watchlist into the Jellyseerr user's own watchlist
+    /// (as TV). Mirrors <see cref="Account.MirrorJellyseerrWatchlist"/>.
+    /// </summary>
+    public bool MirrorJellyseerrWatchlist { get; set; }
+
+    /// <summary>
+    /// Optional override for the watchlist collection + playlist name. When null/blank,
+    /// defaults to "Serializd Watchlist". Mirrors <see cref="Account.PlaylistName"/>.
+    /// </summary>
+    public string? WatchlistName { get; set; }
 }

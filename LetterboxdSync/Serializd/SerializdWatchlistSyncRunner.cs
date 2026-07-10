@@ -31,8 +31,6 @@ namespace LetterboxdSync.Serializd;
 /// </summary>
 public class SerializdWatchlistSyncRunner
 {
-    private const string Name = "Serializd Watchlist";
-
     private readonly ILogger<SerializdWatchlistSyncRunner> _logger;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
@@ -157,20 +155,27 @@ public class SerializdWatchlistSyncRunner
             "Serializd watchlist for {Username}: {Shows} shows, {Episodes} episodes (from watchlisted seasons)",
             user.Username, desiredShows.Count, desiredEpisodes.Count);
 
-        await ReconcileCollectionAsync(user, desiredShows).ConfigureAwait(false);
-        await ReconcilePlaylistAsync(user, desiredEpisodes).ConfigureAwait(false);
+        var name = account.GetWatchlistName();
+        await ReconcileCollectionAsync(user, desiredShows, name).ConfigureAwait(false);
+        await ReconcilePlaylistAsync(user, desiredEpisodes, name).ConfigureAwait(false);
 
-        if (account.AutoRequestWatchlist)
-            await RequestUnmatchedViaSeerrAsync(account, entries, seriesByTmdb, user, cancellationToken).ConfigureAwait(false);
+        await SeerrIntegrationAsync(account, entries, seriesByTmdb, user, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task RequestUnmatchedViaSeerrAsync(SerializdAccount account, List<SerializdWatchlistEntry> entries,
+    /// <summary>
+    /// Seerr side of the Serializd watchlist sync, the TV counterpart to the Letterboxd runner:
+    /// optionally mirror the watchlist into the Seerr user's own watchlist (as TV) and/or
+    /// auto-request watchlisted shows (missing only, or the whole watchlist when backfilling).
+    /// </summary>
+    private async Task SeerrIntegrationAsync(SerializdAccount account, List<SerializdWatchlistEntry> entries,
         Dictionary<string, BaseItem> seriesByTmdb, User user, CancellationToken cancellationToken)
     {
+        if (!account.AutoRequestWatchlist && !account.MirrorJellyseerrWatchlist) return;
+
         var cfg = Config;
         if (!SeerrClient.IsConfigured(cfg.JellyseerrUrl, cfg.JellyseerrApiKey))
         {
-            _logger.LogWarning("Serializd watchlist: AutoRequest is on but Seerr isn't configured; skipping for {Username}", user.Username);
+            _logger.LogWarning("Serializd watchlist: Seerr auto-request/mirror is on but Seerr isn't configured; skipping for {Username}", user.Username);
             return;
         }
 
@@ -178,48 +183,120 @@ public class SerializdWatchlistSyncRunner
         var seerrUserId = await seerr.GetJellyseerrUserIdAsync(account.UserJellyfinId).ConfigureAwait(false);
         if (seerrUserId == null)
         {
-            _logger.LogWarning("Serializd watchlist: no Seerr user linked to {Username}; skipping auto-request", user.Username);
+            _logger.LogWarning("Serializd watchlist: no Seerr user linked to {Username}; skipping auto-request/mirror", user.Username);
             return;
         }
 
-        int requested = 0, existing = 0, failed = 0;
-        foreach (var entry in entries)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (seriesByTmdb.ContainsKey(entry.ShowTmdbId.ToString())) continue; // already in the library
+        var watchlistTmdbIds = entries.Select(e => e.ShowTmdbId).Distinct().ToList();
 
-            var result = await seerr.RequestSeriesAsync(entry.ShowTmdbId, seerrUserId.Value, entry.SeasonNumbers).ConfigureAwait(false);
-            switch (result)
-            {
-                case SeerrClient.RequestResult.Requested: requested++; break;
-                case SeerrClient.RequestResult.AlreadyExists: existing++; break;
-                default: failed++; break;
-            }
+        if (account.MirrorJellyseerrWatchlist)
+        {
+            // The Seerr watchlist is keyed by Jellyfin user, not by Serializd account, so only
+            // the primary Serializd account owns the TV mirror destination (otherwise two
+            // accounts on one user would each wipe the other's diff). Film mirrors mediaType
+            // "movie" and TV mirrors "tv", so the two are independent and never clobber.
+            var primary = cfg.GetPrimarySerializdAccountForUser(account.UserJellyfinId);
+            if (ReferenceEquals(primary, account))
+                await MirrorSerializdWatchlistToSeerrAsync(seerr, seerrUserId.Value, watchlistTmdbIds, user.Username!, cancellationToken).ConfigureAwait(false);
+            else
+                _logger.LogInformation("Skipping Seerr watchlist mirror for {Email}: not the primary Serializd account for {Username}", account.Email, user.Username);
         }
 
-        if (requested + existing + failed > 0)
-            _logger.LogInformation("Serializd watchlist Seerr auto-request for {Username}: {Requested} new, {Existing} already on Seerr, {Failed} failed",
-                user.Username, requested, existing, failed);
+        if (account.AutoRequestWatchlist)
+        {
+            // Default: only shows missing from the library. Backfill mode: the whole watchlist,
+            // so already-available shows also get an attributed request (Seerr's already-exists
+            // handling makes a duplicate a harmless no-op).
+            var candidates = account.BackfillAvailableRequests
+                ? entries
+                : entries.Where(e => !seriesByTmdb.ContainsKey(e.ShowTmdbId.ToString())).ToList();
+
+            int requested = 0, existing = 0, failed = 0;
+            foreach (var entry in candidates)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var result = await seerr.RequestSeriesAsync(entry.ShowTmdbId, seerrUserId.Value, entry.SeasonNumbers, account.BackfillAvailableRequests).ConfigureAwait(false);
+                switch (result)
+                {
+                    case SeerrClient.RequestResult.Requested: requested++; break;
+                    case SeerrClient.RequestResult.AlreadyExists: existing++; break;
+                    default: failed++; break;
+                }
+            }
+
+            if (requested + existing + failed > 0)
+                _logger.LogInformation("Serializd watchlist Seerr auto-request for {Username} ({Mode}): {Requested} new, {Existing} already on Seerr, {Failed} failed",
+                    user.Username, account.BackfillAvailableRequests ? "backfill" : "unmatched-only", requested, existing, failed);
+        }
     }
 
-    private async Task ReconcileCollectionAsync(User user, HashSet<Guid> desired)
+    /// <summary>
+    /// Mirrors the Serializd watchlist into the Seerr user's own watchlist as TV entries
+    /// (add + remove to match). Only touches mediaType "tv" rows, so it never disturbs the
+    /// film mirror. Refuses to run on an empty watchlist to avoid mass-deletion. TV counterpart
+    /// of the Letterboxd <c>MirrorJellyseerrWatchlistAsync</c>.
+    /// </summary>
+    private async Task MirrorSerializdWatchlistToSeerrAsync(SeerrClient seerr, int seerrUserId,
+        List<int> watchlistTmdbIds, string jellyfinUsername, CancellationToken cancellationToken)
+    {
+        if (watchlistTmdbIds.Count == 0)
+        {
+            _logger.LogWarning("Empty Serializd watchlist for {Username}; skipping Seerr TV mirror to avoid mass-deletion", jellyfinUsername);
+            return;
+        }
+
+        HashSet<int> currentSeerr;
+        try
+        {
+            currentSeerr = await seerr.GetUserWatchlistTmdbIdsAsync(seerrUserId, "tv").ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Failed to fetch Seerr TV watchlist for {Username}: {Message}", jellyfinUsername, ex.Message);
+            return;
+        }
+
+        var desired = new HashSet<int>(watchlistTmdbIds);
+        var toAdd = desired.Where(id => !currentSeerr.Contains(id)).ToList();
+        var toRemove = currentSeerr.Where(id => !desired.Contains(id)).ToList();
+
+        int added = 0, removed = 0, addFailed = 0, removeFailed = 0;
+        foreach (var tmdbId in toAdd)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try { if (await seerr.AddToWatchlistAsync(tmdbId, seerrUserId, "tv").ConfigureAwait(false)) added++; else addFailed++; }
+            catch (Exception ex) { _logger.LogWarning("Seerr TV watchlist add errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message); addFailed++; }
+        }
+
+        foreach (var tmdbId in toRemove)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try { if (await seerr.RemoveFromWatchlistAsync(tmdbId, seerrUserId, "tv").ConfigureAwait(false)) removed++; else removeFailed++; }
+            catch (Exception ex) { _logger.LogWarning("Seerr TV watchlist remove errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message); removeFailed++; }
+        }
+
+        _logger.LogInformation("Seerr TV watchlist mirror for {Username}: +{Added} -{Removed} (add failures {AddFailed}, remove failures {RemoveFailed})",
+            jellyfinUsername, added, removed, addFailed, removeFailed);
+    }
+
+    private async Task ReconcileCollectionAsync(User user, HashSet<Guid> desired, string name)
     {
         var boxSet = _libraryManager.GetItemList(new InternalItemsQuery
         {
             IncludeItemTypes = new[] { BaseItemKind.BoxSet },
             Recursive = true,
-        }).FirstOrDefault(b => string.Equals(b.Name, Name, StringComparison.Ordinal));
+        }).FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.Ordinal));
 
         if (boxSet == null)
         {
             if (desired.Count == 0) return;
             await _collectionManager.CreateCollectionAsync(new CollectionCreationOptions
             {
-                Name = Name,
+                Name = name,
                 ItemIdList = desired.Select(g => g.ToString("N")).ToList(),
                 UserIds = new[] { user.Id },
             }).ConfigureAwait(false);
-            _logger.LogInformation("Created '{Name}' collection with {Count} shows for {Username}", Name, desired.Count, user.Username);
+            _logger.LogInformation("Created '{Name}' collection with {Count} shows for {Username}", name, desired.Count, user.Username);
             return;
         }
 
@@ -237,28 +314,28 @@ public class SerializdWatchlistSyncRunner
         if (toRemove.Count > 0)
             await _collectionManager.RemoveFromCollectionAsync(boxSet.Id, toRemove).ConfigureAwait(false);
 
-        _logger.LogInformation("'{Name}' collection for {Username}: +{Added} / -{Removed}", Name, user.Username, toAdd.Count, toRemove.Count);
+        _logger.LogInformation("'{Name}' collection for {Username}: +{Added} / -{Removed}", name, user.Username, toAdd.Count, toRemove.Count);
     }
 
-    private async Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired)
+    private async Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name)
     {
         var playlist = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Playlist },
             Recursive = true,
-        }).FirstOrDefault(p => string.Equals(p.Name, Name, StringComparison.Ordinal));
+        }).FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.Ordinal));
 
         if (playlist == null)
         {
             if (desired.Count == 0) return;
             await _playlistManager.CreatePlaylist(new PlaylistCreationRequest
             {
-                Name = Name,
+                Name = name,
                 UserId = user.Id,
                 MediaType = MediaType.Video,
                 ItemIdList = desired.ToArray(),
             }).ConfigureAwait(false);
-            _logger.LogInformation("Created '{Name}' playlist with {Count} episodes for {Username}", Name, desired.Count, user.Username);
+            _logger.LogInformation("Created '{Name}' playlist with {Count} episodes for {Username}", name, desired.Count, user.Username);
             return;
         }
 
@@ -275,6 +352,6 @@ public class SerializdWatchlistSyncRunner
         if (toRemove.Length > 0)
             await _playlistManager.RemoveItemFromPlaylistAsync(playlist.Id.ToString("N"), toRemove).ConfigureAwait(false);
 
-        _logger.LogInformation("'{Name}' playlist for {Username}: +{Added} / -{Removed}", Name, user.Username, toAdd.Length, toRemove.Length);
+        _logger.LogInformation("'{Name}' playlist for {Username}: +{Added} / -{Removed}", name, user.Username, toAdd.Length, toRemove.Length);
     }
 }

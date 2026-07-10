@@ -75,6 +75,9 @@ public class SerializdController : ControllerBase
         public bool StopOnFailure { get; set; }
         public bool EnableDiaryImport { get; set; }
         public bool AutoRequestWatchlist { get; set; }
+        public bool BackfillAvailableRequests { get; set; }
+        public bool MirrorJellyseerrWatchlist { get; set; }
+        public string? WatchlistName { get; set; }
     }
 
     public class AccountsUpdateRequest
@@ -109,6 +112,9 @@ public class SerializdController : ControllerBase
                 stopOnFailure = a.StopOnFailure,
                 enableDiaryImport = a.EnableDiaryImport,
                 autoRequestWatchlist = a.AutoRequestWatchlist,
+                backfillAvailableRequests = a.BackfillAvailableRequests,
+                mirrorJellyseerrWatchlist = a.MirrorJellyseerrWatchlist,
+                watchlistName = a.WatchlistName,
             })
             .ToList();
 
@@ -154,6 +160,9 @@ public class SerializdController : ControllerBase
             StopOnFailure = req.StopOnFailure,
             EnableDiaryImport = req.EnableDiaryImport,
             AutoRequestWatchlist = req.AutoRequestWatchlist,
+            BackfillAvailableRequests = req.BackfillAvailableRequests,
+            MirrorJellyseerrWatchlist = req.MirrorJellyseerrWatchlist,
+            WatchlistName = string.IsNullOrWhiteSpace(req.WatchlistName) ? null : req.WatchlistName.Trim(),
         }).ToList();
 
         config.SerializdAccounts.Clear();

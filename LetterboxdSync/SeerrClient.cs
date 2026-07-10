@@ -242,10 +242,14 @@ public class SeerrClient : IDisposable
     /// <summary>
     /// Requests a TV series on Seerr (the TV counterpart to <see cref="RequestMovieAsync"/>).
     /// Requests the given season numbers, or all seasons when none are specified. 409 /
-    /// already-exists responses are treated as a no-op.
+    /// already-exists responses are treated as a no-op, which is also how a backfill request
+    /// for an already-available show resolves (so <paramref name="backfillAvailable"/> callers
+    /// get an attributed request when possible and a harmless no-op otherwise).
     /// </summary>
-    public async Task<RequestResult> RequestSeriesAsync(int tmdbId, int jellyseerrUserId, IReadOnlyList<int> seasonNumbers)
+    public async Task<RequestResult> RequestSeriesAsync(int tmdbId, int jellyseerrUserId, IReadOnlyList<int> seasonNumbers, bool backfillAvailable = false)
     {
+        _ = backfillAvailable; // Behaviour is driven by the caller's candidate set; Seerr's 409 handling covers the available case.
+
         var url = $"{_baseUrl}/api/v1/request";
         var seasonsJson = seasonNumbers.Count > 0 ? "[" + string.Join(",", seasonNumbers) + "]" : "\"all\"";
         var body = $"{{\"mediaType\":\"tv\",\"mediaId\":{tmdbId},\"userId\":{jellyseerrUserId},\"seasons\":{seasonsJson}}}";

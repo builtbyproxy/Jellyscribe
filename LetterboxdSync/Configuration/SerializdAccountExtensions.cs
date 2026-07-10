@@ -24,4 +24,21 @@ public static class SerializdAccountExtensions
             .OrderByDescending(a => a.IsPrimary)   // primary first (parity with Letterboxd)
             .ToList();
     }
+
+    /// <summary>
+    /// The primary enabled Serializd account for a user (the one that owns the Seerr-watchlist
+    /// mirror destination), or the first enabled account if none is flagged. Mirrors
+    /// <see cref="AccountExtensions.GetPrimaryAccountForUser"/>.
+    /// </summary>
+    public static SerializdAccount? GetPrimarySerializdAccountForUser(
+        this PluginConfiguration config, string userJellyfinId)
+    {
+        var enabled = config.GetEnabledSerializdAccountsForUser(userJellyfinId).ToList();
+        if (enabled.Count == 0) return null;
+        return enabled.FirstOrDefault(a => a.IsPrimary) ?? enabled[0];
+    }
+
+    /// <summary>Resolved watchlist collection/playlist name, defaulting to "Serializd Watchlist".</summary>
+    public static string GetWatchlistName(this SerializdAccount account)
+        => string.IsNullOrWhiteSpace(account.WatchlistName) ? "Serializd Watchlist" : account.WatchlistName!.Trim();
 }
