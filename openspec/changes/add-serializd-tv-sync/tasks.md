@@ -128,11 +128,14 @@ reversibly (create → read → delete) at both show and episode level with a pa
       `is_log:false` confirmed to set a rating/like *without* a Diary row). Catch-up
       syncs rated/favorited series among the watched set, deduped by `showmeta` kind.
       Limitation: create-once (a later rating change won't re-sync until an update path).
-- [x] 7.6 Serializd watchlist → Jellyfin playlist. Item shape captured once the watchlist
-      had entries: `{showId (TMDb), seasonIds, showName, ...}`. `GetWatchlistShowTmdbIdsAsync`
-      paginates `/user/{username}/watchlistpage_v2` (username resolved via
-      `/validateauthtoken`); `SerializdWatchlistSyncRunner` matches shows to library Series
-      by TMDb and mirrors them into a "Serializd Watchlist" playlist (mirrors the Letterboxd
-      `UpdatePlaylistAsync` add/remove logic, empty-read guard). Opt-in per account
-      (`SyncWatchlist` + config checkbox); daily `SerializdWatchlistSyncTask` + runs on
-      "Sync TV Now". Limitation: single playlist name (multi-account-per-user would collide).
+- [x] 7.6 Serializd watchlist → Jellyfin **collection** (BoxSet, not a playlist: a Series
+      added to a Video playlist expands into its episodes). `GetWatchlistShowTmdbIdsAsync`
+      paginates `/user/{username}/watchlistpage_v2` (item `showId` = TMDb; username resolved
+      via `/validateauthtoken`); `SerializdWatchlistSyncRunner` matches shows to library
+      Series by TMDb and mirrors them into a "Serializd Watchlist" collection via
+      `ICollectionManager`. Opt-in per account (`SyncWatchlist` + config checkbox); daily
+      `SerializdWatchlistSyncTask` + runs on "Sync TV Now". Verified live: 3/3 shows →
+      collection with 3 members. Limitations: add-only (dropped shows not removed yet);
+      single collection name (multi-account-per-user would collide).
+      **Bug fixed en route:** `/show/reviews/add` 500s if `rating` is omitted, so unrated
+      logs/show-meta now always send `rating:0`.
