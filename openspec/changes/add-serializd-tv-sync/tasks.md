@@ -104,9 +104,24 @@
 - [ ] 6.5 One deliberate rebrand release; confirm the ~190-server fleet still
       auto-updates (download count ticks) post-rename.
 
-## 7. Deferred (follow-up change, blocked on task 0.1)
+## 7. Phase 3 — dated diary logs + ratings (endpoint recovered; see task 0.1 in SPIKE.md)
 
-- [ ] 7.1 Spec + build rating sync (Jellyfin rating → Serializd review rating).
-- [ ] 7.2 Written reviews from the dashboard.
-- [ ] 7.3 Backdated diary logs (only if 0.1 confirms `backdate` is writable).
+Endpoint cracked via the current `_app` chunk + a logged-in capture:
+`POST /api/show/reviews/add` (`is_log`, `backdate`, `rating` all writable). Confirmed
+reversibly (create → read → delete) at both show and episode level with a past backdate.
+
+- [x] 7.1 **Rating sync**: `SerializdRating.FromJellyfin` (0..10 → 1..10, round/clamp,
+      0⇒unrated) + `rating` on each dated log. Episode-level for now; series-level
+      rating → show rating is 7.5 below.
+- [ ] 7.2 Written reviews from the dashboard (compose UI + `review_text`). Endpoint
+      ready (`/show/reviews/add|update|delete`); UI not built yet.
+- [x] 7.3 **Backdated diary logs**: `ISerializdService.CreateEpisodeLogAsync` →
+      `/show/reviews/add` with `is_log:true` + `backdate`. Real-time stamps *now*;
+      the catch-up backdates each episode to its Jellyfin `LastPlayedDate`. Separate
+      `SerializdSyncHistory` kind (`log` vs `watched`) so already-watched episodes
+      still get backfilled as dated logs without re-marking watched. Watched-marking
+      via `episode_log/add` retained. Tests: client body shape, rating omit/clamp,
+      kind namespacing, handler creates a log.
 - [ ] 7.4 TV watchlist → Jellyseerr (reuse `SeerrClient`, request TV).
+- [ ] 7.5 Series-level rating → Serializd **show** rating (whole-show entry). Needs a
+      quick check of `is_log:false` (rating without a diary entry) before building.

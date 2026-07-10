@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -164,6 +165,37 @@ public class SerializdApiClient : ISerializdService
 
     public async Task UnlogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers)
         => await PostEpisodeLogAsync("/episode_log/remove", showTmdbId, seasonId, episodeNumbers).ConfigureAwait(false);
+
+    public async Task CreateEpisodeLogAsync(int showTmdbId, int seasonId, int episodeNumber,
+        DateTime watchedAtUtc, int? rating, bool isRewatch)
+    {
+        // snake_case body (see /show/reviews/add). is_log=true makes it a dated Diary entry;
+        // backdate is the watch date. rating is omitted when unrated so we don't post a 0.
+        var payload = new Dictionary<string, object>
+        {
+            ["show_id"] = showTmdbId,
+            ["season_id"] = seasonId,
+            ["episode_number"] = episodeNumber,
+            ["review_text"] = string.Empty,
+            ["contains_spoiler"] = false,
+            ["backdate"] = watchedAtUtc.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+            ["is_log"] = true,
+            ["is_rewatch"] = isRewatch,
+            ["tags"] = Array.Empty<string>(),
+            ["allows_comments"] = true,
+            ["like"] = false,
+        };
+        if (rating is > 0)
+            payload["rating"] = Math.Clamp(rating.Value, 1, 10);
+
+        var body = JsonSerializer.Serialize(payload);
+        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            throw new Exception($"Serializd /show/reviews/add failed ({(int)resp.StatusCode}): {err}");
+        }
+    }
 
     private async Task PostEpisodeLogAsync(string path, int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers)
     {

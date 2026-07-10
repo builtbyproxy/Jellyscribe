@@ -128,6 +128,54 @@ public class SerializdApiClientTests
     }
 
     [Fact]
+    public async Task CreateEpisodeLog_PostsDatedLogWithRating()
+    {
+        string? path = null;
+        string body = string.Empty;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            path = req.RequestUri.AbsolutePath;
+            body = ReadBody(req);
+            return Json(HttpStatusCode.OK, "{\"id\":123}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.CreateEpisodeLogAsync(1396, 3572, 4,
+            new DateTime(2026, 6, 19, 20, 0, 0, DateTimeKind.Utc), rating: 7, isRewatch: false);
+
+        Assert.EndsWith("/show/reviews/add", path);
+        Assert.Contains("\"show_id\":1396", body);
+        Assert.Contains("\"season_id\":3572", body);
+        Assert.Contains("\"episode_number\":4", body);
+        Assert.Contains("\"is_log\":true", body);
+        Assert.Contains("\"backdate\":\"2026-06-19T20:00:00Z\"", body);
+        Assert.Contains("\"rating\":7", body);
+        Assert.DoesNotContain("showId", body); // snake_case
+    }
+
+    [Fact]
+    public async Task CreateEpisodeLog_OmitsRatingWhenUnrated()
+    {
+        string body = string.Empty;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            body = ReadBody(req);
+            return Json(HttpStatusCode.OK, "{\"id\":123}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.CreateEpisodeLogAsync(1396, 3572, 4, DateTime.UtcNow, rating: null, isRewatch: false);
+
+        Assert.DoesNotContain("\"rating\"", body);
+    }
+
+    [Fact]
     public async Task ExpiredToken_ReAuthenticatesAndRetries()
     {
         int logins = 0, addAttempts = 0;

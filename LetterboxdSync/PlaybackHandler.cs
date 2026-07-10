@@ -203,12 +203,28 @@ public class PlaybackHandler : IHostedService, IDisposable
                         continue;
                     }
 
+                    var userId = user.Id.ToString("N");
+
+                    // 1. Mark the episodes watched (populates Shows/Stats).
                     await service.LogEpisodesAsync(epRef.ShowTmdbId, seasonId.Value, epRef.EpisodeNumbers)
                         .ConfigureAwait(false);
-
-                    // Record so the scheduled catch-up doesn't re-log what real-time already did.
                     foreach (var n in epRef.EpisodeNumbers)
-                        SerializdSyncHistory.Record(user.Id.ToString("N"), epRef.ShowTmdbId, epRef.SeasonNumber, n);
+                        SerializdSyncHistory.Record(userId, epRef.ShowTmdbId, epRef.SeasonNumber, n);
+
+                    // 2. Create a dated Diary log per episode, stamped now (the watch just
+                    // finished), carrying the episode's Jellyfin rating if it has one. A second
+                    // finish of the same episode is logged as a rewatch.
+                    var rating = SerializdRating.FromJellyfin(_userDataManager.GetUserData(user, episode)?.Rating);
+                    foreach (var n in epRef.EpisodeNumbers)
+                    {
+                        var isRewatch = SerializdSyncHistory.Has(
+                            userId, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
+                        await service.CreateEpisodeLogAsync(
+                            epRef.ShowTmdbId, seasonId.Value, n, DateTime.UtcNow, rating, isRewatch)
+                            .ConfigureAwait(false);
+                        SerializdSyncHistory.Record(
+                            userId, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
+                    }
 
                     _logger.LogInformation(
                         "Logged {Series} S{Season} episodes {Episodes} (TMDb:{TmdbId}) to Serializd for {Username} as {Email}",

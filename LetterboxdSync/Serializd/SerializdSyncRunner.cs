@@ -29,16 +29,19 @@ public class SerializdSyncRunner
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
+    private readonly IUserDataManager _userDataManager;
 
     public SerializdSyncRunner(
         ILoggerFactory loggerFactory,
         ILibraryManager libraryManager,
-        IUserManager userManager)
+        IUserManager userManager,
+        IUserDataManager userDataManager)
     {
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<SerializdSyncRunner>();
         _libraryManager = libraryManager;
         _userManager = userManager;
+        _userDataManager = userDataManager;
     }
 
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
@@ -148,23 +151,32 @@ public class SerializdSyncRunner
             IsPlayed = true,
         });
 
-        // Map played episodes to (show, season, ep) tuples, dropping anything we can't key
-        // (no series TMDb id / season / episode number) or that's already been logged.
-        var plays = new List<(int Show, int Season, int Episode)>();
+        // Map played episodes to per-episode records carrying the real watch date + rating,
+        // dropping anything we can't key (no series TMDb id / season / episode number).
+        var records = new List<EpisodePlay>();
         foreach (var item in episodes)
         {
             if (item is not Episode ep) continue;
             var epRef = SerializdEpisodeMapper.Build(
                 SeriesTmdbIdReader(ep), ep.ParentIndexNumber, ep.IndexNumber, ep.IndexNumberEnd);
             if (epRef == null) continue;
+
+            var ud = _userDataManager.GetUserData(user, ep);
+            var watchedAt = ud?.LastPlayedDate?.ToUniversalTime() ?? DateTime.UtcNow;
+            var rating = SerializdRating.FromJellyfin(ud?.Rating);
             foreach (var n in epRef.EpisodeNumbers)
-                plays.Add((epRef.ShowTmdbId, epRef.SeasonNumber, n));
+                records.Add(new EpisodePlay(epRef.ShowTmdbId, epRef.SeasonNumber, n, watchedAt, rating));
         }
 
-        var queue = GroupNewEpisodes(plays,
-            (show, season, epNum) => SerializdSyncHistory.Has(userId, show, season, epNum));
+        // Anything new to do? (either watched-marking or a dated log)
+        var needsWatched = GroupNewEpisodes(
+            records.Select(r => (r.Show, r.Season, r.Episode)),
+            (s, se, e) => SerializdSyncHistory.Has(userId, s, se, e, SerializdSyncHistory.KindWatched));
+        var needsLog = records
+            .Where(r => !SerializdSyncHistory.Has(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog))
+            .ToList();
 
-        if (queue.Count == 0)
+        if (needsWatched.Count == 0 && needsLog.Count == 0)
         {
             _logger.LogDebug("Serializd catch-up: nothing new for {Username} as {Email}", user.Username, account.Email);
             return;
@@ -174,7 +186,8 @@ public class SerializdSyncRunner
             .CreateAuthenticatedAsync(account.Email, account.Password, _logger)
             .ConfigureAwait(false);
 
-        foreach (var ((show, season), epNums) in queue)
+        // 1. Watched-status marking, batched per (show, season).
+        foreach (var ((show, season), epNums) in needsWatched)
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -189,18 +202,45 @@ public class SerializdSyncRunner
                 await service.LogEpisodesAsync(show, seasonId.Value, epNums).ConfigureAwait(false);
                 foreach (var n in epNums)
                     SerializdSyncHistory.Record(userId, show, season, n);
-
-                _logger.LogInformation(
-                    "Serializd catch-up: logged TMDb {Show} S{Season} episodes {Episodes} for {Username} as {Email}",
-                    show, season, string.Join(",", epNums), user.Username, account.Email);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Serializd catch-up: failed logging TMDb {Show} S{Season} for {Username}: {Message}",
+                _logger.LogError("Serializd catch-up: failed marking watched TMDb {Show} S{Season} for {Username}: {Message}",
                     show, season, user.Username, ex.Message);
             }
         }
+
+        // 2. Dated Diary logs, one per episode, backdated to the real watch date.
+        var logged = 0;
+        foreach (var r in needsLog)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                var seasonId = await service.ResolveSeasonIdAsync(r.Show, r.Season).ConfigureAwait(false);
+                if (seasonId == null) continue;
+
+                await service.CreateEpisodeLogAsync(r.Show, seasonId.Value, r.Episode, r.WatchedAtUtc, r.Rating, isRewatch: false)
+                    .ConfigureAwait(false);
+                SerializdSyncHistory.Record(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
+                logged++;
+
+                // Be polite during a large first-time backfill.
+                await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Serializd catch-up: failed logging TMDb {Show} S{Season}E{Episode} for {Username}: {Message}",
+                    r.Show, r.Season, r.Episode, user.Username, ex.Message);
+            }
+        }
+
+        if (logged > 0)
+            _logger.LogInformation("Serializd catch-up: created {Count} dated diary logs for {Username} as {Email}",
+                logged, user.Username, account.Email);
     }
+
+    private readonly record struct EpisodePlay(int Show, int Season, int Episode, DateTime WatchedAtUtc, int? Rating);
 
     /// <summary>
     /// Pure: collapse a flat list of (show, season, episode) plays into per-(show, season)

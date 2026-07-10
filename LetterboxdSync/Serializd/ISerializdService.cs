@@ -22,6 +22,16 @@ public interface ISerializdService : IDisposable
     /// <summary>Marks the given episode numbers watched on Serializd.</summary>
     Task LogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers);
 
+    /// <summary>
+    /// Creates a dated diary log for a single episode (Serializd's `is_log` entry), stamped
+    /// with the real watch date (<paramref name="watchedAtUtc"/> → <c>backdate</c>) and an
+    /// optional rating. This is what populates the Diary/Reviews tabs, distinct from the
+    /// watched-status marking done by <see cref="LogEpisodesAsync"/>.
+    /// </summary>
+    /// <param name="rating">Serializd rating 1..10 (10 = 5★), or null for unrated.</param>
+    Task CreateEpisodeLogAsync(int showTmdbId, int seasonId, int episodeNumber,
+        DateTime watchedAtUtc, int? rating, bool isRewatch);
+
     /// <summary>Removes the given episode numbers from watched (used by tests to clean up).</summary>
     Task UnlogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers);
 }

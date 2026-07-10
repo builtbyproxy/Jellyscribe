@@ -49,4 +49,27 @@ public class SerializdSyncHistoryTests : IDisposable
         SerializdSyncHistory.ResetForTesting(); // forces re-read from disk
         Assert.True(SerializdSyncHistory.Has("user1", 77236, 1, 5));
     }
+
+    [Fact]
+    public void Kinds_AreTrackedIndependently()
+    {
+        // Marking an episode watched must NOT make it look diary-logged, and vice versa.
+        SerializdSyncHistory.Record("user1", 77236, 1, 1, SerializdSyncHistory.KindWatched);
+        Assert.True(SerializdSyncHistory.Has("user1", 77236, 1, 1, SerializdSyncHistory.KindWatched));
+        Assert.False(SerializdSyncHistory.Has("user1", 77236, 1, 1, SerializdSyncHistory.KindLog));
+
+        SerializdSyncHistory.Record("user1", 77236, 1, 1, SerializdSyncHistory.KindLog);
+        Assert.True(SerializdSyncHistory.Has("user1", 77236, 1, 1, SerializdSyncHistory.KindLog));
+    }
+
+    [Fact]
+    public void WatchedKind_UsesLegacySuffixFreeKey()
+    {
+        // A key written before dated-logs existed (suffix-free) must still match the
+        // default (watched) lookup, so existing history isn't invalidated.
+        File.WriteAllText(_file, "user1|77236|1|1\n");
+        SerializdSyncHistory.ResetForTesting();
+        Assert.True(SerializdSyncHistory.Has("user1", 77236, 1, 1)); // default kind = watched
+        Assert.False(SerializdSyncHistory.Has("user1", 77236, 1, 1, SerializdSyncHistory.KindLog));
+    }
 }

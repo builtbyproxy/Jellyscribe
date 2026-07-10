@@ -49,12 +49,18 @@ public class SerializdPlaybackTests : IDisposable
             Substitute.For<ISessionManager>(),
             Substitute.For<IUserDataManager>(),
             new LoggerFactory().CreateLogger<PlaybackHandler>());
+
+        // Isolate the dated-log dedup history to this test's temp dir.
+        SerializdSyncHistory.DataPathOverride = Path.Combine(_tempDir, "sz-history.jsonl");
+        SerializdSyncHistory.ResetForTesting();
     }
 
     public void Dispose()
     {
         SerializdServiceFactory.OverrideForTesting = null;
         LetterboxdServiceFactory.OverrideForTesting = null;
+        SerializdSyncHistory.DataPathOverride = null;
+        SerializdSyncHistory.ResetForTesting();
         // Restore a functional equivalent of the production default so a leftover
         // override can't leak into another test class.
         PlaybackHandler.SeriesTmdbIdReader = ep =>
@@ -105,6 +111,8 @@ public class SerializdPlaybackTests : IDisposable
 
         await svc.Received(1).LogEpisodesAsync(1396, 3572,
             Arg.Is<IReadOnlyList<int>>(l => l.Count == 1 && l[0] == 4));
+        // Also creates a dated diary log for the episode (backdated to ~now, first watch = not a rewatch).
+        await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
     }
 
     [Fact]

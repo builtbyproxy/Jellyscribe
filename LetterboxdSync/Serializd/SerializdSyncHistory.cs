@@ -50,8 +50,20 @@ public static class SerializdSyncHistory
         }
     }
 
-    private static string Key(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber)
-        => $"{userJellyfinId}|{showTmdbId}|{seasonNumber}|{episodeNumber}";
+    /// <summary>Watched-status marking (episode_log/add). The default kind, keyed without a
+    /// suffix so history written before dated-logs existed still matches.</summary>
+    public const string KindWatched = "watched";
+
+    /// <summary>A dated Diary log entry (show/reviews/add, is_log).</summary>
+    public const string KindLog = "log";
+
+    private static string Key(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind)
+    {
+        var baseKey = $"{userJellyfinId}|{showTmdbId}|{seasonNumber}|{episodeNumber}";
+        // KindWatched keeps the original suffix-free format for backward compatibility;
+        // other kinds get their own namespace so they're tracked independently.
+        return kind == KindWatched ? baseKey : baseKey + "|" + kind;
+    }
 
     private static HashSet<string> Load()
     {
@@ -76,20 +88,20 @@ public static class SerializdSyncHistory
         return _keys;
     }
 
-    public static bool Has(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber)
+    public static bool Has(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
     {
         lock (_lock)
         {
-            return Load().Contains(Key(userJellyfinId, showTmdbId, seasonNumber, episodeNumber));
+            return Load().Contains(Key(userJellyfinId, showTmdbId, seasonNumber, episodeNumber, kind));
         }
     }
 
-    public static void Record(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber)
+    public static void Record(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
     {
         lock (_lock)
         {
             var keys = Load();
-            var key = Key(userJellyfinId, showTmdbId, seasonNumber, episodeNumber);
+            var key = Key(userJellyfinId, showTmdbId, seasonNumber, episodeNumber, kind);
             if (!keys.Add(key)) return; // already recorded
 
             try

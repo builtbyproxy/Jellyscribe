@@ -14,7 +14,8 @@ namespace LetterboxdSync.Tests.Serializd;
 public class SerializdControllerTests : IDisposable
 {
     private static SerializdSyncRunner MakeRunner()
-        => new(new LoggerFactory(), Substitute.For<ILibraryManager>(), Substitute.For<IUserManager>());
+        => new(new LoggerFactory(), Substitute.For<ILibraryManager>(),
+               Substitute.For<IUserManager>(), Substitute.For<IUserDataManager>());
 
     private readonly SerializdController _controller =
         new(new NullLogger<SerializdController>(), MakeRunner());
