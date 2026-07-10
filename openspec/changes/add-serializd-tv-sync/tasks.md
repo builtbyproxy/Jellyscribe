@@ -123,5 +123,13 @@ reversibly (create → read → delete) at both show and episode level with a pa
       via `episode_log/add` retained. Tests: client body shape, rating omit/clamp,
       kind namespacing, handler creates a log.
 - [ ] 7.4 TV watchlist → Jellyseerr (reuse `SeerrClient`, request TV).
-- [ ] 7.5 Series-level rating → Serializd **show** rating (whole-show entry). Needs a
-      quick check of `is_log:false` (rating without a diary entry) before building.
+- [x] 7.5 Series-level rating → Serializd **show** rating + favorite → **like**, merged
+      into one show-level entry (`SetShowMetaAsync` → `/show/reviews/add`,
+      `is_log:false` confirmed to set a rating/like *without* a Diary row). Catch-up
+      syncs rated/favorited series among the watched set, deduped by `showmeta` kind.
+      Limitation: create-once (a later rating change won't re-sync until an update path).
+- [ ] 7.6 Serializd watchlist → Jellyfin playlist. **Blocked**: the maintainer's
+      Serializd watchlist is empty and the item JSON shape isn't in the `_app` chunk,
+      so the item→TMDb mapping can't be built/verified yet. Needs one show added to the
+      Serializd watchlist to capture the shape (or a decision to build the push
+      direction, Jellyfin/Jellyseerr → Serializd watchlist, instead).
