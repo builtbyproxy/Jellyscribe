@@ -1,6 +1,9 @@
 using System;
+using System.Linq;
 using System.Net.Mime;
+using System.Threading;
 using System.Threading.Tasks;
+using LetterboxdSync.Configuration;
 using LetterboxdSync.Serializd;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -22,6 +25,7 @@ namespace LetterboxdSync.Api;
 public class SerializdController : ControllerBase
 {
     private readonly ILogger<SerializdController> _logger;
+    private readonly SerializdSyncRunner _syncRunner;
 
     /// <summary>
     /// Test-only override for the login check. When non-null, <see cref="Verify"/> calls this
@@ -30,10 +34,20 @@ public class SerializdController : ControllerBase
     /// </summary>
     internal static Func<ILogger, string, string, Task<string?>>? VerifyOverrideForTesting;
 
-    public SerializdController(ILogger<SerializdController> logger)
+    /// <summary>
+    /// Holds the most recent fire-and-forget sync started by <see cref="SyncNow"/> so tests can
+    /// await it (it otherwise outlives the request). Production never reads it.
+    /// </summary>
+    internal Task? LastBackgroundSync { get; private set; }
+
+    public SerializdController(ILogger<SerializdController> logger, SerializdSyncRunner syncRunner)
     {
         _logger = logger;
+        _syncRunner = syncRunner;
     }
+
+    private string? GetCurrentUserId()
+        => User.Claims.FirstOrDefault(c => c.Type == "Jellyfin-UserId")?.Value?.Replace("-", string.Empty);
 
     public class VerifyRequest
     {
@@ -74,5 +88,42 @@ public class SerializdController : ControllerBase
             _logger.LogWarning("Serializd credential verification failed: {Message}", ex.Message);
             return BadRequest(new { error = "Login failed. Check the email and password." });
         }
+    }
+
+    /// <summary>
+    /// Kicks the Serializd catch-up for the calling user (logs any watched episodes not yet on
+    /// Serializd). Any logged-in user may call it; it only touches their own accounts. Returns
+    /// 202 and runs in the background; 400 if the user has no enabled Serializd account,
+    /// 409 if a Serializd sync is already running.
+    /// </summary>
+    [HttpPost("SyncNow")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public ActionResult SyncNow()
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest(new { error = "Could not determine user" });
+
+        if (SerializdSyncGate.IsRunning)
+            return Conflict(new { error = "A Serializd sync is already running" });
+
+        if (!Plugin.Instance!.Configuration.GetEnabledSerializdAccountsForUser(userId).Any())
+            return BadRequest(new { error = "No enabled Serializd accounts are configured for your user" });
+
+        LastBackgroundSync = Task.Run(async () =>
+        {
+            try
+            {
+                await _syncRunner.TryRunForUserAsync(userId, "manual", CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Manual Serializd sync failed for {UserId}: {Message}", userId, ex.Message);
+            }
+        });
+
+        return Accepted(new { started = true });
     }
 }

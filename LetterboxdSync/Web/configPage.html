@@ -170,8 +170,10 @@
                     <p class="c-muted" style="font-size:0.9em;">Log finished TV episodes to <a href="https://www.serializd.com" target="_blank" class="lb-link">Serializd</a> in real time &mdash; the TV counterpart to the Letterboxd film sync. Each Jellyfin user links their own Serializd account (email + password). Films still sync to Letterboxd; episodes go here.</p>
                     <div id="serializdAccountsList"></div>
                     <button type="button" class="lb-btn lb-btn-secondary" id="addSerializdAccountBtn" style="margin-top:1em;">+ Add Serializd Account</button>
-                    <div style="margin-top:2em;">
+                    <div style="margin-top:2em;display:flex;gap:0.7em;align-items:center;flex-wrap:wrap;">
                         <button type="button" class="lb-btn lb-btn-primary" id="saveSerializdBtn">Save</button>
+                        <button type="button" class="lb-btn lb-btn-secondary" id="syncSerializdBtn" title="Log your Jellyfin TV watch history to Serializd now (catch-up for anything real-time missed)">Sync TV Now</button>
+                        <span id="syncSerializdStatus" class="c-muted" style="font-size:0.85em;"></span>
                     </div>
                 </div>
 
@@ -716,6 +718,22 @@
                             });
                         },
 
+                        syncSerializdNow: function () {
+                            var statusEl = document.getElementById('syncSerializdStatus');
+                            statusEl.innerHTML = '<span class="c-muted">Starting TV sync...</span>';
+                            ApiClient.ajax({
+                                url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow'),
+                                type: 'POST'
+                            }).then(function () {
+                                statusEl.innerHTML = '<span class="c-green">Sync started. Watched episodes are being logged to Serializd in the background.</span>';
+                            }, function (err) {
+                                var msg = (err && err.status === 409) ? 'A sync is already running.'
+                                    : (err && err.status === 400) ? 'No enabled Serializd account. Add one and Save first.'
+                                    : 'Could not start the sync.';
+                                statusEl.innerHTML = '<span class="c-red">' + msg + '</span>';
+                            });
+                        },
+
                         loadSettings: function () {
                             var self = this;
                             ApiClient.getUsers().then(function (users) {
@@ -1165,6 +1183,7 @@
                             document.getElementById('saveBtn').addEventListener('click', function () { self.saveSettings(); });
                             document.getElementById('addSerializdAccountBtn').addEventListener('click', function () { self.addSerializdAccount(null); });
                             document.getElementById('saveSerializdBtn').addEventListener('click', function () { self.saveSettings(true); });
+                            document.getElementById('syncSerializdBtn').addEventListener('click', function () { self.syncSerializdNow(); });
                             document.getElementById('testJellyseerrBtn').addEventListener('click', function () { self.testJellyseerr(); });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
                             document.getElementById('runWatchlistSyncBtn').addEventListener('click', function () { self.runWatchlistSync(); });

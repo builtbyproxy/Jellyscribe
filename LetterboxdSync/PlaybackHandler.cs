@@ -206,6 +206,10 @@ public class PlaybackHandler : IHostedService, IDisposable
                     await service.LogEpisodesAsync(epRef.ShowTmdbId, seasonId.Value, epRef.EpisodeNumbers)
                         .ConfigureAwait(false);
 
+                    // Record so the scheduled catch-up doesn't re-log what real-time already did.
+                    foreach (var n in epRef.EpisodeNumbers)
+                        SerializdSyncHistory.Record(user.Id.ToString("N"), epRef.ShowTmdbId, epRef.SeasonNumber, n);
+
                     _logger.LogInformation(
                         "Logged {Series} S{Season} episodes {Episodes} (TMDb:{TmdbId}) to Serializd for {Username} as {Email}",
                         episode.SeriesName, epRef.SeasonNumber, string.Join(",", epRef.EpisodeNumbers),

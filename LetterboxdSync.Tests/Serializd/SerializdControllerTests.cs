@@ -1,16 +1,23 @@
 using System;
 using System.Threading.Tasks;
 using LetterboxdSync.Api;
+using LetterboxdSync.Serializd;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Xunit;
 
 namespace LetterboxdSync.Tests.Serializd;
 
 public class SerializdControllerTests : IDisposable
 {
+    private static SerializdSyncRunner MakeRunner()
+        => new(new LoggerFactory(), Substitute.For<ILibraryManager>(), Substitute.For<IUserManager>());
+
     private readonly SerializdController _controller =
-        new(new NullLogger<SerializdController>());
+        new(new NullLogger<SerializdController>(), MakeRunner());
 
     public void Dispose() => SerializdController.VerifyOverrideForTesting = null;
 
@@ -42,6 +49,19 @@ public class SerializdControllerTests : IDisposable
         var result = await _controller.Verify(
             new SerializdController.VerifyRequest { Email = "me@example.com", Password = "wrong" });
 
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void SyncNow_NoAuthenticatedUser_ReturnsBadRequest()
+    {
+        // Empty HttpContext → no Jellyfin-UserId claim → can't determine the user.
+        _controller.ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+        {
+            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext(),
+        };
+
+        var result = _controller.SyncNow();
         Assert.IsType<BadRequestObjectResult>(result);
     }
 }
