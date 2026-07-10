@@ -1,1041 +1,388 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Letterboxd</title>
+    <title>Watch Sync</title>
 </head>
 <body>
     <div id="letterboxdUserPage" data-role="page" class="page type-interior"
          data-require="emby-input,emby-button,emby-checkbox,emby-select">
         <div data-role="content">
             <div class="content-primary">
-
                 <style>
-                    /* Standalone base styles for when loaded outside the Jellyfin SPA shell */
-                    html, body { background:#101010; color:#e0e0e0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,sans-serif; margin:0; padding:0; }
-                    #letterboxdUserPage { max-width:900px; margin:0 auto; padding:1.5em; }
-                    .lb-back-link { display:inline-block; margin-bottom:1em; color:#00e054; text-decoration:none; font-size:0.9em; }
-                    .lb-back-link:hover { text-decoration:underline; }
-                </style>
-                <style>
-                    .lb-tabs { display:flex; gap:0; margin-bottom:1.5em; border-bottom:2px solid rgba(255,255,255,0.1); }
-                    .lb-tab { background:none; border:none; color:inherit; opacity:0.5; padding:0.7em 1.5em; cursor:pointer; font-size:1em; border-bottom:2px solid transparent; margin-bottom:-2px; transition: opacity 0.2s, border-color 0.2s; }
-                    .lb-tab.active { opacity:1; border-bottom-color: #00e054; }
-                    .lb-tab:hover { opacity:0.8; }
-
-                    .lb-stat-cards { display:flex; gap:0.75em; flex-wrap:wrap; margin-bottom:2em; }
-                    .lb-stat-card { background:rgba(255,255,255,0.04); padding:1em 1.5em; border-radius:8px; min-width:90px; text-align:center; flex:1; border:1px solid rgba(255,255,255,0.06); }
-                    .lb-stat-val { font-size:2em; font-weight:bold; }
-                    .lb-stat-label { opacity:0.5; font-size:0.85em; margin-top:0.1em; }
-
-                    .lb-table { width:100%; border-collapse:collapse; font-size:0.9em; }
-                    .lb-table thead tr { border-bottom:2px solid rgba(255,255,255,0.1); text-align:left; }
-                    .lb-table th, .lb-table td { padding:0.6em 0.5em; }
-                    .lb-table tbody tr { border-bottom:1px solid rgba(255,255,255,0.04); transition: background 0.15s; }
-                    .lb-table tbody tr:hover { background:rgba(255,255,255,0.03); }
-
-                    .lb-account { background:rgba(255,255,255,0.04); padding:1.5em; border-radius:8px; border:1px solid rgba(255,255,255,0.06); }
-                    .lb-account label.lb-field { display:block; opacity:0.5; font-size:0.85em; margin-bottom:0.2em; }
-                    .lb-account input[type=text], .lb-account input[type=password], .lb-account input[type=number] {
-                        width:100%; padding:0.4em; background:rgba(255,255,255,0.06); color:inherit; border:1px solid rgba(255,255,255,0.1); border-radius:4px; box-sizing:border-box;
+                #letterboxdUserPage {
+                    --ws-bg: #0d1013; --ws-surface: #15181d; --ws-surface-2: #1c2028; --ws-raise: #232833;
+                    --ws-border: rgba(255,255,255,.085); --ws-border-strong: rgba(255,255,255,.16);
+                    --ws-text: #e9edf2; --ws-muted: #97a1ad; --ws-faint: #6b7684;
+                    --ws-film: #00e054; --ws-tv: #2dd4bf; --ws-primary: #5b8cff;
+                    --ws-info: #47b4f2; --ws-warn: #f5a623; --ws-crit: #f2585e; --ws-ok: #35c281;
+                    --ws-film-soft: rgba(0,224,84,.13); --ws-tv-soft: rgba(45,212,191,.14); --ws-primary-soft: rgba(91,140,255,.16);
+                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55);
+                    --ws-mono: ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,monospace;
+                    --ws-r: 12px; color: var(--ws-text); font-size: 14px; line-height: 1.5;
+                }
+                @media (prefers-color-scheme: light) {
+                    #letterboxdUserPage {
+                        --ws-bg: #f4f6f8; --ws-surface: #ffffff; --ws-surface-2: #f0f2f5; --ws-raise: #e9ecf0;
+                        --ws-border: rgba(16,22,30,.10); --ws-border-strong: rgba(16,22,30,.20);
+                        --ws-text: #131922; --ws-muted: #5a6572; --ws-faint: #8894a1;
+                        --ws-film-soft: rgba(0,180,68,.12); --ws-tv-soft: rgba(17,150,128,.13); --ws-primary-soft: rgba(91,140,255,.13);
+                        --ws-shadow: 0 10px 30px -18px rgba(16,22,30,.30);
                     }
-                    .lb-account input[type=number] { width:80px; }
-                    .lb-checks { display:flex; flex-direction:column; gap:0.7em; margin-top:0.9em; }
-                    .lb-checks label { display:flex; align-items:flex-start; gap:0.6em; cursor:pointer; opacity:1; }
-                    .lb-checks label input[type=checkbox] { margin-top:0.25em; flex:none; }
-                    .lb-checks .lb-check-text { display:flex; flex-direction:column; gap:0.15em; }
-                    .lb-checks .lb-check-title { font-size:0.95em; opacity:0.9; }
-                    .lb-checks .lb-check-desc { font-size:0.8em; opacity:0.5; line-height:1.35; }
-
-                    .lb-btn { border:none; padding:0.5em 1.5em; border-radius:4px; cursor:pointer; font-weight:bold; font-size:0.95em; transition: opacity 0.2s; }
-                    .lb-btn:hover { opacity:0.85; }
-                    .lb-btn:disabled { opacity:0.4; cursor:default; }
-                    .lb-btn-primary { background:#00e054; color:#000; }
-                    .lb-btn-secondary { background:rgba(255,255,255,0.08); color:inherit; border:1px solid rgba(255,255,255,0.1); }
-                    .lb-btn-review { background:none; color:#40bcf4; border:1px solid rgba(64,188,244,0.4); font-size:0.8em; padding:0.15em 0.5em; }
-                    .lb-btn-review:hover { border-color:#40bcf4; }
-
-                    .lb-link { color:#00e054; text-decoration:none; }
-                    .lb-link:hover { text-decoration:underline; }
-
-                    .lb-modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:9999; }
-                    .lb-modal { background:rgba(30,34,40,0.98); padding:2em; border-radius:8px; max-width:500px; width:90%; margin:15vh auto; border:1px solid rgba(255,255,255,0.1); }
-                    .lb-modal textarea { width:100%; padding:0.5em; background:rgba(255,255,255,0.06); color:inherit; border:1px solid rgba(255,255,255,0.1); border-radius:4px; resize:vertical; box-sizing:border-box; }
-
-                    .c-green { color:#00e054; }
-                    .c-blue { color:#40bcf4; }
-                    .c-red { color:#e74c3c; }
-                    .c-muted { opacity:0.4; }
+                }
+                #letterboxdUserPage .content-primary, #letterboxdUserPage div[data-role="content"] { padding: 0 !important; margin: 0 !important; max-width: none !important; }
+                #letterboxdUserPage .ws { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 3.4rem); background: var(--ws-bg); overflow: hidden; }
+                #letterboxdUserPage .ws-rail { border-right: 1px solid var(--ws-border); background: var(--ws-surface); padding: 22px 16px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: calc(100vh - 3.4rem); align-self: start; }
+                #letterboxdUserPage .ws-brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
+                #letterboxdUserPage .ws-glyph { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: linear-gradient(150deg, var(--ws-film), var(--ws-tv)); }
+                #letterboxdUserPage .ws-brand b { font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
+                #letterboxdUserPage .ws-brand small { display: block; font-size: 11px; color: var(--ws-faint); margin-top: -1px; }
+                #letterboxdUserPage .ws-nav { display: flex; flex-direction: column; gap: 2px; }
+                #letterboxdUserPage .ws-nav .ws-navlabel { font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ws-faint); padding: 6px 10px 4px; }
+                #letterboxdUserPage .ws-nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ws-muted); font-weight: 500; cursor: pointer; transition: .13s; }
+                #letterboxdUserPage .ws-nav a svg { width: 16px; height: 16px; opacity: .8; }
+                #letterboxdUserPage .ws-nav a:hover { background: var(--ws-surface-2); color: var(--ws-text); }
+                #letterboxdUserPage .ws-nav a.active { background: var(--ws-primary-soft); color: var(--ws-text); }
+                #letterboxdUserPage .ws-nav a.active svg { opacity: 1; color: var(--ws-primary); }
+                #letterboxdUserPage .ws-main { padding: 24px 32px 40px; min-width: 0; }
+                #letterboxdUserPage .ws-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+                #letterboxdUserPage .ws-head h1 { font-size: 21px; font-weight: 650; letter-spacing: -.02em; margin: 0; }
+                #letterboxdUserPage .ws-head p { margin: 4px 0 0; color: var(--ws-muted); font-size: 13px; }
+                #letterboxdUserPage .ws-mono { font-family: var(--ws-mono); font-variant-numeric: tabular-nums; }
+                #letterboxdUserPage .ws-label { font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ws-faint); }
+                #letterboxdUserPage .ws-btn { border: 1px solid var(--ws-border-strong); background: var(--ws-surface); color: var(--ws-text); font-family: inherit; font-size: 13px; font-weight: 550; padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: .14s; display: inline-flex; align-items: center; gap: 7px; }
+                #letterboxdUserPage .ws-btn:hover { border-color: var(--ws-faint); }
+                #letterboxdUserPage .ws-btn.primary { background: var(--ws-primary); border-color: var(--ws-primary); color: #fff; }
+                #letterboxdUserPage .ws-btn.danger { color: var(--ws-crit); }
+                #letterboxdUserPage .ws-filters { display: flex; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; }
+                #letterboxdUserPage .ws-chip { border: 1px solid var(--ws-border); background: var(--ws-surface); border-radius: 20px; padding: 5px 13px; font-size: 12.5px; font-weight: 550; color: var(--ws-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+                #letterboxdUserPage .ws-chip.on { color: var(--ws-text); border-color: var(--ws-border-strong); background: var(--ws-surface-2); }
+                #letterboxdUserPage .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
+                #letterboxdUserPage .ws-dot.film { background: var(--ws-film); } #letterboxdUserPage .ws-dot.tv { background: var(--ws-tv); }
+                #letterboxdUserPage .ws-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin: 10px 0 22px; }
+                #letterboxdUserPage .ws-tile { background: var(--ws-surface); border: 1px solid var(--ws-border); border-radius: var(--ws-r); padding: 15px 16px; box-shadow: var(--ws-shadow); position: relative; overflow: hidden; }
+                #letterboxdUserPage .ws-tile::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--ac, var(--ws-primary)); }
+                #letterboxdUserPage .ws-tile.film { --ac: var(--ws-film); } #letterboxdUserPage .ws-tile.tv { --ac: var(--ws-tv); }
+                #letterboxdUserPage .ws-tile .n { font-family: var(--ws-mono); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 600; letter-spacing: -.02em; line-height: 1.1; }
+                #letterboxdUserPage .ws-tile .k { margin-top: 3px; }
+                #letterboxdUserPage .ws-panel { background: var(--ws-surface); border: 1px solid var(--ws-border); border-radius: var(--ws-r); box-shadow: var(--ws-shadow); }
+                #letterboxdUserPage .ws-sect-title { display: flex; align-items: center; gap: 10px; margin: 22px 0 12px; }
+                #letterboxdUserPage .ws-sect-title h2 { font-size: 13px; font-weight: 600; margin: 0; }
+                #letterboxdUserPage .ws-sect-title .rule { flex: 1; height: 1px; background: var(--ws-border); }
+                #letterboxdUserPage table.ws-table { width: 100%; border-collapse: collapse; }
+                #letterboxdUserPage .ws-table thead th { text-align: left; font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ws-faint); font-weight: 500; padding: 12px 16px; border-bottom: 1px solid var(--ws-border); }
+                #letterboxdUserPage .ws-table tbody td { padding: 11px 16px; border-bottom: 1px solid var(--ws-border); }
+                #letterboxdUserPage .ws-table tbody tr:last-child td { border-bottom: 0; }
+                #letterboxdUserPage .ws-table tbody tr:hover { background: var(--ws-surface-2); }
+                #letterboxdUserPage .ws-titlecell { display: flex; align-items: center; gap: 11px; }
+                #letterboxdUserPage .ws-badge { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; flex: none; font-family: var(--ws-mono); font-size: 10px; font-weight: 700; }
+                #letterboxdUserPage .ws-badge.film { background: var(--ws-film-soft); color: var(--ws-film); }
+                #letterboxdUserPage .ws-badge.tv { background: var(--ws-tv-soft); color: var(--ws-tv); }
+                #letterboxdUserPage .ws-tc .t { font-weight: 550; } #letterboxdUserPage .ws-tc .m { font-size: 11.5px; color: var(--ws-faint); font-family: var(--ws-mono); }
+                #letterboxdUserPage .ws-pill { font-family: var(--ws-mono); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; display: inline-flex; }
+                #letterboxdUserPage .ws-pill.Success { color: var(--ws-ok); background: rgba(53,194,129,.13); }
+                #letterboxdUserPage .ws-pill.Rewatch { color: var(--ws-info); background: rgba(71,180,242,.14); }
+                #letterboxdUserPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
+                #letterboxdUserPage .ws-pill.Failed { color: var(--ws-crit); background: rgba(242,88,94,.14); }
+                #letterboxdUserPage .ws-when { font-family: var(--ws-mono); font-size: 12px; color: var(--ws-muted); white-space: nowrap; }
+                #letterboxdUserPage .ws-src { color: var(--ws-faint); font-size: 12px; }
+                #letterboxdUserPage .ws-review-btn { border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-family: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
+                #letterboxdUserPage .ws-review-btn:hover { color: var(--ws-text); }
+                #letterboxdUserPage .ws-cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px,1fr)); gap: 12px; }
+                #letterboxdUserPage .ws-acct { background: var(--ws-surface); border: 1px solid var(--ws-border); border-radius: var(--ws-r); padding: 14px; box-shadow: var(--ws-shadow); display: flex; flex-direction: column; gap: 11px; }
+                #letterboxdUserPage .ws-acct.film { border-top: 2px solid var(--ws-film); } #letterboxdUserPage .ws-acct.tv { border-top: 2px solid var(--ws-tv); }
+                #letterboxdUserPage .ws-acct .top { display: flex; align-items: center; gap: 10px; }
+                #letterboxdUserPage .ws-acct .u { font-family: var(--ws-mono); font-weight: 600; font-size: 14px; }
+                #letterboxdUserPage .ws-acct .svc { font-size: 11px; }
+                #letterboxdUserPage .ws-acct .svc.film { color: var(--ws-film); } #letterboxdUserPage .ws-acct .svc.tv { color: var(--ws-tv); }
+                #letterboxdUserPage .ws-prim { margin-left: auto; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ws-warn); background: rgba(245,166,35,.14); padding: 3px 7px; border-radius: 5px; }
+                #letterboxdUserPage .ws-featchips { display: flex; flex-wrap: wrap; gap: 5px; }
+                #letterboxdUserPage .ws-feat { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: var(--ws-surface-2); color: var(--ws-muted); border: 1px solid var(--ws-border); }
+                #letterboxdUserPage .ws-feat.on { color: var(--ws-text); border-color: var(--ws-border-strong); }
+                #letterboxdUserPage .ws-feat.on::before { content: "✓ "; color: var(--ws-ok); }
+                #letterboxdUserPage .ws-acct .foot { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--ws-border); padding-top: 10px; }
+                #letterboxdUserPage .ws-acct .st { font-size: 11.5px; color: var(--ws-muted); }
+                #letterboxdUserPage .ws-linkbtn { border: 0; background: none; color: var(--ws-muted); font-family: inherit; font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+                #letterboxdUserPage .ws-linkbtn:hover { color: var(--ws-text); background: var(--ws-surface-2); }
+                #letterboxdUserPage .ws-add { border: 1px dashed var(--ws-border-strong); background: transparent; border-radius: var(--ws-r); display: grid; place-items: center; color: var(--ws-muted); cursor: pointer; min-height: 140px; gap: 6px; font-weight: 550; font-family: inherit; font-size: 13px; }
+                #letterboxdUserPage .ws-add:hover { color: var(--ws-text); border-color: var(--ws-faint); background: var(--ws-surface); }
+                #letterboxdUserPage .ws-add .plus { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--ws-surface-2); font-size: 19px; }
+                #letterboxdUserPage .ws-view { display: none; } #letterboxdUserPage .ws-view.show { display: block; }
+                #letterboxdUserPage .ws-field { display: block; font-family: var(--ws-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ws-faint); margin-bottom: 5px; }
+                #letterboxdUserPage .ws-input { width: 100%; background: var(--ws-surface-2); border: 1px solid var(--ws-border); border-radius: 8px; padding: 9px 11px; color: var(--ws-text); font-family: inherit; font-size: 13px; }
+                #letterboxdUserPage .ws-checks { display: flex; flex-direction: column; gap: 9px; }
+                #letterboxdUserPage .ws-checks label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; font-size: 13px; }
+                #letterboxdUserPage .ws-checks input { margin-top: 2px; }
+                #letterboxdUserPage .ws-checks .desc { display: block; color: var(--ws-faint); font-size: 11.5px; }
+                #letterboxdUserPage .ws-modal-ov { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; }
+                #letterboxdUserPage .ws-modal-ov.show { display: grid; place-items: center; padding: 20px; }
+                #letterboxdUserPage .ws-modal { background: var(--ws-surface); border: 1px solid var(--ws-border-strong); border-radius: 14px; padding: 22px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); }
+                #letterboxdUserPage .ws-modal h3 { margin: 0 0 14px; font-size: 16px; }
+                #letterboxdUserPage .ws-row { margin-bottom: 12px; }
+                #letterboxdUserPage .ws-star { cursor: pointer; font-size: 1.6em; user-select: none; color: var(--ws-faint); }
+                #letterboxdUserPage .ws-star.filled { color: var(--ws-warn); }
+                #letterboxdUserPage .ws-muted { color: var(--ws-muted); } #letterboxdUserPage .ws-green { color: var(--ws-ok); } #letterboxdUserPage .ws-red { color: var(--ws-crit); }
+                #letterboxdUserPage a.ws-link { color: var(--ws-primary); }
+                @media (max-width: 820px) { #letterboxdUserPage .ws { grid-template-columns: 1fr; } #letterboxdUserPage .ws-rail { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--ws-border); height: auto; position: static; } #letterboxdUserPage .ws-nav { flex-direction: row; } }
                 </style>
 
-                <a href="/web/index.html" class="lb-back-link" id="backLink">&larr; Back to Jellyfin</a>
-
-                <div style="display:flex;align-items:center;gap:0.7em;margin-bottom:0.5em;">
-                    <h2 style="margin:0;">Letterboxd Sync</h2>
-                    <span class="c-muted" style="font-size:0.7em;padding-top:0.3em;">by <a href="https://lachlanyoung.dev" target="_blank" class="lb-link">Lachlan Young</a> and <strong style="color:#ff8c00;">AI</strong></span>
-                </div>
-
-                <!-- Admin link -->
-                <div id="adminLink" style="display:none;margin-bottom:1em;">
-                    <a href="/web/index.html#!/dashboard/plugins" class="lb-link" style="font-size:0.85em;">Manage All Accounts (Admin)</a>
-                </div>
-
-                <!-- Tabs -->
-                <div class="lb-tabs">
-                    <button type="button" class="lb-tab active" data-tab="stats">Dashboard</button>
-                    <button type="button" class="lb-tab" data-tab="account">My Account</button>
-                    <button type="button" class="lb-tab" data-tab="szaccount">My TV Account</button>
-                </div>
-
-                <!-- DASHBOARD TAB -->
-                <div id="tab-stats" class="lb-tab-content">
-                    <div style="display:flex;gap:0.4em;margin-bottom:0.9em;" id="dashSourceToggle">
-                        <button type="button" class="lb-btn lb-btn-primary" data-source="letterboxd">Letterboxd (Film)</button>
-                        <button type="button" class="lb-btn lb-btn-secondary" data-source="serializd">Serializd (TV)</button>
-                    </div>
-                    <div id="syncControls">
-                        <div style="display:flex;align-items:center;gap:1em;margin-bottom:0.5em;flex-wrap:wrap;">
-                            <button type="button" class="lb-btn lb-btn-primary" id="runSyncBtn">Run Sync Now</button>
-                            <button type="button" class="lb-btn lb-btn-secondary" id="runWatchlistSyncBtn" title="Pull your Letterboxd watchlist into the Jellyfin playlist (and Seerr if configured)">Sync Watchlist Now</button>
-                            <span id="syncStatus" class="c-muted" style="font-size:0.9em;"></span>
-                        </div>
-                        <div id="syncProgressBar" style="display:none;margin-bottom:1.5em;">
-                            <div style="background:#2a2a2a;border-radius:4px;height:6px;overflow:hidden;margin-bottom:0.3em;">
-                                <div id="progressFill" style="background:#00e054;height:100%;width:0%;transition:width 0.5s ease;"></div>
+                <div class="ws">
+                    <aside class="ws-rail">
+                        <div class="ws-brand"><span class="ws-glyph"><svg viewBox="0 0 24 24" fill="none" stroke="#0d1013" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span><div><b>Watch Sync</b><small>Your film &amp; TV diaries</small></div></div>
+                        <nav class="ws-nav" id="wsNav">
+                            <div class="ws-navlabel">You</div>
+                            <a class="active" data-sec="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</a>
+                            <a data-sec="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>My accounts</a>
+                        </nav>
+                    </aside>
+                    <main class="ws-main">
+                        <section class="ws-view show" data-sec="overview">
+                            <div class="ws-head"><div><h1>Your diaries</h1><p>What we've logged from your watching, across both accounts.</p></div>
+                                <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="runWatchlistBtn">Sync watchlist</button><button type="button" class="ws-btn primary" id="runSyncBtn">Run sync now</button></div></div>
+                            <div class="ws-filters" id="ovFilters">
+                                <button type="button" class="ws-chip on" data-f="all">All</button>
+                                <button type="button" class="ws-chip" data-f="letterboxd"><span class="ws-dot film"></span>Film</button>
+                                <button type="button" class="ws-chip" data-f="serializd"><span class="ws-dot tv"></span>TV</button>
                             </div>
-                            <span id="progressDetail" class="c-muted" style="font-size:0.8em;"></span>
-                        </div>
-                    </div>
-
-                    <div class="lb-stat-cards">
-                        <div class="lb-stat-card"><div class="lb-stat-val" id="statTotal">-</div><div class="lb-stat-label">Total</div></div>
-                        <div class="lb-stat-card"><div class="lb-stat-val c-green" id="statSuccess">-</div><div class="lb-stat-label">Synced</div></div>
-                        <div class="lb-stat-card"><div class="lb-stat-val c-blue" id="statRewatches">-</div><div class="lb-stat-label">Rewatches</div></div>
-                        <div class="lb-stat-card"><div class="lb-stat-val c-muted" id="statSkipped">-</div><div class="lb-stat-label">Skipped</div></div>
-                        <div class="lb-stat-card"><div class="lb-stat-val c-red" id="statFailed">-</div><div class="lb-stat-label">Failed</div></div>
-                    </div>
-
-                    <h3 style="margin-bottom:0.5em;">Recent Activity</h3>
-                    <div style="overflow-x:auto;">
-                        <table class="lb-table">
-                            <thead><tr><th id="historyTitleHeader">Film</th><th>Status</th><th>Source</th><th>Date</th><th></th></tr></thead>
-                            <tbody id="historyBody">
-                                <tr><td colspan="5" style="padding:2em;text-align:center;" class="c-muted">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    <div id="historyPagination" style="display:none;margin-top:0.7em;align-items:center;gap:0.4em;flex-wrap:wrap;font-size:0.9em;">
-                        <button type="button" class="lb-btn lb-btn-secondary lb-page-btn" id="historyFirst" title="First page">&laquo;</button>
-                        <button type="button" class="lb-btn lb-btn-secondary lb-page-btn" id="historyPrev" title="Previous page">&lsaquo;</button>
-                        <span id="historyPageInfo" class="c-muted" style="margin:0 0.4em;"></span>
-                        <button type="button" class="lb-btn lb-btn-secondary lb-page-btn" id="historyNext" title="Next page">&rsaquo;</button>
-                        <button type="button" class="lb-btn lb-btn-secondary lb-page-btn" id="historyLast" title="Last page">&raquo;</button>
-                    </div>
-                </div>
-
-                <!-- MY ACCOUNT TAB -->
-                <div id="tab-account" class="lb-tab-content" style="display:none;">
-                    <h3>Your Letterboxd accounts</h3>
-                    <p class="c-muted" style="font-size:0.9em;">Link one or more Letterboxd accounts to this Jellyfin user. Each gets its own diary, ratings, and watchlist; auto-sync fans out across every enabled account. When you have more than one, mark one as <em>primary</em> &mdash; it wins on rating-import conflicts and is preselected in the review modal.</p>
-
-                    <div id="accountsList"></div>
-
-                    <button type="button" class="lb-btn lb-btn-secondary" id="addAccountBtn" style="margin-top:1em;">+ Add Account</button>
-
-                    <div style="margin-top:1.5em;display:flex;align-items:center;gap:1em;">
-                        <button type="button" class="lb-btn lb-btn-primary" id="saveBtn">Save</button>
-                        <span id="saveStatus" style="font-size:0.9em;"></span>
-                    </div>
-                </div>
-
-                <!-- MY TV ACCOUNT TAB -->
-                <div id="tab-szaccount" class="lb-tab-content" style="display:none;">
-                    <h3>Your Serializd account</h3>
-                    <p class="c-muted" style="font-size:0.9em;">Link your <a href="https://www.serializd.com" target="_blank" class="lb-link">Serializd</a> account to log finished TV episodes to your diary automatically (the TV counterpart to Letterboxd). Log in by email or username.</p>
-                    <div id="szAccountsList"></div>
-                    <button type="button" class="lb-btn lb-btn-secondary" id="addSzAccountBtn" style="margin-top:1em;">+ Add Serializd Account</button>
-                    <div style="margin-top:1.5em;display:flex;align-items:center;gap:1em;">
-                        <button type="button" class="lb-btn lb-btn-primary" id="saveSzBtn">Save</button>
-                        <span id="saveSzStatus" style="font-size:0.9em;"></span>
-                    </div>
-                </div>
-
-                <!-- REVIEW MODAL -->
-                <div id="reviewModal" class="lb-modal-overlay">
-                    <div class="lb-modal">
-                        <h3 id="reviewTitle" style="margin-top:0;">Write Review</h3>
-                        <textarea id="reviewText" rows="5" placeholder="Write your review..."></textarea>
-                        <div style="margin-top:0.7em;">
-                            <label style="display:block;opacity:0.5;font-size:0.85em;margin-bottom:0.3em;">Rating</label>
-                            <div id="starRating" style="display:flex;gap:0.15em;cursor:pointer;font-size:1.6em;user-select:none;">
-                                <span data-val="0.5" class="lb-half">&#9734;</span>
-                                <span data-val="1">&#9734;</span>
-                                <span data-val="1.5" class="lb-half">&#9734;</span>
-                                <span data-val="2">&#9734;</span>
-                                <span data-val="2.5" class="lb-half">&#9734;</span>
-                                <span data-val="3">&#9734;</span>
-                                <span data-val="3.5" class="lb-half">&#9734;</span>
-                                <span data-val="4">&#9734;</span>
-                                <span data-val="4.5" class="lb-half">&#9734;</span>
-                                <span data-val="5">&#9734;</span>
+                            <span id="syncStatus" class="ws-muted" style="font-size:12.5px;"></span>
+                            <div class="ws-tiles">
+                                <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged</div></div>
+                                <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged</div></div>
+                                <div class="ws-tile"><div class="n ws-green" id="statSynced">-</div><div class="k ws-label">Synced</div></div>
+                                <div class="ws-tile"><div class="n" style="color:var(--ws-info);" id="statRewatches">-</div><div class="k ws-label">Rewatches</div></div>
+                                <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
                             </div>
-                            <span id="ratingLabel" style="font-size:0.85em;opacity:0.5;margin-left:0.3em;">No rating</span>
-                            <input type="hidden" id="reviewRating" value="" />
-                            <style>
-                                .lb-half { font-size:0.6em; vertical-align:super; margin-right:-0.1em; }
-                                #starRating span { transition: color 0.1s; color: rgba(255,255,255,0.2); }
-                                #starRating span.filled { color: #00e054; }
-                                #starRating span:hover { color: #00e054; opacity: 0.7; }
-                            </style>
-                        </div>
-                        <div style="margin-top:0.5em;display:flex;flex-wrap:wrap;gap:0.5em 1.5em;align-items:center;">
-                            <label class="c-muted"><input type="checkbox" id="reviewSpoilers" /> Contains spoilers</label>
-                            <label class="c-muted"><input type="checkbox" id="reviewRewatch" /> This is a rewatch</label>
-                        </div>
-                        <div id="reviewAccountRow" style="display:none;margin-top:0.7em;">
-                            <label style="display:block;opacity:0.5;font-size:0.85em;margin-bottom:0.2em;">Post as</label>
-                            <select id="reviewAccount" style="min-width:240px;">
-                                <option value="">All my Letterboxd accounts</option>
-                            </select>
-                            <span class="c-muted" style="font-size:0.8em;display:block;margin-top:0.3em;">Defaults to posting on every linked Letterboxd account. Pick one to limit to that account only.</span>
-                        </div>
-                        <div id="rewatchDateRow" style="display:none;margin-top:0.5em;">
-                            <label style="display:block;opacity:0.5;font-size:0.85em;margin-bottom:0.2em;">Date watched</label>
-                            <input type="date" id="reviewDate" style="padding:0.4em;background:rgba(255,255,255,0.06);color:inherit;border:1px solid rgba(255,255,255,0.1);border-radius:4px;" />
-                        </div>
-                        <div style="margin-top:1em;display:flex;gap:1em;">
-                            <button type="button" class="lb-btn lb-btn-primary" id="reviewSubmit">Post to Letterboxd</button>
-                            <button type="button" class="lb-btn lb-btn-secondary" id="reviewCancel">Cancel</button>
-                        </div>
-                        <div id="reviewStatus" style="margin-top:0.5em;font-size:0.9em;"></div>
-                    </div>
+                            <div class="ws-sect-title"><h2>Recent activity</h2><span class="rule"></span></div>
+                            <div class="ws-panel" style="overflow-x:auto;"><table class="ws-table"><thead><tr><th>Title</th><th>Status</th><th>Source</th><th>When</th><th></th></tr></thead><tbody id="historyBody"><tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">Loading…</td></tr></tbody></table></div>
+                        </section>
+                        <section class="ws-view" data-sec="accounts">
+                            <div class="ws-head"><div><h1>My accounts</h1><p>Link your Letterboxd (film) and Serializd (TV) accounts. We log what you watch to each.</p></div></div>
+                            <div class="ws-cardgrid" id="acctGrid"></div>
+                            <div id="saveStatus" style="margin-top:12px;font-size:12.5px;"></div>
+                        </section>
+                    </main>
                 </div>
+
+                <div class="ws-modal-ov" id="acctModal"><div class="ws-modal">
+                    <h3 id="acctModalTitle">Link a diary</h3>
+                    <div class="ws-row"><label class="ws-field">Service</label><select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
+                    <div class="ws-row"><label class="ws-field" id="mUserLabel">Email or username</label><input type="text" class="ws-input" id="mUsername" /></div>
+                    <div class="ws-row"><label class="ws-field">Password</label><input type="password" class="ws-input" id="mPassword" /></div>
+                    <div class="ws-row" id="mCookieRow" style="display:none;"><label class="ws-field">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span></label><input type="text" class="ws-input" id="mCookies" placeholder="From a signed-in browser (incl. cf_clearance)" /></div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;"><button type="button" class="ws-btn" id="mVerifyBtn">Verify login</button><span id="mVerifyStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
+                    <div class="ws-checks" id="mChecks"></div>
+                    <div style="display:flex;gap:10px;margin-top:18px;align-items:center;"><button type="button" class="ws-btn primary" id="mSaveBtn">Save</button><button type="button" class="ws-btn" id="mCancelBtn">Cancel</button><button type="button" class="ws-btn danger" id="mDeleteBtn" style="margin-left:auto;display:none;">Remove</button></div>
+                    <div id="mStatus" style="font-size:12.5px;margin-top:8px;"></div>
+                </div></div>
+
+                <div class="ws-modal-ov" id="reviewModal"><div class="ws-modal">
+                    <h3 id="reviewTitle">Write review</h3>
+                    <textarea id="reviewText" rows="4" class="ws-input" placeholder="Write your review…"></textarea>
+                    <div class="ws-row" style="margin-top:12px;"><label class="ws-field">Rating</label><div id="starRating"><span class="ws-star" data-val="1">&#9734;</span><span class="ws-star" data-val="2">&#9734;</span><span class="ws-star" data-val="3">&#9734;</span><span class="ws-star" data-val="4">&#9734;</span><span class="ws-star" data-val="5">&#9734;</span><span id="ratingLabel" class="ws-muted" style="margin-left:8px;font-size:12px;">No rating</span></div><input type="hidden" id="reviewRating" value="" /></div>
+                    <label class="ws-muted" style="display:block;margin:8px 0;font-size:12.5px;"><input type="checkbox" id="reviewSpoilers" /> Contains spoilers</label>
+                    <div style="display:flex;gap:10px;margin-top:8px;align-items:center;"><button type="button" class="ws-btn primary" id="reviewSubmit">Post review</button><button type="button" class="ws-btn" id="reviewCancel">Cancel</button><span id="reviewStatus" style="font-size:12.5px;"></span></div>
+                </div></div>
 
                 <script type="text/javascript">
-                    var LBUser = {
-                        serverUrl: '',
-                        token: '',
-                        isAdmin: false,
-                        currentSlug: '',
-                        syncPoll: null,
-                        historyPageSize: 100,
-                        historyOffset: 0,
-                        historyTotal: 0,
-
+                (function () {
+                    var U = {
+                        serverUrl: '', token: '', ovFilter: 'all', merged: [], lb: [], sz: [], editing: null,
+                        reviewSvc: '', reviewTmdb: 0, reviewSlug: '',
                         resolveAuth: function () {
-                            if (typeof ApiClient !== 'undefined') {
-                                try {
-                                    this.serverUrl = ApiClient.serverAddress();
-                                    this.token = ApiClient.accessToken();
-                                    if (this.serverUrl && this.token) return true;
-                                } catch (e) {}
-                            }
-                            try {
-                                var creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}');
-                                var server = (creds.Servers || [])[0];
-                                if (server) {
-                                    this.serverUrl = server.ManualAddress || server.LocalAddress || '';
-                                    this.token = server.AccessToken || '';
-                                    return !!(this.serverUrl && this.token);
-                                }
-                            } catch (e) {}
+                            try { if (typeof ApiClient !== 'undefined') { this.serverUrl = ApiClient.serverAddress(); this.token = ApiClient.accessToken(); if (this.serverUrl && this.token) return true; } } catch (e) {}
+                            try { var creds = JSON.parse(localStorage.getItem('jellyfin_credentials') || '{}'); var s = (creds.Servers || [])[0]; if (s) { this.serverUrl = s.ManualAddress || s.LocalAddress || ''; this.token = s.AccessToken || ''; return !!(this.serverUrl && this.token); } } catch (e) {}
                             return false;
                         },
-
-                        apiFetch: function (path) {
-                            return fetch(this.serverUrl + '/' + path, {
-                                headers: { 'Authorization': 'MediaBrowser Token="' + this.token + '"' }
-                            });
-                        },
-
-                        apiPost: function (path, body) {
-                            return fetch(this.serverUrl + '/' + path, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': 'MediaBrowser Token="' + this.token + '"',
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify(body)
-                            });
-                        },
-
-                        apiPut: function (path, body) {
-                            return fetch(this.serverUrl + '/' + path, {
-                                method: 'PUT',
-                                headers: {
-                                    'Authorization': 'MediaBrowser Token="' + this.token + '"',
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify(body)
-                            });
-                        },
-
-                        initTabs: function () {
-                            var tabs = document.querySelectorAll('.lb-tab');
-                            tabs.forEach(function (tab) {
-                                tab.addEventListener('click', function () {
-                                    tabs.forEach(function (t) { t.classList.remove('active'); });
-                                    tab.classList.add('active');
-                                    document.querySelectorAll('.lb-tab-content').forEach(function (c) { c.style.display = 'none'; });
-                                    document.getElementById('tab-' + tab.getAttribute('data-tab')).style.display = '';
-                                });
-                            });
-                        },
-
-                        accountHtml: function () {
-                            return '<div class="account-entry lb-account" style="margin-bottom:1em;">'
-                                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5em;">'
-                                + '<h4 style="margin:0;" class="accountHeading">Account</h4>'
-                                + '<button type="button" class="lb-btn lb-btn-danger removeAccountBtn">Remove</button></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Letterboxd Username</label>'
-                                + '<input type="text" class="lbUsername" /></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Letterboxd Password</label>'
-                                + '<input type="password" class="lbPassword" /></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Raw Cookies <span class="c-muted">(strongly recommended)</span></label>'
-                                + '<input type="text" class="rawCookies" placeholder="Paste cookie header from a signed-in browser (must include cf_clearance)" />'
-                                + '<div class="c-muted" style="font-size:0.8em;margin-top:0.3em;">Letterboxd often blocks username/password login with a Cloudflare/reCAPTCHA challenge, and accounts with two-factor auth can\'t use password login at all. Pasting raw cookies (including <code>cf_clearance</code>) from a browser already signed in to Letterboxd is the most reliable way to authenticate.</div></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">User-Agent <span class="c-muted">(optional, must match the browser used to copy cookies)</span></label>'
-                                + '<input type="text" class="userAgent" placeholder="Leave blank for default (Firefox 134 on Windows)" />'
-                                + '<div class="c-muted" style="font-size:0.8em;margin-top:0.3em;">Cloudflare ties the <code>cf_clearance</code> cookie to the exact User-Agent that solved the challenge. If you copied cookies from Chrome, paste Chrome\'s UA here.</div></div>'
-                                + '<div style="margin-top:1em;margin-bottom:0.5em;">'
-                                + '<button type="button" class="lb-btn lb-btn-secondary testBtn">Test Connection</button>'
-                                + '<span class="testStatus" style="font-size:0.9em;margin-left:0.7em;"></span></div>'
-                                + '<h4 style="margin-top:1.5em;margin-bottom:0.5em;">Sync Preferences</h4>'
-                                + '<div class="lb-checks">'
-                                + '<label><input type="checkbox" class="accountEnabled" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Enabled</span>'
-                                + '<span class="lb-check-desc">Master switch for this account. When unchecked, no diary, watchlist, or playback sync runs for it. Saved settings are kept.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="isPrimary" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Primary account</span>'
-                                + '<span class="lb-check-desc">When this Jellyfin user has more than one Letterboxd account linked, the primary one wins on rating-import conflicts and is preselected in the review modal. Only one primary per Jellyfin user is kept (the server demotes extras on save).</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="syncFavorites" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Mark Jellyfin favourites as liked on Letterboxd</span>'
-                                + '<span class="lb-check-desc">When a film is in your Jellyfin favourites, the diary entry on Letterboxd gets the red heart (liked). Otherwise it syncs as a plain watch.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="enableDateFilter" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Only sync recently played films</span>'
-                                + '<span class="lb-check-desc">Limit the catch-up sync to films watched within the last N days (set below). Useful on first run if you don\'t want to backfill years of history.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="enableWatchlistSync" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Mirror Letterboxd watchlist as a Jellyfin playlist</span>'
-                                + '<span class="lb-check-desc">Pulls this account\'s Letterboxd watchlist daily and mirrors it into a Jellyfin playlist. With multiple accounts each gets its own playlist named "Letterboxd Watchlist (username)" by default. Adds new films and removes ones taken off Letterboxd. Films not in your library are skipped.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="autoRequestWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Auto-request unmatched watchlist films via Seerr</span>'
-                                + '<span class="lb-check-desc">When a watchlisted film is not in the Jellyfin library, request it through Seerr. The request is attributed to your Seerr account. Requires Seerr to be configured in the admin plugin settings.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="mirrorJellyseerrWatchlist" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Mirror Letterboxd watchlist into Seerr watchlist</span>'
-                                + '<span class="lb-check-desc">Two-way mirror against your Seerr user\'s own watchlist. Only takes effect on the primary account, since the Seerr watchlist is per-Jellyfin-user (the secondary account\'s flag is silently ignored to avoid the two accounts overwriting each other). Movies only, so manually-added Seerr TV is left alone.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="enableDiaryImport" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Import Letterboxd diary as Jellyfin watched</span>'
-                                + '<span class="lb-check-desc">Reverse direction: marks films in your Jellyfin library as played if they are already in this account\'s Letterboxd diary. With multiple accounts the played-state is unioned across them.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="skipPreviouslySynced" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Skip films already synced locally</span>'
-                                + '<span class="lb-check-desc">Use the plugin\'s own sync history to short-circuit the duplicate check, so we don\'t hit Letterboxd at all for films we already logged. Massively reduces Cloudflare blocks on large libraries. Recommended.</span>'
-                                + '</span></label>'
-                                + '<label><input type="checkbox" class="stopOnFailure" /><span class="lb-check-text">'
-                                + '<span class="lb-check-title">Stop sync immediately on first failure</span>'
-                                + '<span class="lb-check-desc">Halt this account\'s sync the moment a film fails (e.g. Cloudflare 403 or anti-flooding). Prevents wasted retries that further inflame Letterboxd\'s rate limits. Remaining films will be picked up next run, prioritising failed and never-attempted entries first.</span>'
-                                + '</span></label>'
-                                + '</div>'
-                                + '<div class="dateFilterDaysContainer" style="display:none;margin-top:0.5em;">'
-                                + '<label class="lb-field">Days to look back</label>'
-                                + '<input type="number" class="dateFilterDays" min="1" max="365" value="7" /></div>'
-                                + '<div style="margin-top:0.5em;">'
-                                + '<label class="lb-field">Watchlist Playlist Name <span class="c-muted">(optional)</span></label>'
-                                + '<input type="text" class="playlistName" placeholder="Letterboxd Watchlist (username)" />'
-                                + '<div class="c-muted" style="font-size:0.8em;margin-top:0.3em;">Override the playlist name for this account\'s mirrored Letterboxd watchlist. Leave blank to use the default pattern.</div></div>'
-                                + '</div>';
-                        },
-
-                        wireAccountEntry: function (entry, account) {
-                            var self = this;
-                            if (account) {
-                                entry.querySelector('.lbUsername').value = account.letterboxdUsername || '';
-                                entry.querySelector('.lbPassword').value = account.letterboxdPassword || '';
-                                entry.querySelector('.rawCookies').value = account.rawCookies || '';
-                                entry.querySelector('.userAgent').value = account.userAgent || '';
-                                entry.querySelector('.accountEnabled').checked = account.enabled === true;
-                                entry.querySelector('.isPrimary').checked = account.isPrimary === true;
-                                entry.querySelector('.syncFavorites').checked = account.syncFavorites === true;
-                                entry.querySelector('.enableDateFilter').checked = account.enableDateFilter === true;
-                                entry.querySelector('.dateFilterDays').value = account.dateFilterDays || 7;
-                                entry.querySelector('.enableWatchlistSync').checked = account.enableWatchlistSync === true;
-                                entry.querySelector('.autoRequestWatchlist').checked = account.autoRequestWatchlist === true;
-                                entry.querySelector('.mirrorJellyseerrWatchlist').checked = account.mirrorJellyseerrWatchlist === true;
-                                entry.querySelector('.enableDiaryImport').checked = account.enableDiaryImport === true;
-                                entry.querySelector('.skipPreviouslySynced').checked = account.skipPreviouslySynced !== false;
-                                entry.querySelector('.stopOnFailure').checked = account.stopOnFailure === true;
-                                entry.querySelector('.playlistName').value = account.playlistName || '';
-                                if (account.enableDateFilter) entry.querySelector('.dateFilterDaysContainer').style.display = '';
-                                self.updateAccountHeading(entry);
-                            } else {
-                                entry.querySelector('.accountEnabled').checked = true;
-                                entry.querySelector('.skipPreviouslySynced').checked = true;
-                                entry.querySelector('.accountHeading').textContent = 'New account';
-                            }
-                            entry.querySelector('.enableDateFilter').addEventListener('change', function () {
-                                entry.querySelector('.dateFilterDaysContainer').style.display = this.checked ? '' : 'none';
-                            });
-                            entry.querySelector('.lbUsername').addEventListener('input', function () { self.updateAccountHeading(entry); });
-                            entry.querySelector('.isPrimary').addEventListener('change', function () { self.updateAccountHeading(entry); });
-                            entry.querySelector('.removeAccountBtn').addEventListener('click', function () { entry.remove(); });
-                            entry.querySelector('.testBtn').addEventListener('click', function () { self.testConnection(entry); });
-                        },
-
-                        updateAccountHeading: function (entry) {
-                            var name = entry.querySelector('.lbUsername').value.trim();
-                            var primary = entry.querySelector('.isPrimary').checked;
-                            var label = name || 'New account';
-                            if (primary) label += ' (primary)';
-                            entry.querySelector('.accountHeading').textContent = label;
-                        },
-
-                        addAccount: function (account) {
-                            var container = document.getElementById('accountsList');
-                            container.insertAdjacentHTML('beforeend', this.accountHtml());
-                            this.wireAccountEntry(container.lastElementChild, account);
-                        },
-
-                        loadAccount: function () {
-                            var self = this;
-                            self.apiFetch('Jellyfin.Plugin.LetterboxdSync/Accounts')
-                            .then(function (r) { return r.json(); })
-                            .then(function (data) {
-                                var list = document.getElementById('accountsList');
-                                list.innerHTML = '';
-                                var accounts = (data && data.accounts) || [];
-                                accounts.forEach(function (a) { self.addAccount(a); });
-                                if (accounts.length === 0) {
-                                    // First-time setup: render an empty row so the user has something
-                                    // to fill in rather than staring at the +Add button alone.
-                                    self.addAccount(null);
-                                }
-                            })
-                            .catch(function (err) {
-                                console.error('[LetterboxdSync] Failed to load accounts:', err);
-                            });
-                        },
-
-                        collectAccounts: function () {
-                            var accounts = [];
-                            document.querySelectorAll('#accountsList .account-entry').forEach(function (entry) {
-                                accounts.push({
-                                    letterboxdUsername: entry.querySelector('.lbUsername').value.trim(),
-                                    letterboxdPassword: entry.querySelector('.lbPassword').value,
-                                    rawCookies: entry.querySelector('.rawCookies').value || null,
-                                    userAgent: entry.querySelector('.userAgent').value || null,
-                                    enabled: entry.querySelector('.accountEnabled').checked,
-                                    syncFavorites: entry.querySelector('.syncFavorites').checked,
-                                    enableDateFilter: entry.querySelector('.enableDateFilter').checked,
-                                    dateFilterDays: parseInt(entry.querySelector('.dateFilterDays').value, 10) || 7,
-                                    enableWatchlistSync: entry.querySelector('.enableWatchlistSync').checked,
-                                    autoRequestWatchlist: entry.querySelector('.autoRequestWatchlist').checked,
-                                    mirrorJellyseerrWatchlist: entry.querySelector('.mirrorJellyseerrWatchlist').checked,
-                                    enableDiaryImport: entry.querySelector('.enableDiaryImport').checked,
-                                    skipPreviouslySynced: entry.querySelector('.skipPreviouslySynced').checked,
-                                    stopOnFailure: entry.querySelector('.stopOnFailure').checked,
-                                    isPrimary: entry.querySelector('.isPrimary').checked,
-                                    playlistName: entry.querySelector('.playlistName').value.trim() || null
-                                });
-                            });
-                            return accounts;
-                        },
-
-                        saveAccount: function () {
-                            var self = this;
-                            var saveBtn = document.getElementById('saveBtn');
-                            var saveStatus = document.getElementById('saveStatus');
-                            var accounts = self.collectAccounts();
-
-                            // Reject empty rows client-side so the server doesn't have to send a 400
-                            // for a UX problem we can describe inline.
-                            for (var i = 0; i < accounts.length; i++) {
-                                if (!accounts[i].letterboxdUsername) {
-                                    saveStatus.innerHTML = '<span class="c-red">Account #' + (i + 1) + ' is missing a Letterboxd username</span>';
-                                    return;
-                                }
-                            }
-
-                            saveBtn.disabled = true;
-                            saveStatus.textContent = 'Saving...';
-
-                            self.apiPut('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: accounts })
-                            .then(function (r) {
-                                if (r.ok) {
-                                    // Warn (without blocking the save) about enabled accounts relying on
-                                    // password-only login: Letterboxd frequently reCAPTCHA-blocks it and 2FA
-                                    // accounts can't use it at all. This is the most common cause of sync
-                                    // failures we see, so nudge the user toward Raw Cookies.
-                                    var noCookies = accounts.filter(function (a) {
-                                        return a.enabled && a.letterboxdPassword && !a.rawCookies;
-                                    }).length;
-                                    if (noCookies > 0) {
-                                        saveStatus.innerHTML = '<span class="c-green">Saved.</span> <span style="color:#f5a623;">'
-                                            + (noCookies === 1 ? 'This account has' : noCookies + ' accounts have')
-                                            + ' no Raw Cookies. Letterboxd often blocks password-only login (reCAPTCHA / 2FA), so syncing may fail. '
-                                            + 'Use "Test Connection" above, and add Raw Cookies (with cf_clearance) if it fails.</span>';
-                                    } else {
-                                        saveStatus.innerHTML = '<span class="c-green">Saved!</span>';
-                                    }
-                                    saveBtn.disabled = false;
-                                    // Reload to pick up server-side normalisation (e.g. auto-promoted primary).
-                                    self.loadAccount();
-                                } else {
-                                    r.json().then(function (d) {
-                                        saveStatus.innerHTML = '<span class="c-red">' + (d.error || 'Failed to save') + '</span>';
-                                        saveBtn.disabled = false;
-                                    });
-                                }
-                            })
-                            .catch(function (err) {
-                                saveStatus.innerHTML = '<span class="c-red">Error: ' + err.message + '</span>';
-                                saveBtn.disabled = false;
-                            });
-                            return;
-                        },
-
-                        testConnection: function (entry) {
-                            var self = this;
-                            var testBtn = entry.querySelector('.testBtn');
-                            var testStatus = entry.querySelector('.testStatus');
-                            var username = entry.querySelector('.lbUsername').value;
-                            var password = entry.querySelector('.lbPassword').value;
-
-                            if (!username || !password) {
-                                testStatus.innerHTML = '<span class="c-red">Enter username and password first</span>';
-                                return;
-                            }
-
-                            testBtn.disabled = true;
-                            testStatus.innerHTML = '<span class="c-muted" style="opacity:0.7;">Connecting to Letterboxd...</span>';
-
-                            self.apiPost('Jellyfin.Plugin.LetterboxdSync/TestConnection', {
-                                letterboxdUsername: username,
-                                letterboxdPassword: password,
-                                rawCookies: entry.querySelector('.rawCookies').value || null,
-                                userAgent: entry.querySelector('.userAgent').value || null
-                            })
-                            .then(function (r) { return r.json(); })
-                            .then(function (data) {
-                                testBtn.disabled = false;
-                                if (data.success) {
-                                    testStatus.innerHTML = '<span class="c-green">Connected as ' + data.letterboxdUsername + '</span>';
-                                } else {
-                                    var msg = data.error || 'Connection failed';
-                                    if (msg.indexOf('403') >= 0 || msg.indexOf('Cloudflare') >= 0) {
-                                        msg = 'Blocked by Cloudflare. Try adding Raw Cookies with cf_clearance.';
-                                    }
-                                    testStatus.innerHTML = '<span class="c-red">' + msg + '</span>';
-                                }
-                            })
-                            .catch(function (err) {
-                                testBtn.disabled = false;
-                                testStatus.innerHTML = '<span class="c-red">Error: ' + err.message + '</span>';
-                            });
-                        },
-
-                        dashboardSource: 'letterboxd',
-                        szBase: function () {
-                            return this.dashboardSource === 'serializd'
-                                ? 'Jellyfin.Plugin.LetterboxdSync/Serializd'
-                                : 'Jellyfin.Plugin.LetterboxdSync';
-                        },
-                        switchDashboardSource: function (source) {
-                            this.dashboardSource = source;
-                            document.querySelectorAll('#dashSourceToggle button').forEach(function (b) {
-                                b.className = 'lb-btn ' + (b.getAttribute('data-source') === source ? 'lb-btn-primary' : 'lb-btn-secondary');
-                            });
-                            document.getElementById('historyTitleHeader').textContent = source === 'serializd' ? 'Show' : 'Film';
-                            document.getElementById('syncStatus').textContent = '';
-                            this.loadStats();
-                            this.loadHistory(true);
-                        },
-
-                        szAccountHtml: function () {
-                            return '<div class="account-entry lb-account" style="border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1em;margin-bottom:1em;">'
-                                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5em;"><h4 style="margin:0;">Serializd Account</h4>'
-                                + '<button type="button" class="lb-btn lb-btn-danger removeSzBtn">Remove</button></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Email or Username</label><input type="text" class="szEmail" placeholder="you@example.com or username" /></div>'
-                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Password</label><input type="password" class="szPassword" /></div>'
-                                + '<div class="lb-checks">'
-                                + '<label><input type="checkbox" class="szEnabled" /> Enabled</label>'
-                                + '<label><input type="checkbox" class="szSyncFavorites" /> Mark favourites as liked</label>'
-                                + '<label><input type="checkbox" class="szEnableDateFilter" /> Only sync recently played</label>'
-                                + '<label><input type="checkbox" class="szIsPrimary" /> Primary account</label>'
-                                + '<label><input type="checkbox" class="szSyncWatchlist" /> Mirror watchlist as collection + playlist</label>'
-                                + '<label><input type="checkbox" class="szAutoRequestWatchlist" /> Auto-request unmatched shows via Seerr</label>'
-                                + '<label><input type="checkbox" class="szSkipPreviouslySynced" /> Skip episodes already synced</label>'
-                                + '<label><input type="checkbox" class="szStopOnFailure" /> Stop on first failure</label>'
-                                + '<label><input type="checkbox" class="szEnableDiaryImport" /> Import Serializd diary as watched</label>'
-                                + '</div>'
-                                + '<div class="szDateDaysRow" style="display:none;margin-top:0.5em;"><label class="lb-field">Days to look back</label><input type="number" class="szDateFilterDays" min="1" max="365" value="7" /></div>'
-                                + '<div style="display:flex;gap:0.7em;align-items:center;margin-top:0.6em;"><button type="button" class="lb-btn lb-btn-secondary verifySzBtn">Verify login</button><span class="szVerifyStatus c-muted" style="font-size:0.85em;"></span></div>'
-                                + '</div>';
-                        },
-                        addSerializdAccount: function (a) {
-                            var self = this;
-                            var c = document.getElementById('szAccountsList');
-                            c.insertAdjacentHTML('beforeend', this.szAccountHtml());
-                            var e = c.lastElementChild;
-                            if (a) {
-                                e.querySelector('.szEmail').value = a.email || '';
-                                e.querySelector('.szPassword').value = a.password || '';
-                                e.querySelector('.szEnabled').checked = a.enabled !== false;
-                                e.querySelector('.szSyncFavorites').checked = a.syncFavorites === true;
-                                e.querySelector('.szEnableDateFilter').checked = a.enableDateFilter === true;
-                                e.querySelector('.szDateFilterDays').value = a.dateFilterDays || 7;
-                                e.querySelector('.szIsPrimary').checked = a.isPrimary === true;
-                                e.querySelector('.szSyncWatchlist').checked = a.syncWatchlist === true;
-                                e.querySelector('.szAutoRequestWatchlist').checked = a.autoRequestWatchlist === true;
-                                e.querySelector('.szSkipPreviouslySynced').checked = a.skipPreviouslySynced !== false;
-                                e.querySelector('.szStopOnFailure').checked = a.stopOnFailure === true;
-                                e.querySelector('.szEnableDiaryImport').checked = a.enableDiaryImport === true;
-                                if (a.enableDateFilter) e.querySelector('.szDateDaysRow').style.display = '';
-                            } else {
-                                e.querySelector('.szEnabled').checked = true;
-                                e.querySelector('.szSkipPreviouslySynced').checked = true;
-                            }
-                            e.querySelector('.szEnableDateFilter').addEventListener('change', function () { e.querySelector('.szDateDaysRow').style.display = this.checked ? '' : 'none'; });
-                            e.querySelector('.removeSzBtn').addEventListener('click', function () { e.remove(); });
-                            e.querySelector('.verifySzBtn').addEventListener('click', function () { self.verifySerializd(e); });
-                        },
-                        loadSerializdAccounts: function () {
-                            var self = this;
-                            self.apiFetch('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts')
-                            .then(function (r) { return r.json(); })
-                            .then(function (data) {
-                                var list = document.getElementById('szAccountsList'); list.innerHTML = '';
-                                var accounts = (data && data.accounts) || [];
-                                accounts.forEach(function (a) { self.addSerializdAccount(a); });
-                                if (accounts.length === 0) self.addSerializdAccount(null);
-                            }).catch(function () {});
-                        },
-                        collectSerializdAccounts: function () {
-                            var accounts = [];
-                            document.querySelectorAll('#szAccountsList .account-entry').forEach(function (e) {
-                                accounts.push({
-                                    email: e.querySelector('.szEmail').value.trim(),
-                                    password: e.querySelector('.szPassword').value,
-                                    enabled: e.querySelector('.szEnabled').checked,
-                                    syncFavorites: e.querySelector('.szSyncFavorites').checked,
-                                    enableDateFilter: e.querySelector('.szEnableDateFilter').checked,
-                                    dateFilterDays: parseInt(e.querySelector('.szDateFilterDays').value, 10) || 7,
-                                    isPrimary: e.querySelector('.szIsPrimary').checked,
-                                    syncWatchlist: e.querySelector('.szSyncWatchlist').checked,
-                                    autoRequestWatchlist: e.querySelector('.szAutoRequestWatchlist').checked,
-                                    skipPreviouslySynced: e.querySelector('.szSkipPreviouslySynced').checked,
-                                    stopOnFailure: e.querySelector('.szStopOnFailure').checked,
-                                    enableDiaryImport: e.querySelector('.szEnableDiaryImport').checked
-                                });
-                            });
-                            return accounts;
-                        },
-                        saveSerializdAccounts: function () {
-                            var self = this;
-                            var btn = document.getElementById('saveSzBtn'); var status = document.getElementById('saveSzStatus');
-                            var accounts = self.collectSerializdAccounts();
-                            for (var i = 0; i < accounts.length; i++) { if (!accounts[i].email) { status.innerHTML = '<span class="c-red">Account #' + (i + 1) + ' is missing an email/username</span>'; return; } }
-                            btn.disabled = true; status.textContent = 'Saving...';
-                            self.apiPut('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: accounts })
-                            .then(function (r) {
-                                btn.disabled = false;
-                                if (r.ok) { status.innerHTML = '<span class="c-green">Saved.</span>'; }
-                                else { r.json().then(function (d) { status.innerHTML = '<span class="c-red">' + (d.error || 'Save failed') + '</span>'; }); }
-                            }).catch(function (err) { btn.disabled = false; status.innerHTML = '<span class="c-red">Error: ' + err.message + '</span>'; });
-                        },
-                        verifySerializd: function (entry) {
-                            var self = this;
-                            var email = entry.querySelector('.szEmail').value.trim();
-                            var password = entry.querySelector('.szPassword').value;
-                            var st = entry.querySelector('.szVerifyStatus');
-                            if (!email || !password) { st.innerHTML = '<span class="c-red">Email and password required.</span>'; return; }
-                            st.innerHTML = '<span class="c-muted">Verifying...</span>';
-                            self.apiPost('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: password })
-                            .then(function (r) {
-                                if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="c-green">Login OK' + (d.username ? ' (' + d.username + ')' : '') + '. Remember to Save.</span>'; }); }
-                                else { st.innerHTML = '<span class="c-red">Login failed. Check email and password.</span>'; }
-                            }).catch(function () { st.innerHTML = '<span class="c-red">Login failed.</span>'; });
-                        },
-
-                        loadStats: function () {
-                            this.apiFetch(this.szBase() + '/Stats')
-                            .then(function (r) { return r.json(); })
-                            .then(function (s) {
-                                document.getElementById('statTotal').textContent = s.total;
-                                document.getElementById('statSuccess').textContent = s.success;
-                                document.getElementById('statRewatches').textContent = s.rewatches;
-                                document.getElementById('statSkipped').textContent = s.skipped;
-                                document.getElementById('statFailed').textContent = s.failed;
-                            }).catch(function () {});
-                        },
-
-                        loadHistory: function (resetToFirstPage) {
-                            var self = this;
-                            if (resetToFirstPage) self.historyOffset = 0;
-                            var url = self.szBase() + '/History?count=' + self.historyPageSize + '&offset=' + self.historyOffset;
-                            this.apiFetch(url)
-                            .then(function (r) { return r.json(); })
-                            .then(function (resp) {
-                                // Backwards-compat: pre-1.9.1 returned a bare array.
-                                var events = (resp && resp.events) ? resp.events : (Array.isArray(resp) ? resp : []);
-                                self.historyTotal = (resp && typeof resp.total === 'number') ? resp.total : events.length;
-                                self.renderPaginator();
-                                var tbody = document.getElementById('historyBody');
-                                tbody.innerHTML = '';
-                                if (events.length === 0) {
-                                    tbody.innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="c-muted">No sync activity yet.</td></tr>';
-                                    return;
-                                }
-                                events.forEach(function (e) {
-                                    var tr = document.createElement('tr');
-                                    var s = typeof e.Status === 'string' ? e.Status : ['Success','Skipped','Failed','Rewatch'][e.Status] || 'Unknown';
-                                    var statusMap = { Success: {color:'#00e054', label:'Synced'}, Skipped: {color:'', label:'Skipped'}, Failed: {color:'#e74c3c', label:'Failed'}, Rewatch: {color:'#40bcf4', label:'Rewatch'} };
-                                    var sm = statusMap[s] || {color:'', label:s};
-                                    var link = e.FilmSlug ? '<a href="https://letterboxd.com/film/' + e.FilmSlug + '/" target="_blank" class="lb-link">' + e.FilmTitle + '</a>' : e.FilmTitle;
-                                    var ts = new Date(e.Timestamp);
-                                    var time = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-                                    var canReview = (s === 'Success' || s === 'Rewatch' || s === 'Skipped');
-                                    var btn = (e.FilmSlug && canReview) ? '<button type="button" onclick="LBUser.openReview(\'' + e.FilmSlug + '\',\'' + e.FilmTitle.replace(/'/g, "\\'") + '\',' + (e.TmdbId || 0) + ')" class="lb-btn lb-btn-review">Review</button>' : '';
-                                    var errText = '';
-                                    if (s === 'Failed' && e.Error) {
-                                        var shortErr = e.Error;
-                                        if (shortErr.indexOf('403') >= 0 || shortErr.indexOf('Just a moment') >= 0) shortErr = 'Blocked by Cloudflare. Refresh your Raw Cookies.';
-                                        else if (shortErr.length > 150) shortErr = shortErr.substring(0, 150) + '...';
-                                        errText = ' title="' + shortErr.replace(/"/g, '&quot;') + '"';
-                                    }
-                                    var scStyle = sm.color ? ' style="color:' + sm.color + ';"' : ' class="c-muted"';
-                                    var failIcon = (s === 'Failed' && errText) ? ' <span style="cursor:help;opacity:0.7;"' + errText + '>&#9432;</span>' : '';
-                                    tr.innerHTML = '<td style="padding:0.5em;">' + link + '</td>'
-                                        + '<td style="padding:0.5em;"><span' + scStyle + '>' + sm.label + '</span>' + failIcon + '</td>'
-                                        + '<td style="padding:0.5em;" class="c-muted">' + (e.Source || '') + '</td>'
-                                        + '<td style="padding:0.5em;" class="c-muted">' + time + '</td>'
-                                        + '<td style="padding:0.5em;">' + btn + '</td>';
-                                    tbody.appendChild(tr);
-                                });
-                            }).catch(function () {});
-                        },
-
-                        renderPaginator: function () {
-                            var pager = document.getElementById('historyPagination');
-                            if (!pager) return;
-                            if (this.historyTotal <= this.historyPageSize) { pager.style.display = 'none'; return; }
-                            pager.style.display = 'flex';
-                            var totalPages = Math.max(1, Math.ceil(this.historyTotal / this.historyPageSize));
-                            var currentPage = Math.floor(this.historyOffset / this.historyPageSize) + 1;
-                            document.getElementById('historyPageInfo').textContent =
-                                'Page ' + currentPage + ' of ' + totalPages + ' (' + this.historyTotal + ' entries)';
-                            document.getElementById('historyFirst').disabled = currentPage === 1;
-                            document.getElementById('historyPrev').disabled = currentPage === 1;
-                            document.getElementById('historyNext').disabled = currentPage === totalPages;
-                            document.getElementById('historyLast').disabled = currentPage === totalPages;
-                        },
-
-                        gotoHistoryPage: function (page) {
-                            var totalPages = Math.max(1, Math.ceil(this.historyTotal / this.historyPageSize));
-                            var clamped = Math.min(Math.max(page, 1), totalPages);
-                            this.historyOffset = (clamped - 1) * this.historyPageSize;
-                            this.loadHistory(false);
-                        },
-
-                        setSyncButtons: function (disabled) {
-                            document.getElementById('runSyncBtn').disabled = disabled;
-                            var wl = document.getElementById('runWatchlistSyncBtn');
-                            if (wl) wl.disabled = disabled;
-                        },
-
-                        pollProgress: function () {
-                            var self = this;
-                            if (self.syncPoll) clearInterval(self.syncPoll);
-                            self.syncPoll = setInterval(function () {
-                                self.apiFetch('Jellyfin.Plugin.LetterboxdSync/Progress')
-                                .then(function (r) { return r.json(); })
-                                .then(function (p) {
-                                    if (!p || !p.isRunning) {
-                                        clearInterval(self.syncPoll);
-                                        self.syncPoll = null;
-                                        self.setSyncButtons(false);
-                                        document.getElementById('syncStatus').innerHTML = '<span class="c-green">Done!</span>';
-                                        document.getElementById('syncProgressBar').style.display = 'none';
-                                        self.loadStats();
-                                        self.loadHistory();
-                                        return;
-                                    }
-                                    document.getElementById('syncProgressBar').style.display = 'block';
-                                    var detail = '';
-                                    if (p.totalItems > 0) {
-                                        var pct = Math.round((p.processedItems / p.totalItems) * 100);
-                                        document.getElementById('progressFill').style.width = pct + '%';
-                                        detail = p.processedItems + '/' + p.totalItems + ' films';
-                                    } else if (p.processedItems > 0) {
-                                        detail = p.processedItems + ' films resolved';
-                                    }
-                                    if (p.cacheHits > 0) detail += ' (' + p.cacheHits + ' cached)';
-                                    var elapsed = p.elapsedSeconds || 0;
-                                    var mins = Math.floor(elapsed / 60);
-                                    var secs = elapsed % 60;
-                                    var timeStr = mins > 0 ? mins + 'm ' + secs + 's' : secs + 's';
-                                    document.getElementById('syncStatus').innerHTML = '<span class="c-green">' + (p.phase || '') + '</span>';
-                                    document.getElementById('progressDetail').textContent = detail + ' \u2022 ' + timeStr;
-                                }).catch(function () {});
-                            }, 3000);
-                        },
-
-                        runSync: function () {
-                            var self = this;
-                            if (self.dashboardSource === 'serializd') {
-                                self.setSyncButtons(true);
-                                document.getElementById('syncStatus').textContent = 'Starting TV sync...';
-                                self.apiPost('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow', {})
-                                .then(function (r) {
-                                    self.setSyncButtons(false);
-                                    if (r.ok) { document.getElementById('syncStatus').innerHTML = '<span class="c-green">Syncing TV to Serializd in the background...</span>'; setTimeout(function () { self.loadStats(); self.loadHistory(); }, 5000); }
-                                    else { r.json().then(function (d) { document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + (d.error || 'Failed to start') + '</span>'; }); }
-                                }).catch(function () { self.setSyncButtons(false); });
-                                return;
-                            }
-                            self.setSyncButtons(true);
-                            document.getElementById('syncStatus').textContent = 'Starting...';
-
-                            self.apiPost('Jellyfin.Plugin.LetterboxdSync/Sync', {})
-                            .then(function (r) {
-                                if (r.status === 409) {
-                                    document.getElementById('syncStatus').innerHTML = '<span class="c-blue">Sync already running, polling...</span>';
-                                    self.pollProgress();
-                                    return;
-                                }
-                                if (!r.ok) {
-                                    return r.json().then(function (data) {
-                                        document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + (data.error || 'Failed to start sync') + '</span>';
-                                        self.setSyncButtons(false);
-                                    });
-                                }
-                                document.getElementById('syncStatus').innerHTML = '<span class="c-green">Syncing...</span>';
-                                self.pollProgress();
-                            }).catch(function (err) {
-                                document.getElementById('syncStatus').innerHTML = '<span class="c-red">Error: ' + err.message + '</span>';
-                                self.setSyncButtons(false);
-                            });
-                        },
-
-                        runWatchlistSync: function () {
-                            var self = this;
-                            if (self.dashboardSource === 'serializd') {
-                                self.setSyncButtons(true);
-                                document.getElementById('syncStatus').textContent = 'Starting watchlist sync...';
-                                self.apiPost('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow', {})
-                                .then(function (r) {
-                                    self.setSyncButtons(false);
-                                    if (r.ok) { document.getElementById('syncStatus').innerHTML = '<span class="c-green">Mirroring your Serializd watchlist...</span>'; }
-                                    else { r.json().then(function (d) { document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + (d.error || 'Failed to start') + '</span>'; }); }
-                                }).catch(function () { self.setSyncButtons(false); });
-                                return;
-                            }
-                            self.setSyncButtons(true);
-                            document.getElementById('syncStatus').textContent = 'Starting watchlist sync...';
-
-                            self.apiPost('Jellyfin.Plugin.LetterboxdSync/SyncWatchlist', {})
-                            .then(function (r) {
-                                if (r.status === 409) {
-                                    document.getElementById('syncStatus').innerHTML = '<span class="c-blue">Sync already running, polling...</span>';
-                                    self.pollProgress();
-                                    return;
-                                }
-                                if (!r.ok) {
-                                    return r.json().then(function (data) {
-                                        document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + (data.error || 'Failed to start watchlist sync') + '</span>';
-                                        self.setSyncButtons(false);
-                                    });
-                                }
-                                document.getElementById('syncStatus').innerHTML = '<span class="c-green">Syncing watchlist...</span>';
-                                self.pollProgress();
-                            }).catch(function (err) {
-                                document.getElementById('syncStatus').innerHTML = '<span class="c-red">Error: ' + err.message + '</span>';
-                                self.setSyncButtons(false);
-                            });
-                        },
-
-                        openReview: function (slug, title, tmdbId) {
-                            this.currentSlug = slug;
-                            this.currentTmdbId = tmdbId || 0;
-                            document.getElementById('reviewTitle').textContent = 'Review: ' + title;
-                            document.getElementById('reviewText').value = '';
-                            document.getElementById('reviewSpoilers').checked = false;
-                            document.getElementById('reviewRewatch').checked = false;
-                            document.getElementById('rewatchDateRow').style.display = 'none';
-                            document.getElementById('reviewDate').value = new Date().toISOString().split('T')[0];
-                            document.getElementById('reviewRating').value = '';
-                            document.getElementById('ratingLabel').textContent = 'No rating';
-                            document.querySelectorAll('#starRating span').forEach(function (s) { s.classList.remove('filled'); s.innerHTML = '&#9734;'; });
-                            document.getElementById('reviewStatus').textContent = '';
-                            this.populateReviewAccountDropdown();
-                            document.getElementById('reviewModal').style.display = 'block';
-                        },
-
-                        // Show the "Post as" row only when the current Jellyfin user has more than
-                        // one enabled Letterboxd account. The empty-value first option fans out to
-                        // every account; named options post to that one only. Primary first so it
-                        // matches the ordering in the rest of the UI.
-                        populateReviewAccountDropdown: function () {
-                            var sel = document.getElementById('reviewAccount');
-                            var row = document.getElementById('reviewAccountRow');
-                            if (!sel || !row) return;
-                            sel.innerHTML = '<option value="">All my Letterboxd accounts</option>';
-
-                            this.apiFetch('Jellyfin.Plugin.LetterboxdSync/Accounts')
-                            .then(function (r) { return r.json(); })
-                            .then(function (data) {
-                                var mine = ((data && data.accounts) || []).filter(function (a) { return a.enabled; });
-                                mine.sort(function (a, b) {
-                                    return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
-                                });
-                                mine.forEach(function (a) {
-                                    var label = a.letterboxdUsername + (a.isPrimary ? ' (primary)' : '');
-                                    sel.insertAdjacentHTML('beforeend',
-                                        '<option value="' + (a.letterboxdUsername || '').replace(/"/g, '&quot;') + '">' + label + '</option>');
-                                });
-                                row.style.display = mine.length >= 2 ? '' : 'none';
-                            })
-                            .catch(function () { row.style.display = 'none'; });
-                        },
-
-                        submitReview: function () {
-                            var self = this;
-                            var text = document.getElementById('reviewText').value.trim();
-                            var isRewatch = document.getElementById('reviewRewatch').checked;
-                            var date = document.getElementById('reviewDate').value;
-
-                            if (!text && !isRewatch) { document.getElementById('reviewStatus').textContent = 'Write a review or mark as rewatch.'; return; }
-
-                            document.getElementById('reviewStatus').textContent = 'Posting...';
-                            document.getElementById('reviewSubmit').disabled = true;
-
-                            var ratingVal = document.getElementById('reviewRating').value;
-                            var rating = ratingVal ? parseFloat(ratingVal) : null;
-
-                            // Empty string means fan out to every linked account; a username
-                            // restricts the post to that one account only.
-                            var lbUser = (document.getElementById('reviewAccount').value || '').trim();
-
-                            self.apiPost('Jellyfin.Plugin.LetterboxdSync/Review', {
-                                filmSlug: self.currentSlug,
-                                tmdbId: self.currentTmdbId || null,
-                                reviewText: text || null,
-                                containsSpoilers: document.getElementById('reviewSpoilers').checked,
-                                isRewatch: isRewatch,
-                                date: isRewatch && date ? date : null,
-                                rating: rating,
-                                letterboxdUsername: lbUser || null
-                            })
-                            .then(function (r) { return r.json(); })
-                            .then(function (data) {
-                                document.getElementById('reviewSubmit').disabled = false;
-                                if (data.success) {
-                                    var msg = isRewatch ? 'Rewatch logged!' : 'Review posted!';
-                                    document.getElementById('reviewStatus').innerHTML = '<span class="c-green">' + msg + '</span>';
-                                    self.loadStats();
-                                    self.loadHistory();
-                                    setTimeout(function () { document.getElementById('reviewModal').style.display = 'none'; }, 1500);
-                                } else {
-                                    var errMsg = data.error || 'Failed to post';
-                                    if (errMsg.indexOf('403') >= 0 || errMsg.indexOf('Cloudflare') >= 0) {
-                                        errMsg = 'Blocked by Cloudflare. Try refreshing your Raw Cookies.';
-                                    }
-                                    document.getElementById('reviewStatus').innerHTML = '<span class="c-red">' + errMsg + '</span>';
-                                }
-                            })
-                            .catch(function (err) {
-                                document.getElementById('reviewSubmit').disabled = false;
-                                document.getElementById('reviewStatus').innerHTML = '<span class="c-red">Error: ' + err.message + '</span>';
-                            });
-                        },
+                        get: function (path) { return fetch(this.serverUrl + '/' + path, { headers: { 'Authorization': 'MediaBrowser Token="' + this.token + '"' } }); },
+                        post: function (path, body) { return fetch(this.serverUrl + '/' + path, { method: 'POST', headers: { 'Authorization': 'MediaBrowser Token="' + this.token + '"', 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); },
+                        put: function (path, body) { return fetch(this.serverUrl + '/' + path, { method: 'PUT', headers: { 'Authorization': 'MediaBrowser Token="' + this.token + '"', 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }); },
 
                         init: function () {
                             var self = this;
-                            self.initTabs();
-
-                            // Show admin-only links to admins; sync controls are available to all users
-                            self.apiFetch('Users/Me')
-                            .then(function (r) { return r.json(); })
-                            .then(function (user) {
-                                if (user.Policy && user.Policy.IsAdministrator) {
-                                    self.isAdmin = true;
-                                    document.getElementById('adminLink').style.display = '';
-                                }
-                            }).catch(function () {});
-
-                            // If a sync is already running (started by anyone), pick up polling
-                            self.apiFetch('Jellyfin.Plugin.LetterboxdSync/Progress')
-                            .then(function (r) { return r.json(); })
-                            .then(function (p) {
-                                if (p && p.isRunning) {
-                                    self.setSyncButtons(true);
-                                    document.getElementById('syncStatus').innerHTML = '<span class="c-green">Sync in progress...</span>';
-                                    self.pollProgress();
-                                }
-                            }).catch(function () {});
-
-                            // Load data
-                            self.loadAccount();
-                            self.loadStats();
-                            self.loadHistory();
-
-                            // Event listeners
-                            document.getElementById('saveBtn').addEventListener('click', function () { self.saveAccount(); });
-                            document.getElementById('addAccountBtn').addEventListener('click', function () { self.addAccount(null); });
-                            document.getElementById('saveSzBtn').addEventListener('click', function () { self.saveSerializdAccounts(); });
-                            document.getElementById('addSzAccountBtn').addEventListener('click', function () { self.addSerializdAccount(null); });
-                            self.loadSerializdAccounts();
-                            document.querySelectorAll('#dashSourceToggle button').forEach(function (b) {
-                                b.addEventListener('click', function () { self.switchDashboardSource(b.getAttribute('data-source')); });
-                            });
+                            if (!self.resolveAuth()) { setTimeout(function () { self.init(); }, 400); return; }
+                            self.wire();
+                            self.loadOverview();
+                            self.loadAccounts();
+                        },
+                        wire: function () {
+                            var self = this, nav = document.getElementById('wsNav');
+                            nav.addEventListener('click', function (e) { var a = e.target.closest('a[data-sec]'); if (!a) return; nav.querySelectorAll('a').forEach(function (x) { x.classList.remove('active'); }); a.classList.add('active'); var sec = a.getAttribute('data-sec'); document.querySelectorAll('.ws-view').forEach(function (v) { v.classList.toggle('show', v.getAttribute('data-sec') === sec); }); });
+                            document.getElementById('ovFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovFilter = c.getAttribute('data-f'); self.renderOverview(); });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
-                            document.getElementById('runWatchlistSyncBtn').addEventListener('click', function () { self.runWatchlistSync(); });
-                            document.getElementById('historyFirst').addEventListener('click', function () { self.gotoHistoryPage(1); });
-                            document.getElementById('historyPrev').addEventListener('click', function () { self.gotoHistoryPage(Math.floor(self.historyOffset / self.historyPageSize)); });
-                            document.getElementById('historyNext').addEventListener('click', function () { self.gotoHistoryPage(Math.floor(self.historyOffset / self.historyPageSize) + 2); });
-                            document.getElementById('historyLast').addEventListener('click', function () { self.gotoHistoryPage(Math.ceil(self.historyTotal / self.historyPageSize)); });
-                            document.getElementById('reviewCancel').addEventListener('click', function () { document.getElementById('reviewModal').style.display = 'none'; });
+                            document.getElementById('runWatchlistBtn').addEventListener('click', function () { self.runWatchlist(); });
+                            document.getElementById('mCancelBtn').addEventListener('click', function () { document.getElementById('acctModal').classList.remove('show'); });
+                            document.getElementById('mSaveBtn').addEventListener('click', function () { self.saveAccount(); });
+                            document.getElementById('mDeleteBtn').addEventListener('click', function () { self.deleteAccount(); });
+                            document.getElementById('mVerifyBtn').addEventListener('click', function () { self.verifyAccount(); });
+                            document.getElementById('mSvc').addEventListener('change', function () { self.onSvcChange(); });
+                            document.getElementById('reviewCancel').addEventListener('click', function () { document.getElementById('reviewModal').classList.remove('show'); });
                             document.getElementById('reviewSubmit').addEventListener('click', function () { self.submitReview(); });
-                            document.getElementById('reviewRewatch').addEventListener('change', function () {
-                                document.getElementById('rewatchDateRow').style.display = this.checked ? '' : 'none';
-                            });
+                            ['acctModal', 'reviewModal'].forEach(function (id) { document.getElementById(id).addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); }); });
+                            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); });
+                            document.querySelectorAll('#starRating .ws-star').forEach(function (star) { star.addEventListener('click', function () { var val = parseFloat(this.getAttribute('data-val')); document.getElementById('reviewRating').value = val; document.getElementById('ratingLabel').textContent = val + ' / 5'; document.querySelectorAll('#starRating .ws-star').forEach(function (s) { var sv = parseFloat(s.getAttribute('data-val')); s.classList.toggle('filled', sv <= val); s.innerHTML = sv <= val ? '&#9733;' : '&#9734;'; }); }); });
+                        },
 
-                            // Star rating
-                            var stars = document.querySelectorAll('#starRating span');
-                            stars.forEach(function (star) {
-                                star.addEventListener('click', function () {
-                                    var val = parseFloat(this.getAttribute('data-val'));
-                                    var current = parseFloat(document.getElementById('reviewRating').value);
-                                    if (val === current) {
-                                        document.getElementById('reviewRating').value = '';
-                                        document.getElementById('ratingLabel').textContent = 'No rating';
-                                        stars.forEach(function (s) { s.classList.remove('filled'); s.innerHTML = '&#9734;'; });
-                                        return;
-                                    }
-                                    document.getElementById('reviewRating').value = val;
-                                    document.getElementById('ratingLabel').textContent = val + ' / 5';
-                                    stars.forEach(function (s) {
-                                        var sv = parseFloat(s.getAttribute('data-val'));
-                                        if (sv <= val) { s.classList.add('filled'); s.innerHTML = '&#9733;'; }
-                                        else { s.classList.remove('filled'); s.innerHTML = '&#9734;'; }
-                                    });
+                        loadOverview: function () {
+                            var self = this, LB = 'Jellyfin.Plugin.LetterboxdSync', SZ = 'Jellyfin.Plugin.LetterboxdSync/Serializd';
+                            Promise.all([self.get(LB + '/Stats'), self.get(SZ + '/Stats'), self.get(LB + '/History?count=60&offset=0'), self.get(SZ + '/History?count=60&offset=0')].map(function (p) { return p.then(function (r) { return r.json(); }).catch(function () { return {}; }); }))
+                                .then(function (res) {
+                                    var fs = res[0] || {}, ts = res[1] || {};
+                                    document.getElementById('statFilm').textContent = fs.total || 0;
+                                    document.getElementById('statTv').textContent = ts.total || 0;
+                                    document.getElementById('statSynced').textContent = (fs.success || 0) + (ts.success || 0);
+                                    document.getElementById('statRewatches').textContent = (fs.rewatches || 0) + (ts.rewatches || 0);
+                                    document.getElementById('statFailed').textContent = (fs.failed || 0) + (ts.failed || 0);
+                                    var fe = ((res[2] && res[2].events) || []).map(function (e) { e._svc = 'letterboxd'; return e; });
+                                    var te = ((res[3] && res[3].events) || []).map(function (e) { e._svc = 'serializd'; return e; });
+                                    self.merged = fe.concat(te).sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
+                                    self.renderOverview();
                                 });
-                            });
+                        },
+                        renderOverview: function () {
+                            var f = this.ovFilter, list = this.merged.filter(function (e) { return f === 'all' || e._svc === f; }).slice(0, 40);
+                            if (!list.length) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">No activity yet. Link an account and start watching.</td></tr>'; return; }
+                            document.getElementById('historyBody').innerHTML = list.map(function (e) {
+                                var svc = e._svc === 'serializd' ? 'tv' : 'film';
+                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success';
+                                var title = (e.FilmTitle || '').split(' · '), t = title[0], m = title[1] || '';
+                                var ts = new Date(e.Timestamp), when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';
+                                var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" onclick="WSU.openReview(\'' + e._svc + '\',' + (e.TmdbId || 0) + ',\'' + t.replace(/'/g, "\\'") + '\',\'' + (e.FilmSlug || '') + '\')">Review</button>' : '';
+                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span><div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td><td><span class="ws-pill ' + status + '">' + status + '</span></td><td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
+                            }).join('');
+                        },
+
+                        runSync: function () {
+                            var self = this, f = self.ovFilter; document.getElementById('syncStatus').innerHTML = '<span class="ws-muted">Starting…</span>';
+                            var jobs = [];
+                            if (f === 'all' || f === 'serializd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow', {}).catch(function () {}));
+                            if (f === 'all' || f === 'letterboxd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/Sync', {}).catch(function () {}));
+                            Promise.all(jobs).then(function () { document.getElementById('syncStatus').innerHTML = '<span class="ws-green">Syncing in the background…</span>'; setTimeout(function () { self.loadOverview(); }, 6000); });
+                        },
+                        runWatchlist: function () {
+                            var self = this, f = self.ovFilter; document.getElementById('syncStatus').innerHTML = '<span class="ws-muted">Starting watchlist sync…</span>';
+                            var jobs = [];
+                            if (f === 'all' || f === 'serializd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow', {}).catch(function () {}));
+                            if (f === 'all' || f === 'letterboxd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/SyncWatchlist', {}).catch(function () {}));
+                            Promise.all(jobs).then(function () { document.getElementById('syncStatus').innerHTML = '<span class="ws-green">Syncing watchlists…</span>'; });
+                        },
+
+                        /* ===== Accounts ===== */
+                        loadAccounts: function () {
+                            var self = this;
+                            Promise.all([self.get('Jellyfin.Plugin.LetterboxdSync/Accounts').then(function (r) { return r.json(); }).catch(function () { return { accounts: [] }; }),
+                                self.get('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts').then(function (r) { return r.json(); }).catch(function () { return { accounts: [] }; })])
+                                .then(function (res) { self.lb = (res[0] && res[0].accounts) || []; self.sz = (res[1] && res[1].accounts) || []; self.renderAccounts(); });
+                        },
+                        feat: function (l, on) { return '<span class="ws-feat ' + (on ? 'on' : '') + '">' + l + '</span>'; },
+                        renderAccounts: function () {
+                            var self = this, cards = '';
+                            self.sz.forEach(function (a, i) { cards += self.card('serializd', a, i); });
+                            self.lb.forEach(function (a, i) { cards += self.card('letterboxd', a, i); });
+                            cards += '<button type="button" class="ws-add" onclick="WSU.openAccount(null)"><span class="plus">+</span>Link a diary<span class="ws-label">Film or TV</span></button>';
+                            document.getElementById('acctGrid').innerHTML = cards;
+                        },
+                        card: function (svc, a, i) {
+                            var self = this, uname = svc === 'serializd' ? (a.email || '?') : (a.letterboxdUsername || '?');
+                            var feats = svc === 'serializd'
+                                ? [['Favourites', a.syncFavorites], ['Watchlist', a.syncWatchlist], ['Seerr', a.autoRequestWatchlist], ['Import', a.enableDiaryImport]]
+                                : [['Favourites', a.syncFavorites], ['Watchlist', a.enableWatchlistSync], ['Seerr', a.autoRequestWatchlist], ['Cookies', !!a.rawCookies]];
+                            var chips = feats.map(function (f) { return self.feat(f[0], f[1]); }).join('');
+                            return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '"><div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'FL') + '</span><div style="min-width:0;"><div class="u">' + uname + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' + (a.isPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div><div class="ws-featchips">' + chips + '</div><div class="foot"><span class="st">' + (a.enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>') + '</span><button type="button" class="ws-linkbtn" onclick="WSU.openAccount({svc:\'' + svc + '\',i:' + i + '})">Edit ›</button></div></div>';
+                        },
+                        checksFor: function (svc, a) {
+                            a = a || {};
+                            var rows = [['Enabled', 'chkEnabled', a.enabled !== false, 'Master switch for this account.'],
+                                ['Mark favourites as liked', 'chkFav', !!a.syncFavorites, 'Favourite in Jellyfin → hearted on the diary.'],
+                                ['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
+                                ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
+                                ['Mirror watchlist', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist.' : 'playlist.')],
+                                ['Auto-request via Seerr', 'chkSeerr', !!a.autoRequestWatchlist, 'Missing from the library → request via Seerr.'],
+                                ['Skip already-synced', 'chkSkip', a.skipPreviouslySynced !== false, 'Avoid re-logging via local history.'],
+                                ['Stop on first failure', 'chkStop', !!a.stopOnFailure, 'Halt on the first error.'],
+                                ['Import diary as watched', 'chkImport', !!a.enableDiaryImport, 'Mark Jellyfin played from the diary.']];
+                            return rows.map(function (r) { return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>'; }).join('') +
+                                '<div class="ws-row" id="dateDaysRow" style="display:' + (a.enableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.dateFilterDays || 7) + '" /></div>';
+                        },
+                        onSvcChange: function () { var svc = document.getElementById('mSvc').value; document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; document.getElementById('mCookieRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; },
+                        openAccount: function (ref) {
+                            var self = this, svc = ref ? ref.svc : 'serializd', a = null;
+                            if (ref) a = (svc === 'serializd' ? self.sz : self.lb)[ref.i];
+                            self.editing = ref ? { svc: svc, i: ref.i } : null;
+                            document.getElementById('acctModalTitle').textContent = a ? 'Edit account' : 'Link a diary';
+                            document.getElementById('mSvc').value = svc; document.getElementById('mSvc').disabled = !!a;
+                            document.getElementById('mUsername').value = a ? (svc === 'serializd' ? a.email : a.letterboxdUsername) : '';
+                            document.getElementById('mPassword').value = a ? (svc === 'serializd' ? (a.password || '') : (a.letterboxdPassword || '')) : '';
+                            document.getElementById('mCookies').value = (a && a.rawCookies) || '';
+                            document.getElementById('mVerifyStatus').textContent = ''; document.getElementById('mStatus').textContent = '';
+                            document.getElementById('mDeleteBtn').style.display = a ? '' : 'none';
+                            document.getElementById('mChecks').innerHTML = self.checksFor(svc, a);
+                            document.getElementById('chkDate').addEventListener('change', function () { document.getElementById('dateDaysRow').style.display = this.checked ? 'block' : 'none'; });
+                            self.onSvcChange();
+                            document.getElementById('acctModal').classList.add('show');
+                        },
+                        collectModal: function () {
+                            var g = function (id) { return document.getElementById(id); };
+                            return { svc: g('mSvc').value, username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mCookies').value,
+                                enabled: g('chkEnabled').checked, fav: g('chkFav').checked, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
+                                primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked };
+                        },
+                        saveAccount: function () {
+                            var self = this, m = self.collectModal();
+                            if (!m.username) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Username/email is required.</span>'; return; }
+                            document.getElementById('mStatus').textContent = 'Saving…';
+                            if (m.svc === 'serializd') {
+                                var item = { email: m.username, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp };
+                                if (self.editing) self.sz[self.editing.i] = item; else self.sz.push(item);
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function (r) { self.afterSave(r); });
+                            } else {
+                                var itemL = { letterboxdUsername: m.username, letterboxdPassword: m.password, rawCookies: m.cookies || null, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp };
+                                if (self.editing) self.lb[self.editing.i] = itemL; else self.lb.push(itemL);
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function (r) { self.afterSave(r); });
+                            }
+                        },
+                        afterSave: function (r) {
+                            var self = this;
+                            if (r.ok) { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); document.getElementById('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>'; }
+                            else { r.json().then(function (d) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">' + (d.error || 'Save failed') + '</span>'; }); }
+                        },
+                        deleteAccount: function () {
+                            var self = this; if (!self.editing) return;
+                            if (self.editing.svc === 'serializd') { self.sz.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); }); }
+                            else { self.lb.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); }); }
+                        },
+                        verifyAccount: function () {
+                            var svc = document.getElementById('mSvc').value, st = document.getElementById('mVerifyStatus');
+                            if (svc !== 'serializd') { st.innerHTML = '<span class="ws-muted">Verify is available for Serializd; Letterboxd is checked on first sync.</span>'; return; }
+                            var email = document.getElementById('mUsername').value.trim(), pw = document.getElementById('mPassword').value;
+                            if (!email || !pw) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
+                            st.innerHTML = '<span class="ws-muted">Verifying…</span>';
+                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + d.username + ')' : '') + '.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
+                        },
+
+                        openReview: function (svc, tmdbId, title, slug) {
+                            this.reviewSvc = svc; this.reviewTmdb = tmdbId; this.reviewSlug = slug || '';
+                            document.getElementById('reviewTitle').textContent = 'Review: ' + title;
+                            document.getElementById('reviewText').value = ''; document.getElementById('reviewSpoilers').checked = false;
+                            document.getElementById('reviewRating').value = ''; document.getElementById('ratingLabel').textContent = 'No rating';
+                            document.querySelectorAll('#starRating .ws-star').forEach(function (s) { s.classList.remove('filled'); s.innerHTML = '&#9734;'; });
+                            document.getElementById('reviewStatus').textContent = '';
+                            document.getElementById('reviewModal').classList.add('show');
+                        },
+                        submitReview: function () {
+                            var self = this, text = document.getElementById('reviewText').value.trim();
+                            var rv = document.getElementById('reviewRating').value, rating = rv ? parseFloat(rv) : null;
+                            if (!text && !rating) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Write a review or set a rating.</span>'; return; }
+                            document.getElementById('reviewStatus').textContent = 'Posting…';
+                            var url, body;
+                            if (self.reviewSvc === 'serializd') { url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review'; body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked }; }
+                            else { url = 'Jellyfin.Plugin.LetterboxdSync/Review'; body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, isRewatch: false, rating: rating }; }
+                            self.post(url, body).then(function (r) { if (r.ok) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-green">Review posted!</span>'; setTimeout(function () { document.getElementById('reviewModal').classList.remove('show'); }, 1200); } else { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Failed to post.</span>'; } });
                         }
                     };
-
-                    if (LBUser.resolveAuth()) {
-                        LBUser.init();
-                    } else {
-                        console.error('[LetterboxdSync] Could not resolve auth');
-                    }
+                    window.WSU = U;
+                    U.init();
+                })();
                 </script>
-
             </div>
         </div>
     </div>
