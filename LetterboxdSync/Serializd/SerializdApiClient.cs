@@ -28,6 +28,9 @@ public class SerializdApiClient : ISerializdService
     private string _password = string.Empty;
     private string _token = string.Empty;
 
+    /// <summary>Serializd username returned by the most recent fresh login (null when a cached token was reused).</summary>
+    public string? Username { get; private set; }
+
     // Token reuse across sync events within a process. Keyed by email. Serializd
     // does not advertise a token TTL, so we trust a cached token until a 401, then
     // clear + re-login once (see SendAsync).
@@ -75,6 +78,19 @@ public class SerializdApiClient : ISerializdService
         await LoginAsync().ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Definitive credential check for the config-page "Verify login" button: always hits
+    /// <c>/login</c> (bypassing the token cache) and returns the Serializd username on success,
+    /// or throws on failure. Does not persist anything.
+    /// </summary>
+    internal async Task<string?> VerifyLoginAsync(string email, string password)
+    {
+        _email = email;
+        _password = password;
+        await LoginAsync().ConfigureAwait(false);
+        return Username;
+    }
+
     private async Task LoginAsync()
     {
         var body = JsonSerializer.Serialize(new Dictionary<string, object>
@@ -96,6 +112,7 @@ public class SerializdApiClient : ISerializdService
         using var doc = JsonDocument.Parse(json);
         _token = doc.RootElement.GetProperty("token").GetString()
             ?? throw new Exception("Serializd login response had no token");
+        Username = doc.RootElement.TryGetProperty("username", out var u) ? u.GetString() : null;
 
         TokenCache[_email] = _token;
         _logger.LogInformation("Authenticated with Serializd as {Email}", _email);

@@ -38,8 +38,11 @@
       reuse; a re-login after restart is one cheap call.)
 - [x] 2.2 `PluginConfiguration.SerializdAccounts[]` +
       `GetEnabledSerializdAccountsForUser(id)`.
-- [ ] 2.3 Config-page **Serializd tab** (inline `<script>`): link account
-      (email/password), enable/disable, connection test, "Sync now".
+- [x] 2.3 Config-page **Serializd tab** (inline `<script>`, generic tab switch,
+      zero change to the Letterboxd UI): add/remove account (Jellyfin user + email +
+      password + enabled), **Verify login** button → `POST /Serializd/Verify`
+      (`SerializdController`), Save persists via the standard plugin config PUT.
+      ("Sync now" deferred with the scheduled task, task 3.3.)
 - [ ] 2.4 Per-user page Serializd section + `POST …/Serializd/SyncNow`.
 - [ ] 2.5 Tests: secret round-trips encrypted + `[JsonIgnore]` doesn't echo
       ciphertext through the config-page get→mutate→put cycle.
