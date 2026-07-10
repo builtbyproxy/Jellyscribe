@@ -1000,7 +1000,14 @@
                                     var ts = new Date(e.Timestamp);
                                     var time = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
                                     var canReview = (s === 'Success' || s === 'Rewatch' || s === 'Skipped');
-                                    var btn = (e.FilmSlug && canReview) ? '<button type="button" onclick="LB.openReview(\'' + e.FilmSlug + '\',\'' + e.FilmTitle.replace(/'/g, "\\'") + '\',' + (e.TmdbId || 0) + ')" class="lb-btn lb-btn-review">Review</button>' : '';
+                                    var btn;
+                                    if (self.dashboardSource === 'serializd') {
+                                        // Review the SHOW (title is "Show · SxEy"; take the show name).
+                                        var showName = (e.FilmTitle || '').split(' · ')[0];
+                                        btn = (e.TmdbId && canReview) ? '<button type="button" onclick="LB.openReview(\'\',\'' + showName.replace(/'/g, "\\'") + '\',' + (e.TmdbId || 0) + ',\'serializd\')" class="lb-btn lb-btn-review">Review</button>' : '';
+                                    } else {
+                                        btn = (e.FilmSlug && canReview) ? '<button type="button" onclick="LB.openReview(\'' + e.FilmSlug + '\',\'' + e.FilmTitle.replace(/'/g, "\\'") + '\',' + (e.TmdbId || 0) + ')" class="lb-btn lb-btn-review">Review</button>' : '';
+                                    }
                                     var errText = '';
                                     if (s === 'Failed' && e.Error) {
                                         var shortErr = e.Error;
@@ -1185,8 +1192,9 @@
                             });
                         },
 
-                        openReview: function (slug, title, tmdbId) {
+                        openReview: function (slug, title, tmdbId, source) {
                             var self = this;
+                            this.reviewSource = source || 'letterboxd';
                             this.currentSlug = slug;
                             this.currentTmdbId = tmdbId || 0;
                             document.getElementById('reviewTitle').textContent = 'Review: ' + title;
@@ -1199,7 +1207,11 @@
                             document.getElementById('ratingLabel').textContent = 'No rating';
                             document.querySelectorAll('#starRating span').forEach(function (s) { s.classList.remove('filled'); s.innerHTML = '&#9734;'; });
                             document.getElementById('reviewStatus').textContent = '';
-                            self.populateReviewAccountDropdown();
+                            var isSz = this.reviewSource === 'serializd';
+                            // Rewatch + per-account fan-out are Letterboxd concepts; hide them for a TV show review.
+                            document.getElementById('reviewRewatch').parentElement.style.display = isSz ? 'none' : '';
+                            if (isSz) { document.getElementById('reviewAccountRow').style.display = 'none'; }
+                            else { self.populateReviewAccountDropdown(); }
                             document.getElementById('reviewModal').style.display = 'block';
                         },
 
@@ -1232,19 +1244,48 @@
                             });
                         },
 
+                        submitSerializdReview: function (text, rating) {
+                            var self = this;
+                            if (!text && !rating) { document.getElementById('reviewStatus').textContent = 'Write a review or set a rating.'; return; }
+                            document.getElementById('reviewStatus').textContent = 'Posting...';
+                            document.getElementById('reviewSubmit').disabled = true;
+                            // The star widget is 0.5-5; Serializd ratings are 1-10 (half-star = 1).
+                            var szRating = rating ? Math.round(rating * 2) : null;
+                            ApiClient.ajax({
+                                url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/Review'),
+                                type: 'POST', contentType: 'application/json',
+                                data: JSON.stringify({
+                                    tmdbId: self.currentTmdbId || 0,
+                                    rating: szRating,
+                                    reviewText: text || null,
+                                    containsSpoilers: document.getElementById('reviewSpoilers').checked
+                                })
+                            }).then(function () {
+                                document.getElementById('reviewSubmit').disabled = false;
+                                document.getElementById('reviewStatus').innerHTML = '<span class="c-green">Review posted to Serializd!</span>';
+                                setTimeout(function () { document.getElementById('reviewModal').style.display = 'none'; }, 1500);
+                            }, function (err) {
+                                document.getElementById('reviewSubmit').disabled = false;
+                                var msg = 'Failed to post';
+                                try { var d = JSON.parse(err.responseText || '{}'); if (d.error) msg = d.error; } catch (e2) {}
+                                document.getElementById('reviewStatus').innerHTML = '<span class="c-red">' + msg + '</span>';
+                            });
+                        },
+
                         submitReview: function () {
                             var self = this;
                             var text = document.getElementById('reviewText').value.trim();
                             var isRewatch = document.getElementById('reviewRewatch').checked;
                             var date = document.getElementById('reviewDate').value;
+                            var ratingVal = document.getElementById('reviewRating').value;
+                            var rating = ratingVal ? parseFloat(ratingVal) : null;
+
+                            if (self.reviewSource === 'serializd') { self.submitSerializdReview(text, rating); return; }
 
                             if (!text && !isRewatch) { document.getElementById('reviewStatus').textContent = 'Write a review or mark as rewatch.'; return; }
 
                             document.getElementById('reviewStatus').textContent = 'Posting...';
                             document.getElementById('reviewSubmit').disabled = true;
-
-                            var ratingVal = document.getElementById('reviewRating').value;
-                            var rating = ratingVal ? parseFloat(ratingVal) : null;
 
                             // Empty string => server fans out to every linked account; a username
                             // => post to that single account only.

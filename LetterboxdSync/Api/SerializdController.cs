@@ -87,6 +87,61 @@ public class SerializdController : ControllerBase
         public string? Password { get; set; }
     }
 
+    public class ReviewRequest
+    {
+        public int TmdbId { get; set; }
+
+        public int? Rating { get; set; }
+
+        public string? ReviewText { get; set; }
+
+        public bool ContainsSpoilers { get; set; }
+    }
+
+    /// <summary>
+    /// Posts a show-level Serializd review for the calling user (fans out to their enabled
+    /// Serializd accounts), the TV counterpart to the Letterboxd <c>/Review</c> endpoint.
+    /// </summary>
+    [HttpPost("Review")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult> PostReview([FromBody] ReviewRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest(new { error = "Could not determine user" });
+        if (request == null || request.TmdbId <= 0)
+            return BadRequest(new { error = "A show TMDb id is required" });
+        if (string.IsNullOrWhiteSpace(request.ReviewText) && request.Rating is not > 0)
+            return BadRequest(new { error = "Write a review or set a rating" });
+
+        var accounts = Plugin.Instance!.Configuration.GetEnabledSerializdAccountsForUser(userId).ToList();
+        if (accounts.Count == 0)
+            return BadRequest(new { error = "No enabled Serializd account for your user" });
+
+        var posted = 0;
+        foreach (var account in accounts)
+        {
+            try
+            {
+                using var service = await SerializdServiceFactory
+                    .CreateAuthenticatedAsync(account.Email, account.Password, _logger).ConfigureAwait(false);
+                await service.CreateShowReviewAsync(request.TmdbId, request.Rating, request.ReviewText, request.ContainsSpoilers)
+                    .ConfigureAwait(false);
+                posted++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Serializd review failed for TMDb {TmdbId} as {Email}: {Message}",
+                    request.TmdbId, account.Email, ex.Message);
+            }
+        }
+
+        if (posted == 0)
+            return BadRequest(new { error = "Could not post the review" });
+        return Ok(new { posted });
+    }
+
     /// <summary>
     /// Verifies a Serializd email/password by logging in. Returns the account username on
     /// success (200) or a 400 with an error message on failure. Persists nothing.

@@ -292,6 +292,34 @@ public class SerializdApiClient : ISerializdService
             _username = u.GetString() ?? string.Empty;
     }
 
+    public async Task CreateShowReviewAsync(int showTmdbId, int? rating, string? reviewText, bool containsSpoiler)
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["show_id"] = showTmdbId,
+            ["season_id"] = null,
+            ["episode_number"] = null,
+            ["review_text"] = reviewText ?? string.Empty,
+            ["contains_spoiler"] = containsSpoiler,
+            ["backdate"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+            ["is_log"] = false,
+            ["is_rewatch"] = false,
+            ["tags"] = Array.Empty<string>(),
+            ["allows_comments"] = true,
+            ["like"] = false,
+            // rating is required by /show/reviews/add (omitting it 500s); 0 = unrated.
+            ["rating"] = rating is > 0 ? Math.Clamp(rating.Value, 1, 10) : 0,
+        };
+
+        var body = JsonSerializer.Serialize(payload);
+        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            throw new Exception($"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {err}");
+        }
+    }
+
     public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
     {
         // Whole-show entry, is_log:false so it's a rating/like rather than a Diary row.

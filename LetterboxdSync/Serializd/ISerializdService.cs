@@ -52,4 +52,7 @@ public interface ISerializdService : IDisposable
     /// specific season numbers watchlisted (empty = the whole show / no season detail).
     /// </summary>
     Task<List<SerializdWatchlistEntry>> GetWatchlistAsync();
+
+    /// <summary>Writes a show-level review (text + optional rating), the Serializd equivalent of a Letterboxd review.</summary>
+    Task CreateShowReviewAsync(int showTmdbId, int? rating, string? reviewText, bool containsSpoiler);
 }
