@@ -6,40 +6,42 @@ using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
 using LetterboxdSync.Configuration;
+using MediaBrowser.Controller.Collections;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Playlists;
 using MediaBrowser.Model.Entities;
-using MediaBrowser.Model.Playlists;
 using Microsoft.Extensions.Logging;
 
 namespace LetterboxdSync.Serializd;
 
 /// <summary>
-/// Mirrors a user's Serializd watchlist into a Jellyfin playlist ("Serializd Watchlist"),
-/// the TV counterpart to the Letterboxd watchlist→playlist sync. Only shows that exist in
-/// the Jellyfin library are added; matched by the watchlist item's TMDb show id.
-/// Opt-in per account via <see cref="SerializdAccount.SyncWatchlist"/>.
+/// Mirrors a user's Serializd watchlist into a Jellyfin **collection** ("Serializd Watchlist").
+/// A collection (BoxSet) is the right container for TV shows, a playlist expands a Series into
+/// its episodes. Only shows already in the library are added, matched by the watchlist item's
+/// TMDb show id. Opt-in per account via <see cref="SerializdAccount.SyncWatchlist"/>.
+///
+/// v1 is add-only: it adds newly-watchlisted shows, but does not remove shows you later drop
+/// from your Serializd watchlist (deferred).
 /// </summary>
 public class SerializdWatchlistSyncRunner
 {
-    private const string PlaylistName = "Serializd Watchlist";
+    private const string CollectionName = "Serializd Watchlist";
 
     private readonly ILogger<SerializdWatchlistSyncRunner> _logger;
     private readonly ILibraryManager _libraryManager;
     private readonly IUserManager _userManager;
-    private readonly IPlaylistManager _playlistManager;
+    private readonly ICollectionManager _collectionManager;
 
     public SerializdWatchlistSyncRunner(
         ILoggerFactory loggerFactory,
         ILibraryManager libraryManager,
         IUserManager userManager,
-        IPlaylistManager playlistManager)
+        ICollectionManager collectionManager)
     {
         _logger = loggerFactory.CreateLogger<SerializdWatchlistSyncRunner>();
         _libraryManager = libraryManager;
         _userManager = userManager;
-        _playlistManager = playlistManager;
+        _collectionManager = collectionManager;
     }
 
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
@@ -108,11 +110,8 @@ public class SerializdWatchlistSyncRunner
             tmdbIds = await service.GetWatchlistShowTmdbIdsAsync().ConfigureAwait(false);
         }
 
-        _logger.LogInformation("Serializd watchlist: {Count} shows for {Username} as {Email}",
-            tmdbIds.Count, user.Username, account.Email);
-
         // Match watchlist shows to Series already in the Jellyfin library, by TMDb id.
-        var seriesById = _libraryManager.GetItemList(new InternalItemsQuery(user)
+        var seriesList = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Series },
             IsVirtualItem = false,
@@ -122,57 +121,38 @@ public class SerializdWatchlistSyncRunner
         var wanted = new HashSet<Guid>();
         foreach (var tmdbId in tmdbIds)
         {
-            var match = seriesById.FirstOrDefault(s => s.GetProviderId(MetadataProvider.Tmdb) == tmdbId.ToString());
+            var match = seriesList.FirstOrDefault(s => s.GetProviderId(MetadataProvider.Tmdb) == tmdbId.ToString());
             if (match != null) wanted.Add(match.Id);
         }
 
-        _logger.LogInformation("Serializd watchlist: matched {Matched}/{Total} shows to the Jellyfin library for {Username}",
-            wanted.Count, tmdbIds.Count, user.Username);
+        _logger.LogInformation("Serializd watchlist: {Total} shows, {Matched} in library, for {Username}",
+            tmdbIds.Count, wanted.Count, user.Username);
 
-        await UpdatePlaylistAsync(user, wanted, tmdbIds.Count).ConfigureAwait(false);
-    }
+        if (wanted.Count == 0)
+            return;
 
-    private async Task UpdatePlaylistAsync(User user, HashSet<Guid> wantedItemIds, int watchlistCount)
-    {
-        var existing = _libraryManager.GetItemList(new InternalItemsQuery(user)
+        var existing = _libraryManager.GetItemList(new InternalItemsQuery
         {
-            IncludeItemTypes = new[] { BaseItemKind.Playlist },
+            IncludeItemTypes = new[] { BaseItemKind.BoxSet },
             Recursive = true,
-        });
-        var playlist = existing.FirstOrDefault(p => p.Name == PlaylistName);
+        }).FirstOrDefault(b => string.Equals(b.Name, CollectionName, StringComparison.Ordinal));
 
-        if (playlist == null)
+        if (existing == null)
         {
-            if (wantedItemIds.Count == 0) return;
-            await _playlistManager.CreatePlaylist(new PlaylistCreationRequest
+            await _collectionManager.CreateCollectionAsync(new CollectionCreationOptions
             {
-                Name = PlaylistName,
-                UserId = user.Id,
-                MediaType = MediaType.Video,
-                ItemIdList = wantedItemIds.ToArray(),
+                Name = CollectionName,
+                ItemIdList = wanted.Select(g => g.ToString("N")).ToList(),
+                UserIds = new[] { user.Id },
             }).ConfigureAwait(false);
-            _logger.LogInformation("Created '{Name}' with {Count} shows for {Username}", PlaylistName, wantedItemIds.Count, user.Username);
+            _logger.LogInformation("Created '{Name}' collection with {Count} shows for {Username}",
+                CollectionName, wanted.Count, user.Username);
             return;
         }
 
-        var playlistObj = (Playlist)playlist;
-        var existingIds = playlistObj.LinkedChildren
-            .Where(lc => lc.ItemId.HasValue)
-            .Select(lc => lc.ItemId!.Value)
-            .ToHashSet();
-
-        var toAdd = wantedItemIds.Where(id => !existingIds.Contains(id)).ToArray();
-        if (toAdd.Length > 0)
-            await _playlistManager.AddItemToPlaylistAsync(playlist.Id, toAdd, user.Id).ConfigureAwait(false);
-
-        // An empty read likely means an API hiccup, not a wiped watchlist; don't gut the playlist.
-        var toRemove = (watchlistCount == 0 && existingIds.Count > 0)
-            ? Array.Empty<string>()
-            : existingIds.Where(id => !wantedItemIds.Contains(id)).Select(id => id.ToString("N")).ToArray();
-        if (toRemove.Length > 0)
-            await _playlistManager.RemoveItemFromPlaylistAsync(playlist.Id.ToString("N"), toRemove).ConfigureAwait(false);
-
-        _logger.LogInformation("Serializd watchlist playlist for {Username}: +{Added} / -{Removed}",
-            user.Username, toAdd.Length, toRemove.Length);
+        // Add-only: AddToCollectionAsync ignores shows already in the collection.
+        await _collectionManager.AddToCollectionAsync(existing.Id, wanted).ConfigureAwait(false);
+        _logger.LogInformation("Updated '{Name}' collection ({Count} watchlist shows in library) for {Username}",
+            CollectionName, wanted.Count, user.Username);
     }
 }
