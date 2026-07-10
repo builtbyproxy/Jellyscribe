@@ -916,9 +916,6 @@
                                 b.className = 'lb-btn ' + (active ? 'lb-btn-primary' : 'lb-btn-secondary');
                             });
                             document.getElementById('historyTitleHeader').textContent = source === 'serializd' ? 'Show' : 'Film';
-                            // The Letterboxd-only watchlist button doesn't apply to the TV source
-                            // (Serializd's "Run Sync Now" already mirrors the watchlist).
-                            document.getElementById('runWatchlistSyncBtn').style.display = source === 'serializd' ? 'none' : '';
                             document.getElementById('syncStatus').textContent = '';
                             this.loadStats();
                             this.loadHistory(true);
@@ -1088,6 +1085,25 @@
                             });
                         },
 
+                        runSerializdWatchlistSync: function () {
+                            var self = this;
+                            var btn = document.getElementById('runWatchlistSyncBtn');
+                            btn.disabled = true;
+                            document.getElementById('syncStatus').textContent = 'Starting watchlist sync...';
+                            ApiClient.ajax({
+                                url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow'), type: 'POST'
+                            }).then(function () {
+                                document.getElementById('syncStatus').innerHTML = '<span class="c-green">Mirroring your Serializd watchlist to the Jellyfin collection + playlist...</span>';
+                                btn.disabled = false;
+                            }, function (err) {
+                                var msg = (err && err.status === 400)
+                                    ? 'Enable "Mirror Serializd watchlist" on the TV / Serializd tab and Save first.'
+                                    : 'Could not start the watchlist sync.';
+                                document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + msg + '</span>';
+                                btn.disabled = false;
+                            });
+                        },
+
                         runSerializdSync: function () {
                             var self = this;
                             var btn = document.getElementById('runSyncBtn');
@@ -1110,6 +1126,7 @@
 
                         runWatchlistSync: function () {
                             var self = this;
+                            if (self.dashboardSource === 'serializd') { self.runSerializdWatchlistSync(); return; }
                             self.setSyncButtons(true);
                             document.getElementById('syncStatus').textContent = 'Starting watchlist sync...';
 

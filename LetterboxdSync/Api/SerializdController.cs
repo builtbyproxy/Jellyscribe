@@ -158,4 +158,37 @@ public class SerializdController : ControllerBase
 
         return Accepted(new { started = true });
     }
+
+    /// <summary>
+    /// Mirrors the calling user's Serializd watchlist into the Jellyfin collection + playlist,
+    /// on demand (the TV counterpart to the Letterboxd "Sync Watchlist Now"). 202 + background;
+    /// 400 if no Serializd account has watchlist sync enabled.
+    /// </summary>
+    [HttpPost("SyncWatchlistNow")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult SyncWatchlistNow()
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest(new { error = "Could not determine user" });
+
+        var enabled = Plugin.Instance!.Configuration.GetEnabledSerializdAccountsForUser(userId);
+        if (!enabled.Any(a => a.SyncWatchlist))
+            return BadRequest(new { error = "No Serializd account has watchlist sync enabled. Tick it on the TV / Serializd tab and Save." });
+
+        LastBackgroundSync = Task.Run(async () =>
+        {
+            try
+            {
+                await _watchlistRunner.TryRunForUserAsync(userId, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Manual Serializd watchlist sync failed for {UserId}: {Message}", userId, ex.Message);
+            }
+        });
+
+        return Accepted(new { started = true });
+    }
 }
