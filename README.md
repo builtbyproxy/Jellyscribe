@@ -37,6 +37,15 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 - **Reviews**, write and post reviews to Letterboxd from the plugin dashboard
 - **Diary import**, mark Jellyfin movies as played if they're in your Letterboxd diary
 
+### TV shows → Serializd (beta)
+
+- **TV sync**, finished TV episodes are logged to your [Serializd](https://www.serializd.com) watched list in real time, the TV counterpart to the Letterboxd film sync
+- **Per-user accounts**, each Jellyfin user links their own Serializd account (by email or username) on the TV / Serializd tab, with a Verify login button and passwords encrypted at rest
+- **Daily catch-up**, a "Sync watched TV to Serializd" scheduled task picks up anything real-time missed, plus a Sync TV Now button
+- **TMDb matching**, episodes matched by their series' TMDb id + season/episode number
+- **Isolated from Letterboxd**, films still sync to Letterboxd; a Serializd failure never blocks the Letterboxd path, or vice versa
+- Ratings, reviews, and backdated diary entries for TV are planned next
+
 ### Watchlist & Seerr
 
 - **Watchlist sync**, import your Letterboxd watchlist as a Jellyfin playlist

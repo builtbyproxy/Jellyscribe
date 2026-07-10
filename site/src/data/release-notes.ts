@@ -10,6 +10,20 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.20.0',
+    headline: 'TV shows now sync to Serializd, the Letterboxd for television',
+    summary:
+      'The plugin no longer stops at films. Link a Serializd account on the new TV / Serializd tab and finished TV episodes are logged to your Serializd watched list automatically, in real time as you finish them, with a daily catch-up for anything missed and a Sync TV Now button to run it on demand. Films still go to Letterboxd exactly as before; the two are completely independent, so a Serializd hiccup never touches your Letterboxd sync. Each Jellyfin user links their own Serializd account (by email or username), and passwords are encrypted at rest the same way Letterboxd credentials are. This first release covers watched-episode sync; ratings, reviews, and backdated diary entries are planned next.',
+    highlights: {
+      new: [
+        'New TV / Serializd tab: link a Serializd account per Jellyfin user (email or username) with a Verify login button that confirms your credentials before saving.',
+        'Real-time episode sync: finishing a TV episode logs it to your Serializd watched list automatically, matched by TMDb id so it works regardless of naming.',
+        'Daily catch-up scheduled task ("Sync watched TV to Serializd") logs anything the real-time path missed, plus a Sync TV Now button to run it immediately.',
+        'Serializd runs fully isolated from Letterboxd: films keep syncing to Letterboxd, and a failure on one service never blocks the other.',
+      ],
+    },
+  },
+  {
     version: '1.19.4',
     headline: 'Send logs to developer now tells you when there is nothing to send',
     summary:

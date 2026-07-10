@@ -43,7 +43,9 @@
       password + enabled), **Verify login** button → `POST /Serializd/Verify`
       (`SerializdController`), Save persists via the standard plugin config PUT.
       ("Sync now" deferred with the scheduled task, task 3.3.)
-- [ ] 2.4 Per-user page Serializd section + `POST …/Serializd/SyncNow`.
+- [x] 2.4 `POST …/Serializd/SyncNow` (fires the catch-up for the calling user) +
+      **Sync TV Now** button on the TV tab. (Per-user *page* section deferred; the
+      dashboard tab covers linking + manual sync.)
 - [ ] 2.5 Tests: secret round-trips encrypted + `[JsonIgnore]` doesn't echo
       ciphertext through the config-page get→mutate→put cycle.
 
@@ -56,30 +58,38 @@
       season→seasonId (cache), fan out across enabled Serializd accounts,
       `LogEpisodes`. Handles multi-ep files (`IndexNumberEnd`), specials (season 0),
       missing-TMDb (log-and-skip).
-- [ ] 3.3 `SerializdSyncTask` scheduled catch-up over recently-played episodes;
-      origin-scoped `SyncGate` so it never false-serialises against Letterboxd;
-      never marks rewatch.
-- [ ] 3.4 `ServiceRegistrator` wiring for the scheduled task (handler branch needs
-      no new registration; `PlaybackHandler` is already hosted).
+- [x] 3.3 `SerializdSyncTask` (auto-discovered `IScheduledTask`, daily) →
+      `SerializdSyncRunner`; own `SerializdSyncGate` so it never false-serialises
+      against Letterboxd; never marks rewatch. Dedups via `SerializdSyncHistory`
+      (append-only JSONL), which the real-time path also writes to. Pure
+      `GroupNewEpisodes` for the queue logic.
+- [x] 3.4 `ServiceRegistrator` registers `SerializdSyncRunner` (needed by both the
+      scheduled task and the controller's Sync-Now). Handler branch needs no new
+      registration; `PlaybackHandler` is already hosted.
 - [x] 3.5 Tests: episode→ref mapping incl. specials + multi-ep + missing-id
       (`SerializdEpisodeMapperTests`); handler routing, season-missing skip,
       no-account no-op, and Serializd-failure-doesn't-bubble
-      (`SerializdPlaybackTests`). (Scheduled-path test pending task 3.3.)
+      (`SerializdPlaybackTests`); scheduled-queue grouping/dedup
+      (`SerializdSyncRunnerTests`); history persistence (`SerializdSyncHistoryTests`);
+      controller verify + sync-now (`SerializdControllerTests`).
 
 ## 4. Telemetry + docs (Phase 1)
 
-- [ ] 4.1 Serializd-scoped telemetry categories (auth_failure, log_success,
-      log_failure) on the existing anonymous-ping contract; no backend change.
-- [ ] 4.2 README + `site/` features copy: add TV/Serializd section.
-- [ ] 4.3 Version bump + `release-notes.ts` entry; `## Release notes` PR section.
+- [~] 4.1 **DEFERRED** to a follow-up change. The telemetry pipeline is fleet-wide
+      and intricate (window counters, error-transition detection, the Cloudflare
+      Worker schema); wiring a beta feature in risks the ~190-server telemetry for
+      near-zero value while Serializd has one user. Revisit once adoption warrants it.
+- [x] 4.2 README + `site/` features copy: TV/Serializd section added.
+- [x] 4.3 Version bump (1.20.0.0 in `Directory.Build.props` + csproj) +
+      `release-notes.ts` entry. `## Release notes` PR section pending the eventual PR.
 
 ## 5. Ship Phase 1
 
-- [ ] 5.1 Build + sideload to the maintainer's Jellyfin (`./deploy.sh`), link a
-      Serializd account, watch an episode to completion, confirm it appears in the
-      Serializd watched list, then verify the scheduled task catches a manually
-      un-logged one.
-- [ ] 5.2 Open PR (Serializd inert for film-only users, so low-risk release).
+- [~] 5.1 Sideloaded to the maintainer's Jellyfin (checksum-verified, clean load,
+      scheduled task auto-discovered). Real-time watch-an-episode confirmation is the
+      maintainer's manual step. Backfill of "A Discovery of Witches" S1 done via the
+      API directly (all 8 episodes + season marked watched).
+- [ ] 5.2 Open PR (blocked: maintainer said do NOT push; commits are local only).
 
 ## 6. Rebrand + domain (Phase 2 — after Phase 1 is stable)
 
