@@ -88,6 +88,10 @@
                             <button type="button" class="lb-btn lb-btn-secondary" id="telemetryBannerDismiss">No thanks</button>
                         </div>
                     </div>
+                    <div style="display:flex;gap:0.4em;margin-bottom:0.9em;" id="dashSourceToggle">
+                        <button type="button" class="lb-btn lb-btn-primary" data-source="letterboxd">Letterboxd (Film)</button>
+                        <button type="button" class="lb-btn lb-btn-secondary" data-source="serializd">Serializd (TV)</button>
+                    </div>
                     <div style="display:flex;align-items:center;gap:1em;margin-bottom:0.5em;flex-wrap:wrap;">
                         <button type="button" class="lb-btn lb-btn-primary" id="runSyncBtn">Run Sync Now</button>
                         <button type="button" class="lb-btn lb-btn-secondary" id="runWatchlistSyncBtn" title="Pull your Letterboxd watchlist into the Jellyfin playlist (and Seerr if configured)">Sync Watchlist Now</button>
@@ -111,7 +115,7 @@
                     <h3 style="margin-bottom:0.5em;">Recent Activity</h3>
                     <div style="overflow-x:auto;">
                         <table class="lb-table">
-                            <thead><tr><th>Film</th><th>Status</th><th>Source</th><th>Date</th><th></th></tr></thead>
+                            <thead><tr><th id="historyTitleHeader">Film</th><th>Status</th><th>Source</th><th>Date</th><th></th></tr></thead>
                             <tbody id="historyBody">
                                 <tr><td colspan="5" style="padding:2em;text-align:center;" class="c-muted">Run a sync to see activity here.</td></tr>
                             </tbody>
@@ -894,8 +898,34 @@
                             });
                         },
 
+                        dashboardSource: 'letterboxd',
+
+                        // Base API path for whichever dashboard source is active. The stat cards
+                        // and activity table are the same view components either way, only the
+                        // endpoint (and a couple of labels) change.
+                        syncBase: function () {
+                            return this.dashboardSource === 'serializd'
+                                ? 'Jellyfin.Plugin.LetterboxdSync/Serializd'
+                                : 'Jellyfin.Plugin.LetterboxdSync';
+                        },
+
+                        switchDashboardSource: function (source) {
+                            this.dashboardSource = source;
+                            document.querySelectorAll('#dashSourceToggle button').forEach(function (b) {
+                                var active = b.getAttribute('data-source') === source;
+                                b.className = 'lb-btn ' + (active ? 'lb-btn-primary' : 'lb-btn-secondary');
+                            });
+                            document.getElementById('historyTitleHeader').textContent = source === 'serializd' ? 'Show' : 'Film';
+                            // The Letterboxd-only watchlist button doesn't apply to the TV source
+                            // (Serializd's "Run Sync Now" already mirrors the watchlist).
+                            document.getElementById('runWatchlistSyncBtn').style.display = source === 'serializd' ? 'none' : '';
+                            document.getElementById('syncStatus').textContent = '';
+                            this.loadStats();
+                            this.loadHistory(true);
+                        },
+
                         loadStats: function () {
-                            ApiClient.getJSON(ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Stats')).then(function (s) {
+                            ApiClient.getJSON(ApiClient.getUrl(this.syncBase() + '/Stats')).then(function (s) {
                                 document.getElementById('statTotal').textContent = s.total;
                                 document.getElementById('statSuccess').textContent = s.success;
                                 document.getElementById('statRewatches').textContent = s.rewatches;
@@ -909,7 +939,7 @@
                             if (resetToFirstPage) self.historyOffset = 0;
                             var pageSize = self.historyPageSize || 100;
                             var offset = self.historyOffset || 0;
-                            ApiClient.getJSON(ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/History', { count: pageSize, offset: offset })).then(function (resp) {
+                            ApiClient.getJSON(ApiClient.getUrl(self.syncBase() + '/History', { count: pageSize, offset: offset })).then(function (resp) {
                                 // Backwards-compat: pre-1.9.1 responded with a bare array.
                                 var events = (resp && resp.events) ? resp.events : (Array.isArray(resp) ? resp : []);
                                 self.historyTotal = (resp && typeof resp.total === 'number') ? resp.total : events.length;
@@ -1043,6 +1073,7 @@
 
                         runSync: function () {
                             var self = this;
+                            if (self.dashboardSource === 'serializd') { self.runSerializdSync(); return; }
                             var btn = document.getElementById('runSyncBtn');
                             btn.disabled = true;
                             document.getElementById('syncStatus').textContent = 'Starting...';
@@ -1054,6 +1085,26 @@
                                     document.getElementById('syncStatus').innerHTML = '<span class="c-green">Syncing...</span>';
                                     self.pollTask(task.Id);
                                 });
+                            });
+                        },
+
+                        runSerializdSync: function () {
+                            var self = this;
+                            var btn = document.getElementById('runSyncBtn');
+                            btn.disabled = true;
+                            document.getElementById('syncStatus').textContent = 'Starting TV sync...';
+                            ApiClient.ajax({
+                                url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow'), type: 'POST'
+                            }).then(function () {
+                                document.getElementById('syncStatus').innerHTML = '<span class="c-green">Syncing TV to Serializd in the background...</span>';
+                                btn.disabled = false;
+                                setTimeout(function () { self.loadStats(); self.loadHistory(); }, 5000);
+                            }, function (err) {
+                                var msg = (err && err.status === 409) ? 'A sync is already running.'
+                                    : (err && err.status === 400) ? 'No enabled Serializd account. Add one on the TV / Serializd tab first.'
+                                    : 'Could not start the sync.';
+                                document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + msg + '</span>';
+                                btn.disabled = false;
                             });
                         },
 
@@ -1193,6 +1244,9 @@
                             document.getElementById('testJellyseerrBtn').addEventListener('click', function () { self.testJellyseerr(); });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
                             document.getElementById('runWatchlistSyncBtn').addEventListener('click', function () { self.runWatchlistSync(); });
+                            document.querySelectorAll('#dashSourceToggle button').forEach(function (b) {
+                                b.addEventListener('click', function () { self.switchDashboardSource(b.getAttribute('data-source')); });
+                            });
                             document.getElementById('logsRefreshBtn').addEventListener('click', function () { self.loadLogs(); });
                             document.getElementById('logsCopyBtn').addEventListener('click', function () { self.copyLogs(); });
                             document.getElementById('logsDownloadBtn').addEventListener('click', function () { self.downloadLogs(); });

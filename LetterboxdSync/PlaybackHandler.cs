@@ -224,6 +224,17 @@ public class PlaybackHandler : IHostedService, IDisposable
                             .ConfigureAwait(false);
                         SerializdSyncHistory.Record(
                             userId, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
+
+                        SerializdActivity.Record(new SyncEvent
+                        {
+                            FilmTitle = $"{episode.SeriesName} · S{epRef.SeasonNumber}E{n}",
+                            TmdbId = epRef.ShowTmdbId,
+                            Username = user.Username ?? string.Empty,
+                            Timestamp = DateTime.UtcNow,
+                            ViewingDate = DateTime.Now.Date,
+                            Status = isRewatch ? SyncStatus.Rewatch : SyncStatus.Success,
+                            Source = "playback",
+                        });
                     }
 
                     _logger.LogInformation(
@@ -237,6 +248,16 @@ public class PlaybackHandler : IHostedService, IDisposable
                         "Failed to log {Series} S{Season}E{Episode} (TMDb:{TmdbId}) to Serializd for {Username}: {Message}",
                         episode.SeriesName, epRef.SeasonNumber, episode.IndexNumber, epRef.ShowTmdbId,
                         user.Username, ex.Message);
+                    SerializdActivity.Record(new SyncEvent
+                    {
+                        FilmTitle = episode.SeriesName ?? episode.Name ?? "Episode",
+                        TmdbId = epRef.ShowTmdbId,
+                        Username = user.Username ?? string.Empty,
+                        Timestamp = DateTime.UtcNow,
+                        Status = SyncStatus.Failed,
+                        Error = ex.Message,
+                        Source = "playback",
+                    });
                 }
             }
         }

@@ -80,7 +80,7 @@ public class SerializdSyncRunner
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
+                    await SyncOneAsync(user, account, source, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -123,7 +123,7 @@ public class SerializdSyncRunner
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
+                    await SyncOneAsync(user, account, source, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -140,7 +140,7 @@ public class SerializdSyncRunner
         }
     }
 
-    private async Task SyncOneAsync(User user, SerializdAccount account, CancellationToken cancellationToken)
+    private async Task SyncOneAsync(User user, SerializdAccount account, string source, CancellationToken cancellationToken)
     {
         var userId = user.Id.ToString("N");
 
@@ -165,7 +165,7 @@ public class SerializdSyncRunner
             var watchedAt = ud?.LastPlayedDate?.ToUniversalTime() ?? DateTime.UtcNow;
             var rating = SerializdRating.FromJellyfin(ud?.Rating);
             foreach (var n in epRef.EpisodeNumbers)
-                records.Add(new EpisodePlay(epRef.ShowTmdbId, epRef.SeasonNumber, n, watchedAt, rating));
+                records.Add(new EpisodePlay(epRef.ShowTmdbId, epRef.SeasonNumber, n, watchedAt, rating, ep.SeriesName ?? string.Empty));
         }
 
         // Anything new to do? (either watched-marking or a dated log)
@@ -225,6 +225,17 @@ public class SerializdSyncRunner
                 SerializdSyncHistory.Record(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
                 logged++;
 
+                SerializdActivity.Record(new SyncEvent
+                {
+                    FilmTitle = $"{r.ShowName} · S{r.Season}E{r.Episode}",
+                    TmdbId = r.Show,
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    ViewingDate = r.WatchedAtUtc,
+                    Status = SyncStatus.Success,
+                    Source = source,
+                });
+
                 // Be polite during a large first-time backfill.
                 await Task.Delay(150, cancellationToken).ConfigureAwait(false);
             }
@@ -232,6 +243,16 @@ public class SerializdSyncRunner
             {
                 _logger.LogError("Serializd catch-up: failed logging TMDb {Show} S{Season}E{Episode} for {Username}: {Message}",
                     r.Show, r.Season, r.Episode, user.Username, ex.Message);
+                SerializdActivity.Record(new SyncEvent
+                {
+                    FilmTitle = $"{r.ShowName} · S{r.Season}E{r.Episode}",
+                    TmdbId = r.Show,
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    Status = SyncStatus.Failed,
+                    Error = ex.Message,
+                    Source = source,
+                });
             }
         }
 
@@ -286,7 +307,7 @@ public class SerializdSyncRunner
         }
     }
 
-    private readonly record struct EpisodePlay(int Show, int Season, int Episode, DateTime WatchedAtUtc, int? Rating);
+    private readonly record struct EpisodePlay(int Show, int Season, int Episode, DateTime WatchedAtUtc, int? Rating, string ShowName);
 
     /// <summary>
     /// Pure: collapse a flat list of (show, season, episode) plays into per-(show, season)

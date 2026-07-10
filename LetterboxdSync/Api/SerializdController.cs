@@ -27,6 +27,7 @@ public class SerializdController : ControllerBase
     private readonly ILogger<SerializdController> _logger;
     private readonly SerializdSyncRunner _syncRunner;
     private readonly SerializdWatchlistSyncRunner _watchlistRunner;
+    private readonly MediaBrowser.Controller.Library.IUserManager _userManager;
 
     /// <summary>
     /// Test-only override for the login check. When non-null, <see cref="Verify"/> calls this
@@ -42,15 +43,42 @@ public class SerializdController : ControllerBase
     internal Task? LastBackgroundSync { get; private set; }
 
     public SerializdController(ILogger<SerializdController> logger, SerializdSyncRunner syncRunner,
-        SerializdWatchlistSyncRunner watchlistRunner)
+        SerializdWatchlistSyncRunner watchlistRunner, MediaBrowser.Controller.Library.IUserManager userManager)
     {
         _logger = logger;
         _syncRunner = syncRunner;
         _watchlistRunner = watchlistRunner;
+        _userManager = userManager;
     }
 
     private string? GetCurrentUserId()
         => User.Claims.FirstOrDefault(c => c.Type == "Jellyfin-UserId")?.Value?.Replace("-", string.Empty);
+
+    private string? GetJellyfinUsername()
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId)) return null;
+        return _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId)?.Username;
+    }
+
+    /// <summary>Serializd activity stats for the dashboard, same shape as the Letterboxd <c>/Stats</c>.</summary>
+    [HttpGet("Stats")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult GetStats()
+    {
+        var (total, success, failed, skipped, rewatches) = SerializdActivity.GetStats(GetJellyfinUsername());
+        return Ok(new { total, success, failed, skipped, rewatches });
+    }
+
+    /// <summary>Paged Serializd activity for the dashboard, same shape as the Letterboxd <c>/History</c>.</summary>
+    [HttpGet("History")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult GetHistory([FromQuery] int count = 50, [FromQuery] int offset = 0)
+    {
+        var capped = Math.Clamp(count, 1, 500);
+        var (events, total) = SerializdActivity.GetPage(Math.Max(offset, 0), capped, GetJellyfinUsername());
+        return Ok(new { events, total });
+    }
 
     public class VerifyRequest
     {

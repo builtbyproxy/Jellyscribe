@@ -24,7 +24,7 @@ public class SerializdControllerTests : IDisposable
                Substitute.For<ICollectionManager>(), Substitute.For<IPlaylistManager>());
 
     private readonly SerializdController _controller =
-        new(new NullLogger<SerializdController>(), MakeRunner(), MakeWatchlistRunner());
+        new(new NullLogger<SerializdController>(), MakeRunner(), MakeWatchlistRunner(), Substitute.For<IUserManager>());
 
     public void Dispose() => SerializdController.VerifyOverrideForTesting = null;
 
