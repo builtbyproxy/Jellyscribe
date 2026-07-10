@@ -83,10 +83,15 @@
                 <div class="lb-tabs">
                     <button type="button" class="lb-tab active" data-tab="stats">Dashboard</button>
                     <button type="button" class="lb-tab" data-tab="account">My Account</button>
+                    <button type="button" class="lb-tab" data-tab="szaccount">My TV Account</button>
                 </div>
 
                 <!-- DASHBOARD TAB -->
                 <div id="tab-stats" class="lb-tab-content">
+                    <div style="display:flex;gap:0.4em;margin-bottom:0.9em;" id="dashSourceToggle">
+                        <button type="button" class="lb-btn lb-btn-primary" data-source="letterboxd">Letterboxd (Film)</button>
+                        <button type="button" class="lb-btn lb-btn-secondary" data-source="serializd">Serializd (TV)</button>
+                    </div>
                     <div id="syncControls">
                         <div style="display:flex;align-items:center;gap:1em;margin-bottom:0.5em;flex-wrap:wrap;">
                             <button type="button" class="lb-btn lb-btn-primary" id="runSyncBtn">Run Sync Now</button>
@@ -112,7 +117,7 @@
                     <h3 style="margin-bottom:0.5em;">Recent Activity</h3>
                     <div style="overflow-x:auto;">
                         <table class="lb-table">
-                            <thead><tr><th>Film</th><th>Status</th><th>Source</th><th>Date</th><th></th></tr></thead>
+                            <thead><tr><th id="historyTitleHeader">Film</th><th>Status</th><th>Source</th><th>Date</th><th></th></tr></thead>
                             <tbody id="historyBody">
                                 <tr><td colspan="5" style="padding:2em;text-align:center;" class="c-muted">Loading...</td></tr>
                             </tbody>
@@ -139,6 +144,18 @@
                     <div style="margin-top:1.5em;display:flex;align-items:center;gap:1em;">
                         <button type="button" class="lb-btn lb-btn-primary" id="saveBtn">Save</button>
                         <span id="saveStatus" style="font-size:0.9em;"></span>
+                    </div>
+                </div>
+
+                <!-- MY TV ACCOUNT TAB -->
+                <div id="tab-szaccount" class="lb-tab-content" style="display:none;">
+                    <h3>Your Serializd account</h3>
+                    <p class="c-muted" style="font-size:0.9em;">Link your <a href="https://www.serializd.com" target="_blank" class="lb-link">Serializd</a> account to log finished TV episodes to your diary automatically (the TV counterpart to Letterboxd). Log in by email or username.</p>
+                    <div id="szAccountsList"></div>
+                    <button type="button" class="lb-btn lb-btn-secondary" id="addSzAccountBtn" style="margin-top:1em;">+ Add Serializd Account</button>
+                    <div style="margin-top:1.5em;display:flex;align-items:center;gap:1em;">
+                        <button type="button" class="lb-btn lb-btn-primary" id="saveSzBtn">Save</button>
+                        <span id="saveSzStatus" style="font-size:0.9em;"></span>
                     </div>
                 </div>
 
@@ -522,8 +539,131 @@
                             });
                         },
 
+                        dashboardSource: 'letterboxd',
+                        szBase: function () {
+                            return this.dashboardSource === 'serializd'
+                                ? 'Jellyfin.Plugin.LetterboxdSync/Serializd'
+                                : 'Jellyfin.Plugin.LetterboxdSync';
+                        },
+                        switchDashboardSource: function (source) {
+                            this.dashboardSource = source;
+                            document.querySelectorAll('#dashSourceToggle button').forEach(function (b) {
+                                b.className = 'lb-btn ' + (b.getAttribute('data-source') === source ? 'lb-btn-primary' : 'lb-btn-secondary');
+                            });
+                            document.getElementById('historyTitleHeader').textContent = source === 'serializd' ? 'Show' : 'Film';
+                            document.getElementById('syncStatus').textContent = '';
+                            this.loadStats();
+                            this.loadHistory(true);
+                        },
+
+                        szAccountHtml: function () {
+                            return '<div class="account-entry lb-account" style="border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:1em;margin-bottom:1em;">'
+                                + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5em;"><h4 style="margin:0;">Serializd Account</h4>'
+                                + '<button type="button" class="lb-btn lb-btn-danger removeSzBtn">Remove</button></div>'
+                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Email or Username</label><input type="text" class="szEmail" placeholder="you@example.com or username" /></div>'
+                                + '<div style="margin-bottom:0.5em;"><label class="lb-field">Password</label><input type="password" class="szPassword" /></div>'
+                                + '<div class="lb-checks">'
+                                + '<label><input type="checkbox" class="szEnabled" /> Enabled</label>'
+                                + '<label><input type="checkbox" class="szSyncFavorites" /> Mark favourites as liked</label>'
+                                + '<label><input type="checkbox" class="szEnableDateFilter" /> Only sync recently played</label>'
+                                + '<label><input type="checkbox" class="szIsPrimary" /> Primary account</label>'
+                                + '<label><input type="checkbox" class="szSyncWatchlist" /> Mirror watchlist as collection + playlist</label>'
+                                + '<label><input type="checkbox" class="szAutoRequestWatchlist" /> Auto-request unmatched shows via Seerr</label>'
+                                + '<label><input type="checkbox" class="szSkipPreviouslySynced" /> Skip episodes already synced</label>'
+                                + '<label><input type="checkbox" class="szStopOnFailure" /> Stop on first failure</label>'
+                                + '<label><input type="checkbox" class="szEnableDiaryImport" /> Import Serializd diary as watched</label>'
+                                + '</div>'
+                                + '<div class="szDateDaysRow" style="display:none;margin-top:0.5em;"><label class="lb-field">Days to look back</label><input type="number" class="szDateFilterDays" min="1" max="365" value="7" /></div>'
+                                + '<div style="display:flex;gap:0.7em;align-items:center;margin-top:0.6em;"><button type="button" class="lb-btn lb-btn-secondary verifySzBtn">Verify login</button><span class="szVerifyStatus c-muted" style="font-size:0.85em;"></span></div>'
+                                + '</div>';
+                        },
+                        addSerializdAccount: function (a) {
+                            var self = this;
+                            var c = document.getElementById('szAccountsList');
+                            c.insertAdjacentHTML('beforeend', this.szAccountHtml());
+                            var e = c.lastElementChild;
+                            if (a) {
+                                e.querySelector('.szEmail').value = a.email || '';
+                                e.querySelector('.szPassword').value = a.password || '';
+                                e.querySelector('.szEnabled').checked = a.enabled !== false;
+                                e.querySelector('.szSyncFavorites').checked = a.syncFavorites === true;
+                                e.querySelector('.szEnableDateFilter').checked = a.enableDateFilter === true;
+                                e.querySelector('.szDateFilterDays').value = a.dateFilterDays || 7;
+                                e.querySelector('.szIsPrimary').checked = a.isPrimary === true;
+                                e.querySelector('.szSyncWatchlist').checked = a.syncWatchlist === true;
+                                e.querySelector('.szAutoRequestWatchlist').checked = a.autoRequestWatchlist === true;
+                                e.querySelector('.szSkipPreviouslySynced').checked = a.skipPreviouslySynced !== false;
+                                e.querySelector('.szStopOnFailure').checked = a.stopOnFailure === true;
+                                e.querySelector('.szEnableDiaryImport').checked = a.enableDiaryImport === true;
+                                if (a.enableDateFilter) e.querySelector('.szDateDaysRow').style.display = '';
+                            } else {
+                                e.querySelector('.szEnabled').checked = true;
+                                e.querySelector('.szSkipPreviouslySynced').checked = true;
+                            }
+                            e.querySelector('.szEnableDateFilter').addEventListener('change', function () { e.querySelector('.szDateDaysRow').style.display = this.checked ? '' : 'none'; });
+                            e.querySelector('.removeSzBtn').addEventListener('click', function () { e.remove(); });
+                            e.querySelector('.verifySzBtn').addEventListener('click', function () { self.verifySerializd(e); });
+                        },
+                        loadSerializdAccounts: function () {
+                            var self = this;
+                            self.apiFetch('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts')
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                var list = document.getElementById('szAccountsList'); list.innerHTML = '';
+                                var accounts = (data && data.accounts) || [];
+                                accounts.forEach(function (a) { self.addSerializdAccount(a); });
+                                if (accounts.length === 0) self.addSerializdAccount(null);
+                            }).catch(function () {});
+                        },
+                        collectSerializdAccounts: function () {
+                            var accounts = [];
+                            document.querySelectorAll('#szAccountsList .account-entry').forEach(function (e) {
+                                accounts.push({
+                                    email: e.querySelector('.szEmail').value.trim(),
+                                    password: e.querySelector('.szPassword').value,
+                                    enabled: e.querySelector('.szEnabled').checked,
+                                    syncFavorites: e.querySelector('.szSyncFavorites').checked,
+                                    enableDateFilter: e.querySelector('.szEnableDateFilter').checked,
+                                    dateFilterDays: parseInt(e.querySelector('.szDateFilterDays').value, 10) || 7,
+                                    isPrimary: e.querySelector('.szIsPrimary').checked,
+                                    syncWatchlist: e.querySelector('.szSyncWatchlist').checked,
+                                    autoRequestWatchlist: e.querySelector('.szAutoRequestWatchlist').checked,
+                                    skipPreviouslySynced: e.querySelector('.szSkipPreviouslySynced').checked,
+                                    stopOnFailure: e.querySelector('.szStopOnFailure').checked,
+                                    enableDiaryImport: e.querySelector('.szEnableDiaryImport').checked
+                                });
+                            });
+                            return accounts;
+                        },
+                        saveSerializdAccounts: function () {
+                            var self = this;
+                            var btn = document.getElementById('saveSzBtn'); var status = document.getElementById('saveSzStatus');
+                            var accounts = self.collectSerializdAccounts();
+                            for (var i = 0; i < accounts.length; i++) { if (!accounts[i].email) { status.innerHTML = '<span class="c-red">Account #' + (i + 1) + ' is missing an email/username</span>'; return; } }
+                            btn.disabled = true; status.textContent = 'Saving...';
+                            self.apiPut('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: accounts })
+                            .then(function (r) {
+                                btn.disabled = false;
+                                if (r.ok) { status.innerHTML = '<span class="c-green">Saved.</span>'; }
+                                else { r.json().then(function (d) { status.innerHTML = '<span class="c-red">' + (d.error || 'Save failed') + '</span>'; }); }
+                            }).catch(function (err) { btn.disabled = false; status.innerHTML = '<span class="c-red">Error: ' + err.message + '</span>'; });
+                        },
+                        verifySerializd: function (entry) {
+                            var self = this;
+                            var email = entry.querySelector('.szEmail').value.trim();
+                            var password = entry.querySelector('.szPassword').value;
+                            var st = entry.querySelector('.szVerifyStatus');
+                            if (!email || !password) { st.innerHTML = '<span class="c-red">Email and password required.</span>'; return; }
+                            st.innerHTML = '<span class="c-muted">Verifying...</span>';
+                            self.apiPost('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: password })
+                            .then(function (r) {
+                                if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="c-green">Login OK' + (d.username ? ' (' + d.username + ')' : '') + '. Remember to Save.</span>'; }); }
+                                else { st.innerHTML = '<span class="c-red">Login failed. Check email and password.</span>'; }
+                            }).catch(function () { st.innerHTML = '<span class="c-red">Login failed.</span>'; });
+                        },
+
                         loadStats: function () {
-                            this.apiFetch('Jellyfin.Plugin.LetterboxdSync/Stats')
+                            this.apiFetch(this.szBase() + '/Stats')
                             .then(function (r) { return r.json(); })
                             .then(function (s) {
                                 document.getElementById('statTotal').textContent = s.total;
@@ -537,7 +677,7 @@
                         loadHistory: function (resetToFirstPage) {
                             var self = this;
                             if (resetToFirstPage) self.historyOffset = 0;
-                            var url = 'Jellyfin.Plugin.LetterboxdSync/History?count=' + self.historyPageSize + '&offset=' + self.historyOffset;
+                            var url = self.szBase() + '/History?count=' + self.historyPageSize + '&offset=' + self.historyOffset;
                             this.apiFetch(url)
                             .then(function (r) { return r.json(); })
                             .then(function (resp) {
@@ -647,6 +787,17 @@
 
                         runSync: function () {
                             var self = this;
+                            if (self.dashboardSource === 'serializd') {
+                                self.setSyncButtons(true);
+                                document.getElementById('syncStatus').textContent = 'Starting TV sync...';
+                                self.apiPost('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow', {})
+                                .then(function (r) {
+                                    self.setSyncButtons(false);
+                                    if (r.ok) { document.getElementById('syncStatus').innerHTML = '<span class="c-green">Syncing TV to Serializd in the background...</span>'; setTimeout(function () { self.loadStats(); self.loadHistory(); }, 5000); }
+                                    else { r.json().then(function (d) { document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + (d.error || 'Failed to start') + '</span>'; }); }
+                                }).catch(function () { self.setSyncButtons(false); });
+                                return;
+                            }
                             self.setSyncButtons(true);
                             document.getElementById('syncStatus').textContent = 'Starting...';
 
@@ -673,6 +824,17 @@
 
                         runWatchlistSync: function () {
                             var self = this;
+                            if (self.dashboardSource === 'serializd') {
+                                self.setSyncButtons(true);
+                                document.getElementById('syncStatus').textContent = 'Starting watchlist sync...';
+                                self.apiPost('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow', {})
+                                .then(function (r) {
+                                    self.setSyncButtons(false);
+                                    if (r.ok) { document.getElementById('syncStatus').innerHTML = '<span class="c-green">Mirroring your Serializd watchlist...</span>'; }
+                                    else { r.json().then(function (d) { document.getElementById('syncStatus').innerHTML = '<span class="c-red">' + (d.error || 'Failed to start') + '</span>'; }); }
+                                }).catch(function () { self.setSyncButtons(false); });
+                                return;
+                            }
                             self.setSyncButtons(true);
                             document.getElementById('syncStatus').textContent = 'Starting watchlist sync...';
 
@@ -825,6 +987,12 @@
                             // Event listeners
                             document.getElementById('saveBtn').addEventListener('click', function () { self.saveAccount(); });
                             document.getElementById('addAccountBtn').addEventListener('click', function () { self.addAccount(null); });
+                            document.getElementById('saveSzBtn').addEventListener('click', function () { self.saveSerializdAccounts(); });
+                            document.getElementById('addSzAccountBtn').addEventListener('click', function () { self.addSerializdAccount(null); });
+                            self.loadSerializdAccounts();
+                            document.querySelectorAll('#dashSourceToggle button').forEach(function (b) {
+                                b.addEventListener('click', function () { self.switchDashboardSource(b.getAttribute('data-source')); });
+                            });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
                             document.getElementById('runWatchlistSyncBtn').addEventListener('click', function () { self.runWatchlistSync(); });
                             document.getElementById('historyFirst').addEventListener('click', function () { self.gotoHistoryPage(1); });

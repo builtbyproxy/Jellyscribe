@@ -61,6 +61,110 @@ public class SerializdController : ControllerBase
         return _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId)?.Username;
     }
 
+    public class AccountItem
+    {
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public bool Enabled { get; set; }
+        public bool SyncFavorites { get; set; }
+        public bool EnableDateFilter { get; set; }
+        public int DateFilterDays { get; set; } = 7;
+        public bool IsPrimary { get; set; }
+        public bool SyncWatchlist { get; set; }
+        public bool SkipPreviouslySynced { get; set; } = true;
+        public bool StopOnFailure { get; set; }
+        public bool EnableDiaryImport { get; set; }
+        public bool AutoRequestWatchlist { get; set; }
+    }
+
+    public class AccountsUpdateRequest
+    {
+        public System.Collections.Generic.List<AccountItem>? Accounts { get; set; }
+    }
+
+    /// <summary>Returns the calling user's own Serializd accounts (per-user self-service page).</summary>
+    [HttpGet("Accounts")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult GetAccounts()
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest(new { error = "Could not determine user" });
+
+        var accounts = Plugin.Instance!.Configuration.SerializdAccounts
+            .Where(a => a.UserJellyfinId == userId)
+            .OrderByDescending(a => a.IsPrimary)
+            .Select(a => new
+            {
+                email = a.Email,
+                password = a.Password,
+                enabled = a.Enabled,
+                syncFavorites = a.SyncFavorites,
+                enableDateFilter = a.EnableDateFilter,
+                dateFilterDays = a.DateFilterDays,
+                isPrimary = a.IsPrimary,
+                syncWatchlist = a.SyncWatchlist,
+                skipPreviouslySynced = a.SkipPreviouslySynced,
+                stopOnFailure = a.StopOnFailure,
+                enableDiaryImport = a.EnableDiaryImport,
+                autoRequestWatchlist = a.AutoRequestWatchlist,
+            })
+            .ToList();
+
+        return Ok(new { accounts });
+    }
+
+    /// <summary>
+    /// Bulk-replace the calling user's Serializd accounts. Other users' accounts are
+    /// preserved; each submitted account is stamped with the caller's id. Mirrors the
+    /// Letterboxd per-user <c>PUT /Accounts</c>.
+    /// </summary>
+    [HttpPut("Accounts")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public ActionResult PutAccounts([FromBody] AccountsUpdateRequest request)
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId))
+            return BadRequest(new { error = "Could not determine user" });
+        if (request?.Accounts == null)
+            return BadRequest(new { error = "accounts is required" });
+
+        for (var i = 0; i < request.Accounts.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(request.Accounts[i].Email))
+                return BadRequest(new { error = $"Account #{i + 1} is missing an email/username" });
+        }
+
+        var config = Plugin.Instance!.Configuration;
+        var preserved = config.SerializdAccounts.Where(a => a.UserJellyfinId != userId).ToList();
+        var mine = request.Accounts.Select(req => new Configuration.SerializdAccount
+        {
+            UserJellyfinId = userId,
+            Email = req.Email!.Trim(),
+            Password = req.Password ?? string.Empty,
+            Enabled = req.Enabled,
+            SyncFavorites = req.SyncFavorites,
+            EnableDateFilter = req.EnableDateFilter,
+            DateFilterDays = req.DateFilterDays,
+            IsPrimary = req.IsPrimary,
+            SyncWatchlist = req.SyncWatchlist,
+            SkipPreviouslySynced = req.SkipPreviouslySynced,
+            StopOnFailure = req.StopOnFailure,
+            EnableDiaryImport = req.EnableDiaryImport,
+            AutoRequestWatchlist = req.AutoRequestWatchlist,
+        }).ToList();
+
+        config.SerializdAccounts.Clear();
+        config.SerializdAccounts.AddRange(preserved);
+        config.SerializdAccounts.AddRange(mine);
+        Plugin.Instance!.SaveConfiguration();
+
+        _logger.LogInformation("User {UserId} saved {Count} Serializd account(s) via /Serializd/Accounts", userId, mine.Count);
+        return Ok(new { success = true, count = mine.Count });
+    }
+
     /// <summary>Serializd activity stats for the dashboard, same shape as the Letterboxd <c>/Stats</c>.</summary>
     [HttpGet("Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
