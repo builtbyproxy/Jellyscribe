@@ -658,6 +658,10 @@
                                 + '<label><input type="checkbox" class="szEnabled" /><span class="lb-check-text">'
                                 + '<span class="lb-check-title">Enabled</span>'
                                 + '<span class="lb-check-desc">When on, finished TV episodes for this Jellyfin user are logged to this Serializd account in real time. Saved settings are kept when off.</span>'
+                                + '</span></label>'
+                                + '<label><input type="checkbox" class="szSyncWatchlist" /><span class="lb-check-text">'
+                                + '<span class="lb-check-title">Mirror Serializd watchlist as a Jellyfin playlist</span>'
+                                + '<span class="lb-check-desc">Pulls your Serializd watchlist daily into a Jellyfin playlist called "Serializd Watchlist". Only shows already in your library are added.</span>'
                                 + '</span></label></div>'
                                 + '<div style="display:flex;gap:0.7em;align-items:center;margin-top:0.6em;">'
                                 + '<button type="button" class="lb-btn lb-btn-secondary verifySerializdBtn">Verify login</button>'
@@ -675,6 +679,7 @@
                                 entry.querySelector('.szEmail').value = account.Email || '';
                                 entry.querySelector('.szPassword').value = account.Password || '';
                                 entry.querySelector('.szEnabled').checked = account.Enabled !== false;
+                                entry.querySelector('.szSyncWatchlist').checked = account.SyncWatchlist === true;
                             } else {
                                 entry.querySelector('.szEnabled').checked = true;
                             }
@@ -689,7 +694,8 @@
                                     UserJellyfinId: entry.querySelector('.szJellyfinUser').value,
                                     Email: entry.querySelector('.szEmail').value.trim(),
                                     Password: entry.querySelector('.szPassword').value,
-                                    Enabled: entry.querySelector('.szEnabled').checked
+                                    Enabled: entry.querySelector('.szEnabled').checked,
+                                    SyncWatchlist: entry.querySelector('.szSyncWatchlist').checked
                                 });
                             });
                             return accounts;

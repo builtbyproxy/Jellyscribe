@@ -26,6 +26,7 @@ public class SerializdController : ControllerBase
 {
     private readonly ILogger<SerializdController> _logger;
     private readonly SerializdSyncRunner _syncRunner;
+    private readonly SerializdWatchlistSyncRunner _watchlistRunner;
 
     /// <summary>
     /// Test-only override for the login check. When non-null, <see cref="Verify"/> calls this
@@ -40,10 +41,12 @@ public class SerializdController : ControllerBase
     /// </summary>
     internal Task? LastBackgroundSync { get; private set; }
 
-    public SerializdController(ILogger<SerializdController> logger, SerializdSyncRunner syncRunner)
+    public SerializdController(ILogger<SerializdController> logger, SerializdSyncRunner syncRunner,
+        SerializdWatchlistSyncRunner watchlistRunner)
     {
         _logger = logger;
         _syncRunner = syncRunner;
+        _watchlistRunner = watchlistRunner;
     }
 
     private string? GetCurrentUserId()
@@ -117,6 +120,7 @@ public class SerializdController : ControllerBase
             try
             {
                 await _syncRunner.TryRunForUserAsync(userId, "manual", CancellationToken.None).ConfigureAwait(false);
+                await _watchlistRunner.TryRunForUserAsync(userId, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex)
             {

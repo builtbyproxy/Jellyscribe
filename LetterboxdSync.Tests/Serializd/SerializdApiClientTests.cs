@@ -203,6 +203,29 @@ public class SerializdApiClientTests
     }
 
     [Fact]
+    public async Task GetWatchlistShowTmdbIds_ParsesShowIdsAcrossPages()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/watchlistpage_v2/1"))
+                return Json(HttpStatusCode.OK,
+                    "{\"totalPages\":2,\"items\":[{\"showId\":117648},{\"showId\":136315}]}");
+            if (path.Contains("/watchlistpage_v2/2"))
+                return Json(HttpStatusCode.OK, "{\"totalPages\":2,\"items\":[{\"showId\":206828}]}");
+            return Json(HttpStatusCode.OK, "{\"items\":[]}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var ids = await client.GetWatchlistShowTmdbIdsAsync();
+
+        Assert.Equal(new[] { 117648, 136315, 206828 }, ids); // TMDb showIds, both pages
+    }
+
+    [Fact]
     public async Task ExpiredToken_ReAuthenticatesAndRetries()
     {
         int logins = 0, addAttempts = 0;

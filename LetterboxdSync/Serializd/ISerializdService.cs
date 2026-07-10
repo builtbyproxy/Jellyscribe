@@ -43,4 +43,7 @@ public interface ISerializdService : IDisposable
     /// <param name="rating">Serializd rating 1..10, or null to leave unrated.</param>
     /// <param name="like">True to heart the show (Jellyfin favorite).</param>
     Task SetShowMetaAsync(int showTmdbId, int? rating, bool like);
+
+    /// <summary>Returns the TMDb show ids on the authenticated user's Serializd watchlist.</summary>
+    Task<List<int>> GetWatchlistShowTmdbIdsAsync();
 }

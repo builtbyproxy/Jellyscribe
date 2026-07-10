@@ -37,4 +37,7 @@ public class SerializdAccount
     public string? SerializdUsername { get; set; }
 
     public bool Enabled { get; set; }
+
+    /// <summary>Opt-in: mirror this account's Serializd watchlist into a Jellyfin playlist ("Serializd Watchlist").</summary>
+    public bool SyncWatchlist { get; set; }
 }

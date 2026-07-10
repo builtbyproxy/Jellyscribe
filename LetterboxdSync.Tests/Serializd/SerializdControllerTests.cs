@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using LetterboxdSync.Api;
 using LetterboxdSync.Serializd;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Playlists;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,8 +18,12 @@ public class SerializdControllerTests : IDisposable
         => new(new LoggerFactory(), Substitute.For<ILibraryManager>(),
                Substitute.For<IUserManager>(), Substitute.For<IUserDataManager>());
 
+    private static SerializdWatchlistSyncRunner MakeWatchlistRunner()
+        => new(new LoggerFactory(), Substitute.For<ILibraryManager>(),
+               Substitute.For<IUserManager>(), Substitute.For<IPlaylistManager>());
+
     private readonly SerializdController _controller =
-        new(new NullLogger<SerializdController>(), MakeRunner());
+        new(new NullLogger<SerializdController>(), MakeRunner(), MakeWatchlistRunner());
 
     public void Dispose() => SerializdController.VerifyOverrideForTesting = null;
 

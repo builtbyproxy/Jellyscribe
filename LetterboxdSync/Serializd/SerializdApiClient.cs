@@ -28,6 +28,7 @@ public class SerializdApiClient : ISerializdService
     private string _email = string.Empty;
     private string _password = string.Empty;
     private string _token = string.Empty;
+    private string _username = string.Empty;
 
     /// <summary>Serializd username returned by the most recent fresh login (null when a cached token was reused).</summary>
     public string? Username { get; private set; }
@@ -114,6 +115,7 @@ public class SerializdApiClient : ISerializdService
         _token = doc.RootElement.GetProperty("token").GetString()
             ?? throw new Exception("Serializd login response had no token");
         Username = doc.RootElement.TryGetProperty("username", out var u) ? u.GetString() : null;
+        _username = Username ?? string.Empty;
 
         TokenCache[_email] = _token;
         _logger.LogInformation("Authenticated with Serializd as {Email}", _email);
@@ -213,6 +215,56 @@ public class SerializdApiClient : ISerializdService
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
             throw new Exception($"Serializd {path} failed ({(int)resp.StatusCode}): {err}");
         }
+    }
+
+    public async Task<List<int>> GetWatchlistShowTmdbIdsAsync()
+    {
+        await EnsureUsernameAsync().ConfigureAwait(false);
+        if (string.IsNullOrEmpty(_username))
+            throw new Exception("Serializd username unknown; cannot read watchlist");
+
+        var ids = new List<int>();
+        var seen = new HashSet<int>();
+        for (var page = 1; page <= 100; page++)
+        {
+            using var resp = await SendAsync(HttpMethod.Get,
+                $"/user/{Uri.EscapeDataString(_username)}/watchlistpage_v2/{page}?sort_by=date_added_desc")
+                .ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) break;
+
+            var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("items", out var items)
+                || items.ValueKind != JsonValueKind.Array || items.GetArrayLength() == 0)
+                break;
+
+            foreach (var it in items.EnumerateArray())
+            {
+                // Watchlist items are keyed by TMDb show id (`showId`).
+                if (it.TryGetProperty("showId", out var sid) && sid.TryGetInt32(out var id) && seen.Add(id))
+                    ids.Add(id);
+            }
+
+            var totalPages = doc.RootElement.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var t) ? t : page;
+            if (page >= totalPages) break;
+        }
+
+        return ids;
+    }
+
+    /// <summary>Resolves the authenticated user's own username (needed for user-scoped reads) if not already known.</summary>
+    private async Task EnsureUsernameAsync()
+    {
+        if (!string.IsNullOrEmpty(_username)) return;
+
+        var body = JsonSerializer.Serialize(new Dictionary<string, object> { ["token"] = _token });
+        using var resp = await SendAsync(HttpMethod.Post, "/validateauthtoken", body).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode) return;
+
+        var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+        using var doc = JsonDocument.Parse(json);
+        if (doc.RootElement.TryGetProperty("username", out var u))
+            _username = u.GetString() ?? string.Empty;
     }
 
     public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
