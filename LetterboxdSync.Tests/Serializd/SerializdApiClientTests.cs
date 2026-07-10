@@ -204,7 +204,7 @@ public class SerializdApiClientTests
     }
 
     [Fact]
-    public async Task GetWatchlistShowTmdbIds_ParsesShowIdsAcrossPages()
+    public async Task GetWatchlist_ParsesShowsAndResolvesWatchlistedSeasonNumbers()
     {
         var handler = new ApiMockHandler(req =>
         {
@@ -212,18 +212,27 @@ public class SerializdApiClientTests
             if (path.EndsWith("/login"))
                 return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
             if (path.Contains("/watchlistpage_v2/1"))
+                // The Bear (136315): seasonIds 515011 → season 5. Whole-show item (206828): no seasonIds.
                 return Json(HttpStatusCode.OK,
-                    "{\"totalPages\":2,\"items\":[{\"showId\":117648},{\"showId\":136315}]}");
-            if (path.Contains("/watchlistpage_v2/2"))
-                return Json(HttpStatusCode.OK, "{\"totalPages\":2,\"items\":[{\"showId\":206828}]}");
+                    "{\"totalPages\":1,\"items\":[" +
+                    "{\"showId\":136315,\"seasonIds\":[515011]}," +
+                    "{\"showId\":206828,\"seasonIds\":[]}]}");
+            if (path.Contains("/show/136315"))
+                return Json(HttpStatusCode.OK, "{\"seasons\":[{\"id\":392941,\"seasonNumber\":3},{\"id\":515011,\"seasonNumber\":5}]}");
+            if (path.Contains("/show/206828"))
+                return Json(HttpStatusCode.OK, "{\"seasons\":[{\"id\":302382,\"seasonNumber\":1}]}");
             return Json(HttpStatusCode.OK, "{\"items\":[]}");
         });
 
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
-        var ids = await client.GetWatchlistShowTmdbIdsAsync();
+        var entries = await client.GetWatchlistAsync();
 
-        Assert.Equal(new[] { 117648, 136315, 206828 }, ids); // TMDb showIds, both pages
+        Assert.Equal(2, entries.Count);
+        var bear = entries.Single(e => e.ShowTmdbId == 136315);
+        Assert.Equal(new[] { 5 }, bear.SeasonNumbers);              // season 515011 → 5
+        var whole = entries.Single(e => e.ShowTmdbId == 206828);
+        Assert.Empty(whole.SeasonNumbers);                          // no seasonIds → whole show
     }
 
     [Fact]

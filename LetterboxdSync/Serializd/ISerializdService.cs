@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 
 namespace LetterboxdSync.Serializd;
 
+/// <summary>A show on the Serializd watchlist, with the specific season numbers watchlisted.</summary>
+public sealed record SerializdWatchlistEntry(int ShowTmdbId, IReadOnlyList<int> SeasonNumbers);
+
 /// <summary>
 /// Business operations against a single authenticated Serializd account. The
 /// factory (<see cref="SerializdServiceFactory"/>) hands back an already-logged-in
@@ -44,6 +47,9 @@ public interface ISerializdService : IDisposable
     /// <param name="like">True to heart the show (Jellyfin favorite).</param>
     Task SetShowMetaAsync(int showTmdbId, int? rating, bool like);
 
-    /// <summary>Returns the TMDb show ids on the authenticated user's Serializd watchlist.</summary>
-    Task<List<int>> GetWatchlistShowTmdbIdsAsync();
+    /// <summary>
+    /// Returns the authenticated user's Serializd watchlist: each show (TMDb id) plus the
+    /// specific season numbers watchlisted (empty = the whole show / no season detail).
+    /// </summary>
+    Task<List<SerializdWatchlistEntry>> GetWatchlistAsync();
 }

@@ -217,13 +217,13 @@ public class SerializdApiClient : ISerializdService
         }
     }
 
-    public async Task<List<int>> GetWatchlistShowTmdbIdsAsync()
+    public async Task<List<SerializdWatchlistEntry>> GetWatchlistAsync()
     {
         await EnsureUsernameAsync().ConfigureAwait(false);
         if (string.IsNullOrEmpty(_username))
             throw new Exception("Serializd username unknown; cannot read watchlist");
 
-        var ids = new List<int>();
+        var entries = new List<SerializdWatchlistEntry>();
         var seen = new HashSet<int>();
         for (var page = 1; page <= 100; page++)
         {
@@ -240,16 +240,41 @@ public class SerializdApiClient : ISerializdService
 
             foreach (var it in items.EnumerateArray())
             {
-                // Watchlist items are keyed by TMDb show id (`showId`).
-                if (it.TryGetProperty("showId", out var sid) && sid.TryGetInt32(out var id) && seen.Add(id))
-                    ids.Add(id);
+                // Watchlist items carry a TMDb `showId` plus `seasonIds` (Serializd's internal
+                // season ids) for the specific seasons watchlisted.
+                if (!it.TryGetProperty("showId", out var sid) || !sid.TryGetInt32(out var showTmdb) || !seen.Add(showTmdb))
+                    continue;
+
+                var serializdSeasonIds = new List<int>();
+                if (it.TryGetProperty("seasonIds", out var seasonIdsEl) && seasonIdsEl.ValueKind == JsonValueKind.Array)
+                    foreach (var s in seasonIdsEl.EnumerateArray())
+                        if (s.TryGetInt32(out var sidVal)) serializdSeasonIds.Add(sidVal);
+
+                var seasonNumbers = await ResolveSeasonNumbersAsync(showTmdb, serializdSeasonIds).ConfigureAwait(false);
+                entries.Add(new SerializdWatchlistEntry(showTmdb, seasonNumbers));
             }
 
             var totalPages = doc.RootElement.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var t) ? t : page;
             if (page >= totalPages) break;
         }
 
-        return ids;
+        return entries;
+    }
+
+    /// <summary>Maps Serializd internal season ids to season numbers via the show's season map.</summary>
+    private async Task<IReadOnlyList<int>> ResolveSeasonNumbersAsync(int showTmdbId, IReadOnlyList<int> serializdSeasonIds)
+    {
+        if (serializdSeasonIds.Count == 0) return Array.Empty<int>();
+
+        var numberToId = await FetchSeasonMapAsync(showTmdbId).ConfigureAwait(false);
+        var idToNumber = new Dictionary<int, int>();
+        foreach (var kv in numberToId) idToNumber[kv.Value] = kv.Key;
+
+        var numbers = new List<int>();
+        foreach (var sid in serializdSeasonIds)
+            if (idToNumber.TryGetValue(sid, out var num)) numbers.Add(num);
+        numbers.Sort();
+        return numbers;
     }
 
     /// <summary>Resolves the authenticated user's own username (needed for user-scoped reads) if not already known.</summary>
