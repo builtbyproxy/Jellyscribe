@@ -204,18 +204,34 @@ public class SerializdWatchlistSyncRunner
 
         if (account.AutoRequestWatchlist)
         {
-            // Default: only shows missing from the library. Backfill mode: the whole watchlist,
-            // so already-available shows also get an attributed request (Seerr's already-exists
-            // handling makes a duplicate a harmless no-op).
-            var candidates = account.BackfillAvailableRequests
-                ? entries
-                : entries.Where(e => !seriesByTmdb.ContainsKey(e.ShowTmdbId.ToString())).ToList();
+            // Build the request list per watchlisted show. The default is season-completeness
+            // aware: a show entirely absent is requested whole; a show that's only partially in
+            // the library is requested for JUST the watchlisted seasons that are still missing
+            // episodes, so Seerr/Sonarr fill the gaps (e.g. you have S1E2 → S1 is re-requested and
+            // Sonarr searches the rest). A season already complete on disk is skipped. Backfill
+            // mode ignores completeness and requests the watchlisted seasons regardless (requester
+            // trail); Seerr's already-exists handling makes a redundant request a harmless no-op.
+            var requests = new List<(int Tmdb, IReadOnlyList<int> Seasons)>();
+            foreach (var entry in entries)
+            {
+                var inLibrary = seriesByTmdb.TryGetValue(entry.ShowTmdbId.ToString(), out var series);
+                if (account.BackfillAvailableRequests || !inLibrary)
+                {
+                    requests.Add((entry.ShowTmdbId, entry.SeasonNumbers));
+                }
+                else
+                {
+                    var incomplete = IncompleteWatchlistedSeasons(user, series!, entry.SeasonNumbers);
+                    if (incomplete.Count > 0)
+                        requests.Add((entry.ShowTmdbId, incomplete));
+                }
+            }
 
             int requested = 0, existing = 0, failed = 0;
-            foreach (var entry in candidates)
+            foreach (var (tmdb, seasons) in requests)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var result = await seerr.RequestSeriesAsync(entry.ShowTmdbId, seerrUserId.Value, entry.SeasonNumbers, account.BackfillAvailableRequests).ConfigureAwait(false);
+                var result = await seerr.RequestSeriesAsync(tmdb, seerrUserId.Value, seasons, account.BackfillAvailableRequests).ConfigureAwait(false);
                 switch (result)
                 {
                     case SeerrClient.RequestResult.Requested: requested++; break;
@@ -226,8 +242,57 @@ public class SerializdWatchlistSyncRunner
 
             if (requested + existing + failed > 0)
                 _logger.LogInformation("Serializd watchlist Seerr auto-request for {Username} ({Mode}): {Requested} new, {Existing} already on Seerr, {Failed} failed",
-                    user.Username, account.BackfillAvailableRequests ? "backfill" : "unmatched-only", requested, existing, failed);
+                    user.Username, account.BackfillAvailableRequests ? "backfill" : "incomplete-seasons", requested, existing, failed);
         }
+    }
+
+    /// <summary>
+    /// The watchlisted seasons of a show that are NOT fully present on disk (missing ≥1 episode),
+    /// so Seerr/Sonarr can be asked to fill just those. Completeness is judged against Jellyfin's
+    /// own episode list for the series: episodes it knows about but has no file for are virtual
+    /// (missing) items, so a season with any virtual episode is incomplete. An unknown season
+    /// (not in Jellyfin's metadata) is treated as incomplete so it's still requested. When the
+    /// entry names no seasons (whole-show watchlist), every season the show has is considered.
+    /// Returns an empty list when every watchlisted season is complete (nothing to request).
+    /// </summary>
+    private List<int> IncompleteWatchlistedSeasons(User user, BaseItem series, IReadOnlyList<int> watchlistedSeasons)
+    {
+        var eps = _libraryManager.GetItemList(new InternalItemsQuery(user)
+        {
+            IncludeItemTypes = new[] { BaseItemKind.Episode },
+            AncestorIds = new[] { series.Id },
+            Recursive = true,
+            // IsVirtualItem left unset → returns both on-disk and missing (virtual) episodes.
+        }).OfType<Episode>().ToList();
+
+        // season number -> (episodes present on disk, total grabbable episodes). A missing
+        // (virtual) episode counts toward the total only once it has aired: an unaired future
+        // episode isn't grabbable, so it must not make an ongoing season look "incomplete"
+        // forever and trigger a pointless re-request every sync.
+        var bySeason = new Dictionary<int, (int Present, int Total)>();
+        foreach (var ep in eps)
+        {
+            var s = ep.ParentIndexNumber ?? -1;
+            if (s < 0) continue; // skip specials / unparented
+            var onDisk = !ep.IsVirtualItem;
+            var aired = ep.PremiereDate.HasValue && ep.PremiereDate.Value.ToUniversalTime() <= DateTime.UtcNow;
+            if (!onDisk && !aired) continue; // unaired, not yet grabbable
+            bySeason.TryGetValue(s, out var c);
+            bySeason[s] = (c.Present + (onDisk ? 1 : 0), c.Total + 1);
+        }
+
+        var targets = watchlistedSeasons.Count > 0
+            ? watchlistedSeasons
+            : bySeason.Keys.Where(s => s > 0).ToList();
+
+        var incomplete = new List<int>();
+        foreach (var s in targets)
+        {
+            if (!bySeason.TryGetValue(s, out var c) || c.Present < c.Total)
+                incomplete.Add(s);
+        }
+
+        return incomplete;
     }
 
     /// <summary>
