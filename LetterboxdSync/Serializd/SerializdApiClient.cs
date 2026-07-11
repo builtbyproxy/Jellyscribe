@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -42,6 +43,15 @@ public class SerializdApiClient : ISerializdService
     // stable enough to cache; a miss on a season number triggers one forced refetch
     // (a newly-aired season) before giving up (see ResolveSeasonIdAsync).
     private static readonly ConcurrentDictionary<int, IReadOnlyDictionary<int, int>> SeasonCache = new();
+
+    // Serializd 500s when hit with a concurrent burst (seen during the initial diary backfill:
+    // 6-7 parallel /show/reviews/add in the same second all returned 500). Two guards keep the
+    // backfill polite and self-healing:
+    //   1. a process-wide gate caps how many Serializd requests are in flight at once, and
+    //   2. SendAsync retries transient 5xx with exponential backoff (a slower pass succeeds).
+    private const int MaxConcurrentRequests = 2;
+    private const int MaxSendAttempts = 4; // initial try + 3 backoff retries
+    private static readonly SemaphoreSlim RequestGate = new(MaxConcurrentRequests, MaxConcurrentRequests);
 
     public SerializdApiClient(ILogger logger, HttpMessageHandler? handler = null)
     {
@@ -404,7 +414,7 @@ public class SerializdApiClient : ISerializdService
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path,
-        string? body = null, bool authenticated = true, bool isRetry = false)
+        string? body = null, bool authenticated = true, bool isRetry = false, int attempt = 0)
     {
         using var request = new HttpRequestMessage(method, SerializdApiConstants.BaseUrl + path);
         if (authenticated && !string.IsNullOrEmpty(_token))
@@ -412,7 +422,18 @@ public class SerializdApiClient : ISerializdService
         if (body != null)
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
 
-        var response = await _http.SendAsync(request).ConfigureAwait(false);
+        // Cap concurrency: the gate wraps only the raw send (never a delay or the recursive
+        // retry), so a slow endpoint can't hold a slot and the 401/login recursion can't deadlock.
+        HttpResponseMessage response;
+        await RequestGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            response = await _http.SendAsync(request).ConfigureAwait(false);
+        }
+        finally
+        {
+            RequestGate.Release();
+        }
 
         if (response.StatusCode == (HttpStatusCode)429 && !isRetry)
         {
@@ -421,6 +442,20 @@ public class SerializdApiClient : ISerializdService
             response.Dispose();
             await Task.Delay(TimeSpan.FromSeconds(retryAfter)).ConfigureAwait(false);
             return await SendAsync(method, path, body, authenticated, isRetry: true).ConfigureAwait(false);
+        }
+
+        // Transient server errors (Serializd 500s under load, plus 502/503/504): back off and
+        // retry a few times. A correct-but-overloaded request reliably lands on a later pass;
+        // a genuinely-broken one just exhausts the retries and throws as before.
+        var code = (int)response.StatusCode;
+        if ((code == 500 || code == 502 || code == 503 || code == 504) && attempt + 1 < MaxSendAttempts)
+        {
+            response.Dispose();
+            var delayMs = (int)(Math.Pow(2, attempt) * 500) + Random.Shared.Next(0, 400); // ~0.5s, 1s, 2s (+jitter)
+            _logger.LogWarning("Serializd {Path} returned {Code}; backing off {Ms}ms then retry {Next}/{Max}",
+                path, code, delayMs, attempt + 2, MaxSendAttempts);
+            await Task.Delay(delayMs).ConfigureAwait(false);
+            return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1).ConfigureAwait(false);
         }
 
         // Token went stale: clear the cache, re-login with stored credentials, retry once.
