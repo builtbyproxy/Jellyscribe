@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.19.4.0",
+        "changelog": "Docs-only; ships no release.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.19.4/jellyfin-plugin-letterboxd-v1.19.4.zip",
+        "checksum": "526f85923614d7da784763a9fb947020",
+        "timestamp": "2026-07-13T11:47:59Z"
+      },
+      {
         "version": "1.19.3.0",
         "changelog": "A small improvement to the opt-in anonymous telemetry: alongside the existing per-week sync bucket, the weekly ping now includes a lifetime sync bucket. Until now, an instance reporting zero syncs in a week was indistinguishable from one where syncing never worked at all; the lifetime bucket separates the two, so setup problems can be spotted and fixed. Same privacy rules as everything else: a coarse bucket only (0, 1-10, 11-100, 100+), never exact numbers, and nothing is sent unless you opted in.",
         "targetAbi": "10.11.9.0",
