@@ -223,11 +223,7 @@ public class SeerrClient : IDisposable
 
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         // Belt-and-braces: Seerr returns 409 when an active request already exists; treat as a no-op.
-        if ((int)response.StatusCode == 409 ||
-            responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase))
+        if (IsAlreadyExistsResponse(response.StatusCode, responseBody))
         {
             _logger.LogDebug("Seerr already has request for TMDb {TmdbId} (user {UserId}): {Body}",
                 tmdbId, jellyseerrUserId, Truncate(responseBody, 200));
@@ -273,11 +269,7 @@ public class SeerrClient : IDisposable
             return available ? RequestResult.AlreadyExists : RequestResult.Requested;
         }
 
-        if ((int)response.StatusCode == 409 ||
-            responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase))
+        if (IsAlreadyExistsResponse(response.StatusCode, responseBody))
         {
             _logger.LogInformation("Seerr TV request TMDb {TmdbId} S[{Seasons}] → already exists (HTTP {Status})",
                 tmdbId, seasonsLabel, (int)response.StatusCode);
@@ -459,6 +451,19 @@ public class SeerrClient : IDisposable
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return false;
     }
+
+    /// <summary>
+    /// Shared by RequestMovieAsync and RequestSeriesAsync: Jellyseerr signals "you already have
+    /// this" a few different ways (an HTTP 409, or one of several phrases in the error body
+    /// depending on version/media type). Kept in one place so a new phrase Jellyseerr starts
+    /// using only needs updating once, not once per media-type method.
+    /// </summary>
+    private static bool IsAlreadyExistsResponse(HttpStatusCode status, string responseBody)
+        => (int)status == 409 ||
+           responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
+           responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
+           responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
+           responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase);
 
     private static string Truncate(string s, int max) => s.Length > max ? s.Substring(0, max) + "..." : s;
 
