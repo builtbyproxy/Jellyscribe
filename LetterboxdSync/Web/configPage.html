@@ -241,16 +241,6 @@
                                 <button type="button" class="ws-chip" data-f="letterboxd"><span class="ws-dot film"></span>Film · Letterboxd</button>
                                 <button type="button" class="ws-chip" data-f="serializd"><span class="ws-dot tv"></span>TV · Serializd</button>
                             </div>
-                            <div class="ws-filters" id="ovStatusFilters">
-                                <span class="ws-label" style="align-self:center;margin-right:2px;">Status</span>
-                                <button type="button" class="ws-chip on" data-s="all">All</button>
-                                <button type="button" class="ws-chip" data-s="hide-skipped">Hide skipped</button>
-                                <button type="button" class="ws-chip" data-s="Success">Synced</button>
-                                <button type="button" class="ws-chip" data-s="Rewatch">Rewatch</button>
-                                <button type="button" class="ws-chip" data-s="Reviewed">Reviewed</button>
-                                <button type="button" class="ws-chip" data-s="Skipped">Skipped</button>
-                                <button type="button" class="ws-chip" data-s="Failed">Failed</button>
-                            </div>
                             <span id="syncStatus" class="ws-muted" style="font-size:12.5px;"></span>
                             <div class="ws-jw" id="jobWatcher" style="display:none;">
                                 <div class="ws-jw-head"><span class="ws-spin" id="jwSpin"></span><b id="jwTitle">Syncing…</b><span class="ws-mono ws-muted ws-jw-elapsed" id="jwElapsed"></span></div>
@@ -267,6 +257,15 @@
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
                             </div>
                             <div class="ws-sect-title"><h2>Recent activity</h2><span class="rule"></span></div>
+                            <div class="ws-filters" id="ovStatusFilters">
+                                <button type="button" class="ws-chip on" data-s="all">All</button>
+                                <button type="button" class="ws-chip" data-s="hide-skipped">Hide skipped</button>
+                                <button type="button" class="ws-chip" data-s="Success">Synced</button>
+                                <button type="button" class="ws-chip" data-s="Rewatch">Rewatch</button>
+                                <button type="button" class="ws-chip" data-s="Reviewed">Reviewed</button>
+                                <button type="button" class="ws-chip" data-s="Skipped">Skipped</button>
+                                <button type="button" class="ws-chip" data-s="Failed">Failed</button>
+                            </div>
                             <div class="ws-panel" style="overflow-x:auto;">
                                 <table class="ws-table"><thead><tr><th>Title</th><th>Status</th><th>Source</th><th>When</th><th></th></tr></thead><tbody id="historyBody"><tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">Loading…</td></tr></tbody></table>
                             </div>
