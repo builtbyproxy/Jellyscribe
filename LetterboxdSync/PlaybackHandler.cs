@@ -243,7 +243,10 @@ public class PlaybackHandler : IHostedService, IDisposable
                             TmdbId = epRef.ShowTmdbId,
                             Username = user.Username ?? string.Empty,
                             Timestamp = DateTime.UtcNow,
-                            ViewingDate = DateTime.Now.Date,
+                            // UTC, matching SerializdSyncRunner's WatchedAtUtc: a local-date stamp
+                            // here would show a different calendar day near midnight than the
+                            // catch-up path records for the same logical watch.
+                            ViewingDate = DateTime.UtcNow.Date,
                             Status = isRewatch ? SyncStatus.Rewatch : SyncStatus.Success,
                             Source = "playback",
                         });

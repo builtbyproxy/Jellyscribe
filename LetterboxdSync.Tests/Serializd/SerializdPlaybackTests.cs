@@ -50,9 +50,11 @@ public class SerializdPlaybackTests : IDisposable
             Substitute.For<IUserDataManager>(),
             new LoggerFactory().CreateLogger<PlaybackHandler>());
 
-        // Isolate the dated-log dedup history to this test's temp dir.
+        // Isolate the dated-log dedup history and activity feed to this test's temp dir.
         SerializdSyncHistory.DataPathOverride = Path.Combine(_tempDir, "sz-history.jsonl");
         SerializdSyncHistory.ResetForTesting();
+        SerializdActivity.DataPathOverride = Path.Combine(_tempDir, "sz-activity.jsonl");
+        SerializdActivity.ResetForTesting();
     }
 
     public void Dispose()
@@ -61,6 +63,8 @@ public class SerializdPlaybackTests : IDisposable
         LetterboxdServiceFactory.OverrideForTesting = null;
         SerializdSyncHistory.DataPathOverride = null;
         SerializdSyncHistory.ResetForTesting();
+        SerializdActivity.DataPathOverride = null;
+        SerializdActivity.ResetForTesting();
         // Restore a functional equivalent of the production default so a leftover
         // override can't leak into another test class.
         PlaybackHandler.SeriesTmdbIdReader = ep =>
@@ -113,6 +117,35 @@ public class SerializdPlaybackTests : IDisposable
             Arg.Is<IReadOnlyList<int>>(l => l.Count == 1 && l[0] == 4));
         // Also creates a dated diary log for the episode (backdated to ~now, first watch = not a rewatch).
         await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+    }
+
+    [Fact]
+    public async Task Episode_LogsActivity_WithUtcViewingDate()
+    {
+        // SerializdSyncRunner's catch-up stamps ViewingDate with the UTC watch date
+        // (WatchedAtUtc); the real-time path must match, or the same logical watch
+        // shows a different calendar day in the activity feed depending on which
+        // path logged it (worst near midnight, where local and UTC dates differ).
+        var (user, idHex) = MakeUser();
+        AddSerializdAccount(idHex);
+        PlaybackHandler.SeriesTmdbIdReader = _ => 1396;
+
+        var svc = Substitute.For<ISerializdService>();
+        svc.ResolveSeasonIdAsync(1396, 1).Returns(Task.FromResult<int?>(3572));
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(svc);
+
+        var before = DateTime.UtcNow.Date;
+        await _handler.HandlePlaybackStoppedAsync(new PlaybackStopEventArgs
+        {
+            Item = MakeEpisode(1, 4),
+            PlayedToCompletion = true,
+            Users = new List<User> { user },
+        });
+
+        var (events, _) = SerializdActivity.GetPage(0, 10, user.Username);
+        var recorded = Assert.Single(events);
+        Assert.Equal(before, recorded.ViewingDate!.Value.Date);
+        Assert.Equal(DateTimeKind.Utc, recorded.ViewingDate!.Value.Kind);
     }
 
     [Fact]
