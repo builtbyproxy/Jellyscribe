@@ -173,7 +173,7 @@
                     <main class="ws-main">
                         <section class="ws-view show" data-sec="overview">
                             <div class="ws-head"><div><h1>Your diaries</h1><p>What we've logged from your watching, across both accounts.</p></div>
-                                <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="runWatchlistBtn">Sync watchlist</button><button type="button" class="ws-btn primary" id="runSyncBtn">Run sync now</button></div></div>
+                                <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="runWatchlistBtn">Sync all watchlists</button><button type="button" class="ws-btn primary" id="runSyncBtn">Sync all now</button></div></div>
                             <div class="ws-filters" id="ovFilters">
                                 <button type="button" class="ws-chip on" data-f="all">All</button>
                                 <button type="button" class="ws-chip" data-f="letterboxd"><span class="ws-dot film"></span>Film</button>
@@ -254,7 +254,7 @@
                         wire: function () {
                             var self = this, nav = document.getElementById('wsNav');
                             nav.addEventListener('click', function (e) { var a = e.target.closest('a[data-sec]'); if (!a) return; nav.querySelectorAll('a').forEach(function (x) { x.classList.remove('active'); }); a.classList.add('active'); var sec = a.getAttribute('data-sec'); document.querySelectorAll('.ws-view').forEach(function (v) { v.classList.toggle('show', v.getAttribute('data-sec') === sec); }); });
-                            document.getElementById('ovFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovFilter = c.getAttribute('data-f'); self.renderOverview(); });
+                            document.getElementById('ovFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovFilter = c.getAttribute('data-f'); self.renderOverview(); self.syncLabels(); });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
                             document.getElementById('runWatchlistBtn').addEventListener('click', function () { self.runWatchlist(); });
                             document.getElementById('mCancelBtn').addEventListener('click', function () { document.getElementById('acctModal').classList.remove('show'); });
@@ -300,6 +300,11 @@
                             }).join('');
                         },
 
+                        syncLabels: function () {
+                            var f = this.ovFilter, svc = f === 'serializd' ? 'TV' : (f === 'letterboxd' ? 'film' : 'all');
+                            document.getElementById('runSyncBtn').textContent = f === 'all' ? 'Sync all now' : 'Sync ' + svc + ' now';
+                            document.getElementById('runWatchlistBtn').textContent = f === 'all' ? 'Sync all watchlists' : 'Sync ' + svc + ' watchlist';
+                        },
                         runSync: function () {
                             var self = this, f = self.ovFilter; document.getElementById('syncStatus').innerHTML = '<span class="ws-muted">Starting…</span>';
                             var jobs = [];

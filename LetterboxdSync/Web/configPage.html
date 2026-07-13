@@ -202,8 +202,8 @@
                             <div class="ws-head">
                                 <div><h1>Overview</h1><p>Everything Jellyfin has scrobbled across both diaries.</p></div>
                                 <div style="display:flex;gap:8px;">
-                                    <button type="button" class="ws-btn" id="runWatchlistBtn">Sync watchlist</button>
-                                    <button type="button" class="ws-btn primary" id="runSyncBtn">Run sync now</button>
+                                    <button type="button" class="ws-btn" id="runWatchlistBtn">Sync all watchlists</button>
+                                    <button type="button" class="ws-btn primary" id="runSyncBtn">Sync all now</button>
                                 </div>
                             </div>
                             <div class="ws-filters" id="ovFilters">
@@ -370,6 +370,7 @@
                                 this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on');
                                 self.ovFilter = c.getAttribute('data-f');
                                 self.renderOverview();
+                                self.syncLabels();
                             });
                             document.getElementById('actFilters').addEventListener('click', function (e) {
                                 var c = e.target.closest('.ws-chip'); if (!c) return;
@@ -490,6 +491,11 @@
                                 var task = tasks.filter(function (t) { return t.Key === key; })[0];
                                 if (task) return ApiClient.ajax({ url: ApiClient.getUrl('ScheduledTasks/Running/' + task.Id), type: 'POST' });
                             });
+                        },
+                        syncLabels: function () {
+                            var f = this.ovFilter, svc = f === 'serializd' ? 'TV' : (f === 'letterboxd' ? 'film' : 'all');
+                            document.getElementById('runSyncBtn').textContent = f === 'all' ? 'Sync all now' : 'Sync ' + svc + ' now';
+                            document.getElementById('runWatchlistBtn').textContent = f === 'all' ? 'Sync all watchlists' : 'Sync ' + svc + ' watchlist';
                         },
                         runSync: function () {
                             var self = this, f = self.ovFilter; self.setStatus('<span class="ws-muted">Starting…</span>');
