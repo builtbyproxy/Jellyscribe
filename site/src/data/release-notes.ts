@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.19.6',
+    headline: 'Reverse sync now explains itself when it has nothing to do',
+    summary:
+      'If the "Import Letterboxd diary as Jellyfin watched" task ran and did nothing, it used to finish in a second and leave no trace in the log, so a switched-off toggle looked identical to a broken feature. The task now says why it skipped each user (for example, an account exists but diary import is not turned on, with a pointer to the setting), reports when your Letterboxd returned no films, and always ends with a one-line summary of what it checked. A stuck progress banner on the dashboard for empty diaries is also fixed. If reverse sync has not been working for you, update, run the task once, and the log will now tell you exactly why.',
+    highlights: {
+      fixes: [
+        'The diary import task logs the reason whenever it skips a user, reports empty results, and always writes a completion summary, so a run that does nothing is explainable from the log alone.',
+        'Fixed the dashboard progress banner staying active forever when a diary import found no films to import.',
+      ],
+    },
+  },
+  {
     version: '1.19.3',
     headline: 'Telemetry can now tell a quiet week from a plugin that never worked',
     summary:
