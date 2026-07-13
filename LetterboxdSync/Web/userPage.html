@@ -40,7 +40,7 @@
                     }
                 }
                 #letterboxdUserPage .content-primary, #letterboxdUserPage div[data-role="content"] { padding: 0 !important; margin: 0 !important; max-width: none !important; }
-                #letterboxdUserPage .ws { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 3.4rem); background: var(--ws-bg); overflow: hidden; }
+                #letterboxdUserPage .ws { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 3.4rem); background: var(--ws-bg); }
                 #letterboxdUserPage .ws-rail { border-right: 1px solid var(--ws-border); background: var(--ws-surface); padding: 22px 16px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; height: calc(100vh - 3.4rem); align-self: start; }
                 #letterboxdUserPage .ws-brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
                 #letterboxdUserPage .ws-glyph { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: linear-gradient(150deg, var(--ws-film), var(--ws-tv)); }
@@ -53,7 +53,7 @@
                 #letterboxdUserPage .ws-nav a:hover { background: var(--ws-surface-2); color: var(--ws-text); }
                 #letterboxdUserPage .ws-nav a.active { background: var(--ws-primary-soft); color: var(--ws-text); }
                 #letterboxdUserPage .ws-nav a.active svg { opacity: 1; color: var(--ws-primary); }
-                #letterboxdUserPage .ws-main { padding: 24px 32px 40px; min-width: 0; }
+                #letterboxdUserPage .ws-main { padding: 24px 32px 40px; min-width: 0; overflow-x: hidden; }
                 #letterboxdUserPage .ws-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
                 #letterboxdUserPage .ws-head h1 { font-size: 21px; font-weight: 650; letter-spacing: -.02em; margin: 0; }
                 #letterboxdUserPage .ws-head p { margin: 4px 0 0; color: var(--ws-muted); font-size: 13px; }
@@ -195,6 +195,7 @@
                             </div>
                             <div class="ws-sect-title"><h2>Recent activity</h2><span class="rule"></span></div>
                             <div class="ws-panel" style="overflow-x:auto;"><table class="ws-table"><thead><tr><th>Title</th><th>Status</th><th>Source</th><th>When</th><th></th></tr></thead><tbody id="historyBody"><tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">Loading…</td></tr></tbody></table></div>
+                            <div id="historyPagination" style="display:none;margin-top:12px;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;"><button type="button" class="ws-btn" id="historyPrev">‹ Prev</button><span id="historyPageInfo" class="ws-muted ws-mono" style="margin:0 8px;"></span><button type="button" class="ws-btn" id="historyNext">Next ›</button></div>
                         </section>
                         <section class="ws-view" data-sec="accounts">
                             <div class="ws-head"><div><h1>My accounts</h1><p>Link your Letterboxd (film) and Serializd (TV) accounts. We log what you watch to each.</p></div></div>
@@ -260,7 +261,9 @@
                         wire: function () {
                             var self = this, nav = document.getElementById('wsNav');
                             nav.addEventListener('click', function (e) { var a = e.target.closest('a[data-sec]'); if (!a) return; nav.querySelectorAll('a').forEach(function (x) { x.classList.remove('active'); }); a.classList.add('active'); var sec = a.getAttribute('data-sec'); document.querySelectorAll('.ws-view').forEach(function (v) { v.classList.toggle('show', v.getAttribute('data-sec') === sec); }); });
-                            document.getElementById('ovFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovFilter = c.getAttribute('data-f'); self.renderOverview(); self.syncLabels(); });
+                            document.getElementById('ovFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovFilter = c.getAttribute('data-f'); self.ovPage = 0; self.renderOverview(); self.syncLabels(); });
+                            document.getElementById('historyPrev').addEventListener('click', function () { if ((self.ovPage || 0) > 0) { self.ovPage--; self.renderOverview(); } });
+                            document.getElementById('historyNext').addEventListener('click', function () { self.ovPage = (self.ovPage || 0) + 1; self.renderOverview(); });
                             document.getElementById('runSyncBtn').addEventListener('click', function () { self.runSync(); });
                             document.getElementById('runWatchlistBtn').addEventListener('click', function () { self.runWatchlist(); });
                             document.getElementById('mCancelBtn').addEventListener('click', function () { document.getElementById('acctModal').classList.remove('show'); });
@@ -278,7 +281,7 @@
 
                         loadOverview: function () {
                             var self = this, LB = 'Jellyfin.Plugin.LetterboxdSync', SZ = 'Jellyfin.Plugin.LetterboxdSync/Serializd';
-                            Promise.all([self.get(LB + '/Stats'), self.get(SZ + '/Stats'), self.get(LB + '/History?count=60&offset=0'), self.get(SZ + '/History?count=60&offset=0')].map(function (p) { return p.then(function (r) { return r.json(); }).catch(function () { return {}; }); }))
+                            Promise.all([self.get(LB + '/Stats'), self.get(SZ + '/Stats'), self.get(LB + '/History?count=250&offset=0'), self.get(SZ + '/History?count=250&offset=0')].map(function (p) { return p.then(function (r) { return r.json(); }).catch(function () { return {}; }); }))
                                 .then(function (res) {
                                     var fs = res[0] || {}, ts = res[1] || {};
                                     document.getElementById('statFilm').textContent = fs.total || 0;
@@ -312,9 +315,12 @@
                             if (st) st.innerHTML = build('serializd', 'var(--ws-tv)', 'var(--ws-tv-soft)');
                         },
                         renderOverview: function () {
-                            var f = this.ovFilter, list = this.merged.filter(function (e) { return f === 'all' || e._svc === f; }).slice(0, 40);
-                            if (!list.length) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">No activity yet. Link an account and start watching.</td></tr>'; return; }
-                            document.getElementById('historyBody').innerHTML = list.map(function (e) {
+                            var f = this.ovFilter, all = this.merged.filter(function (e) { return f === 'all' || e._svc === f; });
+                            if (!all.length) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">No activity yet. Link an account and start watching.</td></tr>'; document.getElementById('historyPagination').style.display = 'none'; return; }
+                            var ps = this.ovPageSize || 40, total = all.length, pages = Math.max(1, Math.ceil(total / ps));
+                            if ((this.ovPage || 0) >= pages) this.ovPage = pages - 1;
+                            var start = (this.ovPage || 0) * ps;
+                            document.getElementById('historyBody').innerHTML = all.slice(start, start + ps).map(function (e) {
                                 var svc = e._svc === 'serializd' ? 'tv' : 'film';
                                 var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success';
                                 var title = (e.FilmTitle || '').split(' · '), t = title[0], m = title[1] || '';
@@ -325,6 +331,13 @@
                                 var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" onclick="WSU.openReview(\'' + e._svc + '\',' + (e.TmdbId || 0) + ',\'' + t.replace(/'/g, "\\'") + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>' : '';
                                 return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span><div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td><td><span class="ws-pill ' + status + '">' + status + '</span></td><td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
                             }).join('');
+                            var pag = document.getElementById('historyPagination');
+                            if (total > ps) {
+                                pag.style.display = 'flex';
+                                document.getElementById('historyPageInfo').textContent = (start + 1) + '–' + Math.min(start + ps, total) + ' of ' + total;
+                                document.getElementById('historyPrev').disabled = (this.ovPage || 0) === 0;
+                                document.getElementById('historyNext').disabled = (this.ovPage || 0) >= pages - 1;
+                            } else { pag.style.display = 'none'; }
                         },
 
                         syncLabels: function () {
