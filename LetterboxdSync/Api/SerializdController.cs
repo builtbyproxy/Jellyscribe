@@ -22,12 +22,11 @@ namespace LetterboxdSync.Api;
 [Authorize]
 [Route("Jellyfin.Plugin.LetterboxdSync/Serializd")]
 [Produces(MediaTypeNames.Application.Json)]
-public class SerializdController : ControllerBase
+public class SerializdController : JellyfinUserApiController
 {
     private readonly ILogger<SerializdController> _logger;
     private readonly SerializdSyncRunner _syncRunner;
     private readonly SerializdWatchlistSyncRunner _watchlistRunner;
-    private readonly MediaBrowser.Controller.Library.IUserManager _userManager;
 
     /// <summary>
     /// Test-only override for the login check. When non-null, <see cref="Verify"/> calls this
@@ -44,21 +43,11 @@ public class SerializdController : ControllerBase
 
     public SerializdController(ILogger<SerializdController> logger, SerializdSyncRunner syncRunner,
         SerializdWatchlistSyncRunner watchlistRunner, MediaBrowser.Controller.Library.IUserManager userManager)
+        : base(userManager)
     {
         _logger = logger;
         _syncRunner = syncRunner;
         _watchlistRunner = watchlistRunner;
-        _userManager = userManager;
-    }
-
-    private string? GetCurrentUserId()
-        => User.Claims.FirstOrDefault(c => c.Type == "Jellyfin-UserId")?.Value?.Replace("-", string.Empty);
-
-    private string? GetJellyfinUsername()
-    {
-        var userId = GetCurrentUserId();
-        if (string.IsNullOrEmpty(userId)) return null;
-        return _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId)?.Username;
     }
 
     public class AccountItem
