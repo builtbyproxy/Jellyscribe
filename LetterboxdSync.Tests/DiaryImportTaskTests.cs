@@ -131,7 +131,7 @@ public class DiaryImportTaskTests : IDisposable
 
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
-        // No factory call made, no userdata saves; nothing to assert beyond not throwing.
+        // No factory call, no userdata saves; checks the runner is not left running.
         Assert.False(LetterboxdSyncRunner.IsRunning);
     }
 
@@ -204,6 +204,9 @@ public class DiaryImportTaskTests : IDisposable
 
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
+        // Subsumes the former ExecuteAsync_EmptyDiary_DoesNotQueryLibrary test:
+        // an empty diary must never reach the library query.
+        _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
         Assert.Contains(_logs.Entries, e =>
             e.Level == LogLevel.Information && e.Message.Contains("nothing to import"));
         // This path used to `continue` without SyncProgress.Complete(), leaving the
@@ -249,28 +252,6 @@ public class DiaryImportTaskTests : IDisposable
         var service = Substitute.For<ILetterboxdService>();
         service.GetDiaryFilmEntriesAsync(Arg.Any<string>())
             .Returns<Task<List<DiaryFilmEntry>>>(_ => throw new Exception("403"));
-        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
-
-        await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
-
-        _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_EmptyDiary_DoesNotQueryLibrary()
-    {
-        var (user, userId) = MakeUser("lachlan");
-        _userManager.GetUsers().Returns(new[] { user });
-        Plugin.Instance!.Configuration.Accounts.Add(new Account
-        {
-            UserJellyfinId = userId,
-            LetterboxdUsername = "u",
-            Enabled = true,
-            EnableDiaryImport = true
-        });
-
-        var service = Substitute.For<ILetterboxdService>();
-        service.GetDiaryFilmEntriesAsync(Arg.Any<string>()).Returns(new List<DiaryFilmEntry>());
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
 
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
