@@ -94,6 +94,8 @@
                 #letterboxdUserPage .ws-pill.Success { color: var(--ws-ok); background: rgba(53,194,129,.13); }
                 #letterboxdUserPage .ws-pill.Rewatch { color: var(--ws-info); background: rgba(71,180,242,.14); }
                 #letterboxdUserPage .ws-pill.Reviewed { color: var(--ws-warn); background: rgba(245,166,35,.14); }
+                #letterboxdUserPage .ws-pill.has-reason { cursor: help; gap: 5px; }
+                #letterboxdUserPage .ws-info-i { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid currentColor; font-size: 9px; font-style: italic; line-height: 1; opacity: .8; }
                 #letterboxdUserPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
                 #letterboxdUserPage .ws-pill.Failed { color: var(--ws-crit); background: rgba(242,88,94,.14); }
                 #letterboxdUserPage .ws-when { font-family: var(--ws-mono); font-size: 12px; color: var(--ws-muted); white-space: nowrap; }
@@ -360,7 +362,10 @@
                                 var seaN = seM ? seM[1] : '', epN = seM ? seM[2] : '';
                                 var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" onclick="WSU.openReview(\'' + e._svc + '\',' + (e.TmdbId || 0) + ',\'' + t.replace(/'/g, "\\'") + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>' : '';
                                 if (e.Source === 'review') status = 'Reviewed';
-                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span><div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td><td><span class="ws-pill ' + status + '">' + status + '</span></td><td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
+                                var pill = e.Error
+                                    ? '<span class="ws-pill ' + status + ' has-reason" title="' + String(e.Error).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '">' + status + ' <span class="ws-info-i">i</span></span>'
+                                    : '<span class="ws-pill ' + status + '">' + status + '</span>';
+                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span><div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td><td>' + pill + '</td><td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
                             }).join('');
                             var pag = document.getElementById('historyPagination');
                             if (total > ps) {
