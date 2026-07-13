@@ -61,26 +61,37 @@ public class SerializdWatchlistSyncRunner
                 .Select(a => (User: u, Account: a)))
             .ToList();
 
-        var processed = 0;
-        foreach (var (user, account) in pairs)
+        SyncProgress.Start("Serializd watchlist sync", "Starting");
+        SyncProgress.SetTotal(pairs.Count);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            var processed = 0;
+            foreach (var (user, account) in pairs)
             {
-                await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
-                    user.Username, account.Email, ex.Message);
+                cancellationToken.ThrowIfCancellationRequested();
+                SyncProgress.SetPhase($"Syncing {user.Username}'s watchlist");
+                try
+                {
+                    await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
+                        user.Username, account.Email, ex.Message);
+                }
+
+                processed++;
+                SyncProgress.IncrementProcessed();
+                if (pairs.Count > 0)
+                    progress.Report((double)processed / pairs.Count * 100);
             }
 
-            processed++;
-            if (pairs.Count > 0)
-                progress.Report((double)processed / pairs.Count * 100);
+            progress.Report(100);
         }
-
-        progress.Report(100);
+        finally
+        {
+            SyncProgress.Complete();
+        }
     }
 
     public async Task<bool> TryRunForUserAsync(string userJellyfinId, CancellationToken cancellationToken)
@@ -91,21 +102,32 @@ public class SerializdWatchlistSyncRunner
         var accounts = Config.GetEnabledSerializdAccountsForUser(userJellyfinId).Where(a => a.SyncWatchlist).ToList();
         if (accounts.Count == 0) return false;
 
-        foreach (var account in accounts)
+        SyncProgress.Start("Serializd watchlist sync", $"Syncing {user.Username}'s watchlist");
+        SyncProgress.SetTotal(accounts.Count);
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
+            foreach (var account in accounts)
             {
-                await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
-                    user.Username, account.Email, ex.Message);
-            }
-        }
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
+                        user.Username, account.Email, ex.Message);
+                }
 
-        return true;
+                SyncProgress.IncrementProcessed();
+            }
+
+            return true;
+        }
+        finally
+        {
+            SyncProgress.Complete();
+        }
     }
 
     private async Task SyncOneAsync(User user, SerializdAccount account, CancellationToken cancellationToken)

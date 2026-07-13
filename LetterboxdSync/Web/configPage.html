@@ -136,7 +136,8 @@
                 #letterboxdSyncConfigPage .ws-add .plus { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--ws-surface-2); font-size: 19px; }
                 #letterboxdSyncConfigPage .ws-view { display: none; } #letterboxdSyncConfigPage .ws-view.show { display: block; }
                 #letterboxdSyncConfigPage .ws-field { display: block; font-family: var(--ws-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ws-faint); margin-bottom: 5px; }
-                #letterboxdSyncConfigPage .ws-input { width: 100%; background: var(--ws-surface-2); border: 1px solid var(--ws-border); border-radius: 8px; padding: 9px 11px; color: var(--ws-text); font-family: inherit; font-size: 13px; }
+                #letterboxdSyncConfigPage .ws-input { box-sizing: border-box; max-width: 100%; width: 100%; background: var(--ws-surface-2); border: 1px solid var(--ws-border); border-radius: 8px; padding: 9px 11px; color: var(--ws-text); font-family: inherit; font-size: 13px; }
+                #letterboxdSyncConfigPage textarea.ws-input { resize: vertical; }
                 #letterboxdSyncConfigPage .ws-checks { display: flex; flex-direction: column; gap: 9px; }
                 #letterboxdSyncConfigPage .ws-checks label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; font-size: 13px; }
                 #letterboxdSyncConfigPage .ws-checks input { margin-top: 2px; }
@@ -187,6 +188,20 @@
                 #letterboxdSyncConfigPage .ws-checks input[type="checkbox"]::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--ws-muted); top: 2px; left: 2px; transition: .16s; }
                 #letterboxdSyncConfigPage .ws-checks input[type="checkbox"]:checked { background: var(--ws-primary); border-color: var(--ws-primary); }
                 #letterboxdSyncConfigPage .ws-checks input[type="checkbox"]:checked::after { left: 16px; background: #fff; }
+                /* Job watcher (live sync progress) */
+                #letterboxdSyncConfigPage .ws-jw { background: var(--ws-surface); border: 1px solid var(--ws-border); border-radius: var(--ws-r); padding: 14px 16px; margin: 12px 0 4px; box-shadow: var(--ws-shadow); }
+                #letterboxdSyncConfigPage .ws-jw-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+                #letterboxdSyncConfigPage .ws-jw-head b { font-size: 13.5px; }
+                #letterboxdSyncConfigPage .ws-jw-elapsed { margin-left: auto; font-size: 12px; }
+                #letterboxdSyncConfigPage .ws-jw-phase { font-size: 12.5px; margin-bottom: 9px; }
+                #letterboxdSyncConfigPage .ws-jw-bar { height: 7px; border-radius: 6px; background: var(--ws-surface-2); overflow: hidden; }
+                #letterboxdSyncConfigPage .ws-jw-fill { height: 100%; background: linear-gradient(90deg, var(--ws-film), var(--ws-tv)); width: 0; border-radius: 6px; transition: width .4s ease; }
+                #letterboxdSyncConfigPage .ws-jw-fill.indet { width: 35% !important; transition: none; animation: wsIndet 1.15s ease-in-out infinite; }
+                @keyframes wsIndet { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+                #letterboxdSyncConfigPage .ws-jw-counts { font-size: 12px; margin-top: 6px; }
+                #letterboxdSyncConfigPage .ws-spin { width: 14px; height: 14px; flex: none; border: 2px solid var(--ws-border-strong); border-top-color: var(--ws-primary); border-radius: 50%; animation: wsSpin .8s linear infinite; }
+                #letterboxdSyncConfigPage .ws-spin.done { animation: none; border: 0; color: var(--ws-ok); }
+                @keyframes wsSpin { to { transform: rotate(360deg); } }
                 </style>
 
                 <div class="ws">
@@ -223,6 +238,12 @@
                                 <button type="button" class="ws-chip" data-f="serializd"><span class="ws-dot tv"></span>TV · Serializd</button>
                             </div>
                             <span id="syncStatus" class="ws-muted" style="font-size:12.5px;"></span>
+                            <div class="ws-jw" id="jobWatcher" style="display:none;">
+                                <div class="ws-jw-head"><span class="ws-spin" id="jwSpin"></span><b id="jwTitle">Syncing…</b><span class="ws-mono ws-muted ws-jw-elapsed" id="jwElapsed"></span></div>
+                                <div class="ws-muted ws-jw-phase" id="jwPhase"></div>
+                                <div class="ws-jw-bar"><div class="ws-jw-fill" id="jwFill"></div></div>
+                                <div class="ws-muted ws-mono ws-jw-counts" id="jwCounts"></div>
+                            </div>
                             <div class="ws-tiles" style="margin-top:10px;">
                                 <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged · Letterboxd</div><svg class="ws-spark" id="sparkFilm" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
                                 <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged · Serializd</div><svg class="ws-spark" id="sparkTv" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
@@ -547,21 +568,66 @@
                             document.getElementById('runWatchlistBtn').textContent = f === 'all' ? 'Sync all watchlists' : 'Sync ' + svc + ' watchlist';
                         },
                         runSync: function () {
-                            var self = this, f = self.ovFilter; self.setStatus('<span class="ws-muted">Starting…</span>');
+                            var self = this, f = self.ovFilter; self.setStatus('');
+                            self.startWatcher('Sync');
                             var jobs = [];
                             if (f === 'all' || f === 'serializd') jobs.push(ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow'), type: 'POST' }).catch(function () {}));
                             if (f === 'all' || f === 'letterboxd') jobs.push(self.runLetterboxdTask('LetterboxdSync'));
-                            Promise.all(jobs).then(function () {
-                                self.setStatus('<span class="ws-green">Syncing in the background…</span>');
-                                setTimeout(function () { self.loadOverview(); }, 6000);
-                            });
+                            Promise.all(jobs);
                         },
                         runWatchlist: function () {
-                            var self = this, f = self.ovFilter; self.setStatus('<span class="ws-muted">Starting watchlist sync…</span>');
+                            var self = this, f = self.ovFilter; self.setStatus('');
+                            self.startWatcher('Watchlist sync');
                             var jobs = [];
                             if (f === 'all' || f === 'serializd') jobs.push(ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow'), type: 'POST' }).catch(function () {}));
                             if (f === 'all' || f === 'letterboxd') jobs.push(self.runLetterboxdTask('LetterboxdWatchlistSync'));
-                            Promise.all(jobs).then(function () { self.setStatus('<span class="ws-green">Syncing watchlists…</span>'); });
+                            Promise.all(jobs);
+                        },
+                        getProgress: function () { return ApiClient.getJSON(ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Progress')).catch(function () { return null; }); },
+                        startWatcher: function (label) {
+                            var self = this, w = self.watcher || (self.watcher = {});
+                            if (w.timer) clearInterval(w.timer);
+                            w.sawRunning = false; w.ticks = 0;
+                            document.getElementById('jwTitle').textContent = label + '…';
+                            document.getElementById('jwPhase').textContent = 'Starting…';
+                            document.getElementById('jwCounts').textContent = '';
+                            document.getElementById('jwElapsed').textContent = '';
+                            var fill = document.getElementById('jwFill'); fill.style.width = '0%'; fill.classList.add('indet');
+                            document.getElementById('jwSpin').classList.remove('done'); document.getElementById('jwSpin').innerHTML = '';
+                            document.getElementById('jobWatcher').style.display = 'block';
+                            document.getElementById('runSyncBtn').disabled = true; document.getElementById('runWatchlistBtn').disabled = true;
+                            w.timer = setInterval(function () { self.pollProgress(); }, 1000);
+                            self.pollProgress();
+                        },
+                        pollProgress: function () {
+                            var self = this, w = self.watcher; w.ticks++;
+                            self.getProgress().then(function (p) {
+                                if (!p) return;
+                                if (p.isRunning) {
+                                    w.sawRunning = true;
+                                    document.getElementById('jwTitle').textContent = p.taskName || 'Syncing';
+                                    document.getElementById('jwPhase').textContent = p.phase || '';
+                                    document.getElementById('jwElapsed').textContent = (p.elapsedSeconds || 0) + 's';
+                                    var fill = document.getElementById('jwFill');
+                                    if (p.totalItems > 0) {
+                                        fill.classList.remove('indet');
+                                        fill.style.width = Math.min(100, Math.round(p.processedItems / p.totalItems * 100)) + '%';
+                                        document.getElementById('jwCounts').textContent = p.processedItems + ' / ' + p.totalItems;
+                                    } else { fill.classList.add('indet'); document.getElementById('jwCounts').textContent = ''; }
+                                } else if (w.sawRunning || w.ticks > 6) {
+                                    self.finishWatcher(w.sawRunning);
+                                }
+                            });
+                        },
+                        finishWatcher: function (completed) {
+                            var self = this, w = self.watcher;
+                            if (w.timer) { clearInterval(w.timer); w.timer = null; }
+                            var fill = document.getElementById('jwFill'); fill.classList.remove('indet'); fill.style.width = '100%';
+                            var spin = document.getElementById('jwSpin'); spin.classList.add('done'); spin.innerHTML = completed ? '✓' : '';
+                            document.getElementById('jwTitle').textContent = completed ? 'Done' : 'Nothing to sync';
+                            document.getElementById('jwPhase').textContent = completed ? 'Sync complete' : 'Everything was already up to date';
+                            document.getElementById('runSyncBtn').disabled = false; document.getElementById('runWatchlistBtn').disabled = false;
+                            setTimeout(function () { document.getElementById('jobWatcher').style.display = 'none'; self.loadOverview(); }, completed ? 2600 : 1600);
                         },
 
                         /* ===== Accounts ===== */

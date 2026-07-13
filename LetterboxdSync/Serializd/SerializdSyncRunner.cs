@@ -69,6 +69,7 @@ public class SerializdSyncRunner
 
         try
         {
+            SyncProgress.Start("Serializd TV sync", "Starting");
             var pairs = _userManager.GetUsers()
                 .SelectMany(u => Config.GetEnabledSerializdAccountsForUser(u.Id.ToString("N"))
                     .Select(a => (User: u, Account: a)))
@@ -97,6 +98,7 @@ public class SerializdSyncRunner
         }
         finally
         {
+            SyncProgress.Complete();
             SerializdSyncGate.Instance.Release();
         }
     }
@@ -112,6 +114,7 @@ public class SerializdSyncRunner
 
         try
         {
+            SyncProgress.Start("Serializd TV sync", "Starting");
             var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
             if (user == null) return false;
 
@@ -136,6 +139,7 @@ public class SerializdSyncRunner
         }
         finally
         {
+            SyncProgress.Complete();
             SerializdSyncGate.Instance.Release();
         }
     }
@@ -220,10 +224,13 @@ public class SerializdSyncRunner
         }
 
         // 2. Dated Diary logs, one per episode, backdated to the real watch date.
+        SyncProgress.SetPhase($"Logging {user.Username}'s episodes to Serializd");
+        SyncProgress.SetTotal(needsLog.Count);
         var logged = 0;
         foreach (var r in needsLog)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            SyncProgress.IncrementProcessed();
             try
             {
                 var seasonId = await service.ResolveSeasonIdAsync(r.Show, r.Season).ConfigureAwait(false);
