@@ -1,20 +1,32 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Jellyfin plugin (C#/.NET 9) syncing watch history to Letterboxd (films) and
+  Serializd (TV). Targets Jellyfin 10.11; the Jellyfin.Controller/Jellyfin.Model
+  package version must equal targetAbi.txt and is never bumped routinely
+  (issue #63). The Jellyfin 12 SDK is net10.0-only and must not be adopted.
+  Architecture: ILetterboxdService is the seam every caller uses;
+  LetterboxdServiceFactory tries the JSON API first and silently falls back to
+  web scraping (cookie login, CSRF, HtmlAgilityPack). Sync entry points:
+  SyncTask (scheduled), PlaybackHandler (real-time), WatchlistSyncTask,
+  DiaryImportTask; LetterboxdSyncRunner is the shared engine with SyncGate,
+  SyncHistory, and TmdbCache for dedupe and lookups. Web/*.html and Web/*.js
+  are embedded resources (declared in the csproj) served as config pages.
+  Secrets are stored via SecretProtector (DataProtection), never plaintext.
+  Tests: xUnit + NSubstitute in LetterboxdSync.Tests; unit suite runs with
+  dotnet test -c Release --filter "Category!=Integration"; Integration hits
+  live letterboxd.com and needs LETTERBOXD_TEST_* env vars.
+  Release pipeline: every shipping merge to main needs a Conventional Commits
+  PR title, an AssemblyVersion/FileVersion bump in Directory.Build.props AND
+  LetterboxdSync/LetterboxdSync.csproj, a "## Release notes" PR-body section
+  (one paragraph, user-facing prose), and a site/src/data/release-notes.ts
+  entry. Docs-only diffs (*.md, docs/, openspec/, site/, worker/, .github/)
+  are exempt. manifest.json and git tags are written only by release.yml.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - Always include a "Non-goals" section
+    - Name the GitHub issue (#NNN) in the Why section when one exists
+  tasks:
+    - Every behavior-change task pairs with a test task in the same change
+    - The final task covers release plumbing (version bump, release notes, release-notes.ts) unless the change is docs-only

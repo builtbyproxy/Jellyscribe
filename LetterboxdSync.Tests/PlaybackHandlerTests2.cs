@@ -305,7 +305,9 @@ public class PlaybackHandlerEarlyExitTests : IDisposable
         // userData has rating=8 (Jellyfin scale) → should map to LB 4.0
         _userDataManager.GetUserData(user, movie).Returns(new UserItemData
         {
-            Key = "k", Played = true, Rating = 8.0
+            Key = "k",
+            Played = true,
+            Rating = 8.0
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -318,7 +320,8 @@ public class PlaybackHandlerEarlyExitTests : IDisposable
         double? capturedRating = null;
         service.MarkAsWatchedAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
-            Arg.Any<string?>(), Arg.Any<bool>(), Arg.Do<double?>(r => capturedRating = r));
+            Arg.Any<string?>(), Arg.Any<bool>(), Arg.Do<double?>(r => capturedRating = r))
+            .Returns(Task.CompletedTask);
 
         await _handler.HandlePlaybackStoppedAsync(new PlaybackStopEventArgs
         {

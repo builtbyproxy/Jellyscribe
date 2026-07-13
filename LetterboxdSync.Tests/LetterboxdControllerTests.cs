@@ -397,7 +397,7 @@ public class LetterboxdControllerTests
         });
 
         var mine = h.Config.Accounts.Where(a => a.UserJellyfinId == UserId).ToList();
-        Assert.Single(mine.Where(a => a.IsPrimary));
+        Assert.Single(mine, a => a.IsPrimary);
     }
 
     [Fact]
@@ -415,7 +415,7 @@ public class LetterboxdControllerTests
         });
 
         var mine = h.Config.Accounts.Where(a => a.UserJellyfinId == UserId).ToList();
-        Assert.Single(mine.Where(a => a.IsPrimary));
+        Assert.Single(mine, a => a.IsPrimary);
     }
 
     // ----- StartSync -----

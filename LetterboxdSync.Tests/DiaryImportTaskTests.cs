@@ -425,7 +425,7 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDefaultTriggers_ReturnsDailyInterval()
+    public void GetDefaultTriggers_ReturnsDailyInterval()
     {
         var triggers = _task.GetDefaultTriggers().ToList();
 
