@@ -101,6 +101,7 @@
                 #letterboxdSyncConfigPage .ws-pill { font-family: var(--ws-mono); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; display: inline-flex; }
                 #letterboxdSyncConfigPage .ws-pill.Success, #letterboxdSyncConfigPage .ws-pill.synced { color: var(--ws-ok); background: rgba(53,194,129,.13); }
                 #letterboxdSyncConfigPage .ws-pill.Rewatch { color: var(--ws-info); background: rgba(71,180,242,.14); }
+                #letterboxdSyncConfigPage .ws-pill.Reviewed { color: var(--ws-warn); background: rgba(245,166,35,.14); }
                 #letterboxdSyncConfigPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
                 #letterboxdSyncConfigPage .ws-pill.Failed { color: var(--ws-crit); background: rgba(242,88,94,.14); }
                 #letterboxdSyncConfigPage .ws-when { font-family: var(--ws-mono); font-size: 12px; color: var(--ws-muted); white-space: nowrap; }
@@ -546,6 +547,7 @@
                                     var seaN = seM ? seM[1] : '', epN = seM ? seM[2] : '';
                                     btn = '<button type="button" class="ws-review-btn" onclick="WS.openReview(\'' + source + '\',' + (e.TmdbId || 0) + ',\'' + show + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>';
                                 }
+                                if (e.Source === 'review') status = 'Reviewed';
                                 return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span>' +
                                     '<div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td>' +
                                     '<td><span class="ws-pill ' + status + '">' + status + '</span></td>' +
@@ -771,6 +773,7 @@
                         /* ===== Review ===== */
                         openReview: function (svc, tmdbId, title, slug, season, episode) {
                             this.reviewSvc = svc; this.reviewTmdb = tmdbId; this.reviewSlug = slug || '';
+                            this.reviewTitleText = title || '';
                             this.reviewSeason = season ? parseInt(season, 10) : null;
                             this.reviewEpisode = episode ? parseInt(episode, 10) : null;
                             var scope = (this.reviewSeason && this.reviewEpisode) ? (' · S' + this.reviewSeason + 'E' + this.reviewEpisode) : '';
@@ -791,7 +794,7 @@
                             var url, body;
                             if (self.reviewSvc === 'serializd') {
                                 url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review';
-                                body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, seasonNumber: self.reviewSeason || null, episodeNumber: self.reviewEpisode || null };
+                                body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, seasonNumber: self.reviewSeason || null, episodeNumber: self.reviewEpisode || null, title: self.reviewTitleText || null };
                             } else {
                                 url = 'Jellyfin.Plugin.LetterboxdSync/Review';
                                 body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, isRewatch: false, rating: rating };

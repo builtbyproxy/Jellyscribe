@@ -93,7 +93,8 @@ public static class SerializdActivity
     {
         lock (_lock)
         {
-            IEnumerable<SyncEvent> events = Load();
+            // Reviews show in the feed but aren't episode logs, so they don't count toward the stats.
+            IEnumerable<SyncEvent> events = Load().Where(e => e.Source != "review");
             if (!string.IsNullOrEmpty(username)) events = events.Where(e => e.Username == username);
             var list = events.ToList();
             return (

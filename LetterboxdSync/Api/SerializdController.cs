@@ -215,6 +215,9 @@ public class SerializdController : ControllerBase
         public int? SeasonNumber { get; set; }
 
         public int? EpisodeNumber { get; set; }
+
+        /// <summary>Show name, supplied by the UI purely so the activity-feed row reads properly.</summary>
+        public string? Title { get; set; }
     }
 
     /// <summary>
@@ -262,6 +265,22 @@ public class SerializdController : ControllerBase
 
         if (posted == 0)
             return BadRequest(new { error = "Could not post the review" });
+
+        // Show it in the activity feed. Source="review" so SerializdActivity.GetStats excludes it
+        // from the episode-log counts (a review isn't an episode watched).
+        var epLabel = request.SeasonNumber is int s && s > 0 && request.EpisodeNumber is int e && e > 0
+            ? $" · S{s}E{e}"
+            : string.Empty;
+        SerializdActivity.Record(new SyncEvent
+        {
+            FilmTitle = (string.IsNullOrWhiteSpace(request.Title) ? $"TMDb {request.TmdbId}" : request.Title!.Trim()) + epLabel,
+            TmdbId = request.TmdbId,
+            Username = GetJellyfinUsername() ?? string.Empty,
+            Timestamp = DateTime.UtcNow,
+            Status = SyncStatus.Success,
+            Source = "review",
+        });
+
         return Ok(new { posted });
     }
 
