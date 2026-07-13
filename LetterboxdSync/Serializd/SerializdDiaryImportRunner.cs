@@ -44,6 +44,11 @@ public class SerializdDiaryImportRunner
 
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
 
+    // Same test seam as PlaybackHandler and SerializdSyncRunner: the episode's
+    // parent-series graph is not wireable in unit tests, so tests supply the show
+    // TMDb id directly. Production delegates to the shared reader.
+    internal static Func<Episode, int?> SeriesTmdbIdReader { get; set; } = SerializdSyncRunner.ReadSeriesTmdbId;
+
     public async Task RunForAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var pairs = _userManager.GetUsers()
@@ -96,7 +101,7 @@ public class SerializdDiaryImportRunner
         var byKey = new Dictionary<(int, int, int), Episode>();
         foreach (var ep in episodes)
         {
-            if (!int.TryParse(ep.Series?.GetProviderId(MetadataProvider.Tmdb), out var tmdb)) continue;
+            if (SeriesTmdbIdReader(ep) is not int tmdb) continue;
             if (ep.ParentIndexNumber is not int season || ep.IndexNumber is not int number) continue;
             byKey[(tmdb, season, number)] = ep;
         }

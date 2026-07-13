@@ -279,7 +279,9 @@ public class SerializdWatchlistSyncRunner
     /// entry names no seasons (whole-show watchlist), every season the show has is considered.
     /// Returns an empty list when every watchlisted season is complete (nothing to request).
     /// </summary>
-    private List<int> IncompleteWatchlistedSeasons(User user, BaseItem series, IReadOnlyList<int> watchlistedSeasons)
+    /// <remarks>Internal (not private) for unit tests: the virtual-item and aired-date
+    /// rules here decide real download requests, so each path is pinned by a test.</remarks>
+    internal List<int> IncompleteWatchlistedSeasons(User user, BaseItem series, IReadOnlyList<int> watchlistedSeasons)
     {
         var eps = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
