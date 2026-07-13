@@ -74,7 +74,15 @@
                 #letterboxdSyncConfigPage .ws-btn svg { width: 15px; height: 15px; }
                 #letterboxdSyncConfigPage .ws-filters { display: flex; gap: 7px; margin-bottom: 18px; flex-wrap: wrap; }
                 #letterboxdSyncConfigPage .ws-chip { border: 1px solid var(--ws-border); background: var(--ws-surface); border-radius: 20px; padding: 5px 13px; font-size: 12.5px; font-weight: 550; color: var(--ws-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: .13s; }
-                #letterboxdSyncConfigPage .ws-chip.on { color: var(--ws-text); border-color: var(--ws-border-strong); background: var(--ws-surface-2); }
+                /* Selected chip: clearly accented, and tinted with the colour of whatever it filters. */
+                #letterboxdSyncConfigPage .ws-chip.on { color: var(--ws-text); font-weight: 600; border-color: var(--ws-primary); background: var(--ws-primary-soft); box-shadow: inset 0 0 0 1px var(--ws-primary); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-f="letterboxd"] { border-color: var(--ws-film); background: var(--ws-film-soft); box-shadow: inset 0 0 0 1px var(--ws-film); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-f="serializd"] { border-color: var(--ws-tv); background: var(--ws-tv-soft); box-shadow: inset 0 0 0 1px var(--ws-tv); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Success"] { border-color: var(--ws-ok); background: rgba(53,194,129,.14); box-shadow: inset 0 0 0 1px var(--ws-ok); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Rewatch"] { border-color: var(--ws-info); background: rgba(71,180,242,.14); box-shadow: inset 0 0 0 1px var(--ws-info); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Reviewed"] { border-color: var(--ws-warn); background: rgba(245,166,35,.14); box-shadow: inset 0 0 0 1px var(--ws-warn); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Skipped"] { border-color: var(--ws-faint); background: var(--ws-raise); box-shadow: inset 0 0 0 1px var(--ws-faint); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Failed"] { border-color: var(--ws-crit); background: rgba(242,88,94,.14); box-shadow: inset 0 0 0 1px var(--ws-crit); }
                 #letterboxdSyncConfigPage .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
                 #letterboxdSyncConfigPage .ws-dot.film { background: var(--ws-film); } #letterboxdSyncConfigPage .ws-dot.tv { background: var(--ws-tv); }
                 #letterboxdSyncConfigPage .ws-tiles { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin-bottom: 22px; }
