@@ -68,7 +68,7 @@ public class HttpClientTests
         http.SetRawCookies("   ");
 
         var cookies = http.CookieContainer.GetCookies(BaseUri);
-        Assert.Equal(0, cookies.Count);
+        Assert.Empty(cookies);
     }
 
     [Fact]

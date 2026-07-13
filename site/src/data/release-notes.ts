@@ -24,7 +24,19 @@ export const releaseNotes: ReleaseNotes[] = [
     },
   },
   {
-    version: '1.19.4',
+    version: '1.19.6',
+    headline: 'Reverse sync now explains itself when it has nothing to do',
+    summary:
+      'If the "Import Letterboxd diary as Jellyfin watched" task ran and did nothing, it used to finish in a second and leave no trace in the log, so a switched-off toggle looked identical to a broken feature. The task now says why it skipped each user (for example, an account exists but diary import is not turned on, with a pointer to the setting), reports when your Letterboxd returned no films, and always ends with a one-line summary of what it checked. A stuck progress banner on the dashboard for empty diaries is also fixed. If reverse sync has not been working for you, update, run the task once, and the log will now tell you exactly why.',
+    highlights: {
+      fixes: [
+        'The diary import task logs the reason whenever it skips a user, reports empty results, and always writes a completion summary, so a run that does nothing is explainable from the log alone.',
+        'Fixed the dashboard progress banner staying active forever when a diary import found no films to import.',
+      ],
+    },
+  },
+  {
+    version: '1.19.5',
     headline: 'Send logs to developer now tells you when there is nothing to send',
     summary:
       'A user sent a diagnostic bundle that arrived completely empty: the plugin had not logged anything recently, so there was nothing to collect, but the dialog still reported plain success and neither side could tell why the bundle was blank. Now the send dialog warns you when no plugin log lines were found (with a hint to reproduce the problem first and try again), and every bundle carries a small status line saying which log files were read and how many lines matched, so an empty bundle explains itself.',
@@ -32,6 +44,17 @@ export const releaseNotes: ReleaseNotes[] = [
       fixes: [
         'The "Send logs to developer" dialog now shows a clear warning when the bundle contains no log lines, instead of reporting bare success on an empty send.',
         'Diagnostic bundles now include a collector status line (files read, lines matched, any read error), so support can tell an idle plugin from a broken log reader.',
+      ],
+    },
+  },
+  {
+    version: '1.19.4',
+    headline: 'Housekeeping: a warning-clean test build',
+    summary:
+      'No functional changes. The plugin\u2019s test suite compiled with seven compiler and analyzer warnings (a couple of async test methods that never awaited anything, one fire-and-forget mock setup, and a few assertions written the long way around). All seven are fixed, so the build is warning-clean again and future warnings stand out instead of drowning in noise. Nothing about syncing, accounts, or the dashboard changes in this release.',
+    highlights: {
+      fixes: [
+        'Cleaned up all seven compiler and analyzer warnings in the test project; every touched test was verified to still fail when its assertion is broken, so no coverage was lost.',
       ],
     },
   },

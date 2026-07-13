@@ -398,7 +398,8 @@ internal static class TelemetryService
     /// sent" is literally true: the preview renders this string, the send posts it.
     /// </summary>
     public static string BuildLogBundleJson(
-        string instanceId, string pluginVersion, string telemetrySnapshotJson, string? note, List<string> logLines)
+        string instanceId, string pluginVersion, string telemetrySnapshotJson, string? note, List<string> logLines,
+        object collector)
     {
         var bundle = new
         {
@@ -407,6 +408,10 @@ internal static class TelemetryService
             jellyfin_version = JellyfinVersion ?? "unknown",
             telemetry = JsonSerializer.Deserialize<JsonElement>(telemetrySnapshotJson),
             note,
+            // Structured twin of the "[meta] collector: ..." first log line: tooling
+            // reads this field instead of parsing a string back out of log_lines; the
+            // line itself stays for humans reading the preview or grepping bundles.
+            collector,
             log_lines = logLines
         };
         return JsonSerializer.Serialize(bundle, new JsonSerializerOptions { WriteIndented = true });

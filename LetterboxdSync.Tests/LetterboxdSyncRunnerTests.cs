@@ -271,7 +271,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task IsRunning_FalseWhenIdle()
+    public void IsRunning_FalseWhenIdle()
     {
         Assert.False(LetterboxdSyncRunner.IsRunning);
     }
@@ -405,7 +405,9 @@ public class LetterboxdSyncRunnerTests : IDisposable
 
         var importedUserData = new UserItemData
         {
-            Key = "k", Played = true, LastPlayedDate = null
+            Key = "k",
+            Played = true,
+            LastPlayedDate = null
         };
         _userDataManager.GetUserData(user, movie).Returns(importedUserData);
 
@@ -449,7 +451,9 @@ public class LetterboxdSyncRunnerTests : IDisposable
 
         var playedUserData = new UserItemData
         {
-            Key = "k", Played = true, LastPlayedDate = DateTime.UtcNow
+            Key = "k",
+            Played = true,
+            LastPlayedDate = DateTime.UtcNow
         };
         _userDataManager.GetUserData(user, movie).Returns(playedUserData);
 
@@ -535,8 +539,11 @@ public class LetterboxdSyncRunnerTests : IDisposable
         for (var i = 0; i < LetterboxdSyncRunner.MaxConsecutiveSyncFailures; i++)
             SyncHistory.Record(new SyncEvent
             {
-                FilmTitle = "Sinners", TmdbId = 1233413, Username = "lachlan",
-                Timestamp = DateTime.UtcNow.AddMinutes(-i), Status = SyncStatus.Failed
+                FilmTitle = "Sinners",
+                TmdbId = 1233413,
+                Username = "lachlan",
+                Timestamp = DateTime.UtcNow.AddMinutes(-i),
+                Status = SyncStatus.Failed
             });
 
         var factoryHit = false;
@@ -570,8 +577,11 @@ public class LetterboxdSyncRunnerTests : IDisposable
         for (var i = 0; i < LetterboxdSyncRunner.MaxConsecutiveSyncFailures - 1; i++)
             SyncHistory.Record(new SyncEvent
             {
-                FilmTitle = "Sinners", TmdbId = 1233413, Username = "lachlan",
-                Timestamp = DateTime.UtcNow.AddMinutes(-i), Status = SyncStatus.Failed
+                FilmTitle = "Sinners",
+                TmdbId = 1233413,
+                Username = "lachlan",
+                Timestamp = DateTime.UtcNow.AddMinutes(-i),
+                Status = SyncStatus.Failed
             });
 
         var factoryHit = false;
@@ -688,14 +698,20 @@ public class LetterboxdSyncRunnerTests : IDisposable
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { movie });
         _userDataManager.GetUserData(user, movie).Returns(new UserItemData
         {
-            Key = "k", Played = true, LastPlayedDate = viewing
+            Key = "k",
+            Played = true,
+            LastPlayedDate = viewing
         });
 
         SyncHistory.Record(new SyncEvent
         {
-            FilmTitle = "Sinners", TmdbId = 1233413, Username = "lachlan",
-            Timestamp = DateTime.UtcNow, ViewingDate = viewing,
-            Status = SyncStatus.Success, Source = "test"
+            FilmTitle = "Sinners",
+            TmdbId = 1233413,
+            Username = "lachlan",
+            Timestamp = DateTime.UtcNow,
+            ViewingDate = viewing,
+            Status = SyncStatus.Success,
+            Source = "test"
         });
 
         var factoryHit = false;
@@ -723,8 +739,12 @@ public class LetterboxdSyncRunnerTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "lb-user", LetterboxdPassword = "secret",
-            Enabled = true, SkipPreviouslySynced = false, StopOnFailure = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "lb-user",
+            LetterboxdPassword = "secret",
+            Enabled = true,
+            SkipPreviouslySynced = false,
+            StopOnFailure = true
         });
 
         var m1 = MakeMovie(1233413, "Sinners");
@@ -769,15 +789,22 @@ public class LetterboxdSyncRunnerTests : IDisposable
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { movie });
         _userDataManager.GetUserData(user, movie).Returns(new UserItemData
         {
-            Key = "k", Played = true, LastPlayedDate = viewing
+            Key = "k",
+            Played = true,
+            LastPlayedDate = viewing
         });
 
         // Prior successful sync on the same viewing date → not a rewatch → suppress.
         SyncHistory.Record(new SyncEvent
         {
-            FilmTitle = "Sinners", FilmSlug = "sinners-2025", TmdbId = 1233413, Username = "lachlan",
-            Timestamp = DateTime.UtcNow.AddHours(-1), ViewingDate = viewing.Date,
-            Status = SyncStatus.Success, Source = "test"
+            FilmTitle = "Sinners",
+            FilmSlug = "sinners-2025",
+            TmdbId = 1233413,
+            Username = "lachlan",
+            Timestamp = DateTime.UtcNow.AddHours(-1),
+            ViewingDate = viewing.Date,
+            Status = SyncStatus.Success,
+            Source = "test"
         });
 
         var service = Substitute.For<ILetterboxdService>();

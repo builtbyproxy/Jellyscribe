@@ -13,7 +13,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Serialization;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
@@ -54,7 +54,36 @@ public class DiaryImportTaskTests : IDisposable
         _libraryManager = Substitute.For<ILibraryManager>();
         _userDataManager = Substitute.For<IUserDataManager>();
 
-        _task = new DiaryImportTask(_userManager, NullLoggerFactory.Instance, _libraryManager, _userDataManager);
+        _logs = new ListLoggerFactory();
+        _task = new DiaryImportTask(_userManager, _logs, _libraryManager, _userDataManager);
+    }
+
+    private readonly ListLoggerFactory _logs;
+
+    /// <summary>
+    /// Captures log output in memory so tests can assert the task explains its
+    /// skip decisions (issue #89: a silent run is indistinguishable from a broken
+    /// feature). Enabled for every level so Debug lines are captured too.
+    /// </summary>
+    private sealed class ListLoggerFactory : ILoggerFactory
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = new();
+        public ILogger CreateLogger(string categoryName) => new ListLogger(Entries);
+        public void AddProvider(ILoggerProvider provider) { }
+        public void Dispose() { }
+
+        private sealed class ListLogger : ILogger
+        {
+            private readonly List<(LogLevel, string)> _entries;
+            public ListLogger(List<(LogLevel, string)> entries) { _entries = entries; }
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel logLevel) => true;
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                lock (_entries) { _entries.Add((logLevel, formatter(state, exception))); }
+            }
+        }
     }
 
     public void Dispose()
@@ -102,12 +131,12 @@ public class DiaryImportTaskTests : IDisposable
 
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
-        // No factory call made, no userdata saves; nothing to assert beyond not throwing.
+        // No factory call, no userdata saves; checks the runner is not left running.
         Assert.False(LetterboxdSyncRunner.IsRunning);
     }
 
     [Fact]
-    public async Task ExecuteAsync_UserHasNoAccount_SkippedSilently()
+    public async Task ExecuteAsync_UserHasNoAccount_SkippedWithDebugLog()
     {
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
@@ -116,6 +145,10 @@ public class DiaryImportTaskTests : IDisposable
 
         // No factory override needed; we never get to it.
         _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
+        // Debug, not Information: a user who never set the plugin up shouldn't
+        // produce daily log noise, but the reason must still be discoverable.
+        Assert.Contains(_logs.Entries, e =>
+            e.Level == LogLevel.Debug && e.Message.Contains("no enabled Letterboxd accounts"));
     }
 
     [Fact]
@@ -134,6 +167,51 @@ public class DiaryImportTaskTests : IDisposable
         await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
 
         _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
+        // Issue #89: this exact state (account exists, toggle off) used to be a
+        // silent no-op. It must now tell the user how to turn reverse sync on.
+        Assert.Contains(_logs.Entries, e =>
+            e.Level == LogLevel.Information && e.Message.Contains("none has diary import turned on"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_AlwaysLogsRunSummary_EvenWithNothingToDo()
+    {
+        _userManager.GetUsers().Returns(new List<User>());
+
+        await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Contains(_logs.Entries, e =>
+            e.Level == LogLevel.Information && e.Message.Contains("Diary import task finished"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_EmptyDiary_LogsOutcomeAndCompletesProgress()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        Plugin.Instance!.Configuration.Accounts.Add(new Account
+        {
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
+        });
+
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetDiaryFilmEntriesAsync(Arg.Any<string>())
+            .Returns(new List<DiaryFilmEntry>());
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        // Subsumes the former ExecuteAsync_EmptyDiary_DoesNotQueryLibrary test:
+        // an empty diary must never reach the library query.
+        _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
+        Assert.Contains(_logs.Entries, e =>
+            e.Level == LogLevel.Information && e.Message.Contains("nothing to import"));
+        // This path used to `continue` without SyncProgress.Complete(), leaving the
+        // dashboard progress banner running forever.
+        Assert.False(SyncProgress.IsRunning);
     }
 
     [Fact]
@@ -182,28 +260,6 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task ExecuteAsync_EmptyDiary_DoesNotQueryLibrary()
-    {
-        var (user, userId) = MakeUser("lachlan");
-        _userManager.GetUsers().Returns(new[] { user });
-        Plugin.Instance!.Configuration.Accounts.Add(new Account
-        {
-            UserJellyfinId = userId,
-            LetterboxdUsername = "u",
-            Enabled = true,
-            EnableDiaryImport = true
-        });
-
-        var service = Substitute.For<ILetterboxdService>();
-        service.GetDiaryFilmEntriesAsync(Arg.Any<string>()).Returns(new List<DiaryFilmEntry>());
-        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
-
-        await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
-
-        _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
-    }
-
-    [Fact]
     public async Task ExecuteAsync_DiaryEntriesMatched_MarksMovieAsPlayed()
     {
         var (user, userId) = MakeUser("lachlan");
@@ -211,8 +267,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         // Letterboxd diary has TMDb 1233413; library has the same movie unplayed.
@@ -243,8 +301,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -274,8 +334,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -307,8 +369,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         // Diary has the film but no rating; library already marked as played.
@@ -339,8 +403,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         // Diary mentions a film, but library has nothing.
@@ -359,7 +425,7 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDefaultTriggers_ReturnsDailyInterval()
+    public void GetDefaultTriggers_ReturnsDailyInterval()
     {
         var triggers = _task.GetDefaultTriggers().ToList();
 
@@ -387,8 +453,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -423,8 +491,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();

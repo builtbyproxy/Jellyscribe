@@ -718,6 +718,7 @@ public class LetterboxdController : ControllerBase
         // arrived as log_lines=[] with nothing saying whether the plugin was idle,
         // the log dir was missing, or the line filter matched nothing.
         lines.Insert(0, $"[meta] collector: files={source ?? "none"}; matched={matched}; error={error ?? "none"}");
+        var collector = new { files = source ?? "none", matched, error = error ?? "none" };
 
         int? libraryCount;
         try
@@ -743,7 +744,8 @@ public class LetterboxdController : ControllerBase
             Plugin.Instance?.Version?.ToString() ?? "unknown",
             telemetrySnapshot,
             note,
-            lines);
+            lines,
+            collector);
         return (json, matched);
     }
 
