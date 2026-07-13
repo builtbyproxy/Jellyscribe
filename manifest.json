@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.19.5.0",
+        "changelog": "**\"Send logs to developer\" now tells you when there is nothing to send.** Previously, if the plugin had not logged anything recently, the send dialog reported success but the bundle arrived empty, and neither you nor the developer could tell why. The dialog now warns you when no plugin log lines were found, with a hint to reproduce the problem first and send again, and every bundle includes a small status line saying which log files were read and how many lines matched, so support requests no longer dead-end on an empty bundle.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v1.19.5/jellyfin-plugin-letterboxd-v1.19.5.zip",
+        "checksum": "fa5522a39009226363027288ce0e358a",
+        "timestamp": "2026-07-13T12:32:04Z"
+      },
+      {
         "version": "1.19.4.0",
         "changelog": "Docs-only; ships no release.",
         "targetAbi": "10.11.9.0",
