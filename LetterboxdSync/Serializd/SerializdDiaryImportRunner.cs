@@ -109,7 +109,7 @@ public class SerializdDiaryImportRunner
             if (!byKey.TryGetValue((d.ShowTmdbId, d.SeasonNumber, d.EpisodeNumber), out var ep)) continue;
 
             var ud = _userDataManager.GetUserData(user, ep);
-            if (ud.Played) continue;
+            if (ud is null || ud.Played) continue;
 
             // Do NOT set LastPlayedDate: the scrobble catch-up skips played episodes without a
             // play date, so an imported episode won't be re-logged straight back to Serializd.

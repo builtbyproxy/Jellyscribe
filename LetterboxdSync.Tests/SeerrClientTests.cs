@@ -494,6 +494,111 @@ public class SeerrClientTests
     private static HttpResponseMessage JsonResponse(string body)
         => new(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
 
+    // ----- RequestSeriesAsync (TV): outcome classification -----
+    // These pin the three body-classification paths of a 2xx response (per-season
+    // detail, media-level fallback, unparseable body) plus the 409 and failure
+    // paths. Wrong classification either re-requests content forever or silently
+    // hides a real grab from the caller's tally.
+
+    private static async Task<(SeerrClient.RequestResult Result, string? PostedBody)> RunSeriesRequest(
+        string responseBody, System.Net.HttpStatusCode status, IReadOnlyList<int> seasons)
+    {
+        string? postedBody = null;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+            {
+                postedBody = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+                return new HttpResponseMessage(status)
+                {
+                    Content = new StringContent(responseBody, System.Text.Encoding.UTF8, "application/json")
+                };
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var result = await client.RequestSeriesAsync(500, 7, seasons);
+        return (result, postedBody);
+    }
+
+    [Fact]
+    public async Task RequestSeries_NewShow_PostsSeasonsAndReturnsRequested()
+    {
+        var (result, body) = await RunSeriesRequest(
+            "{\"media\":{\"seasons\":[{\"seasonNumber\":1,\"status\":2},{\"seasonNumber\":2,\"status\":2}]}}",
+            HttpStatusCode.Created, new[] { 1, 2 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Contains("\"mediaType\":\"tv\"", body);
+        Assert.Contains("\"seasons\":[1,2]", body);
+    }
+
+    [Fact]
+    public async Task RequestSeries_NoSeasonsGiven_RequestsAll()
+    {
+        var (_, body) = await RunSeriesRequest("{}", HttpStatusCode.Created, Array.Empty<int>());
+
+        Assert.Contains("\"seasons\":\"all\"", body);
+    }
+
+    [Fact]
+    public async Task RequestSeries_AllRequestedSeasonsAvailable_ClassifiedAsNoOp()
+    {
+        // Jellyseerr returns 2xx even when everything is already AVAILABLE (status 5).
+        var (result, _) = await RunSeriesRequest(
+            "{\"media\":{\"seasons\":[{\"seasonNumber\":1,\"status\":5},{\"seasonNumber\":2,\"status\":5}]}}",
+            HttpStatusCode.OK, new[] { 1, 2 });
+
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
+    }
+
+    [Fact]
+    public async Task RequestSeries_OneSeasonNotAvailable_StillCountsAsRequested()
+    {
+        var (result, _) = await RunSeriesRequest(
+            "{\"media\":{\"seasons\":[{\"seasonNumber\":1,\"status\":5},{\"seasonNumber\":2,\"status\":3}]}}",
+            HttpStatusCode.OK, new[] { 1, 2 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+    }
+
+    [Fact]
+    public async Task RequestSeries_MediaLevelStatusFallback_WhenNoSeasonDetail()
+    {
+        var (result, _) = await RunSeriesRequest(
+            "{\"media\":{\"status\":5}}", HttpStatusCode.OK, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
+    }
+
+    [Fact]
+    public async Task RequestSeries_UnparseableBody_TreatedAsRealRequest()
+    {
+        // Parse failure must never hide a genuine grab; classification falls back
+        // to Requested.
+        var (result, _) = await RunSeriesRequest("not json at all", HttpStatusCode.OK, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+    }
+
+    [Fact]
+    public async Task RequestSeries_Conflict409_ReturnsAlreadyExists()
+    {
+        var (result, _) = await RunSeriesRequest("{\"message\":\"Request for this media already exists\"}",
+            HttpStatusCode.Conflict, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
+    }
+
+    [Fact]
+    public async Task RequestSeries_ServerError_ReturnsFailed()
+    {
+        var (result, _) = await RunSeriesRequest("{\"message\":\"boom\"}",
+            HttpStatusCode.InternalServerError, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.Failed, result);
+    }
+
     private class SeerrHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;

@@ -51,9 +51,15 @@ public class SerializdSyncRunner
     /// can supply ids without wiring Jellyfin's library-parent graph. Production reads the
     /// resolved Series entity (populated at runtime).
     /// </summary>
-    internal static Func<Episode, int?> SeriesTmdbIdReader { get; set; } = DefaultReadSeriesTmdbId;
+    internal static Func<Episode, int?> SeriesTmdbIdReader { get; set; } = ReadSeriesTmdbId;
 
-    private static int? DefaultReadSeriesTmdbId(Episode episode)
+    /// <summary>
+    /// The one place that knows where a show's TMDb id lives: on the parent Series
+    /// entity, not the episode's own ProviderIds (those carry the episode-level id,
+    /// which is wrong for Serializd). PlaybackHandler delegates here too, so the
+    /// real-time and catch-up paths cannot diverge.
+    /// </summary>
+    internal static int? ReadSeriesTmdbId(Episode episode)
     {
         var s = episode.Series?.GetProviderId(MetadataProvider.Tmdb);
         return int.TryParse(s, out var id) ? id : (int?)null;

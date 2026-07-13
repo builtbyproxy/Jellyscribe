@@ -120,9 +120,14 @@ public class PlaybackHandler : IHostedService, IDisposable
                             e.Item.Name, account.LetterboxdUsername, viewingDate.ToString("yyyy-MM-dd"));
                         SyncHistory.Record(new SyncEvent
                         {
-                            FilmTitle = e.Item.Name, FilmSlug = film.Slug, TmdbId = tmdbId,
-                            Username = user.Username, Timestamp = DateTime.UtcNow,
-                            ViewingDate = viewingDate, Status = SyncStatus.Skipped, Source = "playback"
+                            FilmTitle = e.Item.Name,
+                            FilmSlug = film.Slug,
+                            TmdbId = tmdbId,
+                            Username = user.Username,
+                            Timestamp = DateTime.UtcNow,
+                            ViewingDate = viewingDate,
+                            Status = SyncStatus.Skipped,
+                            Source = "playback"
                         });
                         continue;
                     }
@@ -140,8 +145,11 @@ public class PlaybackHandler : IHostedService, IDisposable
                         action, e.Item.Name, user.Username, account.LetterboxdUsername);
                     SyncHistory.Record(new SyncEvent
                     {
-                        FilmTitle = e.Item.Name, FilmSlug = film.Slug, TmdbId = tmdbId,
-                        Username = user.Username, Timestamp = DateTime.UtcNow,
+                        FilmTitle = e.Item.Name,
+                        FilmSlug = film.Slug,
+                        TmdbId = tmdbId,
+                        Username = user.Username,
+                        Timestamp = DateTime.UtcNow,
                         ViewingDate = viewingDate,
                         Status = isRewatch ? SyncStatus.Rewatch : SyncStatus.Success,
                         Source = "playback"
@@ -153,9 +161,13 @@ public class PlaybackHandler : IHostedService, IDisposable
                         e.Item.Name, tmdbId, user.Username, account.LetterboxdUsername, ex.Message);
                     SyncHistory.Record(new SyncEvent
                     {
-                        FilmTitle = e.Item.Name, TmdbId = tmdbId,
-                        Username = user.Username, Timestamp = DateTime.UtcNow,
-                        Status = SyncStatus.Failed, Error = ex.Message, Source = "playback"
+                        FilmTitle = e.Item.Name,
+                        TmdbId = tmdbId,
+                        Username = user.Username,
+                        Timestamp = DateTime.UtcNow,
+                        Status = SyncStatus.Failed,
+                        Error = ex.Message,
+                        Source = "playback"
                     });
                 }
             }
@@ -265,16 +277,10 @@ public class PlaybackHandler : IHostedService, IDisposable
 
     // Reads the parent series' TMDb id from an episode. Overridable so tests can supply
     // it without wiring Jellyfin's library-parent graph (mirrors the factory OverrideForTesting
-    // convention); production always uses DefaultReadSeriesTmdbId.
-    internal static Func<Episode, int?> SeriesTmdbIdReader { get; set; } = DefaultReadSeriesTmdbId;
-
-    private static int? DefaultReadSeriesTmdbId(Episode episode)
-    {
-        // Serializd keys by the SHOW's TMDb id, which lives on the parent Series
-        // (the episode's own ProviderIds carry the episode-level id, which is wrong here).
-        var fromSeries = episode.Series?.GetProviderId(MetadataProvider.Tmdb);
-        return int.TryParse(fromSeries, out var seriesId) ? seriesId : null;
-    }
+    // convention); production delegates to the shared reader on SerializdSyncRunner so the
+    // real-time and catch-up paths use identical logic.
+    internal static Func<Episode, int?> SeriesTmdbIdReader { get; set; } =
+        Serializd.SerializdSyncRunner.ReadSeriesTmdbId;
 
     public void Dispose()
     {
