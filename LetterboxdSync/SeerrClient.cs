@@ -256,22 +256,87 @@ public class SeerrClient : IDisposable
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         using var response = await _http.PostAsync(url, content).ConfigureAwait(false);
-        if (response.IsSuccessStatusCode)
-            return RequestResult.Requested;
-
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        var seasonsLabel = seasonNumbers.Count > 0 ? string.Join(",", seasonNumbers) : "all";
+
+        if (response.IsSuccessStatusCode)
+        {
+            // A 2xx isn't always a real grab: Jellyseerr also returns success when the requested
+            // seasons are already available (nothing to fetch). Classify from the body so the
+            // caller's tally reflects reality instead of counting no-ops as "new". Full response
+            // logged so mismatches between Jellyfin's and Jellyseerr's view are diagnosable.
+            var available = AllRequestedSeasonsAvailable(responseBody, seasonNumbers);
+            _logger.LogInformation(
+                "Seerr TV request TMDb {TmdbId} S[{Seasons}] → {Outcome} (HTTP {Status}): {Body}",
+                tmdbId, seasonsLabel, available ? "already available (no-op)" : "requested",
+                (int)response.StatusCode, Truncate(responseBody, 400));
+            return available ? RequestResult.AlreadyExists : RequestResult.Requested;
+        }
+
         if ((int)response.StatusCode == 409 ||
             responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
             responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
             responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
             responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase))
         {
+            _logger.LogInformation("Seerr TV request TMDb {TmdbId} S[{Seasons}] → already exists (HTTP {Status})",
+                tmdbId, seasonsLabel, (int)response.StatusCode);
             return RequestResult.AlreadyExists;
         }
 
-        _logger.LogWarning("Seerr TV request failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
-            tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
+        _logger.LogWarning("Seerr TV request failed for TMDb {TmdbId} S[{Seasons}] (user {UserId}): {Status} {Body}",
+            tmdbId, seasonsLabel, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return RequestResult.Failed;
+    }
+
+    /// <summary>
+    /// Best-effort read of a POST /request 2xx body: true when every requested season is already
+    /// AVAILABLE (Jellyseerr status 5) — i.e. the "request" was a no-op with nothing to fetch.
+    /// Prefers per-season detail on <c>media.seasons</c>; falls back to the media-level status when
+    /// the response carries none. Returns false (treat as a real request) on any parse failure so
+    /// a genuine grab is never silently hidden.
+    /// </summary>
+    private static bool AllRequestedSeasonsAvailable(string body, IReadOnlyList<int> requestedSeasons)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("media", out var media)
+                && media.TryGetProperty("seasons", out var seasons)
+                && seasons.ValueKind == JsonValueKind.Array)
+            {
+                var statusByNumber = new Dictionary<int, int>();
+                foreach (var s in seasons.EnumerateArray())
+                {
+                    if (s.TryGetProperty("seasonNumber", out var sn) && sn.ValueKind == JsonValueKind.Number &&
+                        s.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.Number)
+                        statusByNumber[sn.GetInt32()] = st.GetInt32();
+                }
+
+                IEnumerable<int> relevant = requestedSeasons.Count > 0 ? requestedSeasons : statusByNumber.Keys;
+                var any = false;
+                foreach (var n in relevant)
+                {
+                    any = true;
+                    if (!statusByNumber.TryGetValue(n, out var st) || st != 5) return false; // 5 = AVAILABLE
+                }
+                return any;
+            }
+
+            if (root.TryGetProperty("media", out var media2)
+                && media2.TryGetProperty("status", out var ms)
+                && ms.ValueKind == JsonValueKind.Number)
+                return ms.GetInt32() == 5;
+
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
