@@ -42,6 +42,7 @@ public class DiaryImportTask : IScheduledTask
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var users = _userManager.GetUsers().ToList();
+        var usersWithImport = 0;
 
         foreach (var user in users)
         {
@@ -50,12 +51,28 @@ public class DiaryImportTask : IScheduledTask
             // Collect entries from every enabled-with-diary-import account belonging to this
             // Jellyfin user. GetEnabledAccountsForUser returns primary first, so the merge
             // below naturally gives primary's rating priority on conflicts.
-            var accounts = Config.GetEnabledAccountsForUser(user.Id.ToString("N"))
+            var enabledAccounts = Config.GetEnabledAccountsForUser(user.Id.ToString("N")).ToList();
+            var accounts = enabledAccounts
                 .Where(a => a.EnableDiaryImport)
                 .ToList();
 
             if (accounts.Count == 0)
+            {
+                // Say WHY nothing happened: a run that exits here used to log nothing at
+                // all, which made a disabled toggle indistinguishable from a broken
+                // feature (issue #89). Users with no accounts at all stay at Debug so a
+                // multi-user server isn't nagged daily about people who never set up
+                // the plugin.
+                if (enabledAccounts.Count > 0)
+                    _logger.LogInformation(
+                        "Diary import skipped for {Username}: {AccountCount} enabled Letterboxd account(s), but none has diary import turned on. Enable 'Import Letterboxd diary as Jellyfin watched' on the account to use reverse sync.",
+                        user.Username, enabledAccounts.Count);
+                else
+                    _logger.LogDebug("Diary import skipped for {Username}: no enabled Letterboxd accounts", user.Username);
                 continue;
+            }
+
+            usersWithImport++;
 
             _logger.LogInformation("Starting diary import for {Username} ({AccountCount} account(s))",
                 user.Username, accounts.Count);
@@ -115,7 +132,16 @@ public class DiaryImportTask : IScheduledTask
             }
 
             if (diaryTmdbIds.Count == 0)
+            {
+                // Log the outcome and close the progress banner; this path used to
+                // `continue` bare, leaving SyncProgress started forever and the log
+                // silent about why nothing was imported.
+                _logger.LogInformation(
+                    "Diary import for {Username}: no films found on Letterboxd across {AccountCount} account(s) (empty diary/watched list, or every fetch failed above); nothing to import",
+                    user.Username, accounts.Count);
+                SyncProgress.Complete();
                 continue;
+            }
 
             // Pull all movies (not just unplayed) so we can also apply rating-only updates
             // to films already marked as played.
@@ -215,6 +241,12 @@ public class DiaryImportTask : IScheduledTask
                 ratingByTmdbId.Count(kv => libraryTmdbIds.Contains(kv.Key)) - ratingsApplied);
             SyncProgress.Complete();
         }
+
+        // Always leave one line per run, even when every user was skipped, so a
+        // "finished in 0 seconds" run is explainable from the log alone.
+        _logger.LogInformation(
+            "Diary import task finished: {UserCount} Jellyfin user(s) checked, {EligibleCount} with diary import enabled",
+            users.Count, usersWithImport);
 
         progress.Report(100);
     }
