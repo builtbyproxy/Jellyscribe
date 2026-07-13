@@ -159,6 +159,12 @@
                     #letterboxdUserPage .ws-table th:nth-child(4), #letterboxdUserPage .ws-table td:nth-child(4) { display: none; }
                     #letterboxdUserPage .ws-tile .n { font-size: 19px; }
                 }
+                #letterboxdUserPage .ws-spark { display: block; width: 100%; height: 26px; margin-top: 10px; }
+                #letterboxdUserPage .ws-checks input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 20px; background: var(--ws-raise); border: 1px solid var(--ws-border); position: relative; cursor: pointer; flex: none; margin: 1px 0 0; transition: .16s; }
+                #letterboxdUserPage .ws-checks input[type="checkbox"]::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--ws-muted); top: 2px; left: 2px; transition: .16s; }
+                #letterboxdUserPage .ws-checks input[type="checkbox"]:checked { background: var(--ws-primary); border-color: var(--ws-primary); }
+                #letterboxdUserPage .ws-checks input[type="checkbox"]:checked::after { left: 16px; background: #fff; }
+                #letterboxdUserPage .ws-nav a .ws-count { margin-left: auto; font-family: var(--ws-mono); font-size: 11px; color: var(--ws-faint); }
                 </style>
 
                 <div class="ws">
@@ -167,7 +173,7 @@
                         <nav class="ws-nav" id="wsNav">
                             <div class="ws-navlabel">You</div>
                             <a class="active" data-sec="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</a>
-                            <a data-sec="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>My accounts</a>
+                            <a data-sec="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>My accounts<span class="ws-count" id="acctCount"></span></a>
                         </nav>
                     </aside>
                     <main class="ws-main">
@@ -181,8 +187,8 @@
                             </div>
                             <span id="syncStatus" class="ws-muted" style="font-size:12.5px;"></span>
                             <div class="ws-tiles">
-                                <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged</div></div>
-                                <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged</div></div>
+                                <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged</div><svg class="ws-spark" id="sparkFilm" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
+                                <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged</div><svg class="ws-spark" id="sparkTv" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
                                 <div class="ws-tile"><div class="n ws-green" id="statSynced">-</div><div class="k ws-label">Synced</div></div>
                                 <div class="ws-tile"><div class="n" style="color:var(--ws-info);" id="statRewatches">-</div><div class="k ws-label">Rewatches</div></div>
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
@@ -284,7 +290,26 @@
                                     var te = ((res[3] && res[3].events) || []).map(function (e) { e._svc = 'serializd'; return e; });
                                     self.merged = fe.concat(te).sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
                                     self.renderOverview();
+                                    self.renderSparks();
                                 });
+                        },
+                        renderSparks: function () {
+                            var self = this, days = 14, now = Date.now(), dayMs = 86400000;
+                            function build(svc, stroke, fill) {
+                                var buckets = new Array(days).fill(0);
+                                self.merged.forEach(function (e) {
+                                    var idx = days - 1 - Math.floor((now - new Date(e.Timestamp).getTime()) / dayMs);
+                                    if (e._svc === svc && idx >= 0 && idx < days) buckets[idx]++;
+                                });
+                                var max = Math.max.apply(null, buckets.concat([1])), w = 120, h = 26, step = w / (days - 1);
+                                var pts = buckets.map(function (v, i) { return [Math.round(i * step), Math.round(h - 2 - (v / max) * (h - 5))]; });
+                                var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0] + ' ' + p[1]; }).join(' ');
+                                return '<path d="' + line + '" fill="none" stroke="' + stroke + '" stroke-width="1.6"/>' +
+                                    '<path d="' + line + ' L' + w + ' ' + h + ' L0 ' + h + ' Z" fill="' + fill + '"/>';
+                            }
+                            var sf = document.getElementById('sparkFilm'), st = document.getElementById('sparkTv');
+                            if (sf) sf.innerHTML = build('letterboxd', 'var(--ws-film)', 'var(--ws-film-soft)');
+                            if (st) st.innerHTML = build('serializd', 'var(--ws-tv)', 'var(--ws-tv-soft)');
                         },
                         renderOverview: function () {
                             var f = this.ovFilter, list = this.merged.filter(function (e) { return f === 'all' || e._svc === f; }).slice(0, 40);
@@ -330,6 +355,7 @@
                         feat: function (l, on) { return '<span class="ws-feat ' + (on ? 'on' : '') + '">' + l + '</span>'; },
                         renderAccounts: function () {
                             var self = this, cards = '';
+                            var cnt = (self.sz.length + self.lb.length); document.getElementById('acctCount').textContent = cnt || '';
                             self.sz.forEach(function (a, i) { cards += self.card('serializd', a, i); });
                             self.lb.forEach(function (a, i) { cards += self.card('letterboxd', a, i); });
                             cards += '<button type="button" class="ws-add" onclick="WSU.openAccount(null)"><span class="plus">+</span>Link a diary<span class="ws-label">Film or TV</span></button>';

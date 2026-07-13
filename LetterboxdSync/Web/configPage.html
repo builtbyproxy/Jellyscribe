@@ -178,6 +178,13 @@
                     #letterboxdSyncConfigPage .ws-table th:nth-child(4), #letterboxdSyncConfigPage .ws-table td:nth-child(4) { display: none; }
                     #letterboxdSyncConfigPage .ws-tile .n { font-size: 19px; }
                 }
+                /* Sparkline on the Film/TV tiles (approved-mockup parity). */
+                #letterboxdSyncConfigPage .ws-spark { display: block; width: 100%; height: 26px; margin-top: 10px; }
+                /* iOS-style sliding toggles for the account-editor switches (approved-mockup parity). */
+                #letterboxdSyncConfigPage .ws-checks input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 20px; background: var(--ws-raise); border: 1px solid var(--ws-border); position: relative; cursor: pointer; flex: none; margin: 1px 0 0; transition: .16s; }
+                #letterboxdSyncConfigPage .ws-checks input[type="checkbox"]::after { content: ""; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--ws-muted); top: 2px; left: 2px; transition: .16s; }
+                #letterboxdSyncConfigPage .ws-checks input[type="checkbox"]:checked { background: var(--ws-primary); border-color: var(--ws-primary); }
+                #letterboxdSyncConfigPage .ws-checks input[type="checkbox"]:checked::after { left: 16px; background: #fff; }
                 </style>
 
                 <div class="ws">
@@ -213,8 +220,8 @@
                             </div>
                             <span id="syncStatus" class="ws-muted" style="font-size:12.5px;"></span>
                             <div class="ws-tiles" style="margin-top:10px;">
-                                <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged · Letterboxd</div></div>
-                                <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged · Serializd</div></div>
+                                <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged · Letterboxd</div><svg class="ws-spark" id="sparkFilm" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
+                                <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged · Serializd</div><svg class="ws-spark" id="sparkTv" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
                                 <div class="ws-tile"><div class="n ws-green" id="statSynced">-</div><div class="k ws-label">Synced</div></div>
                                 <div class="ws-tile"><div class="n" style="color:var(--ws-info);" id="statRewatches">-</div><div class="k ws-label">Rewatches</div></div>
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
@@ -441,7 +448,26 @@
                                 var te = ((res[3] && res[3].events) || []).map(function (e) { e._svc = 'serializd'; return e; });
                                 self.merged = fe.concat(te).sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
                                 self.renderOverview();
+                                self.renderSparks();
                             }).catch(function () {});
+                        },
+                        renderSparks: function () {
+                            var self = this, days = 14, now = Date.now(), dayMs = 86400000;
+                            function build(svc, stroke, fill) {
+                                var buckets = new Array(days).fill(0);
+                                self.merged.forEach(function (e) {
+                                    var idx = days - 1 - Math.floor((now - new Date(e.Timestamp).getTime()) / dayMs);
+                                    if (e._svc === svc && idx >= 0 && idx < days) buckets[idx]++;
+                                });
+                                var max = Math.max.apply(null, buckets.concat([1])), w = 120, h = 26, step = w / (days - 1);
+                                var pts = buckets.map(function (v, i) { return [Math.round(i * step), Math.round(h - 2 - (v / max) * (h - 5))]; });
+                                var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0] + ' ' + p[1]; }).join(' ');
+                                return '<path d="' + line + '" fill="none" stroke="' + stroke + '" stroke-width="1.6"/>' +
+                                    '<path d="' + line + ' L' + w + ' ' + h + ' L0 ' + h + ' Z" fill="' + fill + '"/>';
+                            }
+                            var sf = document.getElementById('sparkFilm'), st = document.getElementById('sparkTv');
+                            if (sf) sf.innerHTML = build('letterboxd', 'var(--ws-film)', 'var(--ws-film-soft)');
+                            if (st) st.innerHTML = build('serializd', 'var(--ws-tv)', 'var(--ws-tv-soft)');
                         },
                         renderOverview: function () {
                             var f = this.ovFilter || 'all';
