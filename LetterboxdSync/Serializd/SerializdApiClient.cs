@@ -357,6 +357,11 @@ public class SerializdApiClient : ISerializdService
 
     public async Task CreateShowReviewAsync(int showTmdbId, int? rating, string? reviewText, bool containsSpoiler)
     {
+        // Serializd only persists review_text when the entry is a log (is_log:true); with
+        // is_log:false it stores the rating and silently drops the text (HTTP 200, reviewText:"").
+        // So a written review must be a log; a bare rating stays a rating (no diary entry).
+        var hasText = !string.IsNullOrWhiteSpace(reviewText);
+
         var payload = new Dictionary<string, object?>
         {
             ["show_id"] = showTmdbId,
@@ -365,7 +370,7 @@ public class SerializdApiClient : ISerializdService
             ["review_text"] = reviewText ?? string.Empty,
             ["contains_spoiler"] = containsSpoiler,
             ["backdate"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
-            ["is_log"] = false,
+            ["is_log"] = hasText,
             ["is_rewatch"] = false,
             ["tags"] = Array.Empty<string>(),
             ["allows_comments"] = true,
@@ -378,8 +383,8 @@ public class SerializdApiClient : ISerializdService
         using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
         var respBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
         _logger.LogInformation(
-            "Serializd review POST show {Show} (is_log=false, rating={Rating}, textLen={Len}) → HTTP {Status}: {Body}",
-            showTmdbId, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode,
+            "Serializd review POST show {Show} (is_log={IsLog}, rating={Rating}, textLen={Len}) → HTTP {Status}: {Body}",
+            showTmdbId, hasText, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode,
             respBody.Length > 400 ? respBody.Substring(0, 400) : respBody);
         if (!resp.IsSuccessStatusCode)
             throw new Exception($"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {respBody}");
