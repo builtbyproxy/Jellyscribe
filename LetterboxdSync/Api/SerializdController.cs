@@ -325,8 +325,9 @@ public class SerializdController : ControllerBase
         {
             try
             {
+                // Watched-episode catch-up only — the watchlist has its own button/endpoint
+                // (SyncWatchlistNow), matching the Letterboxd "Sync now" which is also catch-up-only.
                 await _syncRunner.TryRunForUserAsync(userId, "manual", CancellationToken.None).ConfigureAwait(false);
-                await _watchlistRunner.TryRunForUserAsync(userId, CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
