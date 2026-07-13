@@ -10,7 +10,7 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
-    version: '1.19.4',
+    version: '1.19.5',
     headline: 'Housekeeping: a warning-clean test build',
     summary:
       'No functional changes. The plugin\u2019s test suite compiled with seven compiler and analyzer warnings (a couple of async test methods that never awaited anything, one fire-and-forget mock setup, and a few assertions written the long way around). All seven are fixed, so the build is warning-clean again and future warnings stand out instead of drowning in noise. Nothing about syncing, accounts, or the dashboard changes in this release.',
