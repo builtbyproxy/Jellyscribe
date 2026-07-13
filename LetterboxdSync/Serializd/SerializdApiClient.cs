@@ -376,11 +376,13 @@ public class SerializdApiClient : ISerializdService
 
         var body = JsonSerializer.Serialize(payload);
         using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        var respBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+        _logger.LogInformation(
+            "Serializd review POST show {Show} (is_log=false, rating={Rating}, textLen={Len}) → HTTP {Status}: {Body}",
+            showTmdbId, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode,
+            respBody.Length > 400 ? respBody.Substring(0, 400) : respBody);
         if (!resp.IsSuccessStatusCode)
-        {
-            var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {err}");
-        }
+            throw new Exception($"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {respBody}");
     }
 
     public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
