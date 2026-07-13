@@ -195,4 +195,22 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
         Assert.True(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 1, SerializdSyncHistory.KindLog));
         Assert.False(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 2, SerializdSyncHistory.KindLog));
     }
+
+    [Fact]
+    public async Task Run_RatedShow_QueriesLibraryOnlyOnce()
+    {
+        // SyncShowMetaAsync used to re-query the whole library for BaseItemKind.Series to
+        // re-find shows the episode scan had already resolved. It now reuses the Series
+        // reference cached during that scan, so a run with something to log/rate performs
+        // exactly one GetItemList call, not two.
+        var (user, _) = AddUserWithAccount();
+        var ep = MakeEpisode(1, 3);
+        LibraryHas(ep);
+        _userDataManager.GetUserData(user, ep).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+        FakeService(out _);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        _libraryManager.Received(1).GetItemList(Arg.Any<InternalItemsQuery>());
+    }
 }
