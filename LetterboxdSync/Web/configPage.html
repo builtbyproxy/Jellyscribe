@@ -117,11 +117,12 @@
                 #letterboxdSyncConfigPage .ws-cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px,1fr)); gap: 12px; }
                 #letterboxdSyncConfigPage .ws-acct { background: var(--ws-surface); border: 1px solid var(--ws-border); border-radius: var(--ws-r); padding: 14px; box-shadow: var(--ws-shadow); display: flex; flex-direction: column; gap: 11px; }
                 #letterboxdSyncConfigPage .ws-acct.film { border-top: 2px solid var(--ws-film); } #letterboxdSyncConfigPage .ws-acct.tv { border-top: 2px solid var(--ws-tv); }
-                #letterboxdSyncConfigPage .ws-acct .top { display: flex; align-items: center; gap: 10px; }
-                #letterboxdSyncConfigPage .ws-acct .u { font-family: var(--ws-mono); font-weight: 600; font-size: 14px; }
-                #letterboxdSyncConfigPage .ws-acct .svc { font-size: 11px; }
+                #letterboxdSyncConfigPage .ws-acct .top { display: flex; align-items: center; gap: 10px; min-width: 0; }
+                #letterboxdSyncConfigPage .ws-acct .top > div { min-width: 0; flex: 1 1 auto; }
+                #letterboxdSyncConfigPage .ws-acct .u { font-family: var(--ws-mono); font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                #letterboxdSyncConfigPage .ws-acct .svc { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 #letterboxdSyncConfigPage .ws-acct .svc.film { color: var(--ws-film); } #letterboxdSyncConfigPage .ws-acct .svc.tv { color: var(--ws-tv); }
-                #letterboxdSyncConfigPage .ws-prim { margin-left: auto; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ws-warn); background: rgba(245,166,35,.14); padding: 3px 7px; border-radius: 5px; }
+                #letterboxdSyncConfigPage .ws-prim { flex: none; margin-left: auto; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ws-warn); background: rgba(245,166,35,.14); padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
                 #letterboxdSyncConfigPage .ws-featchips { display: flex; flex-wrap: wrap; gap: 5px; }
                 #letterboxdSyncConfigPage .ws-feat { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: var(--ws-surface-2); color: var(--ws-muted); border: 1px solid var(--ws-border); }
                 #letterboxdSyncConfigPage .ws-feat.on { color: var(--ws-text); border-color: var(--ws-border-strong); }
@@ -239,6 +240,16 @@
                                 <button type="button" class="ws-chip on" data-f="all">All</button>
                                 <button type="button" class="ws-chip" data-f="letterboxd"><span class="ws-dot film"></span>Film · Letterboxd</button>
                                 <button type="button" class="ws-chip" data-f="serializd"><span class="ws-dot tv"></span>TV · Serializd</button>
+                            </div>
+                            <div class="ws-filters" id="ovStatusFilters">
+                                <span class="ws-label" style="align-self:center;margin-right:2px;">Status</span>
+                                <button type="button" class="ws-chip on" data-s="all">All</button>
+                                <button type="button" class="ws-chip" data-s="hide-skipped">Hide skipped</button>
+                                <button type="button" class="ws-chip" data-s="Success">Synced</button>
+                                <button type="button" class="ws-chip" data-s="Rewatch">Rewatch</button>
+                                <button type="button" class="ws-chip" data-s="Reviewed">Reviewed</button>
+                                <button type="button" class="ws-chip" data-s="Skipped">Skipped</button>
+                                <button type="button" class="ws-chip" data-s="Failed">Failed</button>
                             </div>
                             <span id="syncStatus" class="ws-muted" style="font-size:12.5px;"></span>
                             <div class="ws-jw" id="jobWatcher" style="display:none;">
@@ -409,6 +420,13 @@
                                 self.renderOverview();
                                 self.syncLabels();
                             });
+                            document.getElementById('ovStatusFilters').addEventListener('click', function (e) {
+                                var c = e.target.closest('.ws-chip'); if (!c) return;
+                                this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on');
+                                self.ovStatus = c.getAttribute('data-s');
+                                self.ovPage = 0;
+                                self.renderOverview();
+                            });
                             document.getElementById('historyPrev').addEventListener('click', function () { if ((self.ovPage || 0) > 0) { self.ovPage--; self.renderOverview(); } });
                             document.getElementById('historyNext').addEventListener('click', function () { self.ovPage = (self.ovPage || 0) + 1; self.renderOverview(); });
                             document.getElementById('actFilters').addEventListener('click', function (e) {
@@ -505,8 +523,10 @@
                             if (st) st.innerHTML = build('serializd', 'var(--ws-tv)', 'var(--ws-tv-soft)');
                         },
                         renderOverview: function () {
-                            var f = this.ovFilter || 'all';
-                            var all = this.merged.filter(function (e) { return f === 'all' || e._svc === f; });
+                            var self = this, f = this.ovFilter || 'all';
+                            var all = this.merged.filter(function (e) {
+                                return (f === 'all' || e._svc === f) && self.matchesStatus(e);
+                            });
                             var ps = this.ovPageSize || 40, total = all.length, pages = Math.max(1, Math.ceil(total / ps));
                             if ((this.ovPage || 0) >= pages) this.ovPage = pages - 1;
                             var start = (this.ovPage || 0) * ps;
@@ -530,6 +550,17 @@
                                     pg.style.display = self.actTotal > self.pageSize ? 'flex' : 'none';
                                     document.getElementById('actPageInfo').textContent = (self.actOffset + 1) + '–' + Math.min(self.actOffset + self.pageSize, self.actTotal) + ' of ' + self.actTotal;
                                 }).catch(function () {});
+                        },
+                        statusOf: function (e) {
+                            if (e.Source === 'review') return 'Reviewed';
+                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success');
+                        },
+                        matchesStatus: function (e) {
+                            var s = this.ovStatus || 'all';
+                            if (s === 'all') return true;
+                            var st = this.statusOf(e);
+                            if (s === 'hide-skipped') return st !== 'Skipped';
+                            return st === s;
                         },
                         escAttr: function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
                         pillHtml: function (status, reason) {
@@ -668,7 +699,7 @@
                             var chips = feats.map(function (f) { return self.featChip(f[0], f[1]); }).join('');
                             return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '">' +
                                 '<div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'FL') + '</span>' +
-                                '<div style="min-width:0;"><div class="u">' + uname + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' +
+                                '<div style="min-width:0;"><div class="u" title="' + uname + '">' + uname + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' +
                                 (a.IsPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div>' +
                                 '<div class="ws-featchips">' + chips + '</div>' +
                                 '<div class="foot"><span class="st">' + (a.Enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>') + '</span>' +
