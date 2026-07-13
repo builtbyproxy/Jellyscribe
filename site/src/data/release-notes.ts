@@ -22,6 +22,18 @@ export const releaseNotes: ReleaseNotes[] = [
     },
   },
   {
+    version: '1.19.5',
+    headline: 'Send logs to developer now tells you when there is nothing to send',
+    summary:
+      'A user sent a diagnostic bundle that arrived completely empty: the plugin had not logged anything recently, so there was nothing to collect, but the dialog still reported plain success and neither side could tell why the bundle was blank. Now the send dialog warns you when no plugin log lines were found (with a hint to reproduce the problem first and try again), and every bundle carries a small status line saying which log files were read and how many lines matched, so an empty bundle explains itself.',
+    highlights: {
+      fixes: [
+        'The "Send logs to developer" dialog now shows a clear warning when the bundle contains no log lines, instead of reporting bare success on an empty send.',
+        'Diagnostic bundles now include a collector status line (files read, lines matched, any read error), so support can tell an idle plugin from a broken log reader.',
+      ],
+    },
+  },
+  {
     version: '1.19.4',
     headline: 'Housekeeping: a warning-clean test build',
     summary:

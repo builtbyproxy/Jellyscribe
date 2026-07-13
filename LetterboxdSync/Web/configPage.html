@@ -213,6 +213,7 @@
                             <div style="font-size:0.88em;line-height:1.5;">Your reference code:
                                 <code id="sendLogsRefCode" style="font-size:1.1em;background:rgba(0,0,0,0.35);padding:0.1em 0.4em;border-radius:4px;">&mdash;</code><br>
                                 If you open a bug report on GitHub, quote this code so the developer can find your logs.</div>
+                            <div id="sendLogsWarning" style="display:none;margin-top:0.6em;padding:0.5em 0.7em;background:rgba(255,176,0,0.1);border:1px solid rgba(255,176,0,0.4);border-radius:6px;font-size:0.85em;line-height:1.5;"></div>
                             <button type="button" class="lb-btn lb-btn-secondary" id="sendLogsCopyCode" style="margin-top:0.6em;">Copy code</button>
                             <button type="button" class="lb-btn lb-btn-secondary" id="sendLogsClose" style="margin-top:0.6em;">Close</button>
                         </div>
@@ -475,6 +476,9 @@
                                 response.json().then(function (data) {
                                     status.textContent = '';
                                     document.getElementById('sendLogsRefCode').textContent = data.refCode;
+                                    var warn = document.getElementById('sendLogsWarning');
+                                    warn.textContent = data.warning || '';
+                                    warn.style.display = data.warning ? 'block' : 'none';
                                     document.getElementById('sendLogsResult').style.display = 'block';
                                 });
                             }, function (err) {
