@@ -211,8 +211,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         // Letterboxd diary has TMDb 1233413; library has the same movie unplayed.
@@ -243,8 +245,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -274,8 +278,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -307,8 +313,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         // Diary has the film but no rating; library already marked as played.
@@ -339,8 +347,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         // Diary mentions a film, but library has nothing.
@@ -359,7 +369,7 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDefaultTriggers_ReturnsDailyInterval()
+    public void GetDefaultTriggers_ReturnsDailyInterval()
     {
         var triggers = _task.GetDefaultTriggers().ToList();
 
@@ -387,8 +397,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();
@@ -423,8 +435,10 @@ public class DiaryImportTaskTests : IDisposable
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "u",
-            Enabled = true, EnableDiaryImport = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
         });
 
         var service = Substitute.For<ILetterboxdService>();

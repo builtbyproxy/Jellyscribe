@@ -59,11 +59,16 @@ public class MultiAccountContractTests
         var config = new PluginConfiguration();
         config.Accounts.Add(new Account
         {
-            UserJellyfinId = "u1", LetterboxdUsername = "secondary", Enabled = true
+            UserJellyfinId = "u1",
+            LetterboxdUsername = "secondary",
+            Enabled = true
         });
         config.Accounts.Add(new Account
         {
-            UserJellyfinId = "u1", LetterboxdUsername = "primary", Enabled = true, IsPrimary = true
+            UserJellyfinId = "u1",
+            LetterboxdUsername = "primary",
+            Enabled = true,
+            IsPrimary = true
         });
 
         var ordered = config.GetEnabledAccountsForUser("u1").ToList();
@@ -85,6 +90,6 @@ public class MultiAccountContractTests
 
         config.NormalisePrimaryFlags();
 
-        Assert.Single(config.Accounts.Where(a => a.IsPrimary));
+        Assert.Single(config.Accounts, a => a.IsPrimary);
     }
 }

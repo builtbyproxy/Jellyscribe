@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '1.19.4',
+    headline: 'Housekeeping: a warning-clean test build',
+    summary:
+      'No functional changes. The plugin\u2019s test suite compiled with seven compiler and analyzer warnings (a couple of async test methods that never awaited anything, one fire-and-forget mock setup, and a few assertions written the long way around). All seven are fixed, so the build is warning-clean again and future warnings stand out instead of drowning in noise. Nothing about syncing, accounts, or the dashboard changes in this release.',
+    highlights: {
+      fixes: [
+        'Cleaned up all seven compiler and analyzer warnings in the test project; every touched test was verified to still fail when its assertion is broken, so no coverage was lost.',
+      ],
+    },
+  },
+  {
     version: '1.19.3',
     headline: 'Telemetry can now tell a quiet week from a plugin that never worked',
     summary:
