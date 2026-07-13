@@ -43,12 +43,14 @@ public class SendLogsTests : IDisposable
 
     private static List<string> Lines() => new() { "[INF] LetterboxdSync started", "[ERR] Letterboxd login error" };
 
+    private static object TestCollector(int matched = 2) => new { files = "jellyfin.log", matched, error = "none" };
+
     [Fact]
     public async Task SendLogBundle_PostsToLogsEndpoint_WithExpectedShape()
     {
         var snapshot = TelemetryService.BuildPayload("logs", 1200);
         var built = TelemetryService.BuildLogBundleJson(
-            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "1.17.0.0", snapshot, "diary sync broke", Lines());
+            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "1.17.0.0", snapshot, "diary sync broke", Lines(), TestCollector());
         var code = await TelemetryService.PostLogBundleAsync(built);
 
         Assert.Equal("LBX-TEST01", code);
@@ -65,6 +67,9 @@ public class SendLogsTests : IDisposable
         Assert.Equal(2, root.GetProperty("log_lines").GetArrayLength());
         // The telemetry snapshot is embedded as structured JSON, not a string.
         Assert.Equal(JsonValueKind.Object, root.GetProperty("telemetry").ValueKind);
+        // Collector status is a structured field, not just a string inside log_lines.
+        Assert.Equal(2, root.GetProperty("collector").GetProperty("matched").GetInt32());
+        Assert.Equal("jellyfin.log", root.GetProperty("collector").GetProperty("files").GetString());
         // The preview/bundle MUST contain the actual log text, the consent bug was that
         // the preview showed only the telemetry snapshot, hiding the log lines.
         Assert.Contains("Letterboxd login error", built);
@@ -76,7 +81,7 @@ public class SendLogsTests : IDisposable
         TelemetryService.LogSenderOverride = (_, _) => Task.FromResult<string?>(null);
         var snapshot = TelemetryService.BuildPayload("logs", null);
         var json = TelemetryService.BuildLogBundleJson(
-            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "1.17.0.0", snapshot, null, Lines());
+            "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", "1.17.0.0", snapshot, null, Lines(), TestCollector());
         var code = await TelemetryService.PostLogBundleAsync(json);
         Assert.Null(code);
     }
@@ -155,6 +160,10 @@ public class SendLogsTests : IDisposable
         var (_, json) = Assert.Single(_sent);
         Assert.Contains("[meta] collector:", json);
         Assert.Contains("matched=0", json);
+        using (var doc = System.Text.Json.JsonDocument.Parse(json))
+        {
+            Assert.Equal(0, doc.RootElement.GetProperty("collector").GetProperty("matched").GetInt32());
+        }
     }
 
     [Fact]
@@ -194,7 +203,7 @@ public class SendLogsTests : IDisposable
         // supplies a one-off instance id, and the snapshot reflects disabled state.
         Assert.False(_h.Config.Telemetry.Enabled);
         var snapshot = TelemetryService.BuildPayload("logs", 100);
-        var json = TelemetryService.BuildLogBundleJson(Guid.NewGuid().ToString(), "1.17.0.0", snapshot, null, Lines());
+        var json = TelemetryService.BuildLogBundleJson(Guid.NewGuid().ToString(), "1.17.0.0", snapshot, null, Lines(), TestCollector());
         var code = await TelemetryService.PostLogBundleAsync(json);
         Assert.Equal("LBX-TEST01", code);
         Assert.Single(_sent);
