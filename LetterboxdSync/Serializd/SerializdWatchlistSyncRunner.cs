@@ -245,8 +245,8 @@ public class SerializdWatchlistSyncRunner
                 }
                 else
                 {
-                    var incomplete = IncompleteWatchlistedSeasons(user, series!, entry.SeasonNumbers);
-                    if (incomplete.Count > 0)
+                    var (shouldRequest, incomplete) = IncompleteWatchlistedSeasons(user, series!, entry.SeasonNumbers);
+                    if (shouldRequest)
                         requests.Add((entry.ShowTmdbId, incomplete));
                 }
             }
@@ -277,11 +277,16 @@ public class SerializdWatchlistSyncRunner
     /// (missing) items, so a season with any virtual episode is incomplete. An unknown season
     /// (not in Jellyfin's metadata) is treated as incomplete so it's still requested. When the
     /// entry names no seasons (whole-show watchlist), every season the show has is considered.
-    /// Returns an empty list when every watchlisted season is complete (nothing to request).
+    /// <see cref="ShouldRequest"/> is false only when every watchlisted season is confirmed
+    /// complete; when the whole show has zero episodes indexed (a placeholder Series, or every
+    /// file removed after the initial scan), there is no season data to enumerate at all, so this
+    /// reports "request the whole show" (ShouldRequest=true, empty Seasons = Seerr's "all")
+    /// instead of silently treating "we know nothing" as "everything is complete".
     /// </summary>
     /// <remarks>Internal (not private) for unit tests: the virtual-item and aired-date
     /// rules here decide real download requests, so each path is pinned by a test.</remarks>
-    internal List<int> IncompleteWatchlistedSeasons(User user, BaseItem series, IReadOnlyList<int> watchlistedSeasons)
+    internal (bool ShouldRequest, List<int> Seasons) IncompleteWatchlistedSeasons(
+        User user, BaseItem series, IReadOnlyList<int> watchlistedSeasons)
     {
         var eps = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
@@ -307,6 +312,9 @@ public class SerializdWatchlistSyncRunner
             bySeason[s] = (c.Present + (onDisk ? 1 : 0), c.Total + 1);
         }
 
+        if (watchlistedSeasons.Count == 0 && bySeason.Count == 0)
+            return (true, new List<int>());
+
         var targets = watchlistedSeasons.Count > 0
             ? watchlistedSeasons
             : bySeason.Keys.Where(s => s > 0).ToList();
@@ -318,7 +326,7 @@ public class SerializdWatchlistSyncRunner
                 incomplete.Add(s);
         }
 
-        return incomplete;
+        return (incomplete.Count > 0, incomplete);
     }
 
     /// <summary>

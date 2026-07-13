@@ -56,9 +56,10 @@ public class SerializdWatchlistSeasonTests
     {
         LibraryHas(Ep(1, 1, onDisk: true), Ep(1, 2, onDisk: true));
 
-        var incomplete = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1 });
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1 });
 
-        Assert.Empty(incomplete);
+        Assert.False(shouldRequest);
+        Assert.Empty(seasons);
     }
 
     [Fact]
@@ -66,9 +67,10 @@ public class SerializdWatchlistSeasonTests
     {
         LibraryHas(Ep(1, 1, onDisk: true), Ep(1, 2, onDisk: false)); // aired but no file
 
-        var incomplete = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1 });
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1 });
 
-        Assert.Equal(new[] { 1 }, incomplete);
+        Assert.True(shouldRequest);
+        Assert.Equal(new[] { 1 }, seasons);
     }
 
     [Fact]
@@ -80,9 +82,10 @@ public class SerializdWatchlistSeasonTests
             Ep(1, 1, onDisk: true),
             Ep(1, 2, onDisk: false, premiere: DateTime.UtcNow.AddMonths(1)));
 
-        var incomplete = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1 });
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1 });
 
-        Assert.Empty(incomplete);
+        Assert.False(shouldRequest);
+        Assert.Empty(seasons);
     }
 
     [Fact]
@@ -90,9 +93,10 @@ public class SerializdWatchlistSeasonTests
     {
         LibraryHas(Ep(1, 1, onDisk: true)); // library only knows season 1
 
-        var incomplete = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1, 3 });
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1, 3 });
 
-        Assert.Equal(new[] { 3 }, incomplete);
+        Assert.True(shouldRequest);
+        Assert.Equal(new[] { 3 }, seasons);
     }
 
     [Fact]
@@ -103,8 +107,38 @@ public class SerializdWatchlistSeasonTests
             Ep(1, 1, onDisk: true),                // complete
             Ep(2, 1, onDisk: false));              // incomplete, aired
 
-        var incomplete = _runner.IncompleteWatchlistedSeasons(_user, _series, Array.Empty<int>());
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, Array.Empty<int>());
 
-        Assert.Equal(new[] { 2 }, incomplete);
+        Assert.True(shouldRequest);
+        Assert.Equal(new[] { 2 }, seasons);
+    }
+
+    [Fact]
+    public void WholeShowWatchlist_ZeroEpisodesIndexed_RequestsWholeShow()
+    {
+        // A Series item exists (e.g. an empty placeholder, or every episode file was
+        // removed after the initial scan) but Jellyfin has zero episodes indexed for
+        // it at all. There is no season metadata to enumerate, so this must not be
+        // silently treated as "every season complete": it must ask for the whole show.
+        LibraryHas();
+
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, Array.Empty<int>());
+
+        Assert.True(shouldRequest);
+        Assert.Empty(seasons); // empty seasons list = Seerr requests "all"
+    }
+
+    [Fact]
+    public void ExplicitSeasonsWatchlisted_ZeroEpisodesIndexed_StillTreatedAsIncomplete()
+    {
+        // Same zero-episode series, but specific seasons were watchlisted: the existing
+        // "unknown season = incomplete" rule already covers this without the new
+        // whole-show special case, since targets come from watchlistedSeasons directly.
+        LibraryHas();
+
+        var (shouldRequest, seasons) = _runner.IncompleteWatchlistedSeasons(_user, _series, new[] { 1, 2 });
+
+        Assert.True(shouldRequest);
+        Assert.Equal(new[] { 1, 2 }, seasons);
     }
 }
