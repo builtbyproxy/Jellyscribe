@@ -706,10 +706,18 @@ public class LetterboxdController : ControllerBase
     /// the preview and the send so they cannot diverge: what the preview shows is byte
     /// for byte what the send uploads (note aside, which the user types in either path).
     /// </summary>
-    private string BuildLogBundleJson(string? note)
+    private (string Json, int MatchedLines) BuildLogBundleJson(string? note)
     {
-        var (allLines, _, _) = ReadRecentLogLines();
+        var (allLines, source, error) = ReadRecentLogLines();
+        var matched = allLines.Count;
         var lines = allLines.Count > 500 ? allLines.GetRange(allLines.Count - 500, 500) : allLines;
+
+        // Collector status travels inside the bundle. Without it an empty capture is
+        // indistinguishable (server-side) from a broken collector: bundle LBX-C1EP38
+        // arrived as log_lines=[] with nothing saying whether the plugin was idle,
+        // the log dir was missing, or the line filter matched nothing.
+        lines.Insert(0, $"[meta] collector: files={source ?? "none"}; matched={matched}; error={error ?? "none"}");
+        var collector = new { files = source ?? "none", matched, error = error ?? "none" };
 
         int? libraryCount;
         try
@@ -730,12 +738,14 @@ public class LetterboxdController : ControllerBase
         if (string.IsNullOrEmpty(instanceId))
             instanceId = Guid.NewGuid().ToString();
 
-        return TelemetryService.BuildLogBundleJson(
+        var json = TelemetryService.BuildLogBundleJson(
             instanceId,
             Plugin.Instance?.Version?.ToString() ?? "unknown",
             telemetrySnapshot,
             note,
-            lines);
+            lines,
+            collector);
+        return (json, matched);
     }
 
     /// <summary>
@@ -748,7 +758,7 @@ public class LetterboxdController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult PreviewLogs()
     {
-        return Content(BuildLogBundleJson(null), "application/json");
+        return Content(BuildLogBundleJson(null).Json, "application/json");
     }
 
     [HttpPost("Telemetry/SendLogs")]
@@ -756,13 +766,20 @@ public class LetterboxdController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult> SendLogs([FromBody] SendLogsRequest? request)
     {
-        var json = BuildLogBundleJson(request?.Note);
+        var (json, matched) = BuildLogBundleJson(request?.Note);
         var code = await TelemetryService.PostLogBundleAsync(json).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(code))
             return BadRequest(new { error = "Could not reach the diagnostics endpoint. Check the server's internet connection and try again." });
 
-        return Ok(new { refCode = code });
+        // Still a success (the telemetry snapshot alone can be useful), but the user
+        // must know their diagnostics were blank, otherwise they quote the ref code
+        // in a bug report and wait on logs that never arrived.
+        string? warning = matched == 0
+            ? "No LetterboxdSync entries were found in the two newest server log files, so the bundle contains no log lines. Reproduce the problem first (for example, run a sync), then send logs again."
+            : null;
+
+        return Ok(new { refCode = code, warning });
     }
 
     /// <summary>
