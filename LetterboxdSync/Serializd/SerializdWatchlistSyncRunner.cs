@@ -117,6 +117,8 @@ public class SerializdWatchlistSyncRunner
             entries = await service.GetWatchlistAsync().ConfigureAwait(false);
         }
 
+        WatchlistStats.SetTv(user.Id.ToString("N"), account.Email, entries.Count);
+
         var seriesByTmdb = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Series },

@@ -202,6 +202,7 @@ public class WatchlistSyncRunner
             tmdbIds = await service.GetWatchlistTmdbIdsAsync(account.LetterboxdUsername).ConfigureAwait(false);
             _logger.LogInformation("Found {Count} films in {Username}'s Letterboxd watchlist",
                 tmdbIds.Count, account.LetterboxdUsername);
+            WatchlistStats.SetFilm(user.Id.ToString("N"), account.LetterboxdUsername, tmdbIds.Count);
         }
         catch (Exception ex)
         {

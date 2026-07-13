@@ -180,7 +180,8 @@ public class SerializdController : ControllerBase
     public ActionResult GetStats()
     {
         var (total, success, failed, skipped, rewatches) = SerializdActivity.GetStats(GetJellyfinUsername());
-        return Ok(new { total, success, failed, skipped, rewatches });
+        var watchlist = WatchlistStats.GetTv(GetCurrentUserId() ?? string.Empty);
+        return Ok(new { total, success, failed, skipped, rewatches, watchlist });
     }
 
     /// <summary>Paged Serializd activity for the dashboard, same shape as the Letterboxd <c>/History</c>.</summary>

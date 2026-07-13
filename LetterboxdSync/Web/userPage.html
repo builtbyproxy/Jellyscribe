@@ -189,6 +189,7 @@
                             <div class="ws-tiles">
                                 <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged</div><svg class="ws-spark" id="sparkFilm" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
                                 <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged</div><svg class="ws-spark" id="sparkTv" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
+                                <div class="ws-tile" style="--ac:var(--ws-primary);"><div class="n" style="color:var(--ws-primary);" id="statWatchlist">-</div><div class="k ws-label">On watchlists</div><div class="ws-muted" id="statWatchlistSub" style="font-size:11px;margin-top:4px;"></div></div>
                                 <div class="ws-tile"><div class="n ws-green" id="statSynced">-</div><div class="k ws-label">Synced</div></div>
                                 <div class="ws-tile"><div class="n" style="color:var(--ws-info);" id="statRewatches">-</div><div class="k ws-label">Rewatches</div></div>
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
@@ -286,6 +287,9 @@
                                     var fs = res[0] || {}, ts = res[1] || {};
                                     document.getElementById('statFilm').textContent = fs.total || 0;
                                     document.getElementById('statTv').textContent = ts.total || 0;
+                                    var fw = fs.watchlist, tw = ts.watchlist;
+                                    document.getElementById('statWatchlist').textContent = (fw == null && tw == null) ? '—' : ((fw || 0) + (tw || 0));
+                                    document.getElementById('statWatchlistSub').textContent = (fw == null && tw == null) ? 'run a watchlist sync' : ((tw || 0) + ' shows · ' + (fw || 0) + ' films');
                                     document.getElementById('statSynced').textContent = (fs.success || 0) + (ts.success || 0);
                                     document.getElementById('statRewatches').textContent = (fs.rewatches || 0) + (ts.rewatches || 0);
                                     document.getElementById('statFailed').textContent = (fs.failed || 0) + (ts.failed || 0);

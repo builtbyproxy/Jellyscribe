@@ -218,7 +218,8 @@ public class LetterboxdController : ControllerBase
             success,
             failed,
             skipped,
-            rewatches
+            rewatches,
+            watchlist = WatchlistStats.GetFilm(GetCurrentUserId() ?? string.Empty)
         });
     }
 
