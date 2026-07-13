@@ -164,6 +164,8 @@ public class SerializdSyncRunner
         // Map played episodes to per-episode records carrying the real watch date + rating,
         // dropping anything we can't key (no series TMDb id / season / episode number).
         var records = new List<EpisodePlay>();
+        var seriesById = new Dictionary<int, Series>();
+        var skippedNoPlayDate = 0;
         foreach (var item in episodes)
         {
             if (item is not Episode ep) continue;
@@ -172,11 +174,33 @@ public class SerializdSyncRunner
             if (epRef == null) continue;
 
             var ud = _userDataManager.GetUserData(user, ep);
-            var watchedAt = ud?.LastPlayedDate?.ToUniversalTime() ?? DateTime.UtcNow;
-            var rating = SerializdRating.FromJellyfin(ud?.Rating);
+
+            // Skip episodes marked played on Jellyfin with no LastPlayedDate. There's no real
+            // watch date to log: watchedAt would otherwise fall back to DateTime.UtcNow (today),
+            // which drifts forward on every run and re-logs the same episode every catch-up.
+            // This is also the import-then-export loop guard: SerializdDiaryImportRunner marks
+            // episodes played without a LastPlayedDate specifically so they land here.
+            if (ud?.LastPlayedDate.HasValue != true)
+            {
+                skippedNoPlayDate++;
+                continue;
+            }
+
+            var watchedAt = ud.LastPlayedDate!.Value.ToUniversalTime();
+            var rating = SerializdRating.FromJellyfin(ud.Rating);
             foreach (var n in epRef.EpisodeNumbers)
                 records.Add(new EpisodePlay(epRef.ShowTmdbId, epRef.SeasonNumber, n, watchedAt, rating, ep.SeriesName ?? string.Empty));
+
+            // The parent Series is already resolved here; cache it so SyncShowMetaAsync doesn't
+            // need a second full-library scan to re-find the same shows.
+            if (ep.Series is Series series && !seriesById.ContainsKey(epRef.ShowTmdbId))
+                seriesById[epRef.ShowTmdbId] = series;
         }
+
+        if (skippedNoPlayDate > 0)
+            _logger.LogInformation(
+                "Serializd catch-up: skipping {Count} episodes for {Username}: marked played but no LastPlayedDate (no real watch date to log)",
+                skippedNoPlayDate, user.Username);
 
         // Date filter: limit the catch-up to episodes watched within the look-back window.
         if (account.EnableDateFilter)
@@ -193,7 +217,13 @@ public class SerializdSyncRunner
             account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
 
         var needsWatched = GroupNewEpisodes(records.Select(r => (r.Show, r.Season, r.Episode)), AlreadyWatched);
-        var needsLog = records.Where(r => !AlreadyLogged(r)).ToList();
+
+        // Dedup within this batch (same as GroupNewEpisodes above): duplicate/unmerged Episode
+        // items for the same (show, season, episode) must only produce one dated diary log.
+        var seenLog = new HashSet<(int Show, int Season, int Episode)>();
+        var needsLog = records
+            .Where(r => !AlreadyLogged(r) && seenLog.Add((r.Show, r.Season, r.Episode)))
+            .ToList();
 
         if (needsWatched.Count == 0 && needsLog.Count == 0)
         {
@@ -290,11 +320,12 @@ public class SerializdSyncRunner
 
         // 3. Show-level rating + favorite (like) sync, one entry per rated/favorited series
         //    among the shows we're tracking. is_log:false so it doesn't clutter the Diary.
-        await SyncShowMetaAsync(user, userId, records, account, service, cancellationToken).ConfigureAwait(false);
+        await SyncShowMetaAsync(user, userId, records, seriesById, account, service, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SyncShowMetaAsync(User user, string userId, List<EpisodePlay> records,
-        SerializdAccount account, ISerializdService service, CancellationToken cancellationToken)
+        Dictionary<int, Series> seriesById, SerializdAccount account, ISerializdService service,
+        CancellationToken cancellationToken)
     {
         var watchedShows = new HashSet<int>();
         foreach (var r in records)
@@ -302,16 +333,11 @@ public class SerializdSyncRunner
         if (watchedShows.Count == 0)
             return;
 
-        var seriesList = _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.Series },
-            IsVirtualItem = false,
-        });
-
-        foreach (var s in seriesList)
+        // The episode scan in SyncOneAsync already resolved each played episode's parent
+        // Series; reuse that instead of a second full-library BaseItemKind.Series query.
+        foreach (var (tmdb, s) in seriesById)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!int.TryParse(s.GetProviderId(MetadataProvider.Tmdb), out var tmdb)) continue;
             if (!watchedShows.Contains(tmdb)) continue;
 
             var ud = _userDataManager.GetUserData(user, s);
