@@ -390,6 +390,42 @@ public class SerializdApiClient : ISerializdService
             throw new Exception($"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {respBody}");
     }
 
+    public async Task CreateEpisodeReviewAsync(int showTmdbId, int seasonNumber, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler)
+    {
+        var seasonId = await ResolveSeasonIdAsync(showTmdbId, seasonNumber).ConfigureAwait(false);
+        if (seasonId == null)
+            throw new Exception($"Serializd episode review: no season {seasonNumber} found for show {showTmdbId}");
+
+        // Same rule as the show review: review_text only persists on a log (is_log:true). Attaching
+        // season_id + episode_number scopes it to the episode instead of the whole show.
+        var hasText = !string.IsNullOrWhiteSpace(reviewText);
+        var payload = new Dictionary<string, object?>
+        {
+            ["show_id"] = showTmdbId,
+            ["season_id"] = seasonId.Value,
+            ["episode_number"] = episodeNumber,
+            ["review_text"] = reviewText ?? string.Empty,
+            ["contains_spoiler"] = containsSpoiler,
+            ["backdate"] = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture),
+            ["is_log"] = hasText,
+            ["is_rewatch"] = false,
+            ["tags"] = Array.Empty<string>(),
+            ["allows_comments"] = true,
+            ["like"] = false,
+            ["rating"] = rating is > 0 ? Math.Clamp(rating.Value, 1, 10) : 0,
+        };
+
+        var body = JsonSerializer.Serialize(payload);
+        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        var respBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+        _logger.LogInformation(
+            "Serializd episode review POST show {Show} S{Season}E{Episode} (is_log={IsLog}, rating={Rating}, textLen={Len}) → HTTP {Status}: {Body}",
+            showTmdbId, seasonNumber, episodeNumber, hasText, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode,
+            respBody.Length > 400 ? respBody.Substring(0, 400) : respBody);
+        if (!resp.IsSuccessStatusCode)
+            throw new Exception($"Serializd episode review ({showTmdbId} S{seasonNumber}E{episodeNumber}) failed ({(int)resp.StatusCode}): {respBody}");
+    }
+
     public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
     {
         // Whole-show entry, is_log:false so it's a rating/like rather than a Diary row.

@@ -320,7 +320,9 @@
                                 var title = (e.FilmTitle || '').split(' · '), t = title[0], m = title[1] || '';
                                 var ts = new Date(e.Timestamp), when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                 var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';
-                                var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" onclick="WSU.openReview(\'' + e._svc + '\',' + (e.TmdbId || 0) + ',\'' + t.replace(/'/g, "\\'") + '\',\'' + (e.FilmSlug || '') + '\')">Review</button>' : '';
+                                var seM = (e._svc === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
+                                var seaN = seM ? seM[1] : '', epN = seM ? seM[2] : '';
+                                var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" onclick="WSU.openReview(\'' + e._svc + '\',' + (e.TmdbId || 0) + ',\'' + t.replace(/'/g, "\\'") + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>' : '';
                                 return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span><div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td><td><span class="ws-pill ' + status + '">' + status + '</span></td><td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
                             }).join('');
                         },
@@ -445,9 +447,12 @@
                             this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + d.username + ')' : '') + '.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
                         },
 
-                        openReview: function (svc, tmdbId, title, slug) {
+                        openReview: function (svc, tmdbId, title, slug, season, episode) {
                             this.reviewSvc = svc; this.reviewTmdb = tmdbId; this.reviewSlug = slug || '';
-                            document.getElementById('reviewTitle').textContent = 'Review: ' + title;
+                            this.reviewSeason = season ? parseInt(season, 10) : null;
+                            this.reviewEpisode = episode ? parseInt(episode, 10) : null;
+                            var scope = (this.reviewSeason && this.reviewEpisode) ? (' · S' + this.reviewSeason + 'E' + this.reviewEpisode) : '';
+                            document.getElementById('reviewTitle').textContent = 'Review: ' + title + scope;
                             document.getElementById('reviewText').value = ''; document.getElementById('reviewSpoilers').checked = false;
                             document.getElementById('reviewRating').value = ''; document.getElementById('ratingLabel').textContent = 'No rating';
                             document.querySelectorAll('#starRating .ws-star').forEach(function (s) { s.classList.remove('filled'); s.innerHTML = '&#9734;'; });
@@ -460,7 +465,7 @@
                             if (!text && !rating) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Write a review or set a rating.</span>'; return; }
                             document.getElementById('reviewStatus').textContent = 'Posting…';
                             var url, body;
-                            if (self.reviewSvc === 'serializd') { url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review'; body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked }; }
+                            if (self.reviewSvc === 'serializd') { url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review'; body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, seasonNumber: self.reviewSeason || null, episodeNumber: self.reviewEpisode || null }; }
                             else { url = 'Jellyfin.Plugin.LetterboxdSync/Review'; body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, isRewatch: false, rating: rating }; }
                             self.post(url, body).then(function (r) { if (r.ok) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-green">Review posted!</span>'; setTimeout(function () { document.getElementById('reviewModal').classList.remove('show'); }, 1200); } else { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Failed to post.</span>'; } });
                         }

@@ -500,7 +500,9 @@
                                 var btn = '';
                                 if (canReview && e.TmdbId) {
                                     var show = t.replace(/'/g, "\\'");
-                                    btn = '<button type="button" class="ws-review-btn" onclick="WS.openReview(\'' + source + '\',' + (e.TmdbId || 0) + ',\'' + show + '\',\'' + (e.FilmSlug || '') + '\')">Review</button>';
+                                    var seM = (source === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
+                                    var seaN = seM ? seM[1] : '', epN = seM ? seM[2] : '';
+                                    btn = '<button type="button" class="ws-review-btn" onclick="WS.openReview(\'' + source + '\',' + (e.TmdbId || 0) + ',\'' + show + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>';
                                 }
                                 return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span>' +
                                     '<div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td>' +
@@ -680,9 +682,12 @@
                         },
 
                         /* ===== Review ===== */
-                        openReview: function (svc, tmdbId, title, slug) {
+                        openReview: function (svc, tmdbId, title, slug, season, episode) {
                             this.reviewSvc = svc; this.reviewTmdb = tmdbId; this.reviewSlug = slug || '';
-                            document.getElementById('reviewTitle').textContent = 'Review: ' + title;
+                            this.reviewSeason = season ? parseInt(season, 10) : null;
+                            this.reviewEpisode = episode ? parseInt(episode, 10) : null;
+                            var scope = (this.reviewSeason && this.reviewEpisode) ? (' · S' + this.reviewSeason + 'E' + this.reviewEpisode) : '';
+                            document.getElementById('reviewTitle').textContent = 'Review: ' + title + scope;
                             document.getElementById('reviewText').value = '';
                             document.getElementById('reviewSpoilers').checked = false;
                             document.getElementById('reviewRating').value = '';
@@ -699,7 +704,7 @@
                             var url, body;
                             if (self.reviewSvc === 'serializd') {
                                 url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review';
-                                body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked };
+                                body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, seasonNumber: self.reviewSeason || null, episodeNumber: self.reviewEpisode || null };
                             } else {
                                 url = 'Jellyfin.Plugin.LetterboxdSync/Review';
                                 body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, isRewatch: false, rating: rating };

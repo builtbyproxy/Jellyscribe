@@ -59,6 +59,13 @@ public interface ISerializdService : IDisposable
     /// <summary>Writes a show-level review (text + optional rating), the Serializd equivalent of a Letterboxd review.</summary>
     Task CreateShowReviewAsync(int showTmdbId, int? rating, string? reviewText, bool containsSpoiler);
 
+    /// <summary>
+    /// Writes a review against a specific episode (resolves the Serializd season id from the season
+    /// number). Used when a review is filed from an episode row, so it attaches to that episode
+    /// rather than the whole show.
+    /// </summary>
+    Task CreateEpisodeReviewAsync(int showTmdbId, int seasonNumber, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler);
+
     /// <summary>Reads the authenticated user's Serializd diary as episode-level entries (for import to Jellyfin).</summary>
     Task<List<SerializdDiaryEpisode>> GetDiaryEpisodesAsync();
 }

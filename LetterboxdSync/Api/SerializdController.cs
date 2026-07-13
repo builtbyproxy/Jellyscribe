@@ -209,6 +209,11 @@ public class SerializdController : ControllerBase
         public string? ReviewText { get; set; }
 
         public bool ContainsSpoilers { get; set; }
+
+        /// <summary>When both set, the review attaches to this episode instead of the whole show.</summary>
+        public int? SeasonNumber { get; set; }
+
+        public int? EpisodeNumber { get; set; }
     }
 
     /// <summary>
@@ -239,8 +244,12 @@ public class SerializdController : ControllerBase
             {
                 using var service = await SerializdServiceFactory
                     .CreateAuthenticatedAsync(account.Email, account.Password, _logger).ConfigureAwait(false);
-                await service.CreateShowReviewAsync(request.TmdbId, request.Rating, request.ReviewText, request.ContainsSpoilers)
-                    .ConfigureAwait(false);
+                if (request.SeasonNumber is int season && season > 0 && request.EpisodeNumber is int episode && episode > 0)
+                    await service.CreateEpisodeReviewAsync(request.TmdbId, season, episode, request.Rating, request.ReviewText, request.ContainsSpoilers)
+                        .ConfigureAwait(false);
+                else
+                    await service.CreateShowReviewAsync(request.TmdbId, request.Rating, request.ReviewText, request.ContainsSpoilers)
+                        .ConfigureAwait(false);
                 posted++;
             }
             catch (Exception ex)
