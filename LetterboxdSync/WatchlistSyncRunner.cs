@@ -338,70 +338,13 @@ public class WatchlistSyncRunner
         // Defaults to "Letterboxd Watchlist ({letterboxdUsername})" or the override.
         var playlistName = account.GetPlaylistName();
 
-        var existingPlaylists = _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.Playlist },
-            Recursive = true
-        });
-
-        var playlist = existingPlaylists.FirstOrDefault(p => p.Name == playlistName);
-
-        if (playlist == null)
-        {
-            if (watchlistItemIds.Count == 0) return;
-
-            await _playlistManager.CreatePlaylist(new PlaylistCreationRequest
-            {
-                Name = playlistName,
-                UserId = user.Id,
-                MediaType = MediaType.Video,
-                ItemIdList = watchlistItemIds.ToArray()
-            }).ConfigureAwait(false);
-
-            _logger.LogInformation("Created playlist '{Name}' with {Count} films for {Username}",
-                playlistName, watchlistItemIds.Count, user.Username);
-            return;
-        }
-
-        // Source of truth: Playlist.LinkedChildren contains the wrapped media item IDs
-        // (the underlying Movie GUIDs). Querying ParentId returns playlist *entries* whose
-        // BaseItem.Id is the entry GUID, not the movie GUID, using that for dedup compared
-        // entry IDs against movie IDs and never matched, causing duplicates each run.
-        var playlistObj = (Playlist)playlist;
-        var existingIds = playlistObj.LinkedChildren
-            .Where(lc => lc.ItemId.HasValue)
-            .Select(lc => lc.ItemId!.Value)
-            .ToHashSet();
-
-        var newItems = watchlistItemIds.Where(id => !existingIds.Contains(id)).ToArray();
-        if (newItems.Length > 0)
-        {
-            await _playlistManager.AddItemToPlaylistAsync(playlist.Id, newItems, user.Id).ConfigureAwait(false);
-            _logger.LogInformation("Added {Count} new films to playlist '{Name}' for {Username}",
-                newItems.Length, playlistName, user.Username);
-        }
-
-        // Empty Letterboxd scrape probably means Cloudflare blocked us, not that the
-        // user wiped their watchlist; skip removal so we don't gut the playlist.
-        var removedIds = (letterboxdCount == 0 && existingIds.Count > 0)
-            ? Array.Empty<string>()
-            : existingIds
-                .Where(id => !watchlistItemIds.Contains(id))
-                .Select(id => id.ToString("N"))
-                .ToArray();
-
-        if (removedIds.Length > 0)
-        {
-            await _playlistManager.RemoveItemFromPlaylistAsync(playlist.Id.ToString("N"), removedIds).ConfigureAwait(false);
-            _logger.LogInformation("Removed {Count} films from playlist '{Name}' for {Username}",
-                removedIds.Length, playlistName, user.Username);
-        }
-
-        if (newItems.Length == 0 && removedIds.Length == 0)
-        {
-            _logger.LogInformation("Playlist '{Name}' already up to date for {Username}",
-                playlistName, user.Username);
-        }
+        // letterboxdCount == 0 means the SCRAPE came back empty (e.g. Cloudflare blocked us),
+        // not "watchlistItemIds is empty because none of the watchlist matched the library" -
+        // those are different signals, so this is passed explicitly rather than re-derived
+        // from watchlistItemIds.Count.
+        await PlaylistReconciler.ReconcileAsync(
+            _playlistManager, _libraryManager, _logger, user, playlistName, watchlistItemIds,
+            sourceWasEmpty: letterboxdCount == 0).ConfigureAwait(false);
     }
 
     private async Task MirrorJellyseerrWatchlistAsync(

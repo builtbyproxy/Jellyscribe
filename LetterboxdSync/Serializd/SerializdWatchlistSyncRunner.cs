@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
+using LetterboxdSync;
 using LetterboxdSync.Configuration;
 using MediaBrowser.Controller.Collections;
 using MediaBrowser.Controller.Entities;
@@ -416,41 +417,11 @@ public class SerializdWatchlistSyncRunner
         _logger.LogInformation("'{Name}' collection for {Username}: +{Added} / -{Removed}", name, user.Username, toAdd.Count, toRemove.Count);
     }
 
-    private async Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name)
-    {
-        var playlist = _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.Playlist },
-            Recursive = true,
-        }).FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.Ordinal));
-
-        if (playlist == null)
-        {
-            if (desired.Count == 0) return;
-            await _playlistManager.CreatePlaylist(new PlaylistCreationRequest
-            {
-                Name = name,
-                UserId = user.Id,
-                MediaType = MediaType.Video,
-                ItemIdList = desired.ToArray(),
-            }).ConfigureAwait(false);
-            _logger.LogInformation("Created '{Name}' playlist with {Count} episodes for {Username}", name, desired.Count, user.Username);
-            return;
-        }
-
-        var existing = ((Playlist)playlist).LinkedChildren
-            .Where(lc => lc.ItemId.HasValue).Select(lc => lc.ItemId!.Value).ToHashSet();
-
-        var toAdd = desired.Where(id => !existing.Contains(id)).ToArray();
-        if (toAdd.Length > 0)
-            await _playlistManager.AddItemToPlaylistAsync(playlist.Id, toAdd, user.Id).ConfigureAwait(false);
-
-        var toRemove = (desired.Count == 0 && existing.Count > 0)
-            ? Array.Empty<string>()
-            : existing.Where(id => !desired.Contains(id)).Select(id => id.ToString("N")).ToArray();
-        if (toRemove.Length > 0)
-            await _playlistManager.RemoveItemFromPlaylistAsync(playlist.Id.ToString("N"), toRemove).ConfigureAwait(false);
-
-        _logger.LogInformation("'{Name}' playlist for {Username}: +{Added} / -{Removed}", name, user.Username, toAdd.Length, toRemove.Length);
-    }
+    private Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name)
+        // desired.Count == 0 doubles as this call's "source was empty" signal, preserving the
+        // existing behavior exactly: an empty Serializd watchlist fetch produces an empty
+        // desired set with nothing else to distinguish it from "genuinely nothing watchlisted".
+        => PlaylistReconciler.ReconcileAsync(
+            _playlistManager, _libraryManager, _logger, user, name, desired,
+            sourceWasEmpty: desired.Count == 0);
 }
