@@ -180,9 +180,14 @@ public class SerializdWatchlistSyncRunner
             "Serializd watchlist for {Username}: {Shows} shows, {Episodes} episodes (from watchlisted seasons)",
             user.Username, desiredShows.Count, desiredEpisodes.Count);
 
+        // Distinguishes "the Serializd fetch itself came back empty" (a transient failure we must
+        // not treat as "the user emptied their watchlist") from "the fetch had entries but none
+        // resolved to a desired show/episode" (a real state, safe to reconcile away).
+        var sourceWasEmpty = entries.Count == 0;
+
         var name = account.GetWatchlistName();
-        await ReconcileCollectionAsync(user, desiredShows, name).ConfigureAwait(false);
-        await ReconcilePlaylistAsync(user, desiredEpisodes, name).ConfigureAwait(false);
+        await ReconcileCollectionAsync(user, desiredShows, name, sourceWasEmpty).ConfigureAwait(false);
+        await ReconcilePlaylistAsync(user, desiredEpisodes, name, sourceWasEmpty).ConfigureAwait(false);
 
         await SeerrIntegrationAsync(account, entries, seriesByTmdb, user, cancellationToken).ConfigureAwait(false);
     }
@@ -204,7 +209,7 @@ public class SerializdWatchlistSyncRunner
             return;
         }
 
-        using var seerr = new SeerrClient(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger);
+        using var seerr = CreateSeerrClient(cfg);
         var seerrUserId = await seerr.GetJellyseerrUserIdAsync(account.UserJellyfinId).ConfigureAwait(false);
         if (seerrUserId == null)
         {
@@ -269,6 +274,21 @@ public class SerializdWatchlistSyncRunner
                 _logger.LogInformation("Serializd watchlist Seerr auto-request for {Username} ({Mode}): {Requested} new, {Existing} already on Seerr, {Failed} failed",
                     user.Username, account.BackfillAvailableRequests ? "backfill" : "incomplete-seasons", requested, existing, failed);
         }
+    }
+
+    /// <summary>
+    /// Test-only override. When set, CreateSeerrClient delegates to this so tests can inject a
+    /// SeerrClient bound to a mock HttpMessageHandler. Production never assigns it. Mirrors
+    /// <see cref="WatchlistSyncRunner.JellyseerrClientFactoryOverride"/>.
+    /// </summary>
+    internal static Func<string, string, ILogger, SeerrClient?>? SeerrClientFactoryOverride;
+
+    private SeerrClient CreateSeerrClient(PluginConfiguration cfg)
+    {
+        if (SeerrClientFactoryOverride != null)
+            return SeerrClientFactoryOverride(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger)!;
+
+        return new SeerrClient(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger);
     }
 
     /// <summary>
@@ -379,7 +399,7 @@ public class SerializdWatchlistSyncRunner
             jellyfinUsername, added, removed, addFailed, removeFailed);
     }
 
-    private async Task ReconcileCollectionAsync(User user, HashSet<Guid> desired, string name)
+    private async Task ReconcileCollectionAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
     {
         var boxSet = _libraryManager.GetItemList(new InternalItemsQuery
         {
@@ -407,8 +427,10 @@ public class SerializdWatchlistSyncRunner
         if (toAdd.Count > 0)
             await _collectionManager.AddToCollectionAsync(boxSet.Id, toAdd).ConfigureAwait(false);
 
-        // Empty desired with existing members likely means an API hiccup; don't wipe.
-        var toRemove = (desired.Count == 0 && members.Count > 0)
+        // sourceWasEmpty signals the caller's own upstream fetch came back empty (a blocked
+        // API call), not that the user genuinely emptied their watchlist; skip removal so a
+        // transient failure can't wipe an existing collection. Mirrors ReconcilePlaylistAsync.
+        var toRemove = (sourceWasEmpty && members.Count > 0)
             ? new List<Guid>()
             : members.Where(id => !desired.Contains(id)).ToList();
         if (toRemove.Count > 0)
@@ -417,11 +439,7 @@ public class SerializdWatchlistSyncRunner
         _logger.LogInformation("'{Name}' collection for {Username}: +{Added} / -{Removed}", name, user.Username, toAdd.Count, toRemove.Count);
     }
 
-    private Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name)
-        // desired.Count == 0 doubles as this call's "source was empty" signal, preserving the
-        // existing behavior exactly: an empty Serializd watchlist fetch produces an empty
-        // desired set with nothing else to distinguish it from "genuinely nothing watchlisted".
+    private Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
         => PlaylistReconciler.ReconcileAsync(
-            _playlistManager, _libraryManager, _logger, user, name, desired,
-            sourceWasEmpty: desired.Count == 0);
+            _playlistManager, _libraryManager, _logger, user, name, desired, sourceWasEmpty);
 }
