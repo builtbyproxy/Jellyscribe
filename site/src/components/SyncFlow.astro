@@ -32,9 +32,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <svg viewBox="0 0 120 120" class="flow-pipe-svg" preserveAspectRatio="none">
       <defs>
         <linearGradient id="pipegrad" x1="0" y1="50%" x2="100%" y2="50%">
-          <stop offset="0%" stop-color="#aa5cc3"/>
-          <stop offset="50%" stop-color="#40bcf4"/>
-          <stop offset="100%" stop-color="#00e054"/>
+          <stop offset="0%" stop-color="#a99a83"/>
+          <stop offset="100%" stop-color="#c9903c"/>
         </linearGradient>
       </defs>
       <path d="M0 60 L120 60" stroke="url(#pipegrad)" stroke-width="2" stroke-linecap="round"/>
@@ -103,8 +102,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     gap: 18px;
     min-height: 260px;
   }
-  .flow-jf { border-top: 2px solid var(--jf-purple); }
-  .flow-lb { border-top: 2px solid var(--lb-green); }
+  .flow-jf { border-top: 2px solid var(--border); }
+  .flow-lb { border-top: 2px solid var(--brass); }
 
   .flow-head {
     display: flex;
@@ -115,19 +114,19 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
-  .flow-head svg { color: var(--jf-purple); }
+  .flow-head svg { color: var(--text-dim); }
   .flow-head > span:nth-child(2) { flex: 1; }
   .flow-badge {
     font-size: 10px;
     padding: 3px 8px;
     border-radius: 999px;
-    background: rgba(170,92,195,0.15);
-    color: var(--jf-purple);
+    background: var(--bg-elev-2);
+    color: var(--text-dim);
     letter-spacing: 0.06em;
   }
   .badge-live {
-    background: rgba(0,224,84,0.12);
-    color: var(--lb-green);
+    background: rgba(122,154,118,0.14);
+    color: var(--ledger-green);
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -135,8 +134,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .badge-live::before {
     content: '';
     width: 6px; height: 6px; border-radius: 50%;
-    background: var(--lb-green);
-    box-shadow: 0 0 0 0 rgba(0,224,84,0.6);
+    background: var(--ledger-green);
+    box-shadow: 0 0 0 0 rgba(122,154,118,0.6);
     animation: pulse 1.8s ease-out infinite;
   }
 
@@ -146,10 +145,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   }
   .flow-dots i {
     width: 8px; height: 8px; border-radius: 50%;
+    background: var(--brass);
   }
-  .flow-dots i:nth-child(1) { background: var(--lb-green); }
-  .flow-dots i:nth-child(2) { background: var(--lb-blue); }
-  .flow-dots i:nth-child(3) { background: var(--lb-orange); }
 
   .flow-film {
     display: flex;
@@ -192,7 +189,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     display: block;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, var(--jf-purple), var(--jf-blue));
+    background: var(--text-dim);
     animation: fill 3s ease-out infinite;
     transform-origin: left;
   }
@@ -208,17 +205,17 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
-    background: rgba(0,224,84,0.08);
-    border: 1px solid rgba(0,224,84,0.2);
+    background: rgba(122,154,118,0.08);
+    border: 1px solid rgba(122,154,118,0.2);
     border-radius: 8px;
     font-size: 12px;
-    color: var(--lb-green);
+    color: var(--ledger-green);
   }
   .status-check {
     width: 16px; height: 16px;
     border-radius: 50%;
-    background: var(--lb-green);
-    color: #04140a;
+    background: var(--ledger-green);
+    color: #0e150d;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -242,12 +239,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     height: 6px;
     margin-top: -3px;
     border-radius: 50%;
-    background: var(--lb-green);
-    box-shadow: 0 0 10px var(--lb-green);
+    background: var(--brass);
+    box-shadow: 0 0 10px var(--brass);
     animation: travel 2.4s linear infinite;
   }
-  .pipe-dot:nth-child(3) { animation-delay: 0.8s; background: var(--lb-blue); box-shadow: 0 0 10px var(--lb-blue); }
-  .pipe-dot:nth-child(4) { animation-delay: 1.6s; background: var(--lb-orange); box-shadow: 0 0 10px var(--lb-orange); }
+  .pipe-dot:nth-child(3) { animation-delay: 0.8s; }
+  .pipe-dot:nth-child(4) { animation-delay: 1.6s; }
   @keyframes travel {
     0%   { left: 0%; opacity: 0; }
     10%  { opacity: 1; }
@@ -286,7 +283,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   }
   .diary-date-m {
     font-size: 11px;
-    color: var(--lb-green);
+    color: var(--brass);
     font-weight: 700;
     letter-spacing: 0.12em;
   }
@@ -303,8 +300,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   .diary-title { color: var(--text); font-weight: 600; font-size: 15px; }
   .diary-year { color: var(--text-dim); font-size: 12px; }
   .diary-stars-row { display: flex; align-items: center; gap: 10px; }
-  .diary-stars { color: var(--lb-green); font-family: var(--font-mono); letter-spacing: 1px; font-size: 14px; }
-  .diary-heart { color: var(--lb-orange); font-size: 14px; }
+  .diary-stars { color: var(--brass); font-family: var(--font-mono); letter-spacing: 1px; font-size: 14px; }
+  .diary-heart { color: var(--brass); font-size: 14px; }
 
   .diary-tags { display: flex; gap: 6px; flex-wrap: wrap; }
   .tag {
@@ -318,8 +315,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     letter-spacing: 0.08em;
   }
   .tag-new {
-    background: rgba(0,224,84,0.1);
-    border-color: rgba(0,224,84,0.3);
-    color: var(--lb-green);
+    background: rgba(122,154,118,0.1);
+    border-color: rgba(122,154,118,0.3);
+    color: var(--ledger-green);
   }
 </style>

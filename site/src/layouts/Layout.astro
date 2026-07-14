@@ -4,7 +4,7 @@ interface Props {
   description?: string;
 }
 
-const { title, description = "Automatically sync your Jellyfin watch history to your Letterboxd diary." } = Astro.props;
+const { title, description = "Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep — Letterboxd for film, Serializd for TV." } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 ---
 
@@ -32,23 +32,94 @@ const canonical = new URL(Astro.url.pathname, Astro.site).toString();
   <body>
     <slot />
     <style is:global>
+      @font-face {
+        font-family: 'Fraunces';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/fraunces-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Fraunces';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/fraunces-700.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Fraunces';
+        font-style: italic;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/fraunces-italic-500.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/publicsans-400.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/publicsans-500.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/publicsans-600.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Public Sans';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/publicsans-700.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/jetbrainsmono-400.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/jetbrainsmono-500.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'JetBrains Mono';
+        font-style: normal;
+        font-weight: 600;
+        font-display: swap;
+        src: url('/fonts/jetbrainsmono-600.woff2') format('woff2');
+      }
+
       :root {
-        --bg: #0b0d10;
-        --bg-elev: #14171c;
-        --bg-elev-2: #1b2028;
-        --border: #262c35;
-        --text: #e7ebf0;
-        --text-dim: #9aa4b2;
-        --lb-green: #00e054;
-        --lb-blue: #40bcf4;
-        --lb-orange: #ff8000;
-        --jf-purple: #aa5cc3;
-        --jf-blue: #00a4dc;
-        --radius: 12px;
-        --radius-lg: 16px;
-        --shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 20px 40px -20px rgba(0,0,0,0.6);
-        --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif;
-        --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        --bg: #1c1712;
+        --bg-elev: #24201a;
+        --bg-elev-2: #2f2820;
+        --border: #423a2d;
+        --text: #ede6d8;
+        --text-dim: #a99a83;
+        --brass: #c9903c;
+        --brass-bright: #e3ac5e;
+        --ledger-green: #7a9a76;
+        --warn: #b8633a;
+        --radius: 10px;
+        --radius-lg: 14px;
+        --shadow: 0 1px 0 rgba(237,230,216,0.04) inset, 0 20px 40px -20px rgba(0,0,0,0.7);
+        --font-sans: 'Public Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --font-display: 'Fraunces', ui-serif, Georgia, serif;
+        --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       }
 
       *, *::before, *::after { box-sizing: border-box; }
@@ -65,17 +136,16 @@ const canonical = new URL(Astro.url.pathname, Astro.site).toString();
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         background-image:
-          radial-gradient(1200px 600px at 80% -200px, rgba(170,92,195,0.12), transparent 60%),
-          radial-gradient(1000px 500px at -100px 10%, rgba(0,224,84,0.08), transparent 60%),
-          radial-gradient(900px 500px at 50% 120%, rgba(64,188,244,0.08), transparent 60%);
+          radial-gradient(1100px 550px at 85% -180px, rgba(201,144,60,0.10), transparent 60%),
+          radial-gradient(900px 500px at -100px 20%, rgba(122,154,118,0.06), transparent 60%);
       }
 
-      a { color: var(--lb-green); text-decoration: none; }
+      a { color: var(--brass-bright); text-decoration: none; }
       a:hover { text-decoration: underline; }
 
-      h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 0.5em; }
-      h1 { font-size: clamp(2.25rem, 5vw, 3.75rem); font-weight: 800; }
-      h2 { font-size: clamp(1.5rem, 3vw, 2.125rem); font-weight: 700; }
+      h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 0.5em; text-wrap: balance; }
+      h1 { font-size: clamp(2.25rem, 5vw, 3.75rem); font-weight: 600; }
+      h2 { font-size: clamp(1.5rem, 3vw, 2.125rem); font-weight: 600; }
       h3 { font-size: 1.125rem; font-weight: 600; }
 
       p { margin: 0 0 1em; color: var(--text-dim); }
@@ -121,10 +191,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site).toString();
       }
       .btn:hover { text-decoration: none; transform: translateY(-1px); }
       .btn-primary {
-        background: var(--lb-green);
-        color: #04140a;
+        background: var(--brass);
+        color: #1c1409;
       }
-      .btn-primary:hover { background: #2bed72; }
+      .btn-primary:hover { background: var(--brass-bright); }
       .btn-secondary {
         background: var(--bg-elev);
         color: var(--text);

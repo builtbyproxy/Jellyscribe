@@ -148,10 +148,10 @@ const watchlist = [
     pointer-events: none;
     opacity: 0.5;
   }
-  .tile-rating::before   { background: radial-gradient(400px 150px at 0% 0%, rgba(64,188,244,0.12), transparent 60%); }
+  .tile-rating::before   { background: radial-gradient(400px 150px at 0% 0%, rgba(201,144,60,0.12), transparent 60%); }
   .tile-fav::before      { background: radial-gradient(400px 180px at 100% 0%, rgba(255,92,138,0.14), transparent 60%); }
-  .tile-review::before   { background: radial-gradient(400px 180px at 0% 100%, rgba(255,128,0,0.10), transparent 60%); }
-  .tile-watchlist::before{ background: radial-gradient(400px 200px at 100% 100%, rgba(0,224,84,0.12), transparent 60%); }
+  .tile-review::before   { background: radial-gradient(400px 180px at 0% 100%, rgba(201,144,60,0.10), transparent 60%); }
+  .tile-watchlist::before{ background: radial-gradient(400px 200px at 100% 100%, rgba(122,154,118,0.12), transparent 60%); }
 
   .tile-head {
     display: flex;
@@ -211,12 +211,12 @@ const watchlist = [
     display: block;
     height: 100%;
     width: var(--w, 50%);
-    background: linear-gradient(90deg, var(--jf-purple), var(--jf-blue));
+    background: linear-gradient(90deg, var(--brass), var(--brass-bright));
     border-radius: 999px;
   }
   .rate-arrow { color: var(--text-dim); font-size: 14px; text-align: center; }
   .rate-stars {
-    color: var(--lb-green);
+    color: var(--brass);
     font-family: var(--font-mono);
     letter-spacing: 1px;
     font-size: 15px;
@@ -293,9 +293,9 @@ const watchlist = [
     white-space: nowrap;
   }
   .fav-chip-jf {
-    background: rgba(170,92,195,0.15);
-    border: 1px solid rgba(170,92,195,0.35);
-    color: #d9a5e7;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
   }
   .fav-chip-lb {
     background: rgba(255,92,138,0.15);
@@ -349,7 +349,7 @@ const watchlist = [
     left: 16px;
     background: var(--bg-elev);
     border-radius: 50%;
-    color: var(--lb-orange);
+    color: var(--brass);
     padding: 2px;
   }
   .quote blockquote {
@@ -370,7 +370,7 @@ const watchlist = [
     padding-top: 8px;
     border-top: 1px dashed var(--border);
   }
-  .quote-author { color: var(--lb-green); font-weight: 600; }
+  .quote-author { color: var(--brass-bright); font-weight: 600; }
   .quote-sep { color: var(--border); }
   .quote-stats { margin-left: auto; font-family: var(--font-mono); }
 
@@ -417,19 +417,19 @@ const watchlist = [
     color: var(--text);
     font-weight: 600;
   }
-  .wl-arrow { color: var(--lb-green); }
+  .wl-arrow { color: var(--brass); }
   .wl-pill {
-    background: rgba(0,164,220,0.12);
-    border: 1px solid rgba(0,164,220,0.3);
-    color: #7dd3fc;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 11px;
     font-weight: 500;
   }
   .wl-pill-seerr {
-    background: rgba(255,140,0,0.12);
-    border-color: rgba(255,140,0,0.35);
-    color: #ffb86c;
+    background: rgba(201,144,60,0.12);
+    border-color: rgba(201,144,60,0.35);
+    color: var(--brass-bright);
   }
 </style>

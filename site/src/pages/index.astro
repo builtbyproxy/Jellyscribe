@@ -63,17 +63,16 @@ const featureGroups: FeatureGroup[] = [
 ];
 ---
 
-<Layout title="LetterboxdSync for Jellyfin" description="Automatically sync your Jellyfin watch history to your Letterboxd diary.">
+<Layout title="Jellyscribe for Jellyfin" description="Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep — Letterboxd for film, Serializd for TV.">
   <header class="site-header">
     <div class="container nav">
       <div class="brand-group">
-        <a class="brand" href="/" aria-label="LetterboxdSync home">
-          <span class="dots" aria-hidden="true">
-            <span class="dot dot-green"></span>
-            <span class="dot dot-blue"></span>
-            <span class="dot dot-orange"></span>
-          </span>
-          <span class="brand-name">LetterboxdSync</span>
+        <a class="brand" href="/" aria-label="Jellyscribe home">
+          <svg class="brand-mark" width="22" height="22" viewBox="0 0 64 64" aria-hidden="true">
+            <rect width="64" height="64" rx="12" fill="var(--bg-elev-2)"/>
+            <path d="M20 15 H44 V51 L32 40 L20 51 Z" fill="var(--brass)"/>
+          </svg>
+          <span class="brand-name">Jellyscribe</span>
         </a>
         <span class="brand-by">
           by <a
@@ -102,12 +101,13 @@ const featureGroups: FeatureGroup[] = [
           Jellyfin plugin
         </div>
         <h1>
-          Your Jellyfin diary,<br />
-          on <span class="accent">Letterboxd</span>.
+          Every watch,<br />
+          written to <span class="accent">your diary</span>.
         </h1>
         <p class="lede">
-          LetterboxdSync logs every film you watch in Jellyfin straight to your Letterboxd diary.
-          Real-time, multi-user, and quietly resilient to the rough edges of scraping Letterboxd.
+          Jellyscribe logs what you finish watching in Jellyfin straight into the diaries you
+          already keep — Letterboxd for film, Serializd for TV. Real-time, multi-user, and
+          quietly resilient to the rough edges of scraping.
         </p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#install">Install plugin</a>
@@ -142,10 +142,10 @@ const featureGroups: FeatureGroup[] = [
               <span class="card-title">Recent sync</span>
             </div>
             <ul class="diary">
-              <li><span class="diary-title">Inception</span><span class="diary-stars">★★★★★</span></li>
-              <li><span class="diary-title">The Dark Knight</span><span class="diary-stars">★★★★½</span></li>
-              <li><span class="diary-title">Avatar</span><span class="diary-stars">★★★★</span></li>
-              <li><span class="diary-title">Jurassic Park</span><span class="diary-stars">★★★★</span></li>
+              <li><span class="diary-title">Inception<span class="diary-dest">Letterboxd</span></span><span class="diary-stars">★★★★★</span></li>
+              <li><span class="diary-title">The Bear <span class="diary-ep">S3E7</span><span class="diary-dest">Serializd</span></span><span class="diary-stars">★★★★½</span></li>
+              <li><span class="diary-title">Avatar<span class="diary-dest">Letterboxd</span></span><span class="diary-stars">★★★★</span></li>
+              <li><span class="diary-title">Severance <span class="diary-ep">S2E1</span><span class="diary-dest">Serializd</span></span><span class="diary-stars">★★★★</span></li>
             </ul>
             <div class="card-foot">
               <span class="pulse"></span>
@@ -155,11 +155,11 @@ const featureGroups: FeatureGroup[] = [
           <div class="card card-2">
             <div class="stat">
               <div class="stat-num">1,284</div>
-              <div class="stat-label">films synced</div>
+              <div class="stat-label">watches synced</div>
             </div>
             <div class="stat">
-              <div class="stat-num">27</div>
-              <div class="stat-label">rewatches</div>
+              <div class="stat-num">2</div>
+              <div class="stat-label">diaries kept</div>
             </div>
           </div>
         </div>
@@ -229,7 +229,7 @@ const featureGroups: FeatureGroup[] = [
                 </button>
               </div>
             </li>
-            <li>Add the <strong>LetterboxdSync</strong> repository:
+            <li>Add the <strong>Jellyscribe</strong> repository:
               <div class="install-pill install-pill-inline" data-pill>
                 <code class="install-pill-url">{manifestUrl}</code>
                 <button class="install-pill-btn" type="button" data-copy={manifestUrl} aria-label="Copy manifest URL">
@@ -238,7 +238,7 @@ const featureGroups: FeatureGroup[] = [
                 </button>
               </div>
             </li>
-            <li>Open the <strong>Catalog</strong>, install <strong>File Transformation</strong>, then install <strong>LetterboxdSync</strong>.</li>
+            <li>Open the <strong>Catalog</strong>, install <strong>File Transformation</strong>, then install <strong>Jellyscribe</strong>.</li>
             <li>Restart Jellyfin, then hard-refresh the web UI (Ctrl/Cmd + Shift + R) so the sidebar link loads.</li>
           </ol>
         </div>
@@ -247,8 +247,8 @@ const featureGroups: FeatureGroup[] = [
           <h3>Manual install</h3>
           <ol class="steps">
             <li>Install the <a href={fileTransformationRepoUrl} rel="noopener">File Transformation plugin</a> first, required for the Letterboxd sidebar link.</li>
-            <li>Download the latest LetterboxdSync ZIP from <a href={latestReleaseUrl} rel="noopener">Releases</a>.</li>
-            <li>Extract <code>LetterboxdSync.dll</code> and <code>HtmlAgilityPack.dll</code> into your Jellyfin plugins directory.</li>
+            <li>Download the latest Jellyscribe ZIP from <a href={latestReleaseUrl} rel="noopener">Releases</a>.</li>
+            <li>Extract <code>Jellyscribe.dll</code> and <code>HtmlAgilityPack.dll</code> into your Jellyfin plugins directory.</li>
             <li>Restart Jellyfin.</li>
           </ol>
           <a class="text-link" href={releasesUrl} rel="noopener">Browse all releases &rarr;</a>
@@ -276,7 +276,7 @@ const featureGroups: FeatureGroup[] = [
           <div class="step-num">1</div>
           <div class="step-body">
             <h3>Open the plugin page</h3>
-            <p>Go to <strong>Dashboard &rarr; Plugins &rarr; Letterboxd Sync</strong>, then switch to the <strong>Settings</strong> tab.</p>
+            <p>Go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong>, then switch to the <strong>Settings</strong> tab.</p>
           </div>
         </li>
         <li>
@@ -305,12 +305,11 @@ const featureGroups: FeatureGroup[] = [
   <footer class="site-footer">
     <div class="container footer-inner">
       <div class="footer-brand">
-        <span class="dots dots-sm" aria-hidden="true">
-          <span class="dot dot-green"></span>
-          <span class="dot dot-blue"></span>
-          <span class="dot dot-orange"></span>
-        </span>
-        <span>LetterboxdSync</span>
+        <svg class="brand-mark" width="18" height="18" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="12" fill="var(--bg-elev-2)"/>
+          <path d="M20 15 H44 V51 L32 40 L20 51 Z" fill="var(--brass)"/>
+        </svg>
+        <span>Jellyscribe</span>
       </div>
       <div class="footer-links">
         <a href={repoUrl} rel="noopener">GitHub</a>
@@ -375,21 +374,11 @@ const featureGroups: FeatureGroup[] = [
     .brand-by { display: none; }
   }
 
-  .dots {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+  .brand-mark {
+    flex-shrink: 0;
+    display: block;
+    border-radius: 5px;
   }
-  .dots .dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  .dots-sm .dot { width: 10px; height: 10px; }
-  .dot-green { background: var(--lb-green); }
-  .dot-blue { background: var(--lb-blue); }
-  .dot-orange { background: var(--lb-orange); }
 
   .nav-links {
     display: flex;
@@ -434,12 +423,15 @@ const featureGroups: FeatureGroup[] = [
   }
   .eyebrow-dot {
     width: 8px; height: 8px; border-radius: 50%;
-    background: var(--jf-purple);
-    box-shadow: 0 0 12px var(--jf-purple);
+    background: var(--brass);
+    box-shadow: 0 0 12px rgba(201,144,60,0.5);
   }
 
   .accent {
-    background: linear-gradient(90deg, var(--lb-green), var(--lb-blue) 55%, var(--lb-orange));
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 500;
+    background: linear-gradient(90deg, var(--brass), var(--brass-bright));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -514,8 +506,8 @@ const featureGroups: FeatureGroup[] = [
   }
   .install-pill-btn:hover { background: var(--border); }
   .install-pill-btn.copied {
-    background: var(--lb-green);
-    color: #04140a;
+    background: var(--ledger-green);
+    color: #0e150d;
     border-color: transparent;
   }
   .copy-icon { font-size: 14px; line-height: 1; }
@@ -532,13 +524,13 @@ const featureGroups: FeatureGroup[] = [
     transition: color 120ms ease;
   }
   .latest-link:hover { color: var(--text); text-decoration: none; }
-  .latest-link:hover .latest-arrow { color: var(--lb-green); }
+  .latest-link:hover .latest-arrow { color: var(--brass-bright); }
   .latest-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--lb-green);
-    box-shadow: 0 0 8px rgba(0,224,84,0.6);
+    background: var(--ledger-green);
+    box-shadow: 0 0 8px rgba(122,154,118,0.6);
     flex: 0 0 auto;
   }
   .latest-label {
@@ -546,7 +538,7 @@ const featureGroups: FeatureGroup[] = [
     letter-spacing: 0.1em;
     font-size: 11px;
     font-weight: 600;
-    color: var(--lb-green);
+    color: var(--ledger-green);
   }
   .latest-version {
     color: var(--text);
@@ -612,9 +604,6 @@ const featureGroups: FeatureGroup[] = [
     width: 9px; height: 9px; border-radius: 50%;
     background: var(--border);
   }
-  .mini-dots i:nth-child(1) { background: var(--lb-green); }
-  .mini-dots i:nth-child(2) { background: var(--lb-blue); }
-  .mini-dots i:nth-child(3) { background: var(--lb-orange); }
 
   .diary {
     list-style: none;
@@ -633,8 +622,20 @@ const featureGroups: FeatureGroup[] = [
     font-size: 14px;
   }
   .diary li:last-child { border-bottom: 0; }
-  .diary-title { color: var(--text); }
-  .diary-stars { color: var(--lb-green); font-family: var(--font-mono); letter-spacing: 1px; }
+  .diary-title { color: var(--text); display: inline-flex; align-items: baseline; gap: 8px; }
+  .diary-ep { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); }
+  .diary-dest {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+  .diary-stars { color: var(--brass); font-family: var(--font-mono); letter-spacing: 1px; }
 
   .card-foot {
     display: flex;
@@ -648,14 +649,14 @@ const featureGroups: FeatureGroup[] = [
   }
   .pulse {
     width: 8px; height: 8px; border-radius: 50%;
-    background: var(--lb-green);
-    box-shadow: 0 0 0 0 rgba(0,224,84,0.6);
+    background: var(--ledger-green);
+    box-shadow: 0 0 0 0 rgba(122,154,118,0.6);
     animation: pulse 1.8s ease-out infinite;
   }
   @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(0,224,84,0.55); }
-    70% { box-shadow: 0 0 0 10px rgba(0,224,84,0); }
-    100% { box-shadow: 0 0 0 0 rgba(0,224,84,0); }
+    0% { box-shadow: 0 0 0 0 rgba(122,154,118,0.55); }
+    70% { box-shadow: 0 0 0 10px rgba(122,154,118,0); }
+    100% { box-shadow: 0 0 0 0 rgba(122,154,118,0); }
   }
 
   .stat {
@@ -664,10 +665,11 @@ const featureGroups: FeatureGroup[] = [
     gap: 4px;
   }
   .stat-num {
+    font-family: var(--font-display);
     font-size: 28px;
-    font-weight: 800;
+    font-weight: 600;
     letter-spacing: -0.02em;
-    background: linear-gradient(90deg, var(--lb-green), var(--lb-blue));
+    background: linear-gradient(90deg, var(--brass), var(--brass-bright));
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .stat-label { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; }
@@ -706,19 +708,19 @@ const featureGroups: FeatureGroup[] = [
   .group-label-num {
     font-family: var(--font-mono);
     font-size: 10px;
-    color: var(--lb-green);
-    background: rgba(0,224,84,0.1);
-    border: 1px solid rgba(0,224,84,0.25);
+    color: var(--brass-bright);
+    background: rgba(201,144,60,0.1);
+    border: 1px solid rgba(201,144,60,0.25);
     padding: 3px 8px;
     border-radius: 999px;
     letter-spacing: 0.1em;
   }
   .group-heading {
     font-size: clamp(1.5rem, 2.6vw, 2rem);
-    font-weight: 700;
+    font-weight: 600;
     color: var(--text);
     margin: 0 0 8px;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
   }
   .group-intro {
     margin: 0 auto;
@@ -762,7 +764,7 @@ const featureGroups: FeatureGroup[] = [
     padding: 28px 24px;
     transition: border-color 160ms ease, transform 160ms ease;
   }
-  .feature:hover { border-color: rgba(0,224,84,0.35); transform: translateY(-2px); }
+  .feature:hover { border-color: rgba(201,144,60,0.35); transform: translateY(-2px); }
   .feature h4 {
     color: var(--text);
     margin: 0 0 6px;
@@ -783,22 +785,8 @@ const featureGroups: FeatureGroup[] = [
     border-radius: 10px;
     background: var(--bg-elev-2);
     border: 1px solid var(--border);
-    color: var(--lb-green);
+    color: var(--brass);
     flex-shrink: 0;
-  }
-  .feature-group:nth-of-type(3n+2) .feature-icon { color: var(--lb-blue); }
-  .feature-group:nth-of-type(3n+2) .feature:hover { border-color: rgba(64,188,244,0.35); }
-  .feature-group:nth-of-type(3n+3) .feature-icon { color: var(--lb-orange); }
-  .feature-group:nth-of-type(3n+3) .feature:hover { border-color: rgba(255,128,0,0.35); }
-  .feature-group:nth-of-type(3n+3) .group-label-num {
-    color: var(--lb-orange);
-    background: rgba(255,128,0,0.1);
-    border-color: rgba(255,128,0,0.25);
-  }
-  .feature-group:nth-of-type(3n+2) .group-label-num {
-    color: var(--lb-blue);
-    background: rgba(64,188,244,0.1);
-    border-color: rgba(64,188,244,0.25);
   }
 
   .install-grid {
@@ -838,17 +826,17 @@ const featureGroups: FeatureGroup[] = [
     .req-value { font-size: 12px; }
   }
   .install-card-featured {
-    border-color: rgba(0,224,84,0.35);
+    border-color: rgba(201,144,60,0.35);
     background:
-      radial-gradient(600px 200px at 0% 0%, rgba(0,224,84,0.08), transparent 60%),
+      radial-gradient(600px 200px at 0% 0%, rgba(201,144,60,0.08), transparent 60%),
       var(--bg-elev);
   }
   .install-badge {
     position: absolute;
     top: 16px;
     right: 16px;
-    background: var(--lb-green);
-    color: #04140a;
+    background: var(--brass);
+    color: #1c1409;
     font-size: 11px;
     font-weight: 700;
     padding: 4px 10px;
@@ -868,7 +856,7 @@ const featureGroups: FeatureGroup[] = [
   .text-link {
     display: inline-block;
     margin-top: 14px;
-    color: var(--lb-blue);
+    color: var(--brass-bright);
     font-size: 14px;
     font-weight: 500;
   }
@@ -918,8 +906,8 @@ const featureGroups: FeatureGroup[] = [
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--lb-green), var(--lb-blue));
-    color: #04140a;
+    background: linear-gradient(135deg, var(--brass), var(--brass-bright));
+    color: #1c1409;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -933,7 +921,7 @@ const featureGroups: FeatureGroup[] = [
     margin-top: 32px;
     background: var(--bg-elev);
     border: 1px solid var(--border);
-    border-left: 3px solid var(--lb-orange);
+    border-left: 3px solid var(--warn);
     border-radius: var(--radius);
     padding: 18px 20px;
   }

@@ -13,7 +13,7 @@ const activity = [
 <div class="dash" aria-hidden="true">
   <div class="dash-head">
     <div>
-      <div class="dash-title">LetterboxdSync</div>
+      <div class="dash-title">Jellyscribe</div>
       <div class="dash-sub">Dashboard · @8bitproxy</div>
     </div>
     <div class="dash-actions">
@@ -116,22 +116,22 @@ const activity = [
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(0,224,84,0.1);
-    color: var(--lb-green);
-    border: 1px solid rgba(0,224,84,0.25);
+    background: rgba(122,154,118,0.1);
+    color: var(--ledger-green);
+    border: 1px solid rgba(122,154,118,0.25);
   }
   .pill-dot {
     width: 6px; height: 6px; border-radius: 50%;
-    background: var(--lb-green);
-    box-shadow: 0 0 0 0 rgba(0,224,84,0.6);
+    background: var(--ledger-green);
+    box-shadow: 0 0 0 0 rgba(122,154,118,0.6);
     animation: pulse 1.8s ease-out infinite;
   }
   .dash-btn {
     font-size: 11px;
     padding: 5px 11px;
     border-radius: 8px;
-    background: var(--lb-green);
-    color: #04140a;
+    background: var(--brass);
+    color: #1c1409;
     font-weight: 600;
   }
 
@@ -147,14 +147,15 @@ const activity = [
     padding: 16px 18px;
   }
   .stat-num {
+    font-family: var(--font-display);
     font-size: 24px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    color: var(--lb-green);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--brass);
     margin-bottom: 4px;
   }
-  .stat-num-blue { color: var(--lb-blue); }
-  .stat-num-orange { color: var(--lb-orange); }
+  .stat-num-blue { color: var(--brass-bright); }
+  .stat-num-orange { color: var(--text-dim); }
   .stat-num-dim { color: var(--text-dim); }
   .stat-label {
     font-size: 10px;
@@ -193,7 +194,7 @@ const activity = [
   }
   .dash-card-meta {
     font-family: var(--font-mono);
-    color: var(--lb-green);
+    color: var(--ledger-green);
     font-size: 10px;
   }
 
@@ -206,15 +207,9 @@ const activity = [
   .chart-bar {
     flex: 1;
     height: var(--h);
-    background: linear-gradient(180deg, var(--lb-green), rgba(0,224,84,0.2));
+    background: linear-gradient(180deg, var(--brass), rgba(201,144,60,0.2));
     border-radius: 3px 3px 0 0;
     min-height: 3px;
-  }
-  .chart-bar:nth-child(3n) {
-    background: linear-gradient(180deg, var(--lb-blue), rgba(64,188,244,0.2));
-  }
-  .chart-bar:nth-child(4n) {
-    background: linear-gradient(180deg, var(--lb-orange), rgba(255,128,0,0.2));
   }
 
   .activity {
@@ -246,8 +241,8 @@ const activity = [
     font-size: 10px;
     font-weight: 700;
   }
-  .act-synced { background: rgba(0,224,84,0.15); color: var(--lb-green); }
-  .act-rewatch { background: rgba(64,188,244,0.15); color: var(--lb-blue); }
+  .act-synced { background: rgba(122,154,118,0.15); color: var(--ledger-green); }
+  .act-rewatch { background: rgba(201,144,60,0.15); color: var(--brass); }
   .act-title { color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .act-year { color: var(--text-dim); font-family: var(--font-mono); font-size: 11px; }
   .act-time { color: var(--text-dim); font-size: 11px; }
