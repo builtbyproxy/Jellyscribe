@@ -97,16 +97,11 @@
 
 ## 6. Rebrand + domain (Phase 2 — after Phase 1 is stable)
 
-- [ ] 6.1 Decide the name (design.md candidate list) and new domain.
-- [ ] 6.2 curl-verify `raw.githubusercontent.com` manifest URL survives a repo
-      rename **before** renaming; if not, keep repo name, rename display+domain
-      only.
-- [ ] 6.3 Rename repo + plugin display name. **GUID unchanged.** Default: keep the
-      `LetterboxdSync` namespace (rename display only) unless 6.2 forces more.
-- [ ] 6.4 New domain live; `letterboxdsync.dev` 301 → new; keep old domain
-      registered; update `worker/` Origin allowlist + `site/` copy.
-- [ ] 6.5 One deliberate rebrand release; confirm the ~190-server fleet still
-      auto-updates (download count ticks) post-rename.
+- [x] 6.1 Decide the name (design.md candidate list) and new domain. Decided:
+      **Jellyscribe**, full research/rationale and rejected alternatives in
+      `openspec/changes/rebrand-jellyscribe/design.md`. Execution (6.2-6.5,
+      superseded by that change's own `tasks.md`) blocked on this change
+      shipping and settling on `main` first — do not start until then.
 
 ## 7. Phase 3 — dated diary logs + ratings (endpoint recovered; see task 0.1 in SPIKE.md)
 
