@@ -1,10 +1,12 @@
 ## 0. Close the spike's open questions (only blocks Phase 3, do before speccing ratings)
 
-- [ ] 0.1 In the maintainer's real Chrome (logged in, bypasses Cloudflare): open a
+- [x] 0.1 In the maintainer's real Chrome (logged in, bypasses Cloudflare): open a
       show's `/show/{id}/add-review` page, submit a throwaway review with a rating
       and a **past** date, capture the exact request from the Network tab (method,
       path, JSON body), then delete the review. Record method + path + body +
-      whether `backdate` was accepted in `SPIKE.md`.
+      whether `backdate` was accepted in `SPIKE.md`. Done 2026-07-10 via the `_app`
+      chunk capture; see SPIKE.md's "Phase 3 endpoints — RESOLVED" section
+      (`POST /api/show/reviews/add`, `backdate` confirmed writable).
 
 ## 1. Serializd API client (Phase 1)
 
@@ -46,8 +48,10 @@
 - [x] 2.4 `POST …/Serializd/SyncNow` (fires the catch-up for the calling user) +
       **Sync TV Now** button on the TV tab. (Per-user *page* section deferred; the
       dashboard tab covers linking + manual sync.)
-- [ ] 2.5 Tests: secret round-trips encrypted + `[JsonIgnore]` doesn't echo
-      ciphertext through the config-page get→mutate→put cycle.
+- [x] 2.5 Tests: secret round-trips encrypted + `[JsonIgnore]` doesn't echo
+      ciphertext through the config-page get→mutate→put cycle. Mirrors the
+      Letterboxd `Account` coverage in `SecretProtectorTests.cs` for
+      `SerializdAccount.SerializdPasswordProtected`.
 
 ## 3. Real-time + scheduled scrobble (Phase 1)
 
@@ -113,8 +117,12 @@ reversibly (create → read → delete) at both show and episode level with a pa
 - [x] 7.1 **Rating sync**: `SerializdRating.FromJellyfin` (0..10 → 1..10, round/clamp,
       0⇒unrated) + `rating` on each dated log. Episode-level for now; series-level
       rating → show rating is 7.5 below.
-- [ ] 7.2 Written reviews from the dashboard (compose UI + `review_text`). Endpoint
-      ready (`/show/reviews/add|update|delete`); UI not built yet.
+- [x] 7.2 Written reviews from the dashboard (compose UI + `review_text`). Shipped:
+      `configPage.html`/`userPage.html`'s review modal is source-aware and posts to
+      `Serializd/Review`; `SerializdController.PostReview` fans out to enabled
+      accounts, show- or episode-level (`SeasonNumber`/`EpisodeNumber`), and records
+      a `Source="review"` activity row. `SerializdControllerTests` covers validation,
+      show/episode routing, activity recording, and per-account failure isolation.
 - [x] 7.3 **Backdated diary logs**: `ISerializdService.CreateEpisodeLogAsync` →
       `/show/reviews/add` with `is_log:true` + `backdate`. Real-time stamps *now*;
       the catch-up backdates each episode to its Jellyfin `LastPlayedDate`. Separate
@@ -122,7 +130,14 @@ reversibly (create → read → delete) at both show and episode level with a pa
       still get backfilled as dated logs without re-marking watched. Watched-marking
       via `episode_log/add` retained. Tests: client body shape, rating omit/clamp,
       kind namespacing, handler creates a log.
-- [ ] 7.4 TV watchlist → Jellyseerr (reuse `SeerrClient`, request TV).
+- [x] 7.4 TV watchlist → Jellyseerr (reuse `SeerrClient`, request TV). Shipped:
+      `SerializdWatchlistSyncRunner.SeerrIntegrationAsync` auto-requests missing/
+      incomplete watchlisted seasons and optionally mirrors the watchlist into the
+      Seerr user's own TV watchlist, primary-account-only. Gained a
+      `SeerrClientFactoryOverride` test seam (mirroring `WatchlistSyncRunner`'s) and
+      an end-to-end `SerializdWatchlistSyncRunnerTests` suite (mock-handler-driven
+      auto-request, user-map failure, mirror add/remove, empty-watchlist guard,
+      secondary-account isolation), matching the Letterboxd film analogue's coverage.
 - [x] 7.5 Series-level rating → Serializd **show** rating + favorite → **like**, merged
       into one show-level entry (`SetShowMetaAsync` → `/show/reviews/add`,
       `is_log:false` confirmed to set a rating/like *without* a Diary row). Catch-up

@@ -13,12 +13,15 @@ export const releaseNotes: ReleaseNotes[] = [
     version: '1.20.0',
     headline: 'TV shows now sync to Serializd, the Letterboxd for television',
     summary:
-      'The plugin no longer stops at films. Link a Serializd account on the new TV / Serializd tab and finished TV episodes are logged to your Serializd watched list automatically, in real time as you finish them, with a daily catch-up for anything missed and a Sync TV Now button to run it on demand. Films still go to Letterboxd exactly as before; the two are completely independent, so a Serializd hiccup never touches your Letterboxd sync. Each Jellyfin user links their own Serializd account (by email or username), and passwords are encrypted at rest the same way Letterboxd credentials are. This first release covers watched-episode sync; ratings, reviews, and backdated diary entries are planned next.',
+      'The plugin no longer stops at films. Link a Serializd account on the new TV / Serializd tab and TV episodes sync to Serializd automatically: watched status in real time as you finish an episode, with a daily catch-up for anything missed and a Sync TV Now button to run it on demand, each entry dated to when you actually watched it rather than when the sync ran. Star ratings and favorites mirror to Serializd\'s rating and like, and you can post a written review straight from the dashboard, at the show or episode level. Your Serializd watchlist syncs back into Jellyfin too, as a browsable collection and a playable episode queue, with an optional Jellyseerr auto-request for anything still missing from your library. Films still go to Letterboxd exactly as before; the two are completely independent, so a Serializd hiccup never touches your Letterboxd sync. Each Jellyfin user links their own Serializd account (by email or username), and passwords are encrypted at rest the same way Letterboxd credentials are.',
     highlights: {
       new: [
         'New TV / Serializd tab: link a Serializd account per Jellyfin user (email or username) with a Verify login button that confirms your credentials before saving.',
-        'Real-time episode sync: finishing a TV episode logs it to your Serializd watched list automatically, matched by TMDb id so it works regardless of naming.',
+        'Real-time episode sync: finishing a TV episode logs it to your Serializd watched list automatically, matched by TMDb id so it works regardless of naming, dated to the actual watch time.',
         'Daily catch-up scheduled task ("Sync watched TV to Serializd") logs anything the real-time path missed, plus a Sync TV Now button to run it immediately.',
+        'Series ratings and favorites sync to Serializd as a show rating and like; write a full review (with an optional rating) straight from the dashboard, at the show or a specific episode.',
+        'Serializd watchlist sync: watchlisted shows mirror into a Jellyfin collection (browse) and the watchlisted seasons\' episodes into a playlist (play queue), with an opt-in Jellyseerr auto-request for anything missing.',
+        'Reverse diary import: mark Jellyfin episodes played when they already show up in your Serializd diary.',
         'Serializd runs fully isolated from Letterboxd: films keep syncing to Letterboxd, and a failure on one service never blocks the other.',
       ],
     },
