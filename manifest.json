@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.0.0.0",
+        "changelog": "Two things land together in this release. First, the plugin is renamed from \"Letterboxd Sync\" to Jellyscribe, a name and a look that actually cover both services it now talks to, instead of the old identity that borrowed Letterboxd's own name and brand colors. Nothing about the rename requires any action, your plugin auto-updates in place, every linked account, sync history entry, and setting carries over untouched, and the repository URL you already have configured does not change.\n\nSecond, the plugin no longer stops at films. Link a Serializd account on the new TV / Serializd tab and TV episodes sync to Serializd automatically, watched status in real time as you finish an episode, with a daily catch-up for anything missed and a Sync TV Now button to run it on demand, each entry dated to when you actually watched it rather than when the sync ran.\n\nStar ratings and favorites mirror to Serializd's rating and like, and you can post a written review straight from the dashboard, at the show or episode level. Your Serializd watchlist syncs back into Jellyfin too, as a browsable collection and a playable episode queue, with an optional Jellyseerr auto-request for anything still missing from your library.\n\nFilms still go to Letterboxd exactly as before, the two are completely independent, so a Serializd hiccup never touches your Letterboxd sync. Each Jellyfin user links their own Serializd account (by email or username), and passwords are encrypted at rest the same way Letterboxd credentials are.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.0.0/jellyfin-plugin-letterboxd-v2.0.0.zip",
+        "checksum": "e1d2d44721d28fd8cbaeaa0c89f09e34",
+        "timestamp": "2026-07-15T13:55:09Z"
+      },
+      {
         "version": "1.19.6.0",
         "changelog": "If the \"Import Letterboxd diary as Jellyfin watched\" task ran and did nothing, it used to finish in a second and leave no trace in the log, so a switched-off toggle looked identical to a broken feature. The task now says why it skipped each user (for example, an account exists but diary import is not turned on, with a pointer to the setting), reports when your Letterboxd returned no films, and always ends with a one-line summary of what it checked. A stuck progress banner on the dashboard for empty diaries is also fixed. If reverse sync has not been working for you, update, run the task once, and the log will now tell you exactly why.",
         "targetAbi": "10.11.9.0",
