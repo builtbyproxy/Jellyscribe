@@ -138,7 +138,7 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
         await service.DidNotReceive().CreateEpisodeLogAsync(
             Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
         await service.DidNotReceive().LogEpisodesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>());
-        Assert.False(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 3, SerializdSyncHistory.KindLog));
+        Assert.False(SerializdSyncHistory.Has(idHex, "user@example.com", ShowTmdbId, 1, 3, SerializdSyncHistory.KindLog));
     }
 
     [Fact]
@@ -153,7 +153,7 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
         await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
 
         Assert.Single(logged);
-        Assert.True(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 3, SerializdSyncHistory.KindLog));
+        Assert.True(SerializdSyncHistory.Has(idHex, "user@example.com", ShowTmdbId, 1, 3, SerializdSyncHistory.KindLog));
     }
 
     [Fact]
@@ -192,8 +192,8 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
         await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
 
         Assert.Single(logged);
-        Assert.True(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 1, SerializdSyncHistory.KindLog));
-        Assert.False(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 2, SerializdSyncHistory.KindLog));
+        Assert.True(SerializdSyncHistory.Has(idHex, "user@example.com", ShowTmdbId, 1, 1, SerializdSyncHistory.KindLog));
+        Assert.False(SerializdSyncHistory.Has(idHex, "user@example.com", ShowTmdbId, 1, 2, SerializdSyncHistory.KindLog));
     }
 
     [Fact]

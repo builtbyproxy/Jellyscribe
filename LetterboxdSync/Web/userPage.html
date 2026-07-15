@@ -281,6 +281,18 @@
                     <textarea id="reviewText" rows="4" class="ws-input" placeholder="Write your review…"></textarea>
                     <div class="ws-row" style="margin-top:12px;"><label class="ws-field">Rating</label><div id="starRating"><span class="ws-star" data-val="1">&#9734;</span><span class="ws-star" data-val="2">&#9734;</span><span class="ws-star" data-val="3">&#9734;</span><span class="ws-star" data-val="4">&#9734;</span><span class="ws-star" data-val="5">&#9734;</span><span id="ratingLabel" class="ws-muted" style="margin-left:8px;font-size:12px;">No rating</span></div><input type="hidden" id="reviewRating" value="" /></div>
                     <label class="ws-muted" style="display:block;margin:8px 0;font-size:12.5px;"><input type="checkbox" id="reviewSpoilers" /> Contains spoilers</label>
+                    <label class="ws-muted" id="reviewRewatchRow" style="display:block;margin:8px 0;font-size:12.5px;"><input type="checkbox" id="reviewRewatch" /> This is a rewatch</label>
+                    <div id="rewatchDateRow" style="display:none;margin:8px 0;">
+                        <label class="ws-field" style="display:block;margin-bottom:4px;">Date watched</label>
+                        <input type="date" id="reviewDate" class="ws-input" style="max-width:200px;" />
+                    </div>
+                    <div id="reviewAccountRow" style="display:none;margin:8px 0;">
+                        <label class="ws-field" style="display:block;margin-bottom:4px;">Post as</label>
+                        <select id="reviewAccount" class="ws-input" style="max-width:280px;">
+                            <option value="">All my Letterboxd accounts</option>
+                        </select>
+                        <span class="ws-muted" style="font-size:11.5px;display:block;margin-top:4px;">Defaults to posting on every linked Letterboxd account. Pick one to limit to that account only.</span>
+                    </div>
                     <div style="display:flex;gap:10px;margin-top:8px;align-items:center;"><button type="button" class="ws-btn primary" id="reviewSubmit">Post review</button><button type="button" class="ws-btn" id="reviewCancel">Cancel</button><span id="reviewStatus" style="font-size:12.5px;"></span></div>
                 </div></div>
 
@@ -329,6 +341,9 @@
                             document.getElementById('mSvc').addEventListener('change', function () { self.onSvcChange(); });
                             document.getElementById('reviewCancel').addEventListener('click', function () { document.getElementById('reviewModal').classList.remove('show'); });
                             document.getElementById('reviewSubmit').addEventListener('click', function () { self.submitReview(); });
+                            document.getElementById('reviewRewatch').addEventListener('change', function () {
+                                document.getElementById('rewatchDateRow').style.display = this.checked ? '' : 'none';
+                            });
                             ['acctModal', 'reviewModal'].forEach(function (id) { document.getElementById(id).addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); }); });
                             document.querySelectorAll('.ws-modal-x').forEach(function (x) { x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); }); });
                             document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); });
@@ -589,19 +604,47 @@
                             var scope = (this.reviewSeason && this.reviewEpisode) ? (' · S' + this.reviewSeason + 'E' + this.reviewEpisode) : '';
                             document.getElementById('reviewTitle').textContent = 'Review: ' + title + scope;
                             document.getElementById('reviewText').value = ''; document.getElementById('reviewSpoilers').checked = false;
+                            document.getElementById('reviewRewatch').checked = false;
+                            document.getElementById('rewatchDateRow').style.display = 'none';
+                            document.getElementById('reviewDate').value = new Date().toISOString().split('T')[0];
                             document.getElementById('reviewRating').value = ''; document.getElementById('ratingLabel').textContent = 'No rating';
                             document.querySelectorAll('#starRating .ws-star').forEach(function (s) { s.classList.remove('filled'); s.innerHTML = '&#9734;'; });
                             document.getElementById('reviewStatus').textContent = '';
+                            var isLetterboxd = svc !== 'serializd';
+                            document.getElementById('reviewRewatchRow').style.display = isLetterboxd ? '' : 'none';
+                            document.getElementById('reviewAccountRow').style.display = 'none';
+                            if (isLetterboxd) this.populateReviewAccountDropdown();
                             document.getElementById('reviewModal').classList.add('show');
+                        },
+                        // Uses the accounts already loaded by loadAccounts (self-service; the
+                        // /Accounts endpoint only ever returns the calling user's own accounts),
+                        // so no extra request is needed here.
+                        populateReviewAccountDropdown: function () {
+                            var sel = document.getElementById('reviewAccount'), row = document.getElementById('reviewAccountRow');
+                            if (!sel || !row) return;
+                            sel.innerHTML = '<option value="">All my Letterboxd accounts</option>';
+                            var mine = (this.lb || []).filter(function (a) { return a.enabled !== false; });
+                            mine.sort(function (a, b) { return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0); });
+                            mine.forEach(function (a) {
+                                var label = a.letterboxdUsername + (a.isPrimary ? ' (primary)' : '');
+                                sel.insertAdjacentHTML('beforeend', '<option value="' + (a.letterboxdUsername || '').replace(/"/g, '&quot;') + '">' + label + '</option>');
+                            });
+                            row.style.display = mine.length >= 2 ? '' : 'none';
                         },
                         submitReview: function () {
                             var self = this, text = document.getElementById('reviewText').value.trim();
                             var rv = document.getElementById('reviewRating').value, rating = rv ? parseFloat(rv) : null;
-                            if (!text && !rating) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Write a review or set a rating.</span>'; return; }
+                            var isRewatch = self.reviewSvc !== 'serializd' && document.getElementById('reviewRewatch').checked;
+                            if (!text && !rating && !isRewatch) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Write a review, set a rating, or mark as rewatch.</span>'; return; }
                             document.getElementById('reviewStatus').textContent = 'Posting…';
                             var url, body;
                             if (self.reviewSvc === 'serializd') { url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review'; body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, seasonNumber: self.reviewSeason || null, episodeNumber: self.reviewEpisode || null, title: self.reviewTitleText || null }; }
-                            else { url = 'Jellyfin.Plugin.LetterboxdSync/Review'; body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, isRewatch: false, rating: rating }; }
+                            else {
+                                var date = document.getElementById('reviewDate').value;
+                                var lbUser = (document.getElementById('reviewAccount').value || '').trim();
+                                url = 'Jellyfin.Plugin.LetterboxdSync/Review';
+                                body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: document.getElementById('reviewSpoilers').checked, isRewatch: isRewatch, date: isRewatch && date ? date : null, rating: rating, letterboxdUsername: lbUser || null };
+                            }
                             self.post(url, body).then(function (r) { if (r.ok) { document.getElementById('reviewStatus').innerHTML = '<span class="ws-green">Review posted!</span>'; setTimeout(function () { document.getElementById('reviewModal').classList.remove('show'); }, 1200); } else { document.getElementById('reviewStatus').innerHTML = '<span class="ws-red">Failed to post.</span>'; } });
                         }
                     };

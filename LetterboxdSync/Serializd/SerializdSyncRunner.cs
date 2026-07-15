@@ -75,7 +75,7 @@ public class SerializdSyncRunner
 
         try
         {
-            SyncProgress.Start("Serializd TV sync", "Starting");
+            SyncProgress.Start(SyncProgress.TrackSerializd, "Serializd TV sync", "Starting");
             var pairs = _userManager.GetUsers()
                 .SelectMany(u => Config.GetEnabledSerializdAccountsForUser(u.Id.ToString("N"))
                     .Select(a => (User: u, Account: a)))
@@ -104,7 +104,7 @@ public class SerializdSyncRunner
         }
         finally
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackSerializd);
             SerializdSyncGate.Instance.Release();
         }
     }
@@ -120,7 +120,7 @@ public class SerializdSyncRunner
 
         try
         {
-            SyncProgress.Start("Serializd TV sync", "Starting");
+            SyncProgress.Start(SyncProgress.TrackSerializd, "Serializd TV sync", "Starting");
             var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
             if (user == null) return false;
 
@@ -145,7 +145,7 @@ public class SerializdSyncRunner
         }
         finally
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackSerializd);
             SerializdSyncGate.Instance.Release();
         }
     }
@@ -212,9 +212,9 @@ public class SerializdSyncRunner
         // "Skip previously synced" (default on) short-circuits via the local dedup history.
         // When off, everything is re-sent (which re-logs, i.e. can create duplicate diary rows).
         bool AlreadyWatched(int s, int se, int e) =>
-            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, s, se, e, SerializdSyncHistory.KindWatched);
+            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, account.Email, s, se, e, SerializdSyncHistory.KindWatched);
         bool AlreadyLogged(EpisodePlay r) =>
-            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
+            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, account.Email, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
 
         var needsWatched = GroupNewEpisodes(records.Select(r => (r.Show, r.Season, r.Episode)), AlreadyWatched);
 
@@ -250,7 +250,7 @@ public class SerializdSyncRunner
 
                 await service.LogEpisodesAsync(show, seasonId.Value, epNums).ConfigureAwait(false);
                 foreach (var n in epNums)
-                    SerializdSyncHistory.Record(userId, show, season, n);
+                    SerializdSyncHistory.Record(userId, account.Email, show, season, n);
             }
             catch (Exception ex)
             {
@@ -260,13 +260,13 @@ public class SerializdSyncRunner
         }
 
         // 2. Dated Diary logs, one per episode, backdated to the real watch date.
-        SyncProgress.SetPhase($"Logging {user.Username}'s episodes to Serializd");
-        SyncProgress.SetTotal(needsLog.Count);
+        SyncProgress.SetPhase(SyncProgress.TrackSerializd, $"Logging {user.Username}'s episodes to Serializd");
+        SyncProgress.SetTotal(SyncProgress.TrackSerializd, needsLog.Count);
         var logged = 0;
         foreach (var r in needsLog)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            SyncProgress.IncrementProcessed();
+            SyncProgress.IncrementProcessed(SyncProgress.TrackSerializd);
             try
             {
                 var seasonId = await service.ResolveSeasonIdAsync(r.Show, r.Season).ConfigureAwait(false);
@@ -274,7 +274,7 @@ public class SerializdSyncRunner
 
                 await service.CreateEpisodeLogAsync(r.Show, seasonId.Value, r.Episode, r.WatchedAtUtc, r.Rating, isRewatch: false)
                     .ConfigureAwait(false);
-                SerializdSyncHistory.Record(userId, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
+                SerializdSyncHistory.Record(userId, account.Email, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
                 logged++;
 
                 SerializdActivity.Record(new SyncEvent
@@ -345,12 +345,12 @@ public class SerializdSyncRunner
             // Favourite → like only when the account opts in (parity with Letterboxd SyncFavorites).
             var favorite = account.SyncFavorites && (ud?.IsFavorite ?? false);
             if (rating == null && !favorite) continue;                 // nothing to sync
-            if (SerializdSyncHistory.Has(userId, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta)) continue;
+            if (SerializdSyncHistory.Has(userId, account.Email, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta)) continue;
 
             try
             {
                 await service.SetShowMetaAsync(tmdb, rating, favorite).ConfigureAwait(false);
-                SerializdSyncHistory.Record(userId, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta);
+                SerializdSyncHistory.Record(userId, account.Email, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta);
                 _logger.LogInformation("Serializd: set show meta for TMDb {Show} (rating={Rating}, like={Like}) for {Username}",
                     tmdb, rating, favorite, user.Username);
             }

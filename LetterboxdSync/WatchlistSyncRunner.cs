@@ -59,7 +59,7 @@ public class WatchlistSyncRunner
                     .Select(a => (User: u, Account: a)))
                 .ToList();
 
-            SyncProgress.Start("Letterboxd Watchlist", "Starting");
+            SyncProgress.Start(SyncProgress.TrackLetterboxd, "Letterboxd Watchlist", "Starting");
 
             var processed = 0;
             foreach (var (user, account) in pairs)
@@ -72,7 +72,7 @@ public class WatchlistSyncRunner
             }
 
             progress.Report(100);
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
         }
         finally
         {
@@ -136,7 +136,7 @@ public class WatchlistSyncRunner
             }
 
             using var jellyseerr = CreateJellyseerrClient();
-            SyncProgress.Start("Letterboxd Watchlist", "Starting");
+            SyncProgress.Start(SyncProgress.TrackLetterboxd, "Letterboxd Watchlist", "Starting");
 
             var processed = 0;
             foreach (var account in accounts)
@@ -146,7 +146,7 @@ public class WatchlistSyncRunner
                 processed++;
                 progress.Report((double)processed / accounts.Count * 100);
             }
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return true;
         }
         finally
@@ -176,7 +176,7 @@ public class WatchlistSyncRunner
     private async Task SyncOneUserAsync(User user, Account account, SeerrClient? jellyseerr, string source, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting watchlist sync for {Username} (source={Source})", user.Username, source);
-        SyncProgress.SetPhase($"Authenticating {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Authenticating {user.Username}");
 
         ILetterboxdService service;
         try
@@ -195,7 +195,7 @@ public class WatchlistSyncRunner
 
         using var _s = service;
 
-        SyncProgress.SetPhase($"Fetching watchlist for {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Fetching watchlist for {user.Username}");
         List<int> tmdbIds;
         try
         {
@@ -211,7 +211,7 @@ public class WatchlistSyncRunner
             return;
         }
 
-        SyncProgress.SetPhase($"Updating Jellyfin playlist for {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Updating Jellyfin playlist for {user.Username}");
         var allMovies = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Movie },
@@ -273,7 +273,7 @@ public class WatchlistSyncRunner
             var primary = Config.GetPrimaryAccountForUser(account.UserJellyfinId);
             if (ReferenceEquals(primary, account))
             {
-                SyncProgress.SetPhase($"Mirroring Seerr watchlist for {user.Username}");
+                SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Mirroring Seerr watchlist for {user.Username}");
                 await MirrorJellyseerrWatchlistAsync(jellyseerr!, jellyseerrUserId.Value, tmdbIds, user.Username!, cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -294,7 +294,7 @@ public class WatchlistSyncRunner
                 ? tmdbIds
                 : tmdbIds.Where(id => !matchedTmdbIds.Contains(id)).ToList();
 
-            SyncProgress.SetPhase($"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr for {user.Username}");
+            SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr for {user.Username}");
             if (requestIds.Count == 0) return;
 
             var requested = 0;

@@ -215,7 +215,7 @@ public class LetterboxdScraper
 
             _logger.LogInformation("Films page {Page} for {Username}: found {Count} posters, resolving TMDb IDs...",
                 page, username, posterCount);
-            SyncProgress.SetPhase($"Scanning page {page}");
+            SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Scanning page {page}");
 
             if (containers != null)
             {
@@ -401,12 +401,12 @@ public class LetterboxdScraper
         var cached = TmdbCache.Get(slug);
         if (cached.HasValue)
         {
-            SyncProgress.IncrementCacheHit();
-            SyncProgress.IncrementProcessed();
+            SyncProgress.IncrementCacheHit(SyncProgress.TrackLetterboxd);
+            SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
             return cached.Value;
         }
 
-        SyncProgress.IncrementNewLookup();
+        SyncProgress.IncrementNewLookup(SyncProgress.TrackLetterboxd);
 
         await Task.Delay(2000 + Random.Shared.Next(1000)).ConfigureAwait(false);
 
@@ -424,11 +424,11 @@ public class LetterboxdScraper
         if (!string.IsNullOrEmpty(tmdbStr) && int.TryParse(tmdbStr, out var id))
         {
             TmdbCache.Set(slug, id);
-            SyncProgress.IncrementProcessed();
+            SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
             return id;
         }
 
-        SyncProgress.IncrementProcessed();
+        SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
         return null;
     }
 }

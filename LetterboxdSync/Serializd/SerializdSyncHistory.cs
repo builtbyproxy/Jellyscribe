@@ -6,13 +6,16 @@ using Microsoft.Extensions.Logging;
 namespace LetterboxdSync.Serializd;
 
 /// <summary>
-/// Records which (Jellyfin user, TMDb show, season, episode) tuples have already been
-/// logged to Serializd, so the scheduled catch-up doesn't re-log the same episode every
-/// run. Deliberately separate from the Letterboxd <see cref="SyncHistory"/> (which is
+/// Records which (Jellyfin user, Serializd account, TMDb show, season, episode) tuples have
+/// already been logged to Serializd, so the scheduled catch-up doesn't re-log the same episode
+/// every run. Deliberately separate from the Letterboxd <see cref="SyncHistory"/> (which is
 /// film-centric) and far simpler: an append-only JSONL of keys plus an in-memory set.
 ///
-/// Both the real-time playback path and the scheduled runner record here after a
-/// successful log, keyed by the Jellyfin user id (stable across Serializd account changes).
+/// Both the real-time playback path and the scheduled runner record here after a successful
+/// log, keyed by the Jellyfin user id plus the Serializd account's email: without the account
+/// component, a second linked Serializd account for the same Jellyfin user would read the first
+/// account's history as its own and silently never receive episodes the first account already
+/// logged.
 /// </summary>
 public static class SerializdSyncHistory
 {
@@ -60,11 +63,11 @@ public static class SerializdSyncHistory
     /// <summary>Show-level rating/like sync (one per show; season+episode are 0 sentinels).</summary>
     public const string KindShowMeta = "showmeta";
 
-    private static string Key(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind)
+    private static string Key(string userJellyfinId, string accountEmail, int showTmdbId, int seasonNumber, int episodeNumber, string kind)
     {
-        var baseKey = $"{userJellyfinId}|{showTmdbId}|{seasonNumber}|{episodeNumber}";
-        // KindWatched keeps the original suffix-free format for backward compatibility;
-        // other kinds get their own namespace so they're tracked independently.
+        var baseKey = $"{userJellyfinId}|{accountEmail}|{showTmdbId}|{seasonNumber}|{episodeNumber}";
+        // KindWatched keeps the account-scoped-but-otherwise-original format; other kinds get
+        // their own namespace so they're tracked independently.
         return kind == KindWatched ? baseKey : baseKey + "|" + kind;
     }
 
@@ -91,20 +94,20 @@ public static class SerializdSyncHistory
         return _keys;
     }
 
-    public static bool Has(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
+    public static bool Has(string userJellyfinId, string accountEmail, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
     {
         lock (_lock)
         {
-            return Load().Contains(Key(userJellyfinId, showTmdbId, seasonNumber, episodeNumber, kind));
+            return Load().Contains(Key(userJellyfinId, accountEmail, showTmdbId, seasonNumber, episodeNumber, kind));
         }
     }
 
-    public static void Record(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
+    public static void Record(string userJellyfinId, string accountEmail, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
     {
         lock (_lock)
         {
             var keys = Load();
-            var key = Key(userJellyfinId, showTmdbId, seasonNumber, episodeNumber, kind);
+            var key = Key(userJellyfinId, accountEmail, showTmdbId, seasonNumber, episodeNumber, kind);
             if (!keys.Add(key)) return; // already recorded
 
             try

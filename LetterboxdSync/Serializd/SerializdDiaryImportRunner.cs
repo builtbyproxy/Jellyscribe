@@ -120,7 +120,7 @@ public class SerializdDiaryImportRunner
             // play date, so an imported episode won't be re-logged straight back to Serializd.
             ud.Played = true;
             _userDataManager.SaveUserData(user, ep, ud, MediaBrowser.Model.Entities.UserDataSaveReason.Import, cancellationToken);
-            SerializdSyncHistory.Record(userId, d.ShowTmdbId, d.SeasonNumber, d.EpisodeNumber, KindImported);
+            SerializdSyncHistory.Record(userId, account.Email, d.ShowTmdbId, d.SeasonNumber, d.EpisodeNumber, KindImported);
             marked++;
         }
 

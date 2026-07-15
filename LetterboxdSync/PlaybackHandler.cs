@@ -221,7 +221,7 @@ public class PlaybackHandler : IHostedService, IDisposable
                     await service.LogEpisodesAsync(epRef.ShowTmdbId, seasonId.Value, epRef.EpisodeNumbers)
                         .ConfigureAwait(false);
                     foreach (var n in epRef.EpisodeNumbers)
-                        SerializdSyncHistory.Record(userId, epRef.ShowTmdbId, epRef.SeasonNumber, n);
+                        SerializdSyncHistory.Record(userId, account.Email, epRef.ShowTmdbId, epRef.SeasonNumber, n);
 
                     // 2. Create a dated Diary log per episode, stamped now (the watch just
                     // finished), carrying the episode's Jellyfin rating if it has one. A second
@@ -230,12 +230,12 @@ public class PlaybackHandler : IHostedService, IDisposable
                     foreach (var n in epRef.EpisodeNumbers)
                     {
                         var isRewatch = SerializdSyncHistory.Has(
-                            userId, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
+                            userId, account.Email, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
                         await service.CreateEpisodeLogAsync(
                             epRef.ShowTmdbId, seasonId.Value, n, DateTime.UtcNow, rating, isRewatch)
                             .ConfigureAwait(false);
                         SerializdSyncHistory.Record(
-                            userId, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
+                            userId, account.Email, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
 
                         SerializdActivity.Record(new SyncEvent
                         {

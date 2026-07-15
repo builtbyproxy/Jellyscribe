@@ -104,10 +104,11 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
   const logLines = JSON.stringify((p.log_lines as unknown[]).slice(0, 5000).map((l) => String(l).slice(0, 2000)));
   const telemetry = p.telemetry != null ? JSON.stringify(p.telemetry) : null;
   const note = typeof p.note === "string" ? p.note.slice(0, 2000) : null;
+  const collector = p.collector != null ? JSON.stringify(p.collector) : null;
 
   await env.DB.prepare(
-    `INSERT INTO log_bundles (ref_code, received_at, instance_id, plugin_version, jellyfin_version, telemetry, note, log_lines)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+    `INSERT INTO log_bundles (ref_code, received_at, instance_id, plugin_version, jellyfin_version, telemetry, note, collector, log_lines)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
   ).bind(
     code,
     new Date().toISOString().slice(0, 19) + "Z",
@@ -116,6 +117,7 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
     typeof p.jellyfin_version === "string" ? p.jellyfin_version : "unknown",
     telemetry,
     note,
+    collector,
     logLines,
   ).run();
 

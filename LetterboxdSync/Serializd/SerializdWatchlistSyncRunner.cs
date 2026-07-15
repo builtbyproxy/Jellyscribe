@@ -13,7 +13,6 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
 using MediaBrowser.Model.Entities;
-using MediaBrowser.Model.Playlists;
 using Microsoft.Extensions.Logging;
 
 namespace LetterboxdSync.Serializd;
@@ -62,15 +61,15 @@ public class SerializdWatchlistSyncRunner
                 .Select(a => (User: u, Account: a)))
             .ToList();
 
-        SyncProgress.Start("Serializd watchlist sync", "Starting");
-        SyncProgress.SetTotal(pairs.Count);
+        SyncProgress.Start(SyncProgress.TrackSerializd, "Serializd watchlist sync", "Starting");
+        SyncProgress.SetTotal(SyncProgress.TrackSerializd, pairs.Count);
         try
         {
             var processed = 0;
             foreach (var (user, account) in pairs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                SyncProgress.SetPhase($"Syncing {user.Username}'s watchlist");
+                SyncProgress.SetPhase(SyncProgress.TrackSerializd, $"Syncing {user.Username}'s watchlist");
                 try
                 {
                     await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
@@ -82,7 +81,7 @@ public class SerializdWatchlistSyncRunner
                 }
 
                 processed++;
-                SyncProgress.IncrementProcessed();
+                SyncProgress.IncrementProcessed(SyncProgress.TrackSerializd);
                 if (pairs.Count > 0)
                     progress.Report((double)processed / pairs.Count * 100);
             }
@@ -91,7 +90,7 @@ public class SerializdWatchlistSyncRunner
         }
         finally
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackSerializd);
         }
     }
 
@@ -103,8 +102,8 @@ public class SerializdWatchlistSyncRunner
         var accounts = Config.GetEnabledSerializdAccountsForUser(userJellyfinId).Where(a => a.SyncWatchlist).ToList();
         if (accounts.Count == 0) return false;
 
-        SyncProgress.Start("Serializd watchlist sync", $"Syncing {user.Username}'s watchlist");
-        SyncProgress.SetTotal(accounts.Count);
+        SyncProgress.Start(SyncProgress.TrackSerializd, "Serializd watchlist sync", $"Syncing {user.Username}'s watchlist");
+        SyncProgress.SetTotal(SyncProgress.TrackSerializd, accounts.Count);
         try
         {
             foreach (var account in accounts)
@@ -120,14 +119,14 @@ public class SerializdWatchlistSyncRunner
                         user.Username, account.Email, ex.Message);
                 }
 
-                SyncProgress.IncrementProcessed();
+                SyncProgress.IncrementProcessed(SyncProgress.TrackSerializd);
             }
 
             return true;
         }
         finally
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackSerializd);
         }
     }
 
@@ -399,45 +398,9 @@ public class SerializdWatchlistSyncRunner
             jellyfinUsername, added, removed, addFailed, removeFailed);
     }
 
-    private async Task ReconcileCollectionAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
-    {
-        var boxSet = _libraryManager.GetItemList(new InternalItemsQuery
-        {
-            IncludeItemTypes = new[] { BaseItemKind.BoxSet },
-            Recursive = true,
-        }).FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.Ordinal));
-
-        if (boxSet == null)
-        {
-            if (desired.Count == 0) return;
-            await _collectionManager.CreateCollectionAsync(new CollectionCreationOptions
-            {
-                Name = name,
-                ItemIdList = desired.Select(g => g.ToString("N")).ToList(),
-                UserIds = new[] { user.Id },
-            }).ConfigureAwait(false);
-            _logger.LogInformation("Created '{Name}' collection with {Count} shows for {Username}", name, desired.Count, user.Username);
-            return;
-        }
-
-        var members = ((Folder)boxSet).LinkedChildren
-            .Where(lc => lc.ItemId.HasValue).Select(lc => lc.ItemId!.Value).ToHashSet();
-
-        var toAdd = desired.Where(id => !members.Contains(id)).ToList();
-        if (toAdd.Count > 0)
-            await _collectionManager.AddToCollectionAsync(boxSet.Id, toAdd).ConfigureAwait(false);
-
-        // sourceWasEmpty signals the caller's own upstream fetch came back empty (a blocked
-        // API call), not that the user genuinely emptied their watchlist; skip removal so a
-        // transient failure can't wipe an existing collection. Mirrors ReconcilePlaylistAsync.
-        var toRemove = (sourceWasEmpty && members.Count > 0)
-            ? new List<Guid>()
-            : members.Where(id => !desired.Contains(id)).ToList();
-        if (toRemove.Count > 0)
-            await _collectionManager.RemoveFromCollectionAsync(boxSet.Id, toRemove).ConfigureAwait(false);
-
-        _logger.LogInformation("'{Name}' collection for {Username}: +{Added} / -{Removed}", name, user.Username, toAdd.Count, toRemove.Count);
-    }
+    private Task ReconcileCollectionAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
+        => PlaylistReconciler.ReconcileCollectionAsync(
+            _collectionManager, _libraryManager, _logger, user, name, desired, sourceWasEmpty);
 
     private Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
         => PlaylistReconciler.ReconcileAsync(

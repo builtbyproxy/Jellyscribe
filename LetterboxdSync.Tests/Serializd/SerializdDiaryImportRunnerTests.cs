@@ -121,7 +121,7 @@ public class SerializdDiaryImportRunnerTests : IDisposable
         // the imported episode straight back to Serializd.
         Assert.Null(ud.LastPlayedDate);
         _userDataManager.Received(1).SaveUserData(user, ep, ud, UserDataSaveReason.Import, Arg.Any<CancellationToken>());
-        Assert.True(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 3, SerializdDiaryImportRunner.KindImported));
+        Assert.True(SerializdSyncHistory.Has(idHex, "user@example.com", ShowTmdbId, 1, 3, SerializdDiaryImportRunner.KindImported));
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public class SerializdDiaryImportRunnerTests : IDisposable
 
         _userDataManager.DidNotReceive().SaveUserData(
             Arg.Any<User>(), Arg.Any<BaseItem>(), Arg.Any<UserItemData>(), Arg.Any<UserDataSaveReason>(), Arg.Any<CancellationToken>());
-        Assert.False(SerializdSyncHistory.Has(idHex, ShowTmdbId, 1, 3, SerializdDiaryImportRunner.KindImported));
+        Assert.False(SerializdSyncHistory.Has(idHex, "user@example.com", ShowTmdbId, 1, 3, SerializdDiaryImportRunner.KindImported));
     }
 
     [Fact]

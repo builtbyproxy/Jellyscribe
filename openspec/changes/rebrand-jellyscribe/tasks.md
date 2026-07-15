@@ -95,9 +95,9 @@ separately, and no domain/DNS change ships until 0.1/0.2 are verified.
       references updated, both now note the namespace/project-folder stay
       `LetterboxdSync` while `AssemblyName` and user-visible surfaces say
       Jellyscribe. `deploy.sh` dll reference in CLAUDE.md fixed too.
-- [ ] 4.3 Private repo: `letterboxd-telemetry/AGENTS.md` and
-      `AGENT_WORKFLOW.md` mental-model references to the old name. Not done
-      in this session, separate repo, separate session.
+- [ ] 4.3 Update mental-model references to the old product name in the
+      private agent-infra docs. Not done in this session, separate repo,
+      separate session.
 
 ## 5. Infra
 
