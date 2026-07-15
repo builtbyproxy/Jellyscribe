@@ -10,7 +10,7 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
-    version: '1.20.0',
+    version: '2.0.0',
     headline: 'Renamed to Jellyscribe, and TV shows now sync to Serializd',
     summary:
       'Two things land together in this release. First, the plugin is renamed from "Letterboxd Sync" to Jellyscribe: a name and a look that actually cover both services it now talks to, instead of the old identity that borrowed Letterboxd\'s own name and brand colors. Nothing about the rename requires any action, your plugin auto-updates in place, every linked account, sync history entry, and setting carries over untouched, and the repository URL you already have configured does not change. Second, the plugin no longer stops at films: link a Serializd account on the new TV / Serializd tab and TV episodes sync to Serializd automatically, watched status in real time as you finish an episode, with a daily catch-up for anything missed and a Sync TV Now button to run it on demand, each entry dated to when you actually watched it rather than when the sync ran. Star ratings and favorites mirror to Serializd\'s rating and like, and you can post a written review straight from the dashboard, at the show or episode level. Your Serializd watchlist syncs back into Jellyfin too, as a browsable collection and a playable episode queue, with an optional Jellyseerr auto-request for anything still missing from your library. Films still go to Letterboxd exactly as before; the two are completely independent, so a Serializd hiccup never touches your Letterboxd sync. Each Jellyfin user links their own Serializd account (by email or username), and passwords are encrypted at rest the same way Letterboxd credentials are.',
