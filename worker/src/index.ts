@@ -132,9 +132,9 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
 // rebuilt by prefixing GH_RELEASE_BASE onto the validated path, so it can only
 // ever point back into this one repo's releases (no open-redirect).
 const RAW_MANIFEST_URL =
-  "https://raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json";
+  "https://raw.githubusercontent.com/builtbyproxy/Jellyscribe/main/manifest.json";
 const GH_RELEASE_BASE =
-  "https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/download/";
+  "https://github.com/builtbyproxy/Jellyscribe/releases/download/";
 // Release paths only ever contain tag/file segments like "v1.18.4/jellyfin-plugin-letterboxd-v1.18.4.zip".
 const SAFE_DL_PATH = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 
