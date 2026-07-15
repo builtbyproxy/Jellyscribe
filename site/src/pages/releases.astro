@@ -100,7 +100,9 @@ const categoryOrder: CategoryDef[] = [
               {notes ? (
                 <>
                   <h2 class="release-headline">{notes.headline}</h2>
-                  {notes.summary && <p class="release-summary">{notes.summary}</p>}
+                  {notes.summary && notes.summary.split('\n\n').map((para) => (
+                    <p class="release-summary">{para}</p>
+                  ))}
                   {categoryOrder.map(({ key, label }) => {
                     const items = notes.highlights[key];
                     if (!items || items.length === 0) return null;
