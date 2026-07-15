@@ -1,12 +1,12 @@
 # [Jellyscribe](https://jellyscribe.dev/)
 
-[![CI](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/ci.yml/badge.svg)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/ci.yml)
-[![Release](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/release.yml/badge.svg)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/release.yml)
-[![codecov](https://codecov.io/gh/builtbyproxy/jellyfin-plugin-letterboxd/branch/main/graph/badge.svg)](https://codecov.io/gh/builtbyproxy/jellyfin-plugin-letterboxd)
-[![GitHub release](https://img.shields.io/github/v/release/builtbyproxy/jellyfin-plugin-letterboxd)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases/latest)
+[![CI](https://github.com/builtbyproxy/Jellyscribe/actions/workflows/ci.yml/badge.svg)](https://github.com/builtbyproxy/Jellyscribe/actions/workflows/ci.yml)
+[![Release](https://github.com/builtbyproxy/Jellyscribe/actions/workflows/release.yml/badge.svg)](https://github.com/builtbyproxy/Jellyscribe/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/builtbyproxy/Jellyscribe/branch/main/graph/badge.svg)](https://codecov.io/gh/builtbyproxy/Jellyscribe)
+[![GitHub release](https://img.shields.io/github/v/release/builtbyproxy/Jellyscribe)](https://github.com/builtbyproxy/Jellyscribe/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Downloads](https://img.shields.io/github/downloads/builtbyproxy/jellyfin-plugin-letterboxd/total)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases)
-[![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/builtbyproxy/jellyfin-plugin-letterboxd)
+[![Downloads](https://img.shields.io/github/downloads/builtbyproxy/Jellyscribe/total)](https://github.com/builtbyproxy/Jellyscribe/releases)
+[![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/builtbyproxy/Jellyscribe)
 
 > **Formerly LetterboxdSync.** Renamed to Jellyscribe now that it syncs TV shows (via Serializd) alongside films (via Letterboxd), not just Letterboxd. Existing installs update in place automatically, no action needed.
 
@@ -77,7 +77,7 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 ### Manual install
 
 1. Install the **File Transformation** plugin first (see [iamparadox27/Jellyfin.Plugin.FileTransformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation/releases)), required for the sidebar link to appear
-2. Download the latest Jellyscribe ZIP from [Releases](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases)
+2. Download the latest Jellyscribe ZIP from [Releases](https://github.com/builtbyproxy/Jellyscribe/releases)
 3. Extract `Jellyscribe.dll` and `HtmlAgilityPack.dll` to your Jellyfin plugins directory
 4. Restart Jellyfin
 
@@ -194,8 +194,8 @@ Unlike the anonymous telemetry above, **logs are not anonymous**, they can conta
 ## Building from source
 
 ```bash
-git clone https://github.com/builtbyproxy/jellyfin-plugin-letterboxd.git
-cd jellyfin-plugin-letterboxd
+git clone https://github.com/builtbyproxy/Jellyscribe.git
+cd Jellyscribe
 dotnet build -c Release
 ```
 
