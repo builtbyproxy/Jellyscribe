@@ -49,6 +49,9 @@ public class PlaybackHandlerEarlyExitTests : IDisposable
             .Returns(_ => new PluginConfiguration());
         new Plugin(paths, xml);
 
+        SyncHistory.DataPathOverride = Path.Combine(_tempDir, "sync-history.jsonl");
+        SyncHistory.ResetForTesting();
+
         _sessionManager = Substitute.For<ISessionManager>();
         _userDataManager = Substitute.For<IUserDataManager>();
         _handler = new PlaybackHandler(_sessionManager, _userDataManager,
@@ -58,6 +61,8 @@ public class PlaybackHandlerEarlyExitTests : IDisposable
     public void Dispose()
     {
         LetterboxdServiceFactory.OverrideForTesting = null;
+        SyncHistory.DataPathOverride = null;
+        SyncHistory.ResetForTesting();
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
     }
 
@@ -262,10 +267,17 @@ public class PlaybackHandlerEarlyExitTests : IDisposable
             Users = new List<User> { user }
         });
 
-        // Duplicate path returns before MarkAsWatchedAsync, so it's never called.
+        // Duplicate path returns before MarkAsWatchedAsync, so it's never called...
         await service.DidNotReceive().MarkAsWatchedAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
             Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>());
+
+        // ...but the skip itself is recorded, so BuildSyncQueue can still see this film was
+        // attempted (a silently-dropped duplicate would look identical to "never tried").
+        var recorded = SyncHistory.GetRecent(count: 10, username: "lachlan");
+        var skipEvent = Assert.Single(recorded);
+        Assert.Equal(SyncStatus.Skipped, skipEvent.Status);
+        Assert.Equal(1233413, skipEvent.TmdbId);
     }
 
     [Fact]
