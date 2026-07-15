@@ -88,4 +88,25 @@ public class SerializdSyncHistoryTests : IDisposable
         SerializdSyncHistory.Record("user1", Acct2, 77236, 1, 1);
         Assert.True(SerializdSyncHistory.Has("user1", Acct2, 77236, 1, 1));
     }
+
+    [Fact]
+    public void Has_FallsBackToPreAccountScopingKey_SoUpgradeDoesNotReLogEverything()
+    {
+        // Real-world regression: a server that already ran a pre-account-scoping build has
+        // history written as "user|show|season|episode" (no account). Deploying the
+        // account-scoped format must not make every already-synced episode look unsynced,
+        // or the next catch-up run duplicate-logs the entire back catalog.
+        File.WriteAllText(_file, "user1|77236|1|7\n");
+        SerializdSyncHistory.ResetForTesting();
+
+        Assert.True(SerializdSyncHistory.Has("user1", Acct1, 77236, 1, 7));
+
+        // A fresh episode with no history at all is still correctly reported as new.
+        Assert.False(SerializdSyncHistory.Has("user1", Acct1, 77236, 1, 8));
+
+        // Recording that fresh episode writes the new account-scoped format, not the legacy one.
+        SerializdSyncHistory.Record("user1", Acct1, 77236, 1, 8);
+        var lines = File.ReadAllLines(_file);
+        Assert.Contains("user1|" + Acct1 + "|77236|1|8", lines);
+    }
 }

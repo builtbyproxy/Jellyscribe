@@ -71,6 +71,20 @@ public static class SerializdSyncHistory
         return kind == KindWatched ? baseKey : baseKey + "|" + kind;
     }
 
+    /// <summary>
+    /// The pre-account-scoping key shape (no account component), read-only fallback for
+    /// <see cref="Has"/>. History files written before the account-scoping fix predate any
+    /// concept of "which account", so falling back to this shared key on a lookup miss is what
+    /// stops every already-synced episode from looking unsynced and getting duplicate-logged the
+    /// first time a pre-fix deployment upgrades. Never written by <see cref="Record"/>: all new
+    /// history is account-scoped from here on.
+    /// </summary>
+    private static string LegacyKey(string userJellyfinId, int showTmdbId, int seasonNumber, int episodeNumber, string kind)
+    {
+        var baseKey = $"{userJellyfinId}|{showTmdbId}|{seasonNumber}|{episodeNumber}";
+        return kind == KindWatched ? baseKey : baseKey + "|" + kind;
+    }
+
     private static HashSet<string> Load()
     {
         if (_keys != null) return _keys;
@@ -98,7 +112,9 @@ public static class SerializdSyncHistory
     {
         lock (_lock)
         {
-            return Load().Contains(Key(userJellyfinId, accountEmail, showTmdbId, seasonNumber, episodeNumber, kind));
+            var keys = Load();
+            return keys.Contains(Key(userJellyfinId, accountEmail, showTmdbId, seasonNumber, episodeNumber, kind))
+                || keys.Contains(LegacyKey(userJellyfinId, showTmdbId, seasonNumber, episodeNumber, kind));
         }
     }
 
