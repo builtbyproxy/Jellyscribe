@@ -918,8 +918,14 @@
                                     function () { st.innerHTML = '<span class="ws-red">Connection failed.</span>'; });
                         },
                         loadLogs: function () {
+                            document.getElementById('logsOutput').textContent = 'Loading…';
                             ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Logs', { maxLines: 400 }), type: 'GET' })
-                                .then(function (r) { r.text().then(function (t) { document.getElementById('logsOutput').textContent = t || 'No recent log lines.'; }); })
+                                .then(function (r) { r.json().then(function (d) {
+                                    var lines = d.lines || [];
+                                    document.getElementById('logsOutput').textContent = lines.length
+                                        ? lines.join('\n')
+                                        : (d.error ? 'Error: ' + d.error : 'No recent log lines.');
+                                }); })
                                 .catch(function () { document.getElementById('logsOutput').textContent = 'Could not load logs.'; });
                         },
                         sendLogs: function () {
