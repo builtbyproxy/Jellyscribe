@@ -39,6 +39,19 @@ const infraCards = [
 ---
 
 <Layout title="Jellyscribe for Jellyfin" description="Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep, Letterboxd for film, Serializd for TV.">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Jellyscribe',
+    description: 'Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep, Letterboxd for film, Serializd for TV.',
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Jellyfin 10.11+',
+    url: 'https://jellyscribe.dev/',
+    downloadUrl: releasesUrl,
+    softwareVersion: latestRelease.version,
+    author: { '@type': 'Person', name: 'Lachlan Young' },
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  })} />
   <header class="site-header">
     <div class="container nav">
       <div class="brand-group">
