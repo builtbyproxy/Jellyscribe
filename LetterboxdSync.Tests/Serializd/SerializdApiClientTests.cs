@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -263,5 +264,368 @@ public class SerializdApiClientTests
 
         Assert.Equal(2, logins);      // initial + re-auth after 401
         Assert.Equal(2, addAttempts); // failed once, retried once
+    }
+
+    // ----- Failure paths -----
+
+    [Fact]
+    public async Task Login_ResponseMissingToken_Throws()
+    {
+        var handler = new ApiMockHandler(_ => Json(HttpStatusCode.OK, "{\"username\":\"u\"}"));
+
+        using var client = new SerializdApiClient(Log, handler);
+        var ex = await Assert.ThrowsAsync<Exception>(() => client.AuthenticateAsync("me@example.com", "pw"));
+        Assert.Contains("no token", ex.Message);
+    }
+
+    [Fact]
+    public async Task VerifyLogin_GoodCredentials_ReturnsUsername_BypassesTokenCache()
+    {
+        int logins = 0;
+        var handler = new ApiMockHandler(req =>
+        {
+            logins++;
+            return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"tok\"}");
+        });
+
+        using var c1 = new SerializdApiClient(Log, handler);
+        await c1.AuthenticateAsync("verify@example.com", "pw"); // caches a token
+
+        using var c2 = new SerializdApiClient(Log, handler);
+        var username = await c2.VerifyLoginAsync("verify@example.com", "pw");
+
+        Assert.Equal("8bitproxy", username);
+        Assert.Equal(2, logins); // Verify always hits /login, ignoring the cached token from c1
+    }
+
+    [Fact]
+    public async Task ResolveSeasonId_NonSuccessStatus_Throws()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.InternalServerError, "{\"message\":\"boom\"}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        // 500s exhaust the built-in retry (fast: SerializdApiConstants backoff is short in tests
+        // only in that it's bounded, not mocked away), then the failure surfaces as an exception.
+        var ex = await Assert.ThrowsAsync<Exception>(() => client.ResolveSeasonIdAsync(1396, 1));
+        Assert.Contains("get-show", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateEpisodeLog_NonSuccessStatus_Throws()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.BadRequest, "{\"message\":\"nope\"}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var ex = await Assert.ThrowsAsync<Exception>(() =>
+            client.CreateEpisodeLogAsync(1396, 3572, 1, DateTime.UtcNow, rating: null, isRewatch: false));
+        Assert.Contains("/show/reviews/add", ex.Message);
+    }
+
+    [Fact]
+    public async Task LogEpisodes_NonSuccessStatus_Throws()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.BadRequest, "{\"message\":\"nope\"}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var ex = await Assert.ThrowsAsync<Exception>(() => client.LogEpisodesAsync(1396, 3572, new[] { 1 }));
+        Assert.Contains("/episode_log/add", ex.Message);
+    }
+
+    [Fact]
+    public async Task SetShowMeta_NonSuccessStatus_Throws()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.BadRequest, "{\"message\":\"nope\"}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var ex = await Assert.ThrowsAsync<Exception>(() => client.SetShowMetaAsync(1396, rating: 5, like: false));
+        Assert.Contains("show-meta", ex.Message);
+    }
+
+    // ----- Reviews -----
+
+    [Fact]
+    public async Task CreateShowReview_WithText_IsLogTrue()
+    {
+        string body = string.Empty;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            body = ReadBody(req);
+            return Json(HttpStatusCode.OK, "{\"id\":1,\"reviewText\":\"\"}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.CreateShowReviewAsync(1396, rating: 8, reviewText: "great show", containsSpoiler: true);
+
+        Assert.Contains("\"is_log\":true", body);
+        Assert.Contains("\"review_text\":\"great show\"", body);
+        Assert.Contains("\"contains_spoiler\":true", body);
+        Assert.Contains("\"season_id\":null", body);
+    }
+
+    [Fact]
+    public async Task CreateShowReview_RatingOnly_IsLogFalse()
+    {
+        string body = string.Empty;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            body = ReadBody(req);
+            return Json(HttpStatusCode.OK, "{\"id\":1}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.CreateShowReviewAsync(1396, rating: 6, reviewText: null, containsSpoiler: false);
+
+        Assert.Contains("\"is_log\":false", body);
+        Assert.Contains("\"rating\":6", body);
+    }
+
+    [Fact]
+    public async Task CreateShowReview_NonSuccessStatus_Throws()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.BadRequest, "{\"message\":\"nope\"}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var ex = await Assert.ThrowsAsync<Exception>(() =>
+            client.CreateShowReviewAsync(1396, rating: 5, reviewText: null, containsSpoiler: false));
+        Assert.Contains("Serializd review", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateEpisodeReview_ResolvesSeasonId_PostsScopedPayload()
+    {
+        string body = string.Empty;
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            if (path.Contains("/show/1396"))
+                return Json(HttpStatusCode.OK, ShowJson);
+            body = ReadBody(req);
+            return Json(HttpStatusCode.OK, "{\"id\":1}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.CreateEpisodeReviewAsync(1396, seasonNumber: 1, episodeNumber: 4, rating: 9, reviewText: "good ep", containsSpoiler: false);
+
+        Assert.Contains("\"season_id\":3572", body);
+        Assert.Contains("\"episode_number\":4", body);
+        Assert.Contains("\"is_log\":true", body);
+    }
+
+    [Fact]
+    public async Task CreateEpisodeReview_UnknownSeason_Throws()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            if (path.Contains("/show/1396"))
+                return Json(HttpStatusCode.OK, ShowJson);
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var ex = await Assert.ThrowsAsync<Exception>(() =>
+            client.CreateEpisodeReviewAsync(1396, seasonNumber: 99, episodeNumber: 1, rating: 5, reviewText: null, containsSpoiler: false));
+        Assert.Contains("no season", ex.Message);
+    }
+
+    // ----- Diary -----
+
+    [Fact]
+    public async Task GetDiaryEpisodes_ParsesAndDedupsEntries()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath + req.RequestUri.Query;
+            if (path.Contains("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/diary?page=1"))
+                return Json(HttpStatusCode.OK,
+                    "{\"totalPages\":1,\"reviews\":[" +
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":4,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}," +
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":4,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}," +
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":5,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}]}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var diary = await client.GetDiaryEpisodesAsync();
+
+        Assert.Equal(2, diary.Count); // the repeated (1396,1,4) entry is deduped
+        Assert.Contains(diary, d => d.ShowTmdbId == 1396 && d.SeasonNumber == 1 && d.EpisodeNumber == 4);
+        Assert.Contains(diary, d => d.ShowTmdbId == 1396 && d.SeasonNumber == 1 && d.EpisodeNumber == 5);
+    }
+
+    [Fact]
+    public async Task GetDiaryEpisodes_PaginatesUntilLastPage()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath + req.RequestUri.Query;
+            if (path.Contains("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/diary?page=1"))
+                return Json(HttpStatusCode.OK,
+                    "{\"totalPages\":2,\"reviews\":[{\"showId\":1,\"seasonId\":10,\"episodeNumber\":1,\"showSeasons\":[{\"id\":10,\"seasonNumber\":1}]}]}");
+            if (path.Contains("/diary?page=2"))
+                return Json(HttpStatusCode.OK,
+                    "{\"totalPages\":2,\"reviews\":[{\"showId\":2,\"seasonId\":20,\"episodeNumber\":1,\"showSeasons\":[{\"id\":20,\"seasonNumber\":1}]}]}");
+            return Json(HttpStatusCode.OK, "{\"reviews\":[]}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var diary = await client.GetDiaryEpisodesAsync();
+
+        Assert.Equal(2, diary.Count);
+        Assert.Contains(diary, d => d.ShowTmdbId == 1);
+        Assert.Contains(diary, d => d.ShowTmdbId == 2);
+    }
+
+    [Fact]
+    public async Task GetDiaryEpisodes_UsernameUnresolvable_Throws()
+    {
+        // Login response omits "username", and /validateauthtoken also fails to resolve
+        // one, so EnsureUsernameAsync leaves _username empty.
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"token\":\"t\"}");
+            if (path.EndsWith("/validateauthtoken"))
+                return Json(HttpStatusCode.Unauthorized, "{}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var ex = await Assert.ThrowsAsync<Exception>(() => client.GetDiaryEpisodesAsync());
+        Assert.Contains("username unknown", ex.Message);
+    }
+
+    // ----- Cached-token reuse resolves username via /validateauthtoken -----
+
+    [Fact]
+    public async Task GetWatchlist_ReusedCachedToken_ResolvesUsernameViaValidateAuthToken()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"tok\"}");
+            if (path.EndsWith("/validateauthtoken"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\"}");
+            if (path.Contains("/watchlistpage_v2/"))
+                return Json(HttpStatusCode.OK, "{\"totalPages\":1,\"items\":[]}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        // c1 does the real login (caches the token); c2 reuses the cached token, so its own
+        // _username field starts empty and GetWatchlistAsync must resolve it via /validateauthtoken.
+        using var c1 = new SerializdApiClient(Log, handler);
+        await c1.AuthenticateAsync("cache-reuse@example.com", "pw");
+
+        using var c2 = new SerializdApiClient(Log, handler);
+        await c2.AuthenticateAsync("cache-reuse@example.com", "pw");
+        var entries = await c2.GetWatchlistAsync();
+
+        Assert.Empty(entries);
+    }
+
+    // ----- SendAsync retry behaviour -----
+
+    [Fact]
+    public async Task RateLimited_WaitsRetryAfterThenRetries()
+    {
+        int attempts = 0;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            attempts++;
+            if (attempts == 1)
+            {
+                var resp = new HttpResponseMessage((HttpStatusCode)429) { Content = new StringContent("{}") };
+                resp.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMilliseconds(30));
+                return resp;
+            }
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.SetShowMetaAsync(1396, rating: 5, like: false); // should not throw
+
+        Assert.Equal(2, attempts); // rate-limited once, retried once
+    }
+
+    [Fact]
+    public async Task TransientServerError_RetriesThenSucceeds()
+    {
+        int attempts = 0;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            attempts++;
+            return attempts < 2
+                ? Json(HttpStatusCode.ServiceUnavailable, "{}")
+                : Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.SetShowMetaAsync(1396, rating: 5, like: false); // should not throw after one backoff+retry
+
+        Assert.Equal(2, attempts);
     }
 }

@@ -213,4 +213,216 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
 
         _libraryManager.Received(1).GetItemList(Arg.Any<InternalItemsQuery>());
     }
+
+    // ===== Gate / TryRunForUserAsync =====
+
+    [Fact]
+    public async Task RunForAllAsync_GateAlreadyHeld_SkipsImmediately()
+    {
+        AddUserWithAccount();
+        await SerializdSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        try
+        {
+            await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+            _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
+        }
+        finally
+        {
+            SerializdSyncGate.Instance.Release();
+        }
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_GateAlreadyHeld_ReturnsFalse()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        await SerializdSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        try
+        {
+            var result = await _runner.TryRunForUserAsync(idHex, "test", CancellationToken.None);
+            Assert.False(result);
+        }
+        finally
+        {
+            SerializdSyncGate.Instance.Release();
+        }
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_UnknownUser_ReturnsFalse()
+    {
+        _userManager.GetUsers().Returns(Array.Empty<User>());
+
+        var result = await _runner.TryRunForUserAsync(Guid.NewGuid().ToString("N"), "test", CancellationToken.None);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_NoEnabledAccounts_ReturnsFalse()
+    {
+        var user = new User("lachlan", "test-provider-id", "test-reset-id");
+        _userManager.GetUsers().Returns(new[] { user });
+
+        var result = await _runner.TryRunForUserAsync(user.Id.ToString("N"), "test", CancellationToken.None);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_Success_ReturnsTrue()
+    {
+        var (user, idHex) = AddUserWithAccount();
+        var ep = MakeEpisode(1, 3);
+        LibraryHas(ep);
+        _userDataManager.GetUserData(user, ep).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+        FakeService(out _);
+
+        var result = await _runner.TryRunForUserAsync(idHex, "test", CancellationToken.None);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task Run_OneAccountThrowsDuringAuth_OtherAccountStillSyncs()
+    {
+        var (user, idHex) = AddUserWithAccount(); // "user@example.com"
+        Plugin.Instance!.Configuration.SerializdAccounts.Add(new SerializdAccount
+        {
+            UserJellyfinId = idHex,
+            Email = "second@example.com",
+            Password = "pw",
+            Enabled = true,
+        });
+        var ep = MakeEpisode(1, 3);
+        LibraryHas(ep);
+        _userDataManager.GetUserData(user, ep).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        var goodService = Substitute.For<ISerializdService>();
+        goodService.ResolveSeasonIdAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(ci => 500 + (int)ci[1]);
+        SerializdServiceFactory.OverrideForTesting = (email, _, _) =>
+            email == "user@example.com"
+                ? throw new Exception("Serializd auth failed")
+                : Task.FromResult(goodService);
+
+        // Must not throw: the per-account try/catch in SyncOneAsync's caller isolates failures.
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        await goodService.Received(1).CreateEpisodeLogAsync(
+            ShowTmdbId, Arg.Any<int>(), 3, Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
+    }
+
+    // ===== Date filter =====
+
+    [Fact]
+    public async Task Run_DateFilterEnabled_ExcludesEpisodesOutsideWindow()
+    {
+        var (user, idHex) = AddUserWithAccount();
+        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).EnableDateFilter = true;
+        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).DateFilterDays = 1;
+
+        var recent = MakeEpisode(1, 1);
+        var old = MakeEpisode(1, 2);
+        LibraryHas(recent, old);
+        _userDataManager.GetUserData(user, recent).Returns(MakeUserData(DateTime.UtcNow.AddHours(-1)));
+        _userDataManager.GetUserData(user, old).Returns(MakeUserData(DateTime.UtcNow.AddDays(-30)));
+        var service = FakeService(out var logged);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        Assert.Single(logged);
+        Assert.Equal(1, logged[0].Episode);
+    }
+
+    // ===== SkipPreviouslySynced =====
+
+    [Fact]
+    public async Task Run_SkipPreviouslySyncedFalse_ReSendsAlreadyLoggedEpisode()
+    {
+        var (user, idHex) = AddUserWithAccount();
+        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).SkipPreviouslySynced = false;
+
+        var ep = MakeEpisode(1, 3);
+        LibraryHas(ep);
+        var when = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        _userDataManager.GetUserData(user, ep).Returns(MakeUserData(when));
+        SerializdSyncHistory.Record(idHex, "user@example.com", ShowTmdbId, 1, 3, SerializdSyncHistory.KindLog);
+        SerializdSyncHistory.Record(idHex, "user@example.com", ShowTmdbId, 1, 3, SerializdSyncHistory.KindWatched);
+        FakeService(out var logged);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        Assert.Single(logged); // re-sent despite already being recorded
+    }
+
+    // ===== Season resolution failure =====
+
+    [Fact]
+    public async Task Run_SeasonNotFound_SkipsWithoutThrowing()
+    {
+        var (user, _) = AddUserWithAccount();
+        var ep = MakeEpisode(1, 3);
+        LibraryHas(ep);
+        _userDataManager.GetUserData(user, ep).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        var service = Substitute.For<ISerializdService>();
+        service.ResolveSeasonIdAsync(Arg.Any<int>(), Arg.Any<int>()).Returns((int?)null);
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None); // must not throw
+
+        await service.DidNotReceive().CreateEpisodeLogAsync(
+            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
+    }
+
+    // ===== StopOnFailure =====
+
+    [Fact]
+    public async Task Run_StopOnFailureTrue_StopsAfterFirstLogFailure()
+    {
+        var (user, idHex) = AddUserWithAccount();
+        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).StopOnFailure = true;
+
+        var epA = MakeEpisode(1, 1);
+        var epB = MakeEpisode(1, 2);
+        LibraryHas(epA, epB);
+        _userDataManager.GetUserData(user, epA).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+        _userDataManager.GetUserData(user, epB).Returns(MakeUserData(new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc)));
+
+        var service = Substitute.For<ISerializdService>();
+        service.ResolveSeasonIdAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(ci => 500 + (int)ci[1]);
+        service.CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>())
+            .Returns<Task>(_ => throw new Exception("Serializd 500"));
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None); // must not throw
+
+        await service.Received(1).CreateEpisodeLogAsync(
+            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public async Task Run_StopOnFailureFalse_ContinuesAfterLogFailure()
+    {
+        var (user, _) = AddUserWithAccount(); // StopOnFailure defaults to false
+
+        var epA = MakeEpisode(1, 1);
+        var epB = MakeEpisode(1, 2);
+        LibraryHas(epA, epB);
+        _userDataManager.GetUserData(user, epA).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
+        _userDataManager.GetUserData(user, epB).Returns(MakeUserData(new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc)));
+
+        var service = Substitute.For<ISerializdService>();
+        service.ResolveSeasonIdAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(ci => 500 + (int)ci[1]);
+        service.CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), 1, Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>())
+            .Returns<Task>(_ => throw new Exception("Serializd 500"));
+        service.CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), 2, Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>())
+            .Returns(Task.CompletedTask);
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None); // must not throw
+
+        await service.Received(1).CreateEpisodeLogAsync(
+            Arg.Any<int>(), Arg.Any<int>(), 2, Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
+    }
 }

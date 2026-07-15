@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using LetterboxdSync;
 using LetterboxdSync.Configuration;
+using LetterboxdSync.Serializd;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
@@ -52,6 +53,9 @@ public class ScheduledTaskTests : IDisposable
 
     private WatchlistSyncRunner MakeWatchlistRunner(IUserManager um, ILibraryManager lm, IPlaylistManager pm)
         => new(NullLoggerFactory.Instance, lm, um, pm);
+
+    private SerializdSyncRunner MakeSerializdSyncRunner(IUserManager um, ILibraryManager lm, IUserDataManager udm)
+        => new(NullLoggerFactory.Instance, lm, um, udm);
 
     [Fact]
     public void SyncTask_Metadata()
@@ -135,5 +139,47 @@ public class ScheduledTaskTests : IDisposable
         var task = new WatchlistSyncTask(MakeWatchlistRunner(um, lm, pm));
 
         await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+    }
+
+    [Fact]
+    public void SerializdSyncTask_Metadata()
+    {
+        var um = Substitute.For<IUserManager>();
+        var lm = Substitute.For<ILibraryManager>();
+        var udm = Substitute.For<IUserDataManager>();
+        var task = new SerializdSyncTask(MakeSerializdSyncRunner(um, lm, udm));
+
+        Assert.Equal("Sync watched TV to Serializd", task.Name);
+        Assert.Equal("SerializdSync", task.Key);
+        Assert.Equal("Letterboxd", task.Category);
+        Assert.False(string.IsNullOrEmpty(task.Description));
+    }
+
+    [Fact]
+    public void SerializdSyncTask_DefaultTrigger_IsDaily()
+    {
+        var um = Substitute.For<IUserManager>();
+        var lm = Substitute.For<ILibraryManager>();
+        var udm = Substitute.For<IUserDataManager>();
+        var task = new SerializdSyncTask(MakeSerializdSyncRunner(um, lm, udm));
+
+        var triggers = task.GetDefaultTriggers().ToList();
+
+        Assert.Single(triggers);
+        Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[0].Type);
+        Assert.Equal(TimeSpan.FromDays(1).Ticks, triggers[0].IntervalTicks);
+    }
+
+    [Fact]
+    public async Task SerializdSyncTask_ExecuteAsync_DelegatesToRunner()
+    {
+        var um = Substitute.For<IUserManager>();
+        um.GetUsers().Returns(Array.Empty<Jellyfin.Database.Implementations.Entities.User>());
+        var lm = Substitute.For<ILibraryManager>();
+        var udm = Substitute.For<IUserDataManager>();
+        var task = new SerializdSyncTask(MakeSerializdSyncRunner(um, lm, udm));
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+        // No exception = pass; runner exited cleanly with no users to process.
     }
 }

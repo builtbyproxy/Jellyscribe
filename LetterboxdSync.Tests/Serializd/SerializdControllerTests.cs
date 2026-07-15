@@ -94,6 +94,21 @@ public class SerializdControllerTests : IDisposable
         _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principal } };
     }
 
+    /// <summary>Reads an anonymous-object property off an OkObjectResult / BadRequestObjectResult.</summary>
+    private static T? Prop<T>(ActionResult result, string name)
+    {
+        var value = result switch
+        {
+            OkObjectResult ok => ok.Value,
+            BadRequestObjectResult bad => bad.Value,
+            ObjectResult obj => obj.Value,
+            _ => null
+        };
+        if (value == null) return default;
+        var prop = value.GetType().GetProperty(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        return prop == null ? default : (T?)prop.GetValue(value);
+    }
+
     [Fact]
     public async Task Verify_MissingCredentials_ReturnsBadRequest()
     {
@@ -319,5 +334,264 @@ public class SerializdControllerTests : IDisposable
 
         Assert.IsType<OkObjectResult>(result);
         await goodService.Received(1).CreateShowReviewAsync(1396, 8, null, false);
+    }
+
+    // ----- GetAccounts / PutAccounts -----
+
+    [Fact]
+    public void GetAccounts_NoUserClaim_ReturnsBadRequest()
+    {
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = _controller.GetAccounts();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetAccounts_ReturnsOnlyCallingUsersAccounts_PrimaryFirst()
+    {
+        var (_, idHex) = AddUserWithAccount(email: "secondary@example.com");
+        Plugin.Instance!.Configuration.SerializdAccounts.Add(new SerializdAccount
+        {
+            UserJellyfinId = idHex,
+            Email = "primary@example.com",
+            Password = "pw",
+            Enabled = true,
+            IsPrimary = true,
+        });
+        Plugin.Instance!.Configuration.SerializdAccounts.Add(new SerializdAccount
+        {
+            UserJellyfinId = "someone-else",
+            Email = "not-mine@example.com",
+            Password = "pw",
+            Enabled = true,
+        });
+        Authenticate(idHex);
+
+        var result = _controller.GetAccounts();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var accounts = Prop<System.Collections.IEnumerable>(ok, "accounts")!.Cast<object>().ToList();
+        Assert.Equal(2, accounts.Count);
+        var emails = accounts.Select(a => a.GetType().GetProperty("email")!.GetValue(a)?.ToString()).ToList();
+        Assert.Equal("primary@example.com", emails[0]);
+        Assert.DoesNotContain("not-mine@example.com", emails);
+    }
+
+    [Fact]
+    public void PutAccounts_NoUserClaim_ReturnsBadRequest()
+    {
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest());
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void PutAccounts_NullAccountsList_ReturnsBadRequest()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest { Accounts = null });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void PutAccounts_MissingEmail_ReturnsBadRequestNamingTheRow()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new()
+            {
+                new SerializdController.AccountItem { Email = "ok@example.com" },
+                new SerializdController.AccountItem { Email = "   " },
+            }
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("#2", Prop<string>(result, "error") ?? string.Empty);
+    }
+
+    [Fact]
+    public void PutAccounts_ReplacesCallingUsersAccounts_PreservesOthers()
+    {
+        var (_, idHex) = AddUserWithAccount(email: "old@example.com");
+        Plugin.Instance!.Configuration.SerializdAccounts.Add(new SerializdAccount
+        {
+            UserJellyfinId = "someone-else",
+            Email = "untouched@example.com",
+            Password = "pw",
+            Enabled = true,
+        });
+        Authenticate(idHex);
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new()
+            {
+                new SerializdController.AccountItem { Email = " new@example.com ", Enabled = true, DateFilterDays = 3 },
+            }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        var mine = Plugin.Instance!.Configuration.SerializdAccounts.Where(a => a.UserJellyfinId == idHex).ToList();
+        Assert.Single(mine);
+        Assert.Equal("new@example.com", mine[0].Email); // trimmed
+        Assert.Equal(3, mine[0].DateFilterDays);
+
+        var other = Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == "someone-else");
+        Assert.Equal("untouched@example.com", other.Email);
+    }
+
+    // ----- GetStats / GetHistory -----
+
+    [Fact]
+    public void GetStats_ReturnsAggregateShape()
+    {
+        var (user, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+        SerializdActivity.Record(new SyncEvent
+        {
+            FilmTitle = "Silo · S1E1",
+            TmdbId = 1,
+            Username = user.Username!,
+            Timestamp = DateTime.UtcNow,
+            Status = SyncStatus.Success,
+            Source = "playback",
+        });
+
+        var result = _controller.GetStats();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(1, Prop<int>(ok, "total"));
+        Assert.Equal(1, Prop<int>(ok, "success"));
+    }
+
+    [Fact]
+    public void GetHistory_DefaultPaging_ReturnsRecordedEvents()
+    {
+        var (user, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+        for (var i = 0; i < 3; i++)
+        {
+            SerializdActivity.Record(new SyncEvent
+            {
+                FilmTitle = $"Silo · S1E{i + 1}",
+                TmdbId = 1,
+                Username = user.Username!,
+                Timestamp = DateTime.UtcNow,
+                Status = SyncStatus.Success,
+                Source = "playback",
+            });
+        }
+
+        var result = _controller.GetHistory();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(3, Prop<int>(ok, "total"));
+        var events = Prop<System.Collections.IEnumerable>(ok, "events")!.Cast<object>().ToList();
+        Assert.Equal(3, events.Count);
+    }
+
+    [Fact]
+    public void GetHistory_CountClampedToValidRange()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+
+        // Out-of-range count must not throw; the endpoint clamps it internally.
+        var result = _controller.GetHistory(count: 99999, offset: -5);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    // ----- SyncNow -----
+
+    [Fact]
+    public void SyncNow_GateAlreadyRunning_ReturnsConflict()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+        SerializdSyncGate.Instance.Wait();
+        try
+        {
+            var result = _controller.SyncNow();
+            Assert.IsType<ConflictObjectResult>(result);
+        }
+        finally
+        {
+            SerializdSyncGate.Instance.Release();
+        }
+    }
+
+    [Fact]
+    public void SyncNow_NoEnabledAccounts_ReturnsBadRequest()
+    {
+        var user = new User("lachlan", "test-provider-id", "test-reset-id");
+        var idHex = user.Id.ToString("N");
+        _userManager.GetUsers().Returns(new[] { user });
+        Authenticate(idHex);
+
+        var result = _controller.SyncNow();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task SyncNow_Success_ReturnsAcceptedAndRunsInBackground()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+
+        var result = _controller.SyncNow();
+
+        Assert.IsType<AcceptedResult>(result);
+        Assert.NotNull(_controller.LastBackgroundSync);
+        await _controller.LastBackgroundSync!; // no exception = the background task completed cleanly
+    }
+
+    // ----- SyncWatchlistNow -----
+
+    [Fact]
+    public void SyncWatchlistNow_NoUserClaim_ReturnsBadRequest()
+    {
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = _controller.SyncWatchlistNow();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void SyncWatchlistNow_NoAccountHasWatchlistSyncEnabled_ReturnsBadRequest()
+    {
+        // Enabled account exists, but SyncWatchlist is off (the default).
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+
+        var result = _controller.SyncWatchlistNow();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task SyncWatchlistNow_Success_ReturnsAcceptedAndRunsInBackground()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).SyncWatchlist = true;
+        Authenticate(idHex);
+
+        var result = _controller.SyncWatchlistNow();
+
+        Assert.IsType<AcceptedResult>(result);
+        Assert.NotNull(_controller.LastBackgroundSync);
+        await _controller.LastBackgroundSync!;
     }
 }

@@ -123,7 +123,7 @@ public class SerializdApiClient : ISerializdService
 
         var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
-        _token = doc.RootElement.GetProperty("token").GetString()
+        _token = (doc.RootElement.TryGetProperty("token", out var t) ? t.GetString() : null)
             ?? throw new Exception("Serializd login response had no token");
         Username = doc.RootElement.TryGetProperty("username", out var u) ? u.GetString() : null;
         _username = Username ?? string.Empty;
