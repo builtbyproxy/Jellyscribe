@@ -78,6 +78,8 @@ public class SerializdWatchlistSyncRunner
                 {
                     _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
                         user.Username, account.Email, ex.Message);
+                    // No SyncEvent is recorded on this path; hook telemetry directly.
+                    TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
                 }
 
                 processed++;
@@ -117,6 +119,8 @@ public class SerializdWatchlistSyncRunner
                 {
                     _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
                         user.Username, account.Email, ex.Message);
+                    // No SyncEvent is recorded on this path; hook telemetry directly.
+                    TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
                 }
 
                 SyncProgress.IncrementProcessed(SyncProgress.TrackSerializd);
@@ -272,6 +276,11 @@ public class SerializdWatchlistSyncRunner
             if (requested + existing + failed > 0)
                 _logger.LogInformation("Serializd watchlist Seerr auto-request for {Username} ({Mode}): {Requested} new, {Existing} already on Seerr, {Failed} failed",
                     user.Username, account.BackfillAvailableRequests ? "backfill" : "incomplete-seasons", requested, existing, failed);
+
+            // Seerr failures surface as return values, not SyncEvents; count the
+            // batch once (not per show) so one outage doesn't inflate the error counter.
+            if (failed > 0)
+                TelemetryService.RecordError(TelemetryService.CatJellyseerr);
         }
     }
 

@@ -79,8 +79,12 @@ internal static class TelemetryService
         if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403"))
             return CatCloudflare;
 
+        // "returned 5xx" is Letterboxd's phrasing; Serializd's SerializdApiClient says
+        // "failed (5xx):" instead, same status codes, different wording.
         if (Contains(m, "returned 500") || Contains(m, "returned 502")
-            || Contains(m, "returned 503") || Contains(m, "returned 504"))
+            || Contains(m, "returned 503") || Contains(m, "returned 504")
+            || Contains(m, "(500)") || Contains(m, "(502)")
+            || Contains(m, "(503)") || Contains(m, "(504)"))
             return CatServerError;
 
         if (Contains(m, "not found on Letterboxd") || Contains(m, "TMDb lookup") || Contains(m, "TMDb ID"))
@@ -126,6 +130,45 @@ internal static class TelemetryService
                         // no recovery ping). Must cover every category, including
                         // Jellyseerr and the rate/server/write/parse buckets, or a stuck
                         // failing-state would never clear and never re-fire a transition.
+                        d.StateCloudflare = d.StateAuth = d.StateTmdb = d.StateJellyseerr =
+                            d.StateRateLimit = d.StateServerError = d.StateWriteFailure =
+                            d.StateParse = d.StateOther = false;
+                        break;
+                    case SyncStatus.Skipped:
+                        d.WindowSkipped++;
+                        break;
+                    case SyncStatus.Failed:
+                        RecordErrorLocked(d, Classify(e.Error));
+                        break;
+                }
+                SaveIfDueLocked();
+            }
+        }
+        catch { /* telemetry must never break a sync */ }
+    }
+
+    /// <summary>
+    /// TV counterpart of <see cref="OnSyncEvent"/>, called from SerializdActivity.Record.
+    /// The two diaries are fully independent (separate gates, separate history), so this
+    /// bumps the TV-specific window/lifetime counters instead of the film ones, but shares
+    /// the same error classification and rising-edge transition-ping machinery: a Serializd
+    /// outage is exactly as reportable as a Letterboxd one, and the ingest Worker's fixed
+    /// error-category list has no room for a parallel TV set anyway.
+    /// </summary>
+    public static void OnTvSyncEvent(SyncEvent e)
+    {
+        try
+        {
+            if (!Enabled) return;
+            lock (_lock)
+            {
+                var d = Data!;
+                switch (e.Status)
+                {
+                    case SyncStatus.Success:
+                    case SyncStatus.Rewatch:
+                        d.WindowTvSyncs++;
+                        d.LifetimeTvSyncs++;
                         d.StateCloudflare = d.StateAuth = d.StateTmdb = d.StateJellyseerr =
                             d.StateRateLimit = d.StateServerError = d.StateWriteFailure =
                             d.StateParse = d.StateOther = false;
@@ -241,7 +284,7 @@ internal static class TelemetryService
                 {
                     var d = Data!;
                     d.LastWeeklyPingUtc = UtcNow;
-                    d.WindowSyncs = d.WindowSkipped = 0;
+                    d.WindowSyncs = d.WindowTvSyncs = d.WindowSkipped = 0;
                     d.WindowErrCloudflare = d.WindowErrAuth = d.WindowErrTmdb =
                         d.WindowErrJellyseerr = d.WindowErrRateLimit = d.WindowErrServerError =
                         d.WindowErrWriteFailure = d.WindowErrParse = d.WindowErrOther = 0;
@@ -281,6 +324,8 @@ internal static class TelemetryService
         var cfg = Plugin.Instance?.Configuration;
         var accounts = cfg?.Accounts ?? new List<Account>();
         var enabled = accounts.Where(a => a.Enabled).ToList();
+        var tvAccounts = cfg?.SerializdAccounts ?? new List<Configuration.SerializdAccount>();
+        var tvEnabled = tvAccounts.Where(a => a.Enabled).ToList();
 
         var payload = new
         {
@@ -302,14 +347,27 @@ internal static class TelemetryService
                 skip_previously_synced = enabled.Any(a => a.SkipPreviouslySynced),
                 stop_on_failure = enabled.Any(a => a.StopOnFailure),
                 raw_cookies = enabled.Any(a => !string.IsNullOrEmpty(a.RawCookies)),
-                jellyseerr_configured = !string.IsNullOrEmpty(cfg?.JellyseerrUrl)
+                jellyseerr_configured = !string.IsNullOrEmpty(cfg?.JellyseerrUrl),
+                tv_configured = tvEnabled.Count > 0,
+                tv_multi_account = tvEnabled.Count > 1,
+                tv_sync_favorites = tvEnabled.Any(a => a.SyncFavorites),
+                tv_date_filter = tvEnabled.Any(a => a.EnableDateFilter),
+                tv_watchlist_sync = tvEnabled.Any(a => a.SyncWatchlist),
+                tv_diary_import = tvEnabled.Any(a => a.EnableDiaryImport),
+                tv_auto_request = tvEnabled.Any(a => a.AutoRequestWatchlist),
+                tv_backfill_requests = tvEnabled.Any(a => a.BackfillAvailableRequests),
+                tv_mirror_jellyseerr = tvEnabled.Any(a => a.MirrorJellyseerrWatchlist),
+                tv_skip_previously_synced = tvEnabled.Any(a => a.SkipPreviouslySynced),
+                tv_stop_on_failure = tvEnabled.Any(a => a.StopOnFailure)
             },
             buckets = new
             {
                 accounts = BucketAccounts(enabled.Count),
                 library = libraryCount.HasValue ? BucketLibrary(libraryCount.Value) : "unknown",
                 syncs_per_week = BucketSyncs(d.WindowSyncs),
-                syncs_ever = BucketSyncs(d.LifetimeSyncs)
+                syncs_ever = BucketSyncs(d.LifetimeSyncs),
+                tv_syncs_per_week = BucketSyncs(d.WindowTvSyncs),
+                tv_syncs_ever = BucketSyncs(d.LifetimeTvSyncs)
             },
             errors = new
             {

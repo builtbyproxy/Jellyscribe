@@ -51,9 +51,15 @@ public class TelemetryData
     /// </summary>
     public int LifetimeSyncs { get; set; }
 
+    /// <summary>Lifetime successful-sync counter for the Serializd (TV) diary, the same
+    /// "installed but never activated" signal as <see cref="LifetimeSyncs"/> but tracked
+    /// separately since the two diaries are fully independent.</summary>
+    public int LifetimeTvSyncs { get; set; }
+
     // Window counters, measured since the last successful weekly ping (never cumulative,
     // so canary rates are per-period by construction). Reset on successful weekly ping.
     public int WindowSyncs { get; set; }
+    public int WindowTvSyncs { get; set; }
     public int WindowSkipped { get; set; }
     public int WindowErrCloudflare { get; set; }
     public int WindowErrAuth { get; set; }

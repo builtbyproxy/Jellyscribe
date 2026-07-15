@@ -12,8 +12,9 @@ namespace LetterboxdSync.Serializd;
 /// <see cref="SyncHistory"/>. Reuses the same <see cref="SyncEvent"/> model and
 /// <see cref="SyncHistory.GetPage(System.Collections.Generic.IEnumerable{SyncEvent}, int, int, string)"/>
 /// paging helper so the dashboard view can be reused verbatim, just pointed at these events.
-/// Kept in a separate JSONL from the Letterboxd feed so neither dashboard shows the other's rows,
-/// and deliberately does NOT feed telemetry (that pipeline is Letterboxd-only for now).
+/// Kept in a separate JSONL from the Letterboxd feed so neither dashboard shows the other's rows.
+/// Also feeds telemetry (see <see cref="Record"/>), the TV counterpart of
+/// <see cref="SyncHistory.Record"/>'s hook.
 /// </summary>
 public static class SerializdActivity
 {
@@ -87,6 +88,10 @@ public static class SerializdActivity
                 _logger?.LogError(ex, "Failed to append Serializd activity to {Path}", DataPath);
             }
         }
+
+        // Telemetry chokepoint, the TV counterpart of SyncHistory.Record's hook. No-op
+        // (and exception-proof) while telemetry is disabled.
+        TelemetryService.OnTvSyncEvent(evt);
     }
 
     public static (int Total, int Success, int Failed, int Skipped, int Rewatches) GetStats(string? username = null)

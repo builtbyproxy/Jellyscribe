@@ -56,8 +56,13 @@ public class TelemetryServiceTests : IDisposable
 
     private static SyncEvent Evt(SyncStatus status, string? error = null) => new()
     {
-        FilmTitle = "Sinners", TmdbId = 1233413, Username = "lachlan",
-        Timestamp = DateTime.UtcNow, Status = status, Error = error, Source = "test"
+        FilmTitle = "Sinners",
+        TmdbId = 1233413,
+        Username = "lachlan",
+        Timestamp = DateTime.UtcNow,
+        Status = status,
+        Error = error,
+        Source = "test"
     };
 
     // ----- Classification -----
@@ -79,23 +84,42 @@ public class TelemetryServiceTests : IDisposable
     [InlineData("Letterboxd API token expired. Will re-authenticate on next sync.", TelemetryService.CatAuth)]
     [InlineData("something exploded", TelemetryService.CatOther)]
     [InlineData(null, TelemetryService.CatOther)]
+    // Serializd's SerializdApiClient phrases failures as "failed (5xx):", not Letterboxd's
+    // "returned 5xx" - same status codes, different wording, both must classify the same way.
+    [InlineData("Serializd login failed (401): Incorrect password.", TelemetryService.CatAuth)]
+    [InlineData("Serializd /episode_log/add failed (500): {\"message\":\"boom\"}", TelemetryService.CatServerError)]
+    [InlineData("Serializd get-show 1396 failed (503): timeout", TelemetryService.CatServerError)]
+    [InlineData("Serializd review (1396) failed (429): Too Many Requests", TelemetryService.CatRateLimit)]
     public void Classify_MapsKnownPatterns(string? message, string expected)
         => Assert.Equal(expected, TelemetryService.Classify(message));
 
     // ----- Buckets -----
 
     [Theory]
-    [InlineData(0, "0")] [InlineData(1, "1")] [InlineData(2, "2-4")] [InlineData(4, "2-4")] [InlineData(5, "5+")]
+    [InlineData(0, "0")]
+    [InlineData(1, "1")]
+    [InlineData(2, "2-4")]
+    [InlineData(4, "2-4")]
+    [InlineData(5, "5+")]
     public void BucketAccounts_Edges(int n, string expected) => Assert.Equal(expected, TelemetryService.BucketAccounts(n));
 
     [Theory]
-    [InlineData(0, "<500")] [InlineData(499, "<500")] [InlineData(500, "500-2k")] [InlineData(1999, "500-2k")]
-    [InlineData(2000, "2k-10k")] [InlineData(9999, "2k-10k")] [InlineData(10000, "10k+")]
+    [InlineData(0, "<500")]
+    [InlineData(499, "<500")]
+    [InlineData(500, "500-2k")]
+    [InlineData(1999, "500-2k")]
+    [InlineData(2000, "2k-10k")]
+    [InlineData(9999, "2k-10k")]
+    [InlineData(10000, "10k+")]
     public void BucketLibrary_Edges(int n, string expected) => Assert.Equal(expected, TelemetryService.BucketLibrary(n));
 
     [Theory]
-    [InlineData(0, "0")] [InlineData(1, "1-10")] [InlineData(10, "1-10")] [InlineData(11, "11-100")]
-    [InlineData(100, "11-100")] [InlineData(101, "100+")]
+    [InlineData(0, "0")]
+    [InlineData(1, "1-10")]
+    [InlineData(10, "1-10")]
+    [InlineData(11, "11-100")]
+    [InlineData(100, "11-100")]
+    [InlineData(101, "100+")]
     public void BucketSyncs_Edges(int n, string expected) => Assert.Equal(expected, TelemetryService.BucketSyncs(n));
 
     // ----- Week gate -----
@@ -237,6 +261,45 @@ public class TelemetryServiceTests : IDisposable
         Assert.False(t.StateWriteFailure);
     }
 
+    // ----- TV (Serializd) counting: independent counters, shared error classification -----
+
+    [Fact]
+    public void TvSyncEvents_CountIntoPersistedConfig_SeparatelyFromFilm()
+    {
+        var t = Enable();
+        TelemetryService.OnTvSyncEvent(Evt(SyncStatus.Success));
+        TelemetryService.OnTvSyncEvent(Evt(SyncStatus.Rewatch));
+
+        Assert.Equal(2, t.WindowTvSyncs);
+        Assert.Equal(2, t.LifetimeTvSyncs);
+        // The two diaries are fully independent: a TV sync must never touch the film counters.
+        Assert.Equal(0, t.WindowSyncs);
+        Assert.Equal(0, t.LifetimeSyncs);
+    }
+
+    [Fact]
+    public void OnTvSyncEvent_Failed_RecordsIntoTheSameSharedErrorCategoryAsFilm()
+    {
+        // The ingest Worker's error-category list is fixed and has no room for a parallel
+        // TV set, so a Serializd failure counts against the same shared category as a
+        // Letterboxd one; only the sync counters (WindowTvSyncs/LifetimeTvSyncs) are split.
+        var t = Enable();
+        TelemetryService.OnTvSyncEvent(Evt(SyncStatus.Failed, "Serializd login failed (401): bad credentials"));
+        Assert.True(t.StateAuth);
+        Assert.Equal(1, t.WindowErrAuth);
+    }
+
+    [Fact]
+    public void TvSuccess_ClearsErrorStates()
+    {
+        var t = Enable();
+        TelemetryService.OnTvSyncEvent(Evt(SyncStatus.Failed, "Serializd rate limited (429)"));
+        Assert.True(t.StateRateLimit);
+
+        TelemetryService.OnTvSyncEvent(Evt(SyncStatus.Success));
+        Assert.False(t.StateRateLimit);
+    }
+
     // ----- Rising edge + daily cap + consolidation -----
 
     [Fact]
@@ -321,6 +384,54 @@ public class TelemetryServiceTests : IDisposable
         Assert.DoesNotContain("lachlan", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("1234", body);
         Assert.DoesNotContain("37", body);
+    }
+
+    [Fact]
+    public void Payload_IncludesTvFeaturesAndBuckets()
+    {
+        var t = Enable();
+        _h.Config.SerializdAccounts.Add(new SerializdAccount
+        {
+            UserJellyfinId = TestIds.UserId,
+            Email = "me@example.com",
+            Password = "pw",
+            Enabled = true,
+            SyncWatchlist = true,
+        });
+        t.WindowTvSyncs = 5;
+        t.LifetimeTvSyncs = 250;
+
+        var json = TelemetryService.BuildPayload("weekly", libraryCount: 100);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        Assert.True(root.GetProperty("features").GetProperty("tv_configured").GetBoolean());
+        Assert.True(root.GetProperty("features").GetProperty("tv_watchlist_sync").GetBoolean());
+        Assert.False(root.GetProperty("features").GetProperty("tv_multi_account").GetBoolean());
+        Assert.Equal("1-10", root.GetProperty("buckets").GetProperty("tv_syncs_per_week").GetString());
+        Assert.Equal("100+", root.GetProperty("buckets").GetProperty("tv_syncs_ever").GetString());
+
+        // No Serializd account configured must never crash payload building, and must
+        // report the TV side as unconfigured (not "unknown" or missing).
+        _h.Config.SerializdAccounts.Clear();
+        var emptyJson = TelemetryService.BuildPayload("weekly", libraryCount: 100);
+        using var emptyDoc = JsonDocument.Parse(emptyJson);
+        Assert.False(emptyDoc.RootElement.GetProperty("features").GetProperty("tv_configured").GetBoolean());
+    }
+
+    [Fact]
+    public async Task RunScheduled_WeekRolled_ResetsTvWindowSyncs_NeverResetsTvLifetime()
+    {
+        var t = Enable();
+        t.WindowTvSyncs = 8;
+        t.LifetimeTvSyncs = 40;
+        t.LastWeeklyPingUtc = new DateTime(2026, 6, 8, 2, 0, 0, DateTimeKind.Utc);
+        TelemetryService.ClockOverride = () => new DateTime(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc); // next Monday
+
+        await TelemetryService.RunScheduledAsync(libraryCount: 100, logger: null);
+
+        Assert.Equal(0, t.WindowTvSyncs);
+        Assert.Equal(40, t.LifetimeTvSyncs);
     }
 
     // ----- Preview endpoint policy -----
