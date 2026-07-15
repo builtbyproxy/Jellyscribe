@@ -11,13 +11,14 @@ export type ReleaseNotes = {
 export const releaseNotes: ReleaseNotes[] = [
   {
     version: '2.1.0',
-    headline: 'Telemetry now covers TV syncs, and the dashboard credit is back',
+    headline: 'Telemetry now covers TV syncs, the dashboard credit is back, and Logs actually refresh',
     summary:
-      'Two follow-ups to the 2.0.0 rebrand. The admin and user dashboard headers lost their "by Lachlan Young and AI" credit line during the redesign, it\'s back. And the opt-in anonymous telemetry, which only ever counted Letterboxd film syncs, now counts Serializd TV syncs and errors too, since that pipeline was never touched when TV support was built.',
+      'A few follow-ups to the 2.0.0 rebrand. The admin and user dashboard headers lost their "by Lachlan Young and AI" credit line during the redesign, it\'s back. The opt-in anonymous telemetry, which only ever counted Letterboxd film syncs, now counts Serializd TV syncs and errors too, since that pipeline was never touched when TV support was built. And the Logs tab\'s Refresh button, which had been dumping a raw JSON blob into the panel instead of readable log lines, now shows the actual logs.',
     highlights: {
       fixes: [
         'Restored the "by Lachlan Young and AI" credit line in both the admin and user dashboard headers.',
         'Opt-in anonymous telemetry now tracks Serializd (TV) syncs and errors independently from the Letterboxd (film) side, instead of only ever reporting film activity.',
+        'Fixed the Logs tab\'s Refresh button showing the raw JSON response instead of readable log lines.',
       ],
     },
   },
