@@ -21,7 +21,7 @@ AI writes the code; these gates decide whether it ships:
 - **Live integration tests** hit the real Letterboxd site, so "the AI's fixture was wrong" gets caught before release (a lesson learned, see the v1.18.4 release notes).
 - **Every merge ships a release**, so mistakes are small, attributable, and quickly reverted. Incidents and their prevention are documented in the repo's `CLAUDE.md`.
 
-Bugs still happen, the [issue tracker](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/issues) and [release history](https://letterboxdsync.dev/releases/) don't hide them.
+Bugs still happen, the [issue tracker](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/issues) and [release history](https://jellyscribe.dev/releases/) don't hide them.
 
 ## The scale of it
 
@@ -31,7 +31,7 @@ Rather than abstract token counts (tried it, the numbers were noise), here is th
 - **54 merged pull requests**, every one human-reviewed
 - **41 shipped releases**, every merge auto-ships through the release pipeline since May 2026 (earlier releases were tagged by hand)
 - **~18,000 lines of C#** including **~590 tests**
-- Plus the [letterboxdsync.dev](https://letterboxdsync.dev/) website, the telemetry worker, and the CI/release automation
+- Plus the [jellyscribe.dev](https://jellyscribe.dev/) website, the telemetry worker, and the CI/release automation
 
 All of it AI-written in roughly three months of evenings, by one person who reviews everything and writes almost none of it by hand. The [commit history](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/commits/main) and [merged PRs](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/pulls?q=is%3Apr+is%3Amerged) are the receipts.
 

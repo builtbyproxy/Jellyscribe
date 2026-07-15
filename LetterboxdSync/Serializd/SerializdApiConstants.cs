@@ -17,5 +17,5 @@ internal static class SerializdApiConstants
     /// <summary>Value the web app sends in the X-Requested-With header.</summary>
     internal const string AppId = "serializd_vercel";
 
-    internal const string UserAgent = "LetterboxdSync/1.0 (+https://letterboxdsync.dev)";
+    internal const string UserAgent = "LetterboxdSync/1.0 (+https://jellyscribe.dev)";
 }

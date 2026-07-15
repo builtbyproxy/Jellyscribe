@@ -1,4 +1,4 @@
-# [Jellyscribe](https://letterboxdsync.dev/)
+# [Jellyscribe](https://jellyscribe.dev/)
 
 [![CI](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/ci.yml/badge.svg)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/ci.yml)
 [![Release](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/release.yml/badge.svg)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/release.yml)
@@ -8,8 +8,8 @@
 [![Downloads](https://img.shields.io/github/downloads/builtbyproxy/jellyfin-plugin-letterboxd/total)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases)
 [![Fund contributors](https://img.shields.io/badge/%F0%9F%91%91_Fund_contributors-royalty.dev-BB953A?style=for-the-badge&labelColor=1a1a1a)](https://app.royalty.dev/builtbyproxy/jellyfin-plugin-letterboxd)
 
-- **Website:** [letterboxdsync.dev](https://letterboxdsync.dev/)
-- **What's new:** [release notes for every version](https://letterboxdsync.dev/releases/)
+- **Website:** [jellyscribe.dev](https://jellyscribe.dev/)
+- **What's new:** [release notes for every version](https://jellyscribe.dev/releases/)
 - **Built with AI:** most of this plugin is AI-written, human-reviewed, [full transparency in AI.md](AI.md)
 
 Automatically sync your Jellyfin watch history to your Letterboxd diary. Films are logged in real-time when you finish watching, with a daily scheduled sync as a safety net.
