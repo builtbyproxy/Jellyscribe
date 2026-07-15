@@ -155,7 +155,7 @@ public class LetterboxdSyncRunner
     private async Task SyncOneUserAsync(User user, Account account, string source, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Letterboxd sync for {Username} (source={Source})", user.Username, source);
-        SyncProgress.Start("Letterboxd Sync", "Authenticating");
+        SyncProgress.Start(SyncProgress.TrackLetterboxd, "Letterboxd Sync", "Authenticating");
 
         List<BaseItem> movies = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
@@ -166,7 +166,7 @@ public class LetterboxdSyncRunner
 
         if (movies.Count == 0)
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return;
         }
 
@@ -182,7 +182,7 @@ public class LetterboxdSyncRunner
 
         if (movies.Count == 0)
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return;
         }
 
@@ -208,7 +208,7 @@ public class LetterboxdSyncRunner
 
         if (movies.Count == 0)
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return;
         }
 
@@ -235,7 +235,7 @@ public class LetterboxdSyncRunner
 
         if (movies.Count == 0)
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return;
         }
 
@@ -271,7 +271,7 @@ public class LetterboxdSyncRunner
 
         if (movies.Count == 0)
         {
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return;
         }
 
@@ -289,7 +289,7 @@ public class LetterboxdSyncRunner
             // so telemetry needs its own hook here. Classify rather than hardcode auth:
             // a Cloudflare 403 on /sign-in/ should count as cloudflare, not auth.
             TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return;
         }
 
@@ -299,8 +299,8 @@ public class LetterboxdSyncRunner
         var skipped = 0;
         var failed = 0;
 
-        SyncProgress.SetPhase("Syncing films");
-        SyncProgress.SetTotal(movies.Count);
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Syncing films");
+        SyncProgress.SetTotal(SyncProgress.TrackLetterboxd, movies.Count);
 
         foreach (var movie in movies)
         {
@@ -312,8 +312,12 @@ public class LetterboxdSyncRunner
                 _logger.LogInformation("Skipping {Title}: no TMDb ID on the Jellyfin item", movie.Name);
                 SyncHistory.Record(new SyncEvent
                 {
-                    FilmTitle = movie.Name, Username = user.Username ?? string.Empty, Timestamp = DateTime.UtcNow,
-                    Status = SyncStatus.Skipped, Error = "No TMDb ID", Source = source
+                    FilmTitle = movie.Name,
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    Status = SyncStatus.Skipped,
+                    Error = "No TMDb ID",
+                    Source = source
                 });
                 skipped++;
                 continue;
@@ -334,13 +338,18 @@ public class LetterboxdSyncRunner
                         movie.Name, tmdbId, viewingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                     SyncHistory.Record(new SyncEvent
                     {
-                        FilmTitle = movie.Name, FilmSlug = film.Slug, TmdbId = tmdbId,
-                        Username = user.Username ?? string.Empty, Timestamp = DateTime.UtcNow,
-                        ViewingDate = viewingDate, Status = SyncStatus.Skipped,
-                        Error = "Already on Letterboxd diary for this date", Source = source
+                        FilmTitle = movie.Name,
+                        FilmSlug = film.Slug,
+                        TmdbId = tmdbId,
+                        Username = user.Username ?? string.Empty,
+                        Timestamp = DateTime.UtcNow,
+                        ViewingDate = viewingDate,
+                        Status = SyncStatus.Skipped,
+                        Error = "Already on Letterboxd diary for this date",
+                        Source = source
                     });
                     skipped++;
-                    SyncProgress.IncrementProcessed();
+                    SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
                     continue;
                 }
 
@@ -357,14 +366,18 @@ public class LetterboxdSyncRunner
                         movie.Name, tmdbId, lastSyncStr);
                     SyncHistory.Record(new SyncEvent
                     {
-                        FilmTitle = movie.Name, FilmSlug = film.Slug, TmdbId = tmdbId,
-                        Username = user.Username ?? string.Empty, Timestamp = DateTime.UtcNow,
-                        ViewingDate = viewingDate, Status = SyncStatus.Skipped,
+                        FilmTitle = movie.Name,
+                        FilmSlug = film.Slug,
+                        TmdbId = tmdbId,
+                        Username = user.Username ?? string.Empty,
+                        Timestamp = DateTime.UtcNow,
+                        ViewingDate = viewingDate,
+                        Status = SyncStatus.Skipped,
                         Error = $"Local history shows prior sync on {lastSyncStr}, suppressing potential duplicate",
                         Source = source
                     });
                     skipped++;
-                    SyncProgress.IncrementProcessed();
+                    SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
                     continue;
                 }
 
@@ -380,12 +393,17 @@ public class LetterboxdSyncRunner
                     viewingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
                 SyncHistory.Record(new SyncEvent
                 {
-                    FilmTitle = movie.Name, FilmSlug = film.Slug, TmdbId = tmdbId,
-                    Username = user.Username ?? string.Empty, Timestamp = DateTime.UtcNow,
-                    ViewingDate = viewingDate, Status = SyncStatus.Success, Source = source
+                    FilmTitle = movie.Name,
+                    FilmSlug = film.Slug,
+                    TmdbId = tmdbId,
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    ViewingDate = viewingDate,
+                    Status = SyncStatus.Success,
+                    Source = source
                 });
                 synced++;
-                SyncProgress.IncrementProcessed();
+                SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
             }
             catch (Exception ex)
             {
@@ -393,12 +411,16 @@ public class LetterboxdSyncRunner
                     movie.Name, tmdbId, user.Username, ex.Message);
                 SyncHistory.Record(new SyncEvent
                 {
-                    FilmTitle = movie.Name, TmdbId = tmdbId,
-                    Username = user.Username ?? string.Empty, Timestamp = DateTime.UtcNow,
-                    Status = SyncStatus.Failed, Error = ex.Message, Source = source
+                    FilmTitle = movie.Name,
+                    TmdbId = tmdbId,
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    Status = SyncStatus.Failed,
+                    Error = ex.Message,
+                    Source = source
                 });
                 failed++;
-                SyncProgress.IncrementProcessed();
+                SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
 
                 if (account.StopOnFailure)
                 {
@@ -411,7 +433,7 @@ public class LetterboxdSyncRunner
 
         _logger.LogInformation("Letterboxd sync complete for {Username}: {Synced} synced, {Skipped} skipped (+{LocalSkipped} skipped locally), {Failed} failed",
             user.Username, synced, skipped, locallySkipped, failed);
-        SyncProgress.Complete();
+        SyncProgress.Complete(SyncProgress.TrackLetterboxd);
     }
 
     /// <summary>

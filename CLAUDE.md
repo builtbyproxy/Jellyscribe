@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Jellyfin plugin that syncs watch history to Letterboxd. C#/.NET 9, targets Jellyfin 10.11 (`Jellyfin.Controller`/`Jellyfin.Model` 10.11.0). Letterboxd's official endpoint (`/api/v0/production-log-entries`) is preferred; the plugin falls back to web scraping (cookie login, CSRF tokens, HtmlAgilityPack) when the API path fails.
+Jellyfin plugin ("Jellyscribe") that syncs watch history to Letterboxd (film) and Serializd (TV). C#/.NET 9, targets Jellyfin 10.11 (`Jellyfin.Controller`/`Jellyfin.Model` 10.11.0). Letterboxd's official endpoint (`/api/v0/production-log-entries`) is preferred; the plugin falls back to web scraping (cookie login, CSRF tokens, HtmlAgilityPack) when the API path fails. Serializd's API needs no such fallback. The C# namespace, project folder, and solution file all still say `LetterboxdSync` (pre-rebrand name, unchanged this release, see `openspec/changes/rebrand-jellyscribe/`); only the compiled `AssemblyName` and every user-visible surface say Jellyscribe.
 
 The sidebar link in the Jellyfin web UI depends on the third-party **File Transformation** plugin; the rest of the plugin works without it.
 
@@ -24,7 +24,7 @@ dotnet test --filter "FullyQualifiedName~ScraperTests.LookupBySlug_Returns_Resul
 
 CI also collects coverage via `--collect:"XPlat Code Coverage"` into `TestResults/`; Codecov consumes the Cobertura XML.
 
-Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `LetterboxdSync.dll` + `HtmlAgilityPack.dll` and restarts the container).
+Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellyscribe.dll` + `HtmlAgilityPack.dll` and restarts the container).
 
 ## Architecture
 
@@ -59,7 +59,7 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Letterb
 1. Open a PR. Unless non-shipping (above), the PR must:
    - Have a **Conventional Commits** title (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`, `perf:`, `build:`, `style:`). Enforced by `pr-title.yml` (this one applies to non-shipping PRs too).
    - **Bump `AssemblyVersion` / `FileVersion`** in both `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`. Patch bumps (e.g. `1.13.0.0` → `1.13.1.0`) are fine for CI / refactor changes. Enforced by `version-gate.yml`.
-   - Fill in the **`## Release notes`** section in the PR body. `release.yml` extracts text between that heading and the next H2 and uses it verbatim as the manifest changelog field and the GitHub Release body. The PR template primes the section so it's the path of least resistance. Past entries on https://letterboxdsync.dev/releases set the tone: one paragraph, user-facing prose, no symbol names / internal jargon.
+   - Fill in the **`## Release notes`** section in the PR body. `release.yml` extracts text between that heading and the next H2 and uses it verbatim as the manifest changelog field and the GitHub Release body. The PR template primes the section so it's the path of least resistance. Past entries on https://jellyscribe.dev/releases set the tone: one paragraph, user-facing prose, no symbol names / internal jargon.
    - Add a structured entry to **`site/src/data/release-notes.ts`** for the new version (headline + summary + categorised highlights). The site renders these on the Releases page above the raw manifest changelog. Same tone as the manifest changelog but split into `new` / `improvements` / `fixes` / `breaking` bullets.
    - **SDK floor policy (issue #63)**: the `Jellyfin.Controller`/`Jellyfin.Model` PackageReference version MUST equal `targetAbi.txt`, Jellyfin assemblies have per-patch AssemblyVersions, so the SDK we compile against is the real minimum Jellyfin a release can load on. Never bump the SDK routinely (Dependabot PRs are a compile signal, not a merge queue); bump it only when we need a newer API, raising `targetAbi.txt` and the minor version in the same PR. CI enforces the SDK==targetAbi match.
    - **Jellyfin 12 cliff (verified 2026-07-06)**: the 12.x SDK packages are net10.0-only, they do NOT restore against this net9.0 project (NU1202). Current net9.0 builds run fine on Jellyfin 12 servers (newer runtime loads older assemblies), but compiling against the 12 SDK forces net10.0, which cannot load on 10.11's .NET 9 host, so adopting the 12 SDK is a one-way release-stream split, never a routine bump. Staged plan: `openspec/changes/add-jellyfin-12-support/`.
@@ -68,7 +68,7 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Letterb
 
 3. `release.yml` fires automatically on the push to `main`. It reads `AssemblyVersion` from `Directory.Build.props`, checks no tag for that version exists yet (idempotent), builds + tests, packages, creates the GitHub Release with the PR body's `## Release notes` section, inserts the manifest entry using `targetAbi.txt`, and pushes the auto-commit + tag together.
 
-4. `deploy-docs.yml` fires via `workflow_run` on Release completion, rebuilding letterboxdsync.dev with the fresh manifest. (The `GITHUB_TOKEN`-authenticated auto-commit can't fire push-based workflows, hence the explicit `workflow_run` trigger.)
+4. `deploy-docs.yml` fires via `workflow_run` on Release completion, rebuilding jellyscribe.dev with the fresh manifest. (The `GITHUB_TOKEN`-authenticated auto-commit can't fire push-based workflows, hence the explicit `workflow_run` trigger.)
 
 ### Breaking changes
 

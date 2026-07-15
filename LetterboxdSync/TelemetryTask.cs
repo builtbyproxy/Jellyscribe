@@ -32,7 +32,7 @@ public class TelemetryTask : IScheduledTask
 
     public string Name => "Send anonymous usage telemetry";
     public string Key => "LetterboxdSyncTelemetry";
-    public string Description => "Sends an anonymous weekly usage ping if telemetry is enabled in Letterboxd Sync settings. Does nothing while telemetry is off (the default).";
+    public string Description => "Sends an anonymous weekly usage ping if telemetry is enabled in Jellyscribe settings. Does nothing while telemetry is off (the default).";
     public string Category => "Letterboxd";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)

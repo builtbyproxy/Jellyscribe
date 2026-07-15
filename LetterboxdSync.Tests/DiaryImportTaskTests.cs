@@ -211,7 +211,8 @@ public class DiaryImportTaskTests : IDisposable
             e.Level == LogLevel.Information && e.Message.Contains("nothing to import"));
         // This path used to `continue` without SyncProgress.Complete(), leaving the
         // dashboard progress banner running forever.
-        Assert.False(SyncProgress.IsRunning);
+        var snapshot = SyncProgress.GetSnapshot();
+        Assert.Equal(false, snapshot.GetType().GetProperty("isRunning")!.GetValue(snapshot));
     }
 
     [Fact]

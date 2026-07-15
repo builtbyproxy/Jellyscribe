@@ -17,10 +17,10 @@ public class SidebarInjectionTaskTests
     {
         var task = new SidebarInjectionTask(NullLogger<SidebarInjectionTask>.Instance);
 
-        Assert.Equal("Letterboxd Sidebar Registration", task.Name);
+        Assert.Equal("Jellyscribe Sidebar Registration", task.Name);
         Assert.Equal("LetterboxdSidebarInjection", task.Key);
         Assert.False(string.IsNullOrEmpty(task.Description));
-        Assert.False(string.IsNullOrEmpty(task.Category));
+        Assert.Equal("Jellyscribe", task.Category);
     }
 
     [Fact]

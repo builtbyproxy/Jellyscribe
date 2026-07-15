@@ -10,6 +10,24 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.0.0',
+    headline: 'Renamed to Jellyscribe, and TV shows now sync to Serializd',
+    summary:
+      'Two things land together in this release: the plugin is renamed from "Letterboxd Sync" to Jellyscribe, and it now syncs TV shows to Serializd alongside films to Letterboxd, as a fully independent second diary.\n\nNothing about the rename requires any action, every linked account, sync history entry, and setting carries over untouched. The two diaries never affect each other, so a hiccup on one never touches the other. Details below.',
+    highlights: {
+      new: [
+        'Renamed to Jellyscribe: new display name, new bookmark-ribbon mark, new site palette. Auto-updates in place, no reinstall or reconfiguration, same plugin GUID and repository URL as always.',
+        'New TV / Serializd tab: link a Serializd account per Jellyfin user (email or username) with a Verify login button that confirms your credentials before saving.',
+        'Real-time episode sync: finishing a TV episode logs it to your Serializd watched list automatically, matched by TMDb id so it works regardless of naming, dated to the actual watch time.',
+        'Daily catch-up scheduled task ("Sync watched TV to Serializd") logs anything the real-time path missed, plus a Sync TV Now button to run it immediately.',
+        'Series ratings and favorites sync to Serializd as a show rating and like; write a full review (with an optional rating) straight from the dashboard, at the show or a specific episode.',
+        'Serializd watchlist sync: watchlisted shows mirror into a Jellyfin collection (browse) and the watchlisted seasons\' episodes into a playlist (play queue), with an opt-in Jellyseerr auto-request for anything missing.',
+        'Reverse diary import: mark Jellyfin episodes played when they already show up in your Serializd diary.',
+        'Serializd runs fully isolated from Letterboxd: films keep syncing to Letterboxd, and a failure on one service never blocks the other.',
+      ],
+    },
+  },
+  {
     version: '1.19.6',
     headline: 'Reverse sync now explains itself when it has nothing to do',
     summary:

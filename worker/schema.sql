@@ -38,10 +38,19 @@ CREATE TABLE IF NOT EXISTS log_bundles (
     jellyfin_version TEXT NOT NULL,
     telemetry TEXT,
     note TEXT,
+    -- Structured twin of the "[meta] collector: ..." first log_lines entry (files/matched/
+    -- error), so tooling can read it directly instead of parsing that line back out.
+    collector TEXT,
     log_lines TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS log_bundles_received ON log_bundles (received_at DESC);
 CREATE INDEX IF NOT EXISTS log_bundles_instance ON log_bundles (instance_id);
+
+-- `collector` was added after log_bundles first shipped. CREATE TABLE IF NOT EXISTS above
+-- is a no-op against the already-deployed table, so the already-live database needs this
+-- run once by hand (safe to skip on a fresh database, where the CREATE TABLE already has
+-- the column):
+--   npx wrangler d1 execute lbsync-telemetry --remote --command "ALTER TABLE log_bundles ADD COLUMN collector TEXT"
 
 -- Install-count telemetry (NOT opt-in, unlike pings). Captures the two signals
 -- that reach every install: the Jellyfin manifest poll (Option A, GET /manifest.json

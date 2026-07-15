@@ -76,7 +76,7 @@ public class DiaryImportTask : IScheduledTask
 
             _logger.LogInformation("Starting diary import for {Username} ({AccountCount} account(s))",
                 user.Username, accounts.Count);
-            SyncProgress.Start("Diary Import", "Authenticating");
+            SyncProgress.Start(SyncProgress.TrackLetterboxd, "Diary Import", "Authenticating");
 
             // Merge across accounts:
             //  - diaryTmdbIds: union (any account watched it = mark played)
@@ -107,7 +107,7 @@ public class DiaryImportTask : IScheduledTask
                 List<DiaryFilmEntry> entries;
                 try
                 {
-                    SyncProgress.SetPhase($"Scanning Letterboxd films for {account.LetterboxdUsername}");
+                    SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Scanning Letterboxd films for {account.LetterboxdUsername}");
                     entries = await service.GetDiaryFilmEntriesAsync(account.LetterboxdUsername).ConfigureAwait(false);
                     _logger.LogInformation("Found {Count} films in {LbUser}'s Letterboxd diary",
                         entries.Count, account.LetterboxdUsername);
@@ -139,7 +139,7 @@ public class DiaryImportTask : IScheduledTask
                 _logger.LogInformation(
                     "Diary import for {Username}: no films found on Letterboxd across {AccountCount} account(s) (empty diary/watched list, or every fetch failed above); nothing to import",
                     user.Username, accounts.Count);
-                SyncProgress.Complete();
+                SyncProgress.Complete(SyncProgress.TrackLetterboxd);
                 continue;
             }
 
@@ -239,7 +239,7 @@ public class DiaryImportTask : IScheduledTask
                 user.Username, marked, ratingsApplied,
                 unmatchedFilms, unmatchedRatings,
                 ratingByTmdbId.Count(kv => libraryTmdbIds.Contains(kv.Key)) - ratingsApplied);
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
         }
 
         // Always leave one line per run, even when every user was skipped, so a

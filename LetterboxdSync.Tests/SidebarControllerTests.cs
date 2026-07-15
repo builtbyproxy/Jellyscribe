@@ -1,3 +1,4 @@
+using System.IO;
 using LetterboxdSync.Api;
 using Microsoft.AspNetCore.Mvc;
 using Xunit;
@@ -20,5 +21,20 @@ public class SidebarControllerTests
         var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("application/javascript", file.ContentType);
         Assert.True(file.FileStream.Length > 0, "embedded sidebar.js should not be empty");
+    }
+
+    [Fact]
+    public void GetSidebarJs_NavLinkLabelIsJellyscribe()
+    {
+        // Pins the injected sidebar nav link text so a future partial rename can't
+        // silently regress it back to the old brand name.
+        var controller = new SidebarController();
+
+        var file = Assert.IsType<FileStreamResult>(controller.GetSidebarJs());
+        using var reader = new StreamReader(file.FileStream);
+        var contents = reader.ReadToEnd();
+
+        Assert.Contains("navMenuOptionText\">Jellyscribe<", contents);
+        Assert.DoesNotContain("navMenuOptionText\">Letterboxd<", contents);
     }
 }

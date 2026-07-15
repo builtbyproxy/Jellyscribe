@@ -18,13 +18,13 @@ public class SidebarInjectionTask : IScheduledTask
 {
     private readonly ILogger<SidebarInjectionTask> _logger;
 
-    public string Name => "Letterboxd Sidebar Registration";
+    public string Name => "Jellyscribe Sidebar Registration";
 
     public string Key => "LetterboxdSidebarInjection";
 
     public string Description => "Registers sidebar link with File Transformation plugin.";
 
-    public string Category => "Letterboxd Sync";
+    public string Category => "Jellyscribe";
 
     public SidebarInjectionTask(ILogger<SidebarInjectionTask> logger)
     {

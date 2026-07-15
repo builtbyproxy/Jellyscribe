@@ -59,7 +59,7 @@ public class WatchlistSyncRunner
                     .Select(a => (User: u, Account: a)))
                 .ToList();
 
-            SyncProgress.Start("Letterboxd Watchlist", "Starting");
+            SyncProgress.Start(SyncProgress.TrackLetterboxd, "Letterboxd Watchlist", "Starting");
 
             var processed = 0;
             foreach (var (user, account) in pairs)
@@ -72,7 +72,7 @@ public class WatchlistSyncRunner
             }
 
             progress.Report(100);
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
         }
         finally
         {
@@ -136,7 +136,7 @@ public class WatchlistSyncRunner
             }
 
             using var jellyseerr = CreateJellyseerrClient();
-            SyncProgress.Start("Letterboxd Watchlist", "Starting");
+            SyncProgress.Start(SyncProgress.TrackLetterboxd, "Letterboxd Watchlist", "Starting");
 
             var processed = 0;
             foreach (var account in accounts)
@@ -146,7 +146,7 @@ public class WatchlistSyncRunner
                 processed++;
                 progress.Report((double)processed / accounts.Count * 100);
             }
-            SyncProgress.Complete();
+            SyncProgress.Complete(SyncProgress.TrackLetterboxd);
             return true;
         }
         finally
@@ -176,7 +176,7 @@ public class WatchlistSyncRunner
     private async Task SyncOneUserAsync(User user, Account account, SeerrClient? jellyseerr, string source, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting watchlist sync for {Username} (source={Source})", user.Username, source);
-        SyncProgress.SetPhase($"Authenticating {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Authenticating {user.Username}");
 
         ILetterboxdService service;
         try
@@ -195,13 +195,14 @@ public class WatchlistSyncRunner
 
         using var _s = service;
 
-        SyncProgress.SetPhase($"Fetching watchlist for {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Fetching watchlist for {user.Username}");
         List<int> tmdbIds;
         try
         {
             tmdbIds = await service.GetWatchlistTmdbIdsAsync(account.LetterboxdUsername).ConfigureAwait(false);
             _logger.LogInformation("Found {Count} films in {Username}'s Letterboxd watchlist",
                 tmdbIds.Count, account.LetterboxdUsername);
+            WatchlistStats.SetFilm(user.Id.ToString("N"), account.LetterboxdUsername, tmdbIds.Count);
         }
         catch (Exception ex)
         {
@@ -210,7 +211,7 @@ public class WatchlistSyncRunner
             return;
         }
 
-        SyncProgress.SetPhase($"Updating Jellyfin playlist for {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Updating Jellyfin playlist for {user.Username}");
         var allMovies = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Movie },
@@ -272,7 +273,7 @@ public class WatchlistSyncRunner
             var primary = Config.GetPrimaryAccountForUser(account.UserJellyfinId);
             if (ReferenceEquals(primary, account))
             {
-                SyncProgress.SetPhase($"Mirroring Seerr watchlist for {user.Username}");
+                SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Mirroring Seerr watchlist for {user.Username}");
                 await MirrorJellyseerrWatchlistAsync(jellyseerr!, jellyseerrUserId.Value, tmdbIds, user.Username!, cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -293,7 +294,7 @@ public class WatchlistSyncRunner
                 ? tmdbIds
                 : tmdbIds.Where(id => !matchedTmdbIds.Contains(id)).ToList();
 
-            SyncProgress.SetPhase($"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr for {user.Username}");
+            SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr for {user.Username}");
             if (requestIds.Count == 0) return;
 
             var requested = 0;
@@ -337,70 +338,13 @@ public class WatchlistSyncRunner
         // Defaults to "Letterboxd Watchlist ({letterboxdUsername})" or the override.
         var playlistName = account.GetPlaylistName();
 
-        var existingPlaylists = _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.Playlist },
-            Recursive = true
-        });
-
-        var playlist = existingPlaylists.FirstOrDefault(p => p.Name == playlistName);
-
-        if (playlist == null)
-        {
-            if (watchlistItemIds.Count == 0) return;
-
-            await _playlistManager.CreatePlaylist(new PlaylistCreationRequest
-            {
-                Name = playlistName,
-                UserId = user.Id,
-                MediaType = MediaType.Video,
-                ItemIdList = watchlistItemIds.ToArray()
-            }).ConfigureAwait(false);
-
-            _logger.LogInformation("Created playlist '{Name}' with {Count} films for {Username}",
-                playlistName, watchlistItemIds.Count, user.Username);
-            return;
-        }
-
-        // Source of truth: Playlist.LinkedChildren contains the wrapped media item IDs
-        // (the underlying Movie GUIDs). Querying ParentId returns playlist *entries* whose
-        // BaseItem.Id is the entry GUID, not the movie GUID, using that for dedup compared
-        // entry IDs against movie IDs and never matched, causing duplicates each run.
-        var playlistObj = (Playlist)playlist;
-        var existingIds = playlistObj.LinkedChildren
-            .Where(lc => lc.ItemId.HasValue)
-            .Select(lc => lc.ItemId!.Value)
-            .ToHashSet();
-
-        var newItems = watchlistItemIds.Where(id => !existingIds.Contains(id)).ToArray();
-        if (newItems.Length > 0)
-        {
-            await _playlistManager.AddItemToPlaylistAsync(playlist.Id, newItems, user.Id).ConfigureAwait(false);
-            _logger.LogInformation("Added {Count} new films to playlist '{Name}' for {Username}",
-                newItems.Length, playlistName, user.Username);
-        }
-
-        // Empty Letterboxd scrape probably means Cloudflare blocked us, not that the
-        // user wiped their watchlist; skip removal so we don't gut the playlist.
-        var removedIds = (letterboxdCount == 0 && existingIds.Count > 0)
-            ? Array.Empty<string>()
-            : existingIds
-                .Where(id => !watchlistItemIds.Contains(id))
-                .Select(id => id.ToString("N"))
-                .ToArray();
-
-        if (removedIds.Length > 0)
-        {
-            await _playlistManager.RemoveItemFromPlaylistAsync(playlist.Id.ToString("N"), removedIds).ConfigureAwait(false);
-            _logger.LogInformation("Removed {Count} films from playlist '{Name}' for {Username}",
-                removedIds.Length, playlistName, user.Username);
-        }
-
-        if (newItems.Length == 0 && removedIds.Length == 0)
-        {
-            _logger.LogInformation("Playlist '{Name}' already up to date for {Username}",
-                playlistName, user.Username);
-        }
+        // letterboxdCount == 0 means the SCRAPE came back empty (e.g. Cloudflare blocked us),
+        // not "watchlistItemIds is empty because none of the watchlist matched the library" -
+        // those are different signals, so this is passed explicitly rather than re-derived
+        // from watchlistItemIds.Count.
+        await PlaylistReconciler.ReconcileAsync(
+            _playlistManager, _libraryManager, _logger, user, playlistName, watchlistItemIds,
+            sourceWasEmpty: letterboxdCount == 0).ConfigureAwait(false);
     }
 
     private async Task MirrorJellyseerrWatchlistAsync(

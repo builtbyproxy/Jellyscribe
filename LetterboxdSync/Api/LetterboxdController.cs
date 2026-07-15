@@ -22,7 +22,7 @@ namespace LetterboxdSync.Api;
 [Authorize]
 [Route("Jellyfin.Plugin.LetterboxdSync")]
 [Produces(MediaTypeNames.Application.Json)]
-public class LetterboxdController : ControllerBase
+public class LetterboxdController : JellyfinUserApiController
 {
     private readonly ILogger<LetterboxdController> _logger;
     private readonly IUserManager _userManager;
@@ -45,6 +45,7 @@ public class LetterboxdController : ControllerBase
         IApplicationPaths appPaths,
         LetterboxdSyncRunner syncRunner,
         WatchlistSyncRunner watchlistRunner)
+        : base(userManager)
     {
         _logger = logger;
         _userManager = userManager;
@@ -56,20 +57,6 @@ public class LetterboxdController : ControllerBase
     }
 
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
-
-    private string? GetCurrentUserId()
-        => User.Claims.FirstOrDefault(c => c.Type == "Jellyfin-UserId")?.Value?.Replace("-", "");
-
-    private string? GetJellyfinUsername()
-    {
-        var userId = GetCurrentUserId();
-        if (string.IsNullOrEmpty(userId)) return null;
-
-        // Resolve Jellyfin user ID to username for SyncHistory filtering.
-        // SyncHistory stores the Jellyfin username (e.g. "lachlan"), not the Letterboxd username.
-        var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId);
-        return user?.Username;
-    }
 
     [HttpGet("Progress")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -218,7 +205,8 @@ public class LetterboxdController : ControllerBase
             success,
             failed,
             skipped,
-            rewatches
+            rewatches,
+            watchlist = WatchlistStats.GetFilm(GetCurrentUserId() ?? string.Empty)
         });
     }
 

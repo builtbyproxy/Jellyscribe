@@ -184,7 +184,7 @@ public class RepositoryMigrationTests
         var config = ConfigWith(new RepositoryInfo { Name = null, Url = RepositoryMigrator.RawGitHubManifestUrl });
 
         Assert.True(RepositoryMigrator.TryAddProxiedEntry(config));
-        Assert.Equal("Letterboxd Sync (mirror)", config.PluginRepositories[1].Name);
+        Assert.Equal("Jellyscribe (mirror)", config.PluginRepositories[1].Name);
     }
 }
 

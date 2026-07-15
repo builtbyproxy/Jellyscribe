@@ -47,8 +47,8 @@ public class LetterboxdControllerTests
     public void GetProgress_ReturnsCurrentSyncSnapshot()
     {
         using var h = new ControllerTestHarness();
-        SyncProgress.Start("ProgressTest", "p");
-        SyncProgress.SetTotal(5);
+        SyncProgress.Start(SyncProgress.TrackLetterboxd, "ProgressTest", "p");
+        SyncProgress.SetTotal(SyncProgress.TrackLetterboxd, 5);
 
         var result = h.Controller.GetProgress();
 

@@ -42,10 +42,10 @@ public class PluginTests : IDisposable
     }
 
     [Fact]
-    public void Plugin_NameIsLetterboxdSync()
+    public void Plugin_NameIsJellyscribe()
     {
         var plugin = MakePlugin();
-        Assert.Equal("LetterboxdSync", plugin.Name);
+        Assert.Equal("Jellyscribe", plugin.Name);
     }
 
     [Fact]
@@ -55,6 +55,19 @@ public class PluginTests : IDisposable
         // The plugin's GUID is part of its installable manifest entry; changing it
         // would break upgrades for existing users. Pin the value here.
         Assert.Equal(Guid.Parse("c7a3e1b9-5d42-4f8a-9c06-2b7d8e4f1a35"), plugin.Id);
+    }
+
+    [Fact]
+    public void Plugin_ConfigurationFileNameIsStable()
+    {
+        // BasePlugin derives the config file name from Name by default (Name + ".xml").
+        // The Jellyscribe rebrand changed Name from "LetterboxdSync", which would
+        // otherwise silently point every existing install at a brand-new, empty
+        // config file instead of the one holding real linked accounts (caught live on
+        // 2026-07-15: a real server's accounts "disappeared" after this exact rename).
+        // Pin the file name explicitly so it can never drift again.
+        var plugin = MakePlugin();
+        Assert.Equal("LetterboxdSync.xml", plugin.ConfigurationFileName);
     }
 
     [Fact]
@@ -73,7 +86,7 @@ public class PluginTests : IDisposable
         var config = pages.FirstOrDefault(p => p.Name == "letterboxdsync");
         Assert.NotNull(config);
         Assert.True(config!.EnableInMainMenu);
-        Assert.Equal("Letterboxd Sync", config.DisplayName);
+        Assert.Equal("Jellyscribe", config.DisplayName);
         Assert.Contains("configPage.html", config.EmbeddedResourcePath);
     }
 

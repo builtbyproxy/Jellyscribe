@@ -223,11 +223,7 @@ public class SeerrClient : IDisposable
 
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         // Belt-and-braces: Seerr returns 409 when an active request already exists; treat as a no-op.
-        if ((int)response.StatusCode == 409 ||
-            responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
-            responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase))
+        if (IsAlreadyExistsResponse(response.StatusCode, responseBody))
         {
             _logger.LogDebug("Seerr already has request for TMDb {TmdbId} (user {UserId}): {Body}",
                 tmdbId, jellyseerrUserId, Truncate(responseBody, 200));
@@ -237,6 +233,102 @@ public class SeerrClient : IDisposable
         _logger.LogWarning("Seerr request failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return RequestResult.Failed;
+    }
+
+    /// <summary>
+    /// Requests a TV series on Seerr (the TV counterpart to <see cref="RequestMovieAsync"/>).
+    /// Requests the given season numbers, or all seasons when none are specified. 409 /
+    /// already-exists responses are treated as a no-op, which is also how a backfill request
+    /// for an already-available show resolves (so <paramref name="backfillAvailable"/> callers
+    /// get an attributed request when possible and a harmless no-op otherwise).
+    /// </summary>
+    public async Task<RequestResult> RequestSeriesAsync(int tmdbId, int jellyseerrUserId, IReadOnlyList<int> seasonNumbers, bool backfillAvailable = false)
+    {
+        _ = backfillAvailable; // Behaviour is driven by the caller's candidate set; Seerr's 409 handling covers the available case.
+
+        var url = $"{_baseUrl}/api/v1/request";
+        var seasonsJson = seasonNumbers.Count > 0 ? "[" + string.Join(",", seasonNumbers) + "]" : "\"all\"";
+        var body = $"{{\"mediaType\":\"tv\",\"mediaId\":{tmdbId},\"userId\":{jellyseerrUserId},\"seasons\":{seasonsJson}}}";
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+
+        using var response = await _http.PostAsync(url, content).ConfigureAwait(false);
+        var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        var seasonsLabel = seasonNumbers.Count > 0 ? string.Join(",", seasonNumbers) : "all";
+
+        if (response.IsSuccessStatusCode)
+        {
+            // A 2xx isn't always a real grab: Jellyseerr also returns success when the requested
+            // seasons are already available (nothing to fetch). Classify from the body so the
+            // caller's tally reflects reality instead of counting no-ops as "new". Full response
+            // logged so mismatches between Jellyfin's and Jellyseerr's view are diagnosable.
+            var available = AllRequestedSeasonsAvailable(responseBody, seasonNumbers);
+            _logger.LogInformation(
+                "Seerr TV request TMDb {TmdbId} S[{Seasons}] → {Outcome} (HTTP {Status}): {Body}",
+                tmdbId, seasonsLabel, available ? "already available (no-op)" : "requested",
+                (int)response.StatusCode, Truncate(responseBody, 400));
+            return available ? RequestResult.AlreadyExists : RequestResult.Requested;
+        }
+
+        if (IsAlreadyExistsResponse(response.StatusCode, responseBody))
+        {
+            _logger.LogInformation("Seerr TV request TMDb {TmdbId} S[{Seasons}] → already exists (HTTP {Status})",
+                tmdbId, seasonsLabel, (int)response.StatusCode);
+            return RequestResult.AlreadyExists;
+        }
+
+        _logger.LogWarning("Seerr TV request failed for TMDb {TmdbId} S[{Seasons}] (user {UserId}): {Status} {Body}",
+            tmdbId, seasonsLabel, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
+        return RequestResult.Failed;
+    }
+
+    /// <summary>
+    /// Best-effort read of a POST /request 2xx body: true when every requested season is already
+    /// AVAILABLE (Jellyseerr status 5) — i.e. the "request" was a no-op with nothing to fetch.
+    /// Prefers per-season detail on <c>media.seasons</c>; falls back to the media-level status when
+    /// the response carries none. Returns false (treat as a real request) on any parse failure so
+    /// a genuine grab is never silently hidden.
+    /// </summary>
+    private static bool AllRequestedSeasonsAvailable(string body, IReadOnlyList<int> requestedSeasons)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("media", out var media)
+                && media.TryGetProperty("seasons", out var seasons)
+                && seasons.ValueKind == JsonValueKind.Array)
+            {
+                var statusByNumber = new Dictionary<int, int>();
+                foreach (var s in seasons.EnumerateArray())
+                {
+                    if (s.TryGetProperty("seasonNumber", out var sn) && sn.ValueKind == JsonValueKind.Number &&
+                        s.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.Number)
+                        statusByNumber[sn.GetInt32()] = st.GetInt32();
+                }
+
+                IEnumerable<int> relevant = requestedSeasons.Count > 0 ? requestedSeasons : statusByNumber.Keys;
+                var any = false;
+                foreach (var n in relevant)
+                {
+                    any = true;
+                    if (!statusByNumber.TryGetValue(n, out var st) || st != 5) return false; // 5 = AVAILABLE
+                }
+                return any;
+            }
+
+            if (root.TryGetProperty("media", out var media2)
+                && media2.TryGetProperty("status", out var ms)
+                && ms.ValueKind == JsonValueKind.Number)
+                return ms.GetInt32() == 5;
+
+            return false;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -359,6 +451,19 @@ public class SeerrClient : IDisposable
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
         return false;
     }
+
+    /// <summary>
+    /// Shared by RequestMovieAsync and RequestSeriesAsync: Jellyseerr signals "you already have
+    /// this" a few different ways (an HTTP 409, or one of several phrases in the error body
+    /// depending on version/media type). Kept in one place so a new phrase Jellyseerr starts
+    /// using only needs updating once, not once per media-type method.
+    /// </summary>
+    private static bool IsAlreadyExistsResponse(HttpStatusCode status, string responseBody)
+        => (int)status == 409 ||
+           responseBody.Contains("REQUEST_EXISTS", StringComparison.OrdinalIgnoreCase) ||
+           responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
+           responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
+           responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase);
 
     private static string Truncate(string s, int max) => s.Length > max ? s.Substring(0, max) + "..." : s;
 

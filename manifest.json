@@ -1,9 +1,9 @@
 [
   {
     "guid": "c7a3e1b9-5d42-4f8a-9c06-2b7d8e4f1a35",
-    "name": "LetterboxdSync",
-    "overview": "Real-time Letterboxd diary sync with duplicate detection",
-    "description": "Automatically syncs your Jellyfin watch history to your Letterboxd diary. Supports multiple users, real-time sync on playback completion, duplicate detection, retry with backoff, and TMDb-based film matching.",
+    "name": "Jellyscribe",
+    "overview": "Real-time Letterboxd and Serializd diary sync with duplicate detection",
+    "description": "Automatically syncs your Jellyfin watch history to your Letterboxd diary (films) and Serializd diary (TV). Supports multiple users, real-time sync on playback completion, duplicate detection, retry with backoff, and TMDb-based matching.",
     "owner": "builtbyproxy",
     "category": "General",
     "versions": [

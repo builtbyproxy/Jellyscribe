@@ -131,6 +131,48 @@ public class SecretProtectorTests : IDisposable
     }
 
     [Fact]
+    public void SerializdAccount_XmlRoundTrip_StoresPasswordEncrypted_ReadsBackPlaintext()
+    {
+        var account = new SerializdAccount
+        {
+            UserJellyfinId = "user1",
+            Email = "8bitproxy@example.com",
+            Password = "correct horse battery staple",
+        };
+
+        var xml = SerializeToString(account);
+
+        Assert.DoesNotContain("correct horse battery staple", xml);
+        Assert.Contains("<SerializdPassword>enc:v1:", xml);
+
+        var roundTripped = DeserializeFromString<SerializdAccount>(xml);
+        Assert.Equal("correct horse battery staple", roundTripped.Password);
+    }
+
+    [Fact]
+    public void SerializdAccount_Deserialize_LegacyPlaintextXml_MigratesTransparently()
+    {
+        // Simulates a LetterboxdSync.xml written before encryption was added: plaintext element content.
+        const string legacyXml = """
+            <?xml version="1.0" encoding="utf-16"?>
+            <SerializdAccount xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+              <UserJellyfinId>user1</UserJellyfinId>
+              <Email>8bitproxy@example.com</Email>
+              <SerializdPassword>plaintext-legacy-password</SerializdPassword>
+            </SerializdAccount>
+            """;
+
+        var account = DeserializeFromString<SerializdAccount>(legacyXml);
+
+        Assert.Equal("plaintext-legacy-password", account.Password);
+
+        // Re-serializing (as happens on the next SaveConfiguration) upgrades it to encrypted.
+        var reSerialized = SerializeToString(account);
+        Assert.DoesNotContain("plaintext-legacy-password", reSerialized);
+        Assert.Contains("<SerializdPassword>enc:v1:", reSerialized);
+    }
+
+    [Fact]
     public void PluginConfiguration_XmlRoundTrip_StoresJellyseerrApiKeyEncrypted()
     {
         var config = new PluginConfiguration
@@ -165,6 +207,11 @@ public class SecretProtectorTests : IDisposable
         var config = new PluginConfiguration { JellyseerrApiKey = "key" };
         var configJson = System.Text.Json.JsonSerializer.Serialize(config);
         Assert.DoesNotContain("JellyseerrApiKeyProtected", configJson);
+
+        var serializdAccount = new SerializdAccount { Password = "serializd-secret" };
+        var serializdJson = System.Text.Json.JsonSerializer.Serialize(serializdAccount);
+        Assert.DoesNotContain("SerializdPasswordProtected", serializdJson);
+        Assert.Contains("\"Password\":\"serializd-secret\"", serializdJson);
     }
 
     private static string SerializeToString<T>(T value)
