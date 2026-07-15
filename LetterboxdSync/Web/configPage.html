@@ -48,7 +48,7 @@
                 /* Break out of Jellyfin's padded content column so the app fills the screen. */
                 #letterboxdSyncConfigPage .content-primary,
                 #letterboxdSyncConfigPage div[data-role="content"] { padding: 0 !important; margin: 0 !important; max-width: none !important; }
-                #letterboxdSyncConfigPage .ws { display: grid; grid-template-columns: 248px 1fr; gap: 0;
+                #letterboxdSyncConfigPage .ws { display: grid; grid-template-columns: 248px 1fr; gap: 0; min-height: 100vh;
                     background: var(--ws-bg); }
                 #letterboxdSyncConfigPage .ws-rail { border-right: 1px solid var(--ws-border); background: var(--ws-surface); padding: 22px 16px; align-self: stretch; }
                 #letterboxdSyncConfigPage .ws-rail-inner { display: flex; flex-direction: column; gap: 18px; }
