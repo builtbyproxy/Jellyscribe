@@ -21,7 +21,7 @@ You can expect an acknowledgement within a few days. Because the release pipelin
 
 In scope:
 
-- The plugin itself (`LetterboxdSync.dll`), including anything that could expose Letterboxd credentials, raw cookies, or other users' data on a shared Jellyfin server
+- The plugin itself (`Jellyscribe.dll`), including anything that could expose Letterboxd credentials, raw cookies, or other users' data on a shared Jellyfin server
 - The telemetry/manifest worker (`worker/`), including the anonymous telemetry pipeline, log-bundle uploads, and the manifest/download mirror
 - The plugin's REST endpoints (e.g. privilege escalation between Jellyfin users, non-admins reaching admin-only data)
 

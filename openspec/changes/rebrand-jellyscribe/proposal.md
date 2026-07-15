@@ -17,7 +17,7 @@ instead of holding an open question.
 
 **New name: Jellyscribe.** The naming direction went through three real
 rejections before landing here, each closing off a whole branch rather than
-just one candidate — recorded in full in `design.md` because the reasoning
+just one candidate, recorded in full in `design.md` because the reasoning
 matters as much as the answer:
 
 1. An `-arr`-suffixed name (`Diaryarr`) was the first pick, on the theory that
@@ -25,25 +25,25 @@ matters as much as the answer:
    this plugin isn't part of the Sonarr/Radarr/Prowlarr interoperating PVR
    family (it doesn't acquire or organize media), so borrowing that suffix's
    cachet for a tool outside that family has the same "riding on someone
-   else's credibility" problem the rebrand exists to fix — just aimed at a
+   else's credibility" problem the rebrand exists to fix, just aimed at a
    different community instead of a different company.
 2. A literal `Jellyfin`-in-the-name pick (`JellyfinSync`) was considered next.
    Rejected outright: Jellyfin's own branding guidelines discourage exactly
    this. `JellySync` (the shortened form) was also checked and separately
-   rejected on a plain collision — it's a real, existing plugin
+   rejected on a plain collision, it's a real, existing plugin
    (`SamVellaUK/JellySync`) doing multi-server sync, a different job.
 3. A plain, unprefixed name (`Watchdiary`) was the safe fallback. Landed on
    `Jellyscribe` instead: Jellyfin's guideline against `Jelly[word]` names is
    phrased as a request, not an enforcement mechanism, and there's real
    precedent of it being tolerated for successful plugins (Jellyscrub,
-   Jellystat) — the guideline is really aimed at client apps competing for
+   Jellystat), the guideline is really aimed at client apps competing for
    app-store shelf space under a name that reads as officially blessed, which
    doesn't apply to a server plugin installed via a repository URL.
 
 **New visual identity.** Retires the borrowed Letterboxd/Jellyfin colors for an
 original palette (warm near-black ground, single brass accent, muted ledger
 green for synced/success states only) and type system (Fraunces for display,
-Public Sans for body, JetBrains Mono kept for data/code — continuity with the
+Public Sans for body, JetBrains Mono kept for data/code, continuity with the
 existing admin-UI choice). Full rationale, hex values, and a rendered preview
 in `design.md` and the linked artifact.
 
@@ -53,7 +53,7 @@ in `design.md` and the linked artifact.
   "Jellyscribe". `AssemblyName`/`FileVersion` identifiers change; the **GUID
   does not** (Jellyfin keys plugins by GUID, so this is what keeps existing
   installs auto-updating through the rename). The internal C# namespace stays
-  `LetterboxdSync` for this release — a mechanical rename sweep is real,
+  `LetterboxdSync` for this release, a mechanical rename sweep is real,
   large-diff, zero-user-value work; deferred, not forgotten.
 - GitHub repo renamed (pending the `raw.githubusercontent.com` redirect
   verification in tasks.md 0.1); site rebuilt on the new palette/type/mark; new
@@ -77,14 +77,18 @@ in `design.md` and the linked artifact.
   history format, or any stored configuration shape.
 - No third service (Backloggd/games) added. The name is chosen to leave room
   for one, not to imply one is coming in this change.
-- Does not touch `feat/serializd-tv-scrobble`'s in-flight Phase 1 work. Per
-  `add-serializd-tv-sync`'s own sequencing ("Phase 2 rebrand ships as one
-  deliberate release once Phase 1 is stable"), this change does not start
-  execution until that branch has shipped and settled on `main`.
+- Originally planned to not touch `feat/serializd-tv-scrobble`'s in-flight
+  Phase 1 work and wait for it to ship first (see Sequencing). The maintainer
+  revisited that call and chose to bundle both into the same branch instead.
 
 ## Sequencing
 
-Blocked on `add-serializd-tv-sync` merging first. This change is planning only
-until then: name and visual identity are decided and recorded, tasks are
-sequenced, nothing here executes against the live repo, domain, or worker
-config yet.
+Originally: blocked on `add-serializd-tv-sync` merging first, planning-only
+until then. Revised 2026-07-15: the maintainer chose to bundle the rebrand
+into `feat/serializd-tv-scrobble` directly rather than wait for a separate
+follow-up PR. Code/docs execution (proposal sections 1-4 in tasks.md) is done
+on that branch. Domain/DNS work (tasks.md section 5) and the actual GitHub
+repo rename (task 6.3) remain deferred: the maintainer is doing the repo
+rename themselves, separately, once ready, and nothing in this change edits
+the live domain, worker Origin allowlist, or `github.com/builtbyproxy/...`
+URLs in the meantime.

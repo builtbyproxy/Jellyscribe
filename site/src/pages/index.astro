@@ -1,9 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import Icon from '../components/Icon.astro';
-import SyncFlow from '../components/SyncFlow.astro';
-import TransferBento from '../components/TransferBento.astro';
-import DashboardPeek from '../components/DashboardPeek.astro';
 import { latestRelease } from '../lib/releases';
 
 const repoUrl = 'https://github.com/builtbyproxy/jellyfin-plugin-letterboxd';
@@ -17,60 +14,38 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const localReleasesUrl = `${base}/releases`;
 const latestReleaseAnchor = `${localReleasesUrl}#${latestRelease.anchor}`;
 
-type Feature = { title: string; body: string; icon: string };
-type FeatureGroup = { id: string; label: string; heading: string; intro: string; visual: 'flow' | 'rating' | 'dashboard'; items: Feature[] };
+const flowSteps = [
+  { title: 'Real-time', body: 'Logged the moment credits roll, not on the next scheduled run, rewatches marked automatically.' },
+  { title: 'Daily catch-up', body: 'A scheduled sweep mops up anything missed, an offline watch, a skipped episode, a restart mid-file.' },
+  { title: 'TMDb matching', body: 'No name-guessing. Foreign titles, unusual cuts, absolute-numbered anime, all matched by ID.' },
+];
 
-const featureGroups: FeatureGroup[] = [
-  {
-    id: 'sync',
-    label: 'Syncing',
-    heading: 'Watch it. Log it.',
-    intro: 'Real-time on playback, with a daily sweep for anything missed.',
-    visual: 'flow',
-    items: [
-      { title: 'Real-time', body: 'Diary entry within seconds of credits rolling.', icon: 'bolt' },
-      { title: 'Daily catch-up', body: 'Scheduled sweep picks up offline or skipped watches.', icon: 'clock' },
-      { title: 'TMDb matching', body: 'Matched by ID, so foreign and messy titles just work.', icon: 'target' },
-    ],
-  },
-  {
-    id: 'transfer',
-    label: 'What transfers',
-    heading: 'Stars, likes, reviews, watchlist.',
-    intro: 'All the context around a watch moves between both platforms.',
-    visual: 'rating',
-    items: [
-      { title: 'Ratings as stars, both ways', body: 'Jellyfin 0-10 maps onto Letterboxd 0.5-5, and ratings flow back too. Films you rated on Letterboxd seed your Jellyfin user rating, even ones you never logged a watch for.', icon: 'star' },
-      { title: 'Favorites as likes', body: 'Hearted on Letterboxd when favorited in Jellyfin.', icon: 'heart' },
-      { title: 'Watchlist as playlist', body: 'Each user\'s Letterboxd watchlist mirrors into a Jellyfin playlist daily. Films missing from the library get auto-requested through Jellyseerr, attributed to the right user, with an optional backfill so films that arrived outside Jellyseerr still show a requester.', icon: 'list' },
-      { title: 'Reviews from the dashboard', body: 'Write in Jellyfin, post straight to Letterboxd with rating, spoiler tag, and rewatch flag.', icon: 'pencil' },
-    ],
-  },
-  {
-    id: 'under-the-hood',
-    label: 'Under the hood',
-    heading: 'Built for a home server.',
-    intro: 'Multi-user, resilient, and transparent about what it did.',
-    visual: 'dashboard',
-    items: [
-      { title: 'Multi-user, multi-account', body: 'Each Jellyfin user links one or more Letterboxd accounts. Shared TV logins fan out to every linked diary, each account gets its own watchlist playlist, and the primary one wins on rating conflicts.', icon: 'users' },
-      { title: 'Smart catch-up', body: 'Already-synced films short-circuit locally with no Letterboxd hit. Previously-failed items retry first when rate limits ease, and films that keep failing are set aside after three strikes instead of retrying forever.', icon: 'bolt' },
-      { title: 'Cloudflare resilient', body: 'Official API first, scraping fallback, automatic retry.', icon: 'cloud' },
-      { title: 'Self-healing auth', body: 'Stale cookies trigger an automatic re-login and retry.', icon: 'refresh' },
-      { title: 'Logs in the dashboard', body: 'Filter, copy, or download plugin logs, or send them to the developer in one click with a preview of exactly what is shared and a reference code for your bug report. Passwords, cookies, and auth tokens are never logged.', icon: 'shield' },
-    ],
-  },
+const travelRows = [
+  { icon: 'star', title: 'Ratings, both ways', aside: '', stars: true, body: "Jellyfin's 0–10 becomes Letterboxd's half-stars or Serializd's 1–10 scale. It flows back too, rate something externally and Jellyfin picks it up, even for titles you never logged a watch for." },
+  { icon: 'heart', title: 'Favorites → likes', aside: 'zero clicks', stars: false, body: "Heart it in Jellyfin. It's liked over there by the next sync, no extra step." },
+  { icon: 'pencil', title: 'Written reviews', aside: '', stars: false, stamp: true, body: 'Compose from the Jellyfin dashboard with rating, spoiler tag, rewatch flag, even a specific episode, and it posts exactly as written.' },
+  { icon: 'import', title: 'Watched status, too', aside: '', stars: false, body: "Already marked something watched on Letterboxd or Serializd? Jellyfin picks that up too, no need to log it twice." },
+  { icon: 'list', title: 'Watchlist, mirrored', aside: '', stars: false, body: 'Your watchlist becomes a Jellyfin collection and playlist on its own, and mirrors into your Jellyseerr watchlist too. Anything missing gets requested through Jellyseerr, attributed to you.' },
+];
+
+const infraCards = [
+  { title: 'Multi-user, multi-account', body: "Every Jellyfin user links their own Letterboxd and Serializd logins from the sidebar, no admin access needed. A shared profile just means more than one diary gets the same entry." },
+  { title: 'Retries with judgment', body: 'Already-synced titles never re-hit the API. Failures retry first when limits ease; three strikes and an item waits for the next run instead of hammering forever.' },
+  { title: 'Self-healing auth', body: 'A stale login re-authenticates and retries on its own, on either service. No manual re-login, ever.' },
+  { title: 'TV sync just works', body: "Letterboxd sometimes needs a cookie pasted in to get past a login wall. Serializd never does, so TV sync has nothing to babysit." },
+  { title: 'Isolated by design', body: 'A Serializd hiccup never blocks the Letterboxd path, or vice versa. Two independent syncs, not one fragile pipeline.' },
+  { title: 'Tells you what happened', body: "Every send, skip, and failure lands in the dashboard's searchable log, or one click ships it to the developer with a reference code.", ticker: true },
 ];
 ---
 
-<Layout title="Jellyscribe for Jellyfin" description="Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep — Letterboxd for film, Serializd for TV.">
+<Layout title="Jellyscribe for Jellyfin" description="Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep, Letterboxd for film, Serializd for TV.">
   <header class="site-header">
     <div class="container nav">
       <div class="brand-group">
         <a class="brand" href="/" aria-label="Jellyscribe home">
           <svg class="brand-mark" width="22" height="22" viewBox="0 0 64 64" aria-hidden="true">
             <rect width="64" height="64" rx="12" fill="var(--bg-elev-2)"/>
-            <path d="M20 15 H44 V51 L32 40 L20 51 Z" fill="var(--brass)"/>
+            <path d="M20 15 H44 V51 L32 40 L20 51 Z" fill="var(--gold)"/>
           </svg>
           <span class="brand-name">Jellyscribe</span>
         </a>
@@ -106,7 +81,7 @@ const featureGroups: FeatureGroup[] = [
         </h1>
         <p class="lede">
           Jellyscribe logs what you finish watching in Jellyfin straight into the diaries you
-          already keep — Letterboxd for film, Serializd for TV. Real-time, multi-user, and
+          already keep, Letterboxd for film, Serializd for TV. Real-time, multi-user, and
           quietly resilient to the rough edges of scraping.
         </p>
         <div class="hero-cta">
@@ -171,39 +146,97 @@ const featureGroups: FeatureGroup[] = [
     <div class="container">
       <div class="section-head">
         <h2>Everything you'd expect. And a few you wouldn't.</h2>
-        <p>Built as a replacement for an older plugin that broke when Letterboxd deprecated its legacy endpoint. This one targets the current JSON API, falls back to scraping when it has to, and hides the scraping stitches from you.</p>
+        <p>Talks to Letterboxd's current JSON API first, with a scraping fallback for when it's needed. Serializd's API needs none of that. Either way, the stitches stay hidden.</p>
       </div>
 
-      {featureGroups.map((group, i) => (
-        <div class={`feature-group ${i === 0 ? 'feature-group-first' : ''}`} id={`features-${group.id}`}>
-          <div class="group-head">
-            <h3 class="group-heading">{group.heading}</h3>
-            <p class="group-intro">{group.intro}</p>
+      <div class="scribe-block">
+        <div class="grid6">
+          <div class="feat-head">
+            <div class="head-copy">
+              <div class="feat-eyebrow">How it works</div>
+              <h3>One real-time engine, film and TV alike.</h3>
+              <p>Finish something in Jellyfin, and it's logged before you've picked what's next. One matching layer, one dedupe history, one daily sweep, Letterboxd and Serializd both run through it.</p>
+            </div>
+            <span class="status-pill"><span class="dot"></span>Syncing live</span>
           </div>
 
-          <div class="group-body">
-            <div class="group-visual">
-              {group.visual === 'flow' && <SyncFlow />}
-              {group.visual === 'rating' && <TransferBento />}
-              {group.visual === 'dashboard' && <DashboardPeek />}
+          <div class="flow-row">
+            <div class="flow-line">
+              <svg class="flow-dot" viewBox="0 0 12 12" fill="var(--gold)"><path d="M2.5 1.2 L10.5 6 L2.5 10.8 Z"/></svg>
+              <svg class="flow-dot" viewBox="0 0 12 12" fill="var(--gold)"><path d="M2.5 1.2 L10.5 6 L2.5 10.8 Z"/></svg>
             </div>
-
-            <ul class="feature-list">
-              {group.items.map((f) => (
-                <li class="feature">
-                  <span class="feature-icon" aria-hidden="true">
-                    <Icon name={f.icon} />
-                  </span>
-                  <div class="feature-text">
-                    <h4>{f.title}</h4>
-                    <p>{f.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {flowSteps.map((step, i) => (
+              <div class="flow-step">
+                <div class="flow-step-head">
+                  <h4>{step.title}</h4>
+                  {i === 0 && <span class="status-pill"><span class="dot"></span>Live</span>}
+                </div>
+                <p>{step.body}</p>
+              </div>
+            ))}
+            <div class="flow-note margin-note">
+              <svg width="34" height="24" viewBox="0 0 34 24" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round"><path d="M2,22 Q10,4 30,3"/><path d="M22,2 L30,3 L26,10"/></svg>
+              usually before the credits finish
+            </div>
           </div>
         </div>
-      ))}
+      </div>
+
+      <div class="scribe-block scribe-divider">
+        <div class="grid6">
+          <div class="feat-head">
+            <div class="head-copy">
+              <div class="feat-eyebrow">What moves with it</div>
+              <h3>Not just the watch. The whole entry.</h3>
+              <p>Rating, like, review, watchlist, all of it travels both directions, automatically.</p>
+            </div>
+          </div>
+
+          {travelRows.map((row) => (
+            <div class="travel-row">
+              <div class="row-divider"></div>
+              <div class="label">
+                <span class={`travel-icon ${row.icon === 'heart' ? 'beat' : ''}`}><Icon name={row.icon} size={16} /></span>
+                <div class="label-text">
+                  <h4>{row.title}{row.aside && <span class="aside">{row.aside}</span>}</h4>
+                  {row.stars && <span class="row-stars"><span>★</span><span>★</span><span>★</span><span>★</span><span>½</span></span>}
+                </div>
+              </div>
+              <div class="desc">
+                <p>{row.body}{row.stamp && <span class="stamp">✓ noted</span>}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div class="scribe-block scribe-divider">
+        <div class="grid6">
+          <div class="feat-head">
+            <div class="head-copy">
+              <div class="feat-eyebrow">Why trust it unattended</div>
+              <h3>Runs like infrastructure, not a script. <span class="aside">no duct tape, promise</span></h3>
+              <p>This thing runs for months without anyone watching it. It has to be honest about failure, not just good at success.</p>
+            </div>
+            <span class="status-pill"><span class="dot"></span>System healthy</span>
+          </div>
+
+          <div class="infra-grid">
+            {infraCards.map((card) => (
+              <div class="infra-card">
+                <h4>{card.title}</h4>
+                <p>{card.body}</p>
+                {card.ticker && (
+                  <>
+                    <span class="log-ticker"><span class="dot"></span>Severance S2E1 · just now</span>
+                    <span class="aside">we keep receipts</span>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -257,7 +290,7 @@ const featureGroups: FeatureGroup[] = [
 
       <div class="reqs">
         <div class="req"><span class="req-label">Jellyfin</span><span class="req-value">10.11 or newer</span></div>
-        <div class="req"><span class="req-label">Requires</span><span class="req-value">A Letterboxd account</span></div>
+        <div class="req"><span class="req-label">Requires</span><span class="req-value">A Letterboxd and/or Serializd account</span></div>
         <div class="req"><span class="req-label">For sidebar link</span><span class="req-value"><a href={fileTransformationRepoUrl} rel="noopener">File Transformation plugin</a></span></div>
         <div class="req"><span class="req-label">License</span><span class="req-value">MIT</span></div>
       </div>
@@ -268,7 +301,7 @@ const featureGroups: FeatureGroup[] = [
     <div class="container">
       <div class="section-head">
         <h2>Setup in under a minute</h2>
-        <p>Once the plugin is installed, each user links their own Letterboxd account from the Jellyfin dashboard.</p>
+        <p>Once the plugin is installed, each user links their own Letterboxd account, Serializd account, or both, from the Jellyfin dashboard.</p>
       </div>
 
       <ol class="setup-steps">
@@ -276,21 +309,21 @@ const featureGroups: FeatureGroup[] = [
           <div class="step-num">1</div>
           <div class="step-body">
             <h3>Open the plugin page</h3>
-            <p>Go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong>, then switch to the <strong>Settings</strong> tab.</p>
+            <p>Go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong>, then switch to the <strong>Letterboxd</strong> or <strong>TV / Serializd</strong> tab.</p>
           </div>
         </li>
         <li>
           <div class="step-num">2</div>
           <div class="step-body">
             <h3>Add an account</h3>
-            <p>Click <strong>+ Add Account</strong>, pick a Jellyfin user, and enter their Letterboxd credentials. Check <strong>Enabled</strong>.</p>
+            <p>Click <strong>+ Add Account</strong>, pick a Jellyfin user, and enter their Letterboxd or Serializd credentials. Check <strong>Enabled</strong>.</p>
           </div>
         </li>
         <li>
           <div class="step-num">3</div>
           <div class="step-body">
-            <h3>Watch a movie</h3>
-            <p>That's it. Finish a film in Jellyfin and check your Letterboxd diary. A daily scheduled sync catches anything missed.</p>
+            <h3>Watch something</h3>
+            <p>That's it. Finish a film or an episode in Jellyfin and check your diary. A daily scheduled sync catches anything missed.</p>
           </div>
         </li>
       </ol>
@@ -307,7 +340,7 @@ const featureGroups: FeatureGroup[] = [
       <div class="footer-brand">
         <svg class="brand-mark" width="18" height="18" viewBox="0 0 64 64" aria-hidden="true">
           <rect width="64" height="64" rx="12" fill="var(--bg-elev-2)"/>
-          <path d="M20 15 H44 V51 L32 40 L20 51 Z" fill="var(--brass)"/>
+          <path d="M20 15 H44 V51 L32 40 L20 51 Z" fill="var(--gold)"/>
         </svg>
         <span>Jellyscribe</span>
       </div>
@@ -316,10 +349,11 @@ const featureGroups: FeatureGroup[] = [
         <a href={releasesUrl} rel="noopener">Releases</a>
         <a href={`${repoUrl}/issues`} rel="noopener">Issues</a>
         <a href="https://letterboxd.com/" rel="noopener">Letterboxd</a>
+        <a href="https://www.serializd.com/" rel="noopener">Serializd</a>
         <a href="https://jellyfin.org/" rel="noopener">Jellyfin</a>
       </div>
       <div class="footer-meta">
-        <span>Unofficial. Not affiliated with Letterboxd or Jellyfin.</span>
+        <span>Unofficial. Not affiliated with Letterboxd, Serializd, or Jellyfin.</span>
       </div>
     </div>
   </footer>
@@ -394,7 +428,7 @@ const featureGroups: FeatureGroup[] = [
     .nav-links a:nth-child(-n+2) { display: none; }
   }
 
-  .hero { padding: 80px 0 72px; }
+  .hero { padding: 80px 0 60px; }
   .hero-grid {
     display: grid;
     grid-template-columns: 1.1fr 0.9fr;
@@ -423,15 +457,15 @@ const featureGroups: FeatureGroup[] = [
   }
   .eyebrow-dot {
     width: 8px; height: 8px; border-radius: 50%;
-    background: var(--brass);
-    box-shadow: 0 0 12px rgba(201,144,60,0.5);
+    background: var(--gold);
+    box-shadow: 0 0 12px rgba(232,184,75,0.5);
   }
 
   .accent {
     font-family: var(--font-display);
     font-style: italic;
     font-weight: 500;
-    background: linear-gradient(90deg, var(--brass), var(--brass-bright));
+    background: linear-gradient(90deg, var(--gold), var(--gold-bright));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -506,8 +540,8 @@ const featureGroups: FeatureGroup[] = [
   }
   .install-pill-btn:hover { background: var(--border); }
   .install-pill-btn.copied {
-    background: var(--ledger-green);
-    color: #0e150d;
+    background: var(--success);
+    color: #14161c;
     border-color: transparent;
   }
   .copy-icon { font-size: 14px; line-height: 1; }
@@ -524,13 +558,13 @@ const featureGroups: FeatureGroup[] = [
     transition: color 120ms ease;
   }
   .latest-link:hover { color: var(--text); text-decoration: none; }
-  .latest-link:hover .latest-arrow { color: var(--brass-bright); }
+  .latest-link:hover .latest-arrow { color: var(--gold-bright); }
   .latest-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--ledger-green);
-    box-shadow: 0 0 8px rgba(122,154,118,0.6);
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(95,201,168,0.6);
     flex: 0 0 auto;
   }
   .latest-label {
@@ -538,7 +572,7 @@ const featureGroups: FeatureGroup[] = [
     letter-spacing: 0.1em;
     font-size: 11px;
     font-weight: 600;
-    color: var(--ledger-green);
+    color: var(--success);
   }
   .latest-version {
     color: var(--text);
@@ -635,7 +669,7 @@ const featureGroups: FeatureGroup[] = [
     padding: 1px 6px;
     border-radius: 999px;
   }
-  .diary-stars { color: var(--brass); font-family: var(--font-mono); letter-spacing: 1px; }
+  .diary-stars { color: var(--gold); font-family: var(--font-mono); letter-spacing: 1px; }
 
   .card-foot {
     display: flex;
@@ -649,14 +683,14 @@ const featureGroups: FeatureGroup[] = [
   }
   .pulse {
     width: 8px; height: 8px; border-radius: 50%;
-    background: var(--ledger-green);
-    box-shadow: 0 0 0 0 rgba(122,154,118,0.6);
+    background: var(--success);
+    box-shadow: 0 0 0 0 rgba(95,201,168,0.6);
     animation: pulse 1.8s ease-out infinite;
   }
   @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(122,154,118,0.55); }
-    70% { box-shadow: 0 0 0 10px rgba(122,154,118,0); }
-    100% { box-shadow: 0 0 0 0 rgba(122,154,118,0); }
+    0% { box-shadow: 0 0 0 0 rgba(95,201,168,0.55); }
+    70% { box-shadow: 0 0 0 10px rgba(95,201,168,0); }
+    100% { box-shadow: 0 0 0 0 rgba(95,201,168,0); }
   }
 
   .stat {
@@ -669,7 +703,7 @@ const featureGroups: FeatureGroup[] = [
     font-size: 28px;
     font-weight: 600;
     letter-spacing: -0.02em;
-    background: linear-gradient(90deg, var(--brass), var(--brass-bright));
+    background: linear-gradient(90deg, var(--gold), var(--gold-bright));
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   .stat-label { color: var(--text-dim); font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; }
@@ -681,120 +715,136 @@ const featureGroups: FeatureGroup[] = [
   }
   .section-head p { font-size: 1.05rem; margin-left: auto; margin-right: auto; }
 
-  .feature-group + .feature-group {
-    margin-top: 96px;
-    padding-top: 96px;
-    border-top: 1px dashed var(--border);
-  }
-
-  .group-head {
-    display: block;
-    text-align: center;
-    max-width: 720px;
-    margin: 0 auto 40px;
-  }
-
-  .group-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: var(--text-dim);
-    flex-shrink: 0;
-  }
-  .group-label-num {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    color: var(--brass-bright);
-    background: rgba(201,144,60,0.1);
-    border: 1px solid rgba(201,144,60,0.25);
-    padding: 3px 8px;
-    border-radius: 999px;
-    letter-spacing: 0.1em;
-  }
-  .group-heading {
-    font-size: clamp(1.5rem, 2.6vw, 2rem);
-    font-weight: 600;
-    color: var(--text);
-    margin: 0 0 8px;
-    letter-spacing: -0.01em;
-  }
-  .group-intro {
-    margin: 0 auto;
-    color: var(--text-dim);
-    font-size: 1.0625rem;
-    max-width: 620px;
-  }
-
-  .group-body {
-    display: flex;
-    flex-direction: column;
-    gap: 36px;
-  }
-
-  .group-visual {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .feature-list {
-    list-style: none;
-    margin: 0 auto;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    max-width: 1040px;
-  }
-  @media (max-width: 800px) { .feature-list { grid-template-columns: 1fr; max-width: 460px; } }
-
-  .feature {
+  #features, #install, #setup { padding-top: 40px; padding-bottom: 60px; }
+  #features > .container, #install > .container, #setup > .container { padding-top: 28px; }
+  #features .section-head,
+  #install .section-head,
+  #setup .section-head {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 12px;
-    background: var(--bg-elev);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 28px 24px;
-    transition: border-color 160ms ease, transform 160ms ease;
+    max-width: none;
+    margin: 0 0 16px;
+    text-align: left;
   }
-  .feature:hover { border-color: rgba(201,144,60,0.35); transform: translateY(-2px); }
-  .feature h4 {
-    color: var(--text);
-    margin: 0 0 6px;
-    font-size: 1.05rem;
-    font-weight: 600;
-    letter-spacing: -0.005em;
+  #features .section-head h2,
+  #install .section-head h2,
+  #setup .section-head h2 { font-size: clamp(1.5rem, 2.6vw, 2rem); }
+  #features .section-head p,
+  #install .section-head p,
+  #setup .section-head p { margin: 0; text-align: left; max-width: 62ch; }
+
+  #features .section-head::before, #install .section-head::before, #setup .section-head::before {
+    content: '';
+    position: absolute;
+    top: -68px; left: 0; right: 0; height: 8px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='8' viewBox='0 0 42 8'%3E%3Cpath d='M0,4.3 Q5,0.8 10.5,4.1 T21,4 T31.5,3.8 T42,4.2' fill='none' stroke='%23454c60' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: left center;
+    background-size: 42px 8px;
   }
-  .feature p { margin: 0; font-size: 0.95rem; line-height: 1.55; color: var(--text-dim); }
 
-  .feature-text { min-width: 0; }
+  /* ============ scribe-block: aligned 6-column grid + handwritten flourishes ============ */
+  .scribe-block {
+    padding-top: 72px;
+  }
+  .scribe-block:first-of-type { padding-top: 8px; }
 
-  .feature-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
-    background: var(--bg-elev-2);
-    border: 1px solid var(--border);
-    color: var(--brass);
-    flex-shrink: 0;
+  section + section { border-top: none; }
+
+  .scribe-divider { position: relative; margin-top: 24px; }
+  .scribe-divider::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 8px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='8' viewBox='0 0 42 8'%3E%3Cpath d='M0,4.3 Q5,0.8 10.5,4.1 T21,4 T31.5,3.8 T42,4.2' fill='none' stroke='%23454c60' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: left center;
+    background-size: 42px 8px;
+  }
+  .grid6 { display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 20px; }
+
+  .feat-head { grid-column: 1 / 7; margin-bottom: 40px; display: flex; align-items: baseline; justify-content: space-between; gap: 20px; }
+  .feat-head .head-copy { max-width: 66.666%; }
+  .feat-eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-bright); margin-bottom: 10px; }
+  .feat-head h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); margin-bottom: 12px; }
+  .feat-head p { font-size: 1.0625rem; line-height: 1.6; max-width: 52ch; margin: 0; }
+
+  @keyframes scribe-pulse { 0% { box-shadow: 0 0 0 0 rgba(95,201,168,0.6); } 100% { box-shadow: 0 0 0 8px rgba(95,201,168,0); } }
+  @keyframes scribe-travel { 0% { left: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+  @keyframes scribe-heartbeat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+  @keyframes scribe-star-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+
+  .status-pill { font-size: 11px; padding: 4px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; background: rgba(95,201,168,0.1); color: var(--success); border: 1px solid rgba(95,201,168,0.25); white-space: nowrap; font-family: var(--font-mono); }
+  .status-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); animation: scribe-pulse 1.8s ease-out infinite; }
+
+  .scribble, .margin-note, .aside, .stamp { font-family: var(--font-script); color: var(--ink); }
+  .margin-note { display: inline-flex; align-items: center; gap: 6px; font-size: 1.25rem; transform: rotate(-2.5deg); }
+  .margin-note svg { flex-shrink: 0; transform: translateY(-2px); }
+  .aside { font-size: 1.15rem; margin-left: 8px; transform: rotate(-2deg); display: inline-block; }
+  .stamp { display: inline-flex; align-items: center; gap: 5px; font-size: 1rem; border: 1.5px dashed var(--ink-dim); border-radius: 4px; padding: 2px 10px 4px; transform: rotate(-3deg); margin-left: 10px; }
+
+  /* how it works: 3 cards on a shared sync line */
+  .flow-row { grid-column: 1 / 7; position: relative; display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 20px; padding-top: 22px; }
+  .flow-line { position: absolute; top: 0; left: 20px; right: 20px; height: 2px; background: linear-gradient(90deg, var(--border), var(--gold) 50%, var(--border)); }
+  .flow-dot { position: absolute; top: 50%; width: 12px; height: 12px; margin-top: -6px; filter: drop-shadow(0 0 4px var(--gold)); animation: scribe-travel 3.2s linear infinite; }
+  .flow-dot:nth-child(2) { animation-delay: 1.6s; }
+  .flow-step { grid-column: span 2; background: var(--bg-elev-2); border: 1px solid var(--border); padding: 24px 22px; }
+  .flow-step:not(:last-of-type) { border-right: none; }
+  .flow-step-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .flow-step h4 { font-size: 1.05rem; margin: 0; color: var(--text); }
+  .flow-step p { font-size: 0.94rem; line-height: 1.55; margin: 0; }
+  .flow-note { grid-column: 1 / 3; margin-top: 14px; padding-left: 4px; }
+
+  /* what moves with it: label + description rows sharing the flow-step column unit */
+  .travel-row { display: contents; }
+  .travel-row .row-divider { grid-column: 1 / 7; border-top: 1px solid var(--border); }
+  .travel-row .label { grid-column: 1 / 3; padding: 20px 0; display: flex; align-items: flex-start; gap: 10px; }
+  .travel-row .desc { grid-column: 3 / 7; padding: 20px 0; }
+  .travel-row .label h4 { font-size: 1.05rem; margin: 0; color: var(--text); }
+  .travel-row .desc p { font-size: 0.96rem; margin: 0; }
+  .travel-icon { flex-shrink: 0; margin-top: 3px; color: var(--gold); }
+  .travel-icon.beat { animation: scribe-heartbeat 2.4s ease-in-out infinite; }
+  .label-text { display: flex; flex-direction: column; gap: 5px; }
+  .row-stars { display: inline-flex; gap: 2px; color: var(--gold); font-family: var(--font-mono); font-size: 13px; }
+  .row-stars span { opacity: 0; animation: scribe-star-in 0.4s ease-out forwards; }
+  .row-stars span:nth-child(1) { animation-delay: 0.1s; }
+  .row-stars span:nth-child(2) { animation-delay: 0.2s; }
+  .row-stars span:nth-child(3) { animation-delay: 0.3s; }
+  .row-stars span:nth-child(4) { animation-delay: 0.4s; }
+  .row-stars span:nth-child(5) { animation-delay: 0.5s; }
+
+  /* why trust it unattended: 2x2 cards on the same shared unit */
+  .infra-grid { grid-column: 1 / 7; display: grid; grid-template-columns: repeat(6, 1fr); column-gap: 20px; row-gap: 20px; }
+  .infra-card { grid-column: span 2; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; transition: transform 160ms ease; }
+  .infra-card:hover { transform: rotate(-0.4deg) translateY(-2px); }
+  .infra-card h4 { font-size: 1rem; margin: 0 0 8px; color: var(--text); }
+  .infra-card p { font-size: 0.92rem; margin: 0 0 12px; }
+  .log-ticker { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10.5px; padding: 3px 8px; border-radius: 999px; background: rgba(95,201,168,0.1); border: 1px solid rgba(95,201,168,0.3); color: var(--success); }
+  .log-ticker .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--success); animation: scribe-pulse 1.8s ease-out infinite; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-pill .dot, .flow-dot, .row-stars span, .travel-icon.beat, .log-ticker .dot { animation: none !important; opacity: 1 !important; transform: none !important; }
+    .infra-card:hover { transform: none; }
+  }
+
+  @media (max-width: 800px) {
+    .grid6 { grid-template-columns: 1fr; }
+    .feat-head { grid-column: 1; flex-direction: column; align-items: flex-start; }
+    .feat-head .head-copy { max-width: 100%; }
+    .flow-row { grid-template-columns: 1fr; }
+    .flow-line { display: none; }
+    .flow-note { grid-column: 1; }
+    .infra-grid { grid-column: 1; grid-template-columns: 1fr; }
+    .flow-step, .infra-card { grid-column: 1; }
+    .flow-step { border-right: 1px solid var(--border) !important; }
+    .travel-row .row-divider { grid-column: 1; }
+    .travel-row .label, .travel-row .desc { grid-column: 1; }
+    .travel-row .desc { padding-top: 4px; padding-bottom: 20px; }
   }
 
   .install-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 28px;
-    max-width: 1200px;
-    margin: 0 auto;
   }
   @media (max-width: 800px) { .install-grid { grid-template-columns: 1fr; } }
 
@@ -820,23 +870,23 @@ const featureGroups: FeatureGroup[] = [
     .install-card .steps li { margin-bottom: 6px; line-height: 1.5; }
     .install-card .text-link { font-size: 13px; margin-top: 10px; }
     .install-badge { top: 12px; right: 12px; font-size: 10px; padding: 3px 8px; }
-    .reqs { gap: 6px; margin-top: 20px; }
-    .req { padding: 7px 10px; }
+    .reqs { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 20px; }
+    .req { padding: 10px 12px; }
     .req-label { font-size: 10px; }
     .req-value { font-size: 12px; }
   }
   .install-card-featured {
-    border-color: rgba(201,144,60,0.35);
+    border-color: rgba(232,184,75,0.35);
     background:
-      radial-gradient(600px 200px at 0% 0%, rgba(201,144,60,0.08), transparent 60%),
+      radial-gradient(600px 200px at 0% 0%, rgba(232,184,75,0.08), transparent 60%),
       var(--bg-elev);
   }
   .install-badge {
     position: absolute;
     top: 16px;
     right: 16px;
-    background: var(--brass);
-    color: #1c1409;
+    background: var(--gold);
+    color: #14161c;
     font-size: 11px;
     font-weight: 700;
     padding: 4px 10px;
@@ -856,7 +906,7 @@ const featureGroups: FeatureGroup[] = [
   .text-link {
     display: inline-block;
     margin-top: 14px;
-    color: var(--brass-bright);
+    color: var(--gold-bright);
     font-size: 14px;
     font-weight: 500;
   }
@@ -887,7 +937,6 @@ const featureGroups: FeatureGroup[] = [
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 20px;
-    max-width: 1000px;
   }
   @media (max-width: 800px) { .setup-steps { grid-template-columns: 1fr; max-width: 460px; } }
   .setup-steps li {
@@ -906,8 +955,8 @@ const featureGroups: FeatureGroup[] = [
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--brass), var(--brass-bright));
-    color: #1c1409;
+    background: linear-gradient(135deg, var(--gold), var(--gold-bright));
+    color: #14161c;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -918,7 +967,7 @@ const featureGroups: FeatureGroup[] = [
   .step-body p { margin: 0; font-size: 1rem; line-height: 1.55; }
 
   .tip {
-    margin-top: 32px;
+    margin: 32px auto 0;
     background: var(--bg-elev);
     border: 1px solid var(--border);
     border-left: 3px solid var(--warn);

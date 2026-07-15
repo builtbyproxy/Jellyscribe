@@ -8,7 +8,7 @@
         link.setAttribute("is", "emby-linkbutton");
         link.className = "navMenuOption lnkMediaFolder";
         link.href = "#";
-        link.innerHTML = '<span class="material-icons navMenuOptionIcon movie_filter" aria-hidden="true"></span><span class="navMenuOptionText">Letterboxd</span>';
+        link.innerHTML = '<span class="material-icons navMenuOptionIcon movie_filter" aria-hidden="true"></span><span class="navMenuOptionText">Jellyscribe</span>';
         link.addEventListener("click", function(e) {
             e.preventDefault();
             e.stopPropagation();

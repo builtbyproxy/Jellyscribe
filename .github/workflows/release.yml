@@ -137,7 +137,7 @@ jobs:
         if: steps.check.outputs.skip == 'false'
         run: |
           cd LetterboxdSync/bin/Release/net9.0
-          zip -j /tmp/jellyfin-plugin-letterboxd-${{ steps.version.outputs.tag }}.zip LetterboxdSync.dll HtmlAgilityPack.dll
+          zip -j /tmp/jellyfin-plugin-letterboxd-${{ steps.version.outputs.tag }}.zip Jellyscribe.dll HtmlAgilityPack.dll
 
       - name: Compute checksum
         if: steps.check.outputs.skip == 'false'

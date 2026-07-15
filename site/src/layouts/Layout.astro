@@ -4,7 +4,7 @@ interface Props {
   description?: string;
 }
 
-const { title, description = "Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep — Letterboxd for film, Serializd for TV." } = Astro.props;
+const { title, description = "Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep, Letterboxd for film, Serializd for TV." } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 ---
 
@@ -102,24 +102,34 @@ const canonical = new URL(Astro.url.pathname, Astro.site).toString();
         font-display: swap;
         src: url('/fonts/jetbrainsmono-600.woff2') format('woff2');
       }
+      @font-face {
+        font-family: 'Caveat';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/caveat-700.woff2') format('woff2');
+      }
 
       :root {
-        --bg: #1c1712;
-        --bg-elev: #24201a;
-        --bg-elev-2: #2f2820;
-        --border: #423a2d;
-        --text: #ede6d8;
-        --text-dim: #a99a83;
-        --brass: #c9903c;
-        --brass-bright: #e3ac5e;
-        --ledger-green: #7a9a76;
-        --warn: #b8633a;
+        --bg: #14161c;
+        --bg-elev: #1c1f27;
+        --bg-elev-2: #242833;
+        --border: #343a47;
+        --text: #edeff5;
+        --text-dim: #9aa1b5;
+        --gold: #e8b84b;
+        --gold-bright: #f5cc6e;
+        --success: #5fc9a8;
+        --warn: #e0714f;
+        --ink: #90a6ee;
+        --ink-dim: rgba(144,166,238,0.4);
         --radius: 10px;
         --radius-lg: 14px;
-        --shadow: 0 1px 0 rgba(237,230,216,0.04) inset, 0 20px 40px -20px rgba(0,0,0,0.7);
+        --shadow: 0 1px 0 rgba(237,239,245,0.04) inset, 0 20px 40px -20px rgba(0,0,0,0.7);
         --font-sans: 'Public Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         --font-display: 'Fraunces', ui-serif, Georgia, serif;
         --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        --font-script: 'Caveat', cursive;
       }
 
       *, *::before, *::after { box-sizing: border-box; }
@@ -136,11 +146,11 @@ const canonical = new URL(Astro.url.pathname, Astro.site).toString();
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         background-image:
-          radial-gradient(1100px 550px at 85% -180px, rgba(201,144,60,0.10), transparent 60%),
-          radial-gradient(900px 500px at -100px 20%, rgba(122,154,118,0.06), transparent 60%);
+          radial-gradient(1100px 550px at 85% -180px, rgba(232,184,75,0.10), transparent 60%),
+          radial-gradient(900px 500px at -100px 20%, rgba(95,201,168,0.06), transparent 60%);
       }
 
-      a { color: var(--brass-bright); text-decoration: none; }
+      a { color: var(--gold-bright); text-decoration: none; }
       a:hover { text-decoration: underline; }
 
       h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; letter-spacing: -0.01em; margin: 0 0 0.5em; text-wrap: balance; }
@@ -191,10 +201,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site).toString();
       }
       .btn:hover { text-decoration: none; transform: translateY(-1px); }
       .btn-primary {
-        background: var(--brass);
-        color: #1c1409;
+        background: var(--gold);
+        color: #14161c;
       }
-      .btn-primary:hover { background: var(--brass-bright); }
+      .btn-primary:hover { background: var(--gold-bright); }
       .btn-secondary {
         background: var(--bg-elev);
         color: var(--text);

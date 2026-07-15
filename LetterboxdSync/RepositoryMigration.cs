@@ -79,7 +79,7 @@ public class RepositoryMigrationService : IHostedService
                 }
 
                 _logger.LogInformation(
-                    "Added proxied LetterboxdSync catalog entry {Url} alongside the existing GitHub entry",
+                    "Added proxied Jellyscribe catalog entry {Url} alongside the existing GitHub entry",
                     RepositoryMigrator.ProxiedManifestUrl);
             }
 
@@ -91,7 +91,7 @@ public class RepositoryMigrationService : IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "LetterboxdSync repository migration failed; catalog left unchanged");
+            _logger.LogWarning(ex, "Jellyscribe repository migration failed; catalog left unchanged");
         }
 
         return Task.CompletedTask;
@@ -138,7 +138,7 @@ internal static class RepositoryMigrator
 
         var baseName = rawEntries
             .Select(r => r.Name)
-            .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? "Letterboxd Sync";
+            .FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? "Jellyscribe";
 
         configuration.PluginRepositories = repositories
             .Append(new RepositoryInfo

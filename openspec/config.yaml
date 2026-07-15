@@ -1,8 +1,11 @@
 schema: spec-driven
 
 context: |
-  Jellyfin plugin (C#/.NET 9) syncing watch history to Letterboxd (films) and
-  Serializd (TV). Targets Jellyfin 10.11; the Jellyfin.Controller/Jellyfin.Model
+  Jellyfin plugin ("Jellyscribe", C#/.NET 9) syncing watch history to
+  Letterboxd (films) and Serializd (TV). The C# namespace, project folder,
+  and solution file still say LetterboxdSync (pre-rebrand name, unchanged
+  this release); only AssemblyName and user-visible surfaces say Jellyscribe.
+  Targets Jellyfin 10.11; the Jellyfin.Controller/Jellyfin.Model
   package version must equal targetAbi.txt and is never bumped routinely
   (issue #63). The Jellyfin 12 SDK is net10.0-only and must not be adopted.
   Architecture: ILetterboxdService is the seam every caller uses;

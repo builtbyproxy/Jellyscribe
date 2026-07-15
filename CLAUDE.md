@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Jellyfin plugin that syncs watch history to Letterboxd. C#/.NET 9, targets Jellyfin 10.11 (`Jellyfin.Controller`/`Jellyfin.Model` 10.11.0). Letterboxd's official endpoint (`/api/v0/production-log-entries`) is preferred; the plugin falls back to web scraping (cookie login, CSRF tokens, HtmlAgilityPack) when the API path fails.
+Jellyfin plugin ("Jellyscribe") that syncs watch history to Letterboxd (film) and Serializd (TV). C#/.NET 9, targets Jellyfin 10.11 (`Jellyfin.Controller`/`Jellyfin.Model` 10.11.0). Letterboxd's official endpoint (`/api/v0/production-log-entries`) is preferred; the plugin falls back to web scraping (cookie login, CSRF tokens, HtmlAgilityPack) when the API path fails. Serializd's API needs no such fallback. The C# namespace, project folder, and solution file all still say `LetterboxdSync` (pre-rebrand name, unchanged this release, see `openspec/changes/rebrand-jellyscribe/`); only the compiled `AssemblyName` and every user-visible surface say Jellyscribe.
 
 The sidebar link in the Jellyfin web UI depends on the third-party **File Transformation** plugin; the rest of the plugin works without it.
 
@@ -24,7 +24,7 @@ dotnet test --filter "FullyQualifiedName~ScraperTests.LookupBySlug_Returns_Resul
 
 CI also collects coverage via `--collect:"XPlat Code Coverage"` into `TestResults/`; Codecov consumes the Cobertura XML.
 
-Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `LetterboxdSync.dll` + `HtmlAgilityPack.dll` and restarts the container).
+Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellyscribe.dll` + `HtmlAgilityPack.dll` and restarts the container).
 
 ## Architecture
 

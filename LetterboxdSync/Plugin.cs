@@ -16,7 +16,14 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         Instance = this;
     }
 
-    public override string Name => "LetterboxdSync";
+    public override string Name => "Jellyscribe";
+
+    // BasePlugin derives the config file name from Name by default (Name + ".xml"),
+    // so renaming the display name would otherwise silently point every install at a
+    // brand-new, empty LetterboxdSync.xml -> Jellyscribe.xml config file instead of the
+    // one holding every user's actual linked accounts. Pinned here so the rebrand truly
+    // carries no functional or data changes, matching the GUID staying fixed below.
+    public override string ConfigurationFileName => "LetterboxdSync.xml";
 
     public override Guid Id => Guid.Parse("c7a3e1b9-5d42-4f8a-9c06-2b7d8e4f1a35");
 
@@ -57,7 +64,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
                 Name = "letterboxdsync",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Web.configPage.html",
                 EnableInMainMenu = true,
-                DisplayName = "Letterboxd Sync",
+                DisplayName = "Jellyscribe",
             },
             new PluginPageInfo
             {

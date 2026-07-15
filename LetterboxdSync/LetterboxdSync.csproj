@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>Jellyscribe</AssemblyName>
     <RootNamespace>LetterboxdSync</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>

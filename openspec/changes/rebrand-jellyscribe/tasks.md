@@ -1,5 +1,9 @@
-Blocked on `add-serializd-tv-sync` shipping and settling on `main` first (see
-proposal.md Sequencing). Nothing in this file executes until then.
+Was blocked on `add-serializd-tv-sync` shipping to `main` first; the
+maintainer chose to bundle both into `feat/serializd-tv-scrobble` instead
+(2026-07-15) rather than wait. Sections 0-4 below are executed on that
+branch. Section 5 (infra: DNS/domain) and the GitHub repo rename itself
+(6.3) remain explicitly deferred, the maintainer is doing the repo rename
+separately, and no domain/DNS change ships until 0.1/0.2 are verified.
 
 ## 0. Verify before committing to anything
 
@@ -8,69 +12,92 @@ proposal.md Sequencing). Nothing in this file executes until then.
       against GitHub's documented repo-rename redirect behavior (or a
       throwaway test rename) to confirm raw content 301s survive a repo
       rename. Record the result in this file. If redirects don't hold, keep
-      the repo name and rename display + domain only.
+      the repo name and rename display + domain only. Not run, deferred to
+      whenever the maintainer does the actual repo rename.
 - [ ] 0.2 Check `jellyscribe.dev` against a live registrar (design.md's
       research only ruled out project-name collisions, not registration
       status). `jellyscribe.app` and `jellyscribe.com` as fallbacks if taken.
-- [ ] 0.3 Decide the exact `AssemblyName` value (`Jellyscribe` vs
-      `JellyscribeSync` vs something continuity-shaped) — maintainer's call,
-      see design.md's open question 3.
+      Not checked yet.
+- [x] 0.3 Decide the exact `AssemblyName` value. **Decided: `Jellyscribe`**
+      (plain, matches the product name, no continuity suffix needed). See
+      design.md's open question 3.
 
 ## 1. Visual assets
 
-- [ ] 1.1 New `site/public/favicon.svg`: the bookmark-ribbon mark from
-      design.md (brass `#C9903C` on ink `#24201A`), replacing the current
-      Letterboxd-three-circles SVG.
+- [x] 1.1 New `site/public/favicon.svg`: the bookmark-ribbon mark, gold
+      `#E8B84B` on `#242833` (Midnight + Gold palette, superseding
+      design.md's original brass pitch, see design.md's Palette section),
+      replacing the Letterboxd-three-circles SVG. Same mark shipped inline
+      in the site header/footer.
 - [ ] 1.2 App icon / OG-social image derived from the same mark, for link
-      previews (Twitter/Discord/Slack unfurls of the new domain).
+      previews (Twitter/Discord/Slack unfurls). Not done, no domain to
+      point them at yet (blocked on 0.2).
 - [ ] 1.3 Test: a visual regression baseline capture of the new favicon at
-      16/32/96px (matches the artifact's mark-scales preview) so a future
-      accidental revert back to the Letterboxd mark is caught.
+      16/32/96px. Not done, no automated visual regression harness wired up
+      for `site/` yet.
 
 ## 2. Site rebuild
 
-- [ ] 2.1 `site/src/layouts/Layout.astro`: replace the `:root` CSS variables
-      (`--lb-green`, `--lb-blue`, `--lb-orange`, `--jf-purple`, `--jf-blue`)
-      with the new token set from design.md (`--ink`, `--paper`, `--brass`,
-      `--ledger-green`, etc.). Embed Fraunces/Public Sans/JetBrains Mono as
-      self-hosted `@font-face` (CDN font links won't survive the same CSP
-      concerns as the artifact — self-host the woff2 files under
-      `site/public/fonts/`, don't rely on Google Fonts at request time).
-- [ ] 2.2 Hero copy and headline across `site/src/pages/index.astro` and
-      components (`SyncFlow.astro`, `TransferBento.astro`,
-      `DashboardPeek.astro`) updated for the new name and positioning.
-- [ ] 2.3 Test: `$TELE/bin/visual` rebaseline against the new palette/type
-      (expected, deliberate DIFF — rebaseline, don't chase it as a
-      regression).
+- [x] 2.1 `site/src/layouts/Layout.astro`: `:root` tokens rebuilt around the
+      Midnight + Gold palette (`--bg`, `--gold`, `--success`, `--warn`,
+      `--ink`/`--ink-dim` for the scribe flourish layer). Fraunces/Public
+      Sans/JetBrains Mono/Caveat self-hosted as `@font-face` under
+      `site/public/fonts/`.
+- [x] 2.2 Hero copy and headline, and the full features section, rewritten
+      across `site/src/pages/index.astro`. `SyncFlow.astro`,
+      `TransferBento.astro`, `DashboardPeek.astro` deleted (superseded by
+      the new aligned-grid `flow-row`/`travel-row`/`infra-card` sections
+      built directly into `index.astro`).
+- [ ] 2.3 Test: no automated visual regression harness for `site/`; verified
+      manually via the `/browse` skill at 1440px and 390px instead (no
+      console errors, no layout breaks).
 
 ## 3. Plugin identity
 
-- [ ] 3.1 `Plugin.cs`: display `Name` string → "Jellyscribe" (shown in
-      Jellyfin's Dashboard > Plugins). GUID unchanged.
-- [ ] 3.2 `Directory.Build.props` + `LetterboxdSync/LetterboxdSync.csproj`:
-      `AssemblyName` → the value decided in 0.3. C# `RootNamespace` and all
-      `.cs` file namespaces stay `LetterboxdSync` this release (see
-      proposal.md Non-goals).
-- [ ] 3.3 In-app UI strings: `configPage.html`/`userPage.html` page titles
-      and any "Letterboxd Sync" copy that refers to the whole product (not
-      the Letterboxd-specific tab/feature, which keeps saying "Letterboxd").
-      Sidebar link label in `SidebarInjection.cs`/`sidebar.js`.
-- [ ] 3.4 Test: a snapshot/string-match test asserting the plugin's `Name`
-      property and the sidebar link label both say "Jellyscribe", so a future
-      partial rename can't silently regress one but not the other.
+- [x] 3.1 `Plugin.cs`: display `Name` string → "Jellyscribe". `DisplayName`
+      on the main config-page `PluginPageInfo` → "Jellyscribe" too. GUID
+      unchanged.
+- [x] 3.2 `LetterboxdSync/LetterboxdSync.csproj`: explicit
+      `<AssemblyName>Jellyscribe</AssemblyName>` added. C# `RootNamespace`
+      and all `.cs` file namespaces stay `LetterboxdSync` this release (see
+      proposal.md Non-goals). Coordinated fixes so the rename doesn't break
+      anything: `release.yml`'s package step and `deploy.sh` now zip/copy
+      `Jellyscribe.dll` instead of `LetterboxdSync.dll`; `deploy.sh`'s
+      plugin-directory glob checks both `Jellyscribe_*` and the old
+      `LetterboxdSync_*` for the first post-rebrand deploy.
+- [x] 3.3 In-app UI strings: `configPage.html`/`userPage.html`/
+      `statsPage.html` page titles, `sidebar.js`'s nav link label,
+      `SidebarInjectionTask`'s scheduled-task `Name`/`Category`,
+      `TelemetryTask`'s description, `RepositoryMigration.cs`'s mirror-entry
+      fallback name and log messages, `bug_report.yml`'s issue template.
+      Left unchanged (technical/internal, not user-visible product name):
+      the `[Route("LetterboxdSync/Web")]` API path, `PluginPageInfo.Name`
+      route keys (`letterboxdsync`, `letterboxduser`, etc.), the
+      `Jellyfin.Plugin.LetterboxdSync/...` controller route prefix used by
+      the dashboard JS, and `SyncProgress.Start("Letterboxd Sync", ...)`
+      (names the specific film-sync operation, parallel to "Serializd TV
+      sync", not the product name).
+- [x] 3.4 Test: `PluginTests.Plugin_NameIsJellyscribe` and
+      `PluginTests.GetPages_ContainsConfigPage` pin `Plugin.Name` and the
+      config page `DisplayName`; new
+      `SidebarControllerTests.GetSidebarJs_NavLinkLabelIsJellyscribe` pins
+      the embedded sidebar.js nav text.
 
 ## 4. Docs
 
-- [ ] 4.1 `README.md`: title, badges (repo path in CI/release/codecov/GitHub
-      badge URLs — verify these still resolve if the repo renames per 0.1),
-      website link, install instructions' repository Name field.
-- [ ] 4.2 `AI.md`, `CLAUDE.md`, `openspec/config.yaml`'s `context` block: any
-      literal "LetterboxdSync"/"jellyfin-plugin-letterboxd" references that
-      describe the product name rather than a still-accurate code namespace.
+- [x] 4.1 `README.md`: title, image alt text, install instructions'
+      repository Name field, manual-install DLL filename, setup section
+      path, send-logs copy, build-from-source output filename. Website link
+      and all `github.com/builtbyproxy/...` badge/repo URLs deliberately
+      left unchanged, repo hasn't renamed yet (0.1 still open).
+      `SECURITY.md`'s dll reference fixed too.
+- [x] 4.2 `CLAUDE.md`, `openspec/config.yaml`'s `context` block: product-name
+      references updated, both now note the namespace/project-folder stay
+      `LetterboxdSync` while `AssemblyName` and user-visible surfaces say
+      Jellyscribe. `deploy.sh` dll reference in CLAUDE.md fixed too.
 - [ ] 4.3 Private repo: `letterboxd-telemetry/AGENTS.md` and
-      `AGENT_WORKFLOW.md` mental-model references to the old name (not
-      committed to the public repo, but should stay accurate for future agent
-      sessions).
+      `AGENT_WORKFLOW.md` mental-model references to the old name. Not done
+      in this session, separate repo, separate session.
 
 ## 5. Infra
 
@@ -89,7 +116,7 @@ proposal.md Sequencing). Nothing in this file executes until then.
 
 ## 6. Ship
 
-- [ ] 6.1 One deliberate version bump (minor, not patch — a display-name and
+- [ ] 6.1 One deliberate version bump (minor, not patch, a display-name and
       branding change is significant enough to signal, even though nothing
       structurally breaking changed) in `Directory.Build.props` +
       `LetterboxdSync/LetterboxdSync.csproj`.

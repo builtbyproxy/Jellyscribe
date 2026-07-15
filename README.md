@@ -1,4 +1,4 @@
-# [Jellyfin Letterboxd Sync](https://letterboxdsync.dev/)
+# [Jellyscribe](https://letterboxdsync.dev/)
 
 [![CI](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/ci.yml/badge.svg)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/ci.yml)
 [![Release](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/release.yml/badge.svg)](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/actions/workflows/release.yml)
@@ -16,7 +16,7 @@ Automatically sync your Jellyfin watch history to your Letterboxd diary. Films a
 
 Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 
-<img alt="Letterboxd Sync dashboard inside the Jellyfin admin UI, showing sync stats and recent activity" src="docs/images/dashboard.png" />
+<img alt="Jellyscribe dashboard inside the Jellyfin admin UI, showing sync stats and recent activity" src="docs/images/dashboard.png" />
 
 ## Features
 
@@ -65,23 +65,23 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 2. Add the **File Transformation** repository (required for the sidebar link):
    - **Name:** `File Transformation`
    - **URL:** `https://www.iamparadox.dev/jellyfin/plugins/manifest.json`
-3. Add the LetterboxdSync repository:
-   - **Name:** `LetterboxdSync`
+3. Add the Jellyscribe repository:
+   - **Name:** `Jellyscribe`
    - **URL:** `https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
-4. Go to **Catalog**, install **File Transformation**, then install **LetterboxdSync**
+4. Go to **Catalog**, install **File Transformation**, then install **Jellyscribe**
 5. Restart Jellyfin
 6. Hard-refresh the Jellyfin web UI (Ctrl/Cmd + Shift + R) so the new sidebar link loads
 
 ### Manual install
 
 1. Install the **File Transformation** plugin first (see [iamparadox27/Jellyfin.Plugin.FileTransformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation/releases)), required for the sidebar link to appear
-2. Download the latest LetterboxdSync ZIP from [Releases](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases)
-3. Extract `LetterboxdSync.dll` and `HtmlAgilityPack.dll` to your Jellyfin plugins directory
+2. Download the latest Jellyscribe ZIP from [Releases](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/releases)
+3. Extract `Jellyscribe.dll` and `HtmlAgilityPack.dll` to your Jellyfin plugins directory
 4. Restart Jellyfin
 
 ## Setup
 
-1. Go to **Dashboard > Plugins > Letterboxd Sync**
+1. Go to **Dashboard > Plugins > Jellyscribe**
 2. Switch to the **Settings** tab
 3. Click **+ Add Account**
 4. Select your Jellyfin user, enter your Letterboxd username and password
@@ -177,7 +177,7 @@ Since v1.19.0 the plugin also adds the mirror as a second catalog repository ent
 
 ### Send logs to the developer
 
-When something goes wrong, the **Logs** tab has a **Send logs to developer** button. It packages the recent Letterboxd Sync log lines shown on that tab (passwords, cookies, and auth tokens are never logged) plus an anonymous telemetry snapshot, uploads them privately, and gives you a short **reference code** (e.g. `LBX-7Q2F9K`) to quote if you open a bug report.
+When something goes wrong, the **Logs** tab has a **Send logs to developer** button. It packages the recent Jellyscribe log lines shown on that tab (passwords, cookies, and auth tokens are never logged) plus an anonymous telemetry snapshot, uploads them privately, and gives you a short **reference code** (e.g. `LBX-7Q2F9K`) to quote if you open a bug report.
 
 Unlike the anonymous telemetry above, **logs are not anonymous**, they can contain your Letterboxd username or film titles, and the bundle is linked to your telemetry instance ID. So it is strictly opt-in per use: a confirmation step spells this out, lets you add a note describing the problem, and offers a preview of exactly what is sent before anything leaves your server. Works whether or not telemetry is enabled. Uploaded bundles are stored privately and auto-deleted after 90 days.
 
@@ -197,7 +197,7 @@ cd jellyfin-plugin-letterboxd
 dotnet build -c Release
 ```
 
-Output DLLs are in `LetterboxdSync/bin/Release/net9.0/`.
+Output `Jellyscribe.dll` is in `LetterboxdSync/bin/Release/net9.0/`.
 
 ## Contributing
 
