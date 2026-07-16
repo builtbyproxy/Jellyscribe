@@ -2,25 +2,9 @@ Was blocked on `add-serializd-tv-sync` shipping to `main` first; the
 maintainer chose to bundle both into `feat/serializd-tv-scrobble` instead
 (2026-07-15) rather than wait. That branch has since merged to `main`
 (PR #94, `2.0.0.0`, followed by the `2.1.0.0` follow-up release).
-Sections 0-4, 5, and 6.1-6.3 are all done as of 2026-07-16; only 4.3
-(private agent-infra docs, separate repo/session), 5.4 (needs a live
-Jellyfin instance, see below), and 6.4 (too recent to confirm, re-check
-in a few days) remain open.
-
-## How to do 5.4
-
-No Jellyfin instance is reachable from this environment, this one needs
-your hands:
-1. Spin up a fresh/throwaway Jellyfin server (a clean Docker container is
-   easiest: `docker run -d -p 8096:8096 jellyfin/jellyfin`).
-2. Dashboard → Plugins → Repositories → Add Repository, set the URL to
-   `https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
-   (the exact URL end users already have configured, confirmed unchanged
-   by 5.3).
-3. Go to Catalog and confirm "Jellyscribe" shows up with the current
-   version, install it, confirm it loads without error.
-   This proves the manifest → GitHub release asset path still resolves
-   end-to-end post-rename, not just that the raw JSON serves.
+Sections 0-6 are all done as of 2026-07-16 except 4.3 (private agent-infra
+docs, separate repo/session) and 6.4 (too recent to confirm, re-check in a
+few days).
 
 ## 0. Verify before committing to anything
 
@@ -147,9 +131,18 @@ your hands:
       manifest entry. This URL lives on `workers.dev`, entirely independent
       of the `letterboxdsync.dev`/`jellyscribe.dev` DNS cutover in 5.2, so
       it was never at risk, verified anyway per the "must NOT move" note.
-- [ ] 5.4 Test: after 5.1-5.3 land, a manual check that a fresh Jellyfin
-      instance can still add the existing repository URL and see the plugin
-      (proves the worker/manifest path survived the domain change).
+- [x] 5.4 Done, end-to-end, on a throwaway container on the real media
+      server (`servarr`, via Tailscale, `jellyfin/jellyfin:latest`,
+      isolated name/port/no shared volumes, torn down after). Ran the
+      startup wizard and repository-add via the Jellyfin REST API: added
+      the exact repository URL end users have configured
+      (`https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`),
+      confirmed "Jellyscribe" appears in `/Packages` with `2.1.0.0` at the
+      top of its version list, installed it, restarted the server, and
+      confirmed via `/Plugins` it loads as `"Status": "Active"` with no
+      errors in the container logs (`Loaded plugin: Jellyscribe 2.1.0.0`,
+      sidebar injection task ran clean). Container removed afterward,
+      real `jellyfin` container on the host confirmed untouched throughout.
 
 ## 6. Ship
 
