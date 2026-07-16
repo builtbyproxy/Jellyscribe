@@ -54,6 +54,12 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
 
         new Plugin(paths, xml);
 
+        // Isolate SyncHistory's JSONL file to this test's temp dir so Seerr-auto-request
+        // recording assertions don't read/write the real on-disk history.
+        SyncHistory.DataPathOverride = Path.Combine(_tempDir, "sync-history.jsonl");
+        SyncHistory.ResetForTesting();
+        SyncHistory.SetLogger(NullLogger.Instance);
+
         _userManager = Substitute.For<IUserManager>();
         _libraryManager = Substitute.For<ILibraryManager>();
         _collectionManager = Substitute.For<ICollectionManager>();
@@ -67,6 +73,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
         SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = null;
         Plugin.Instance!.Configuration.JellyseerrUrl = null;
         Plugin.Instance!.Configuration.JellyseerrApiKey = null;
+        SyncHistory.DataPathOverride = null;
+        SyncHistory.ResetForTesting();
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
     }
 
@@ -152,6 +160,134 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
         Assert.NotNull(requestBody);
         Assert.Contains("\"mediaType\":\"tv\"", requestBody);
         Assert.Contains("\"mediaId\":1396", requestBody);
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_Requested_RecordsSyncEventWithTitle()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry> { new(1396, Array.Empty<int>()) });
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return UserMapResponse(user.Id.ToString("N"));
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/1396"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"name\":\"Breaking Bad\"}"),
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Created) { Content = new StringContent("{}") };
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = (url, key, log) => new SeerrClient(url, key, log, handler);
+
+        await _runner.TryRunForUserAsync(userId, CancellationToken.None);
+
+        var (events, total) = SyncHistory.GetPage(0, 10, user.Username);
+        Assert.Equal(1, total);
+        var evt = Assert.Single(events);
+        Assert.Equal(SyncStatus.Requested, evt.Status);
+        Assert.Equal(SyncEventSources.SeerrAutoRequestTv, evt.Source);
+        Assert.Equal(1396, evt.TmdbId);
+        Assert.Equal("Breaking Bad", evt.FilmTitle);
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_Failed_RecordsSyncEventWithError()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry> { new(1396, Array.Empty<int>()) });
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return UserMapResponse(user.Id.ToString("N"));
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/1396"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"name\":\"Breaking Bad\"}"),
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent("{\"message\":\"boom\"}"),
+                };
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = (url, key, log) => new SeerrClient(url, key, log, handler);
+
+        await _runner.TryRunForUserAsync(userId, CancellationToken.None);
+
+        var (events, total) = SyncHistory.GetPage(0, 10, user.Username);
+        Assert.Equal(1, total);
+        var evt = Assert.Single(events);
+        Assert.Equal(SyncStatus.Failed, evt.Status);
+        Assert.Equal(SyncEventSources.SeerrAutoRequestTv, evt.Source);
+        Assert.Equal("Breaking Bad", evt.FilmTitle);
+        Assert.False(string.IsNullOrEmpty(evt.Error));
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_AlreadyExists_RecordsNoSyncEvent()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry> { new(1396, Array.Empty<int>()) });
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return UserMapResponse(user.Id.ToString("N"));
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/1396"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"name\":\"Breaking Bad\"}"),
+                };
+            // All requested seasons already AVAILABLE (status 5) → classified as a no-op.
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"media\":{\"status\":5}}"),
+                };
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = (url, key, log) => new SeerrClient(url, key, log, handler);
+
+        await _runner.TryRunForUserAsync(userId, CancellationToken.None);
+
+        var (_, total) = SyncHistory.GetPage(0, 10, user.Username);
+        Assert.Equal(0, total);
     }
 
     [Fact]

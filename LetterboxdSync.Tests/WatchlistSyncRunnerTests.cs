@@ -47,6 +47,12 @@ public class WatchlistSyncRunnerTests : IDisposable
 
         new Plugin(paths, xml);
 
+        // Isolate SyncHistory's JSONL file to this test's temp dir so Seerr-auto-request
+        // recording assertions don't read/write the real on-disk history.
+        SyncHistory.DataPathOverride = Path.Combine(_tempDir, "sync-history.jsonl");
+        SyncHistory.ResetForTesting();
+        SyncHistory.SetLogger(NullLogger.Instance);
+
         _userManager = Substitute.For<IUserManager>();
         _libraryManager = Substitute.For<ILibraryManager>();
         _playlistManager = Substitute.For<IPlaylistManager>();
@@ -57,6 +63,8 @@ public class WatchlistSyncRunnerTests : IDisposable
     public void Dispose()
     {
         LetterboxdServiceFactory.OverrideForTesting = null;
+        SyncHistory.DataPathOverride = null;
+        SyncHistory.ResetForTesting();
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
     }
 
@@ -768,6 +776,165 @@ public class WatchlistSyncRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_Requested_RecordsSyncEventWithTitle()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetWatchlistTmdbIdsAsync(Arg.Any<string>()).Returns(new List<int> { 1233413 });
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent(
+                        "{\"results\":[{\"id\":7,\"jellyfinUserId\":\"" + user.Id.ToString("N") + "\"}]}")
+                };
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/movie/1233413"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent("{\"title\":\"Sinners\"}")
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Created);
+            return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
+            new SeerrClient(url, key, log, handler);
+        try
+        {
+            await _runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None);
+
+            var (events, total) = SyncHistory.GetPage(0, 10, user.Username);
+            Assert.Equal(1, total);
+            var evt = Assert.Single(events);
+            Assert.Equal(SyncStatus.Requested, evt.Status);
+            Assert.Equal(SyncEventSources.SeerrAutoRequestFilm, evt.Source);
+            Assert.Equal(1233413, evt.TmdbId);
+            Assert.Equal("Sinners", evt.FilmTitle);
+        }
+        finally
+        {
+            WatchlistSyncRunner.JellyseerrClientFactoryOverride = null;
+            Plugin.Instance!.Configuration.JellyseerrUrl = null;
+            Plugin.Instance!.Configuration.JellyseerrApiKey = null;
+        }
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_Failed_RecordsSyncEventWithError()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetWatchlistTmdbIdsAsync(Arg.Any<string>()).Returns(new List<int> { 1233413 });
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent(
+                        "{\"results\":[{\"id\":7,\"jellyfinUserId\":\"" + user.Id.ToString("N") + "\"}]}")
+                };
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/movie/1233413"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent("{\"title\":\"Sinners\"}")
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError);
+            return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
+            new SeerrClient(url, key, log, handler);
+        try
+        {
+            await _runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None);
+
+            var (events, total) = SyncHistory.GetPage(0, 10, user.Username);
+            Assert.Equal(1, total);
+            var evt = Assert.Single(events);
+            Assert.Equal(SyncStatus.Failed, evt.Status);
+            Assert.Equal(SyncEventSources.SeerrAutoRequestFilm, evt.Source);
+            Assert.Equal("Sinners", evt.FilmTitle);
+            Assert.False(string.IsNullOrEmpty(evt.Error));
+        }
+        finally
+        {
+            WatchlistSyncRunner.JellyseerrClientFactoryOverride = null;
+            Plugin.Instance!.Configuration.JellyseerrUrl = null;
+            Plugin.Instance!.Configuration.JellyseerrApiKey = null;
+        }
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_AlreadyExists_RecordsNoSyncEvent()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetWatchlistTmdbIdsAsync(Arg.Any<string>()).Returns(new List<int> { 1233413 });
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent(
+                        "{\"results\":[{\"id\":7,\"jellyfinUserId\":\"" + user.Id.ToString("N") + "\"}]}")
+                };
+            // Status 5 (available) → pre-check short-circuits to AlreadyExists, no POST.
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/movie/1233413"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent("{\"title\":\"Sinners\",\"mediaInfo\":{\"status\":5}}")
+                };
+            return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
+            new SeerrClient(url, key, log, handler);
+        try
+        {
+            await _runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None);
+
+            var (_, total) = SyncHistory.GetPage(0, 10, user.Username);
+            Assert.Equal(0, total);
+        }
+        finally
+        {
+            WatchlistSyncRunner.JellyseerrClientFactoryOverride = null;
+            Plugin.Instance!.Configuration.JellyseerrUrl = null;
+            Plugin.Instance!.Configuration.JellyseerrApiKey = null;
+        }
+    }
+
+    [Fact]
     public async Task TryRunForUserAsync_JellyseerrUserMapErrors_SkipsGracefully()
     {
         // The Seerr user-map fetch fails (500). The runner must log and bail out of
@@ -815,13 +982,23 @@ public class WatchlistSyncRunnerTests : IDisposable
 
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "primary-lb", LetterboxdPassword = "x",
-            Enabled = true, EnableWatchlistSync = true, MirrorJellyseerrWatchlist = true, IsPrimary = true
+            UserJellyfinId = userId,
+            LetterboxdUsername = "primary-lb",
+            LetterboxdPassword = "x",
+            Enabled = true,
+            EnableWatchlistSync = true,
+            MirrorJellyseerrWatchlist = true,
+            IsPrimary = true
         });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
-            UserJellyfinId = userId, LetterboxdUsername = "secondary-lb", LetterboxdPassword = "x",
-            Enabled = true, EnableWatchlistSync = true, MirrorJellyseerrWatchlist = true, IsPrimary = false
+            UserJellyfinId = userId,
+            LetterboxdUsername = "secondary-lb",
+            LetterboxdPassword = "x",
+            Enabled = true,
+            EnableWatchlistSync = true,
+            MirrorJellyseerrWatchlist = true,
+            IsPrimary = false
         });
 
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";

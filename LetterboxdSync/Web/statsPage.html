@@ -39,6 +39,10 @@
                         <div style="font-size: 2em; font-weight: bold; color: #e0714f;" id="statFailed">-</div>
                         <div style="color: #9aa1b5; font-size: 0.9em;">Failed</div>
                     </div>
+                    <div style="background: #1c1f27; padding: 1em 1.5em; border-radius: 8px; min-width: 120px; text-align: center;">
+                        <div style="font-size: 2em; font-weight: bold; color: #a78bfa;" id="statRequested">-</div>
+                        <div style="color: #9aa1b5; font-size: 0.9em;">Requested</div>
+                    </div>
                 </div>
 
                 <div class="verticalSection">
@@ -132,6 +136,7 @@
                                 document.getElementById('statRewatches').textContent = stats.rewatches;
                                 document.getElementById('statSkipped').textContent = stats.skipped;
                                 document.getElementById('statFailed').textContent = stats.failed;
+                                document.getElementById('statRequested').textContent = stats.requested;
                             })
                             .catch(function (err) {
                                 console.error('[LetterboxdSync] Stats error:', err);
@@ -151,8 +156,8 @@
                                     var tr = document.createElement('tr');
                                     tr.style.borderBottom = '1px solid #343a47';
 
-                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : '#5b8cff';
-                                    var statusText = e.Status === 0 ? 'Synced' : e.Status === 1 ? 'Skipped' : e.Status === 2 ? 'Failed' : 'Rewatch';
+                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : e.Status === 4 ? '#a78bfa' : '#5b8cff';
+                                    var statusText = e.Status === 0 ? 'Synced' : e.Status === 1 ? 'Skipped' : e.Status === 2 ? 'Failed' : e.Status === 4 ? 'Requested' : 'Rewatch';
 
                                     var filmLink = e.FilmSlug
                                         ? '<a href="https://letterboxd.com/film/' + e.FilmSlug + '/" target="_blank" style="color:#e8b84b;">' + e.FilmTitle + '</a>'
@@ -201,6 +206,7 @@
                                 document.getElementById('statRewatches').textContent = stats.rewatches;
                                 document.getElementById('statSkipped').textContent = stats.skipped;
                                 document.getElementById('statFailed').textContent = stats.failed;
+                                document.getElementById('statRequested').textContent = stats.requested;
                             });
 
                             self.apiFetch('Jellyfin.Plugin.LetterboxdSync/History?count=100')
@@ -215,8 +221,8 @@
                                 events.forEach(function (e) {
                                     var tr = document.createElement('tr');
                                     tr.style.borderBottom = '1px solid #343a47';
-                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : '#5b8cff';
-                                    var statusText = e.Status === 0 ? 'Synced' : e.Status === 1 ? 'Skipped' : e.Status === 2 ? 'Failed' : 'Rewatch';
+                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : e.Status === 4 ? '#a78bfa' : '#5b8cff';
+                                    var statusText = e.Status === 0 ? 'Synced' : e.Status === 1 ? 'Skipped' : e.Status === 2 ? 'Failed' : e.Status === 4 ? 'Requested' : 'Rewatch';
                                     var filmLink = e.FilmSlug ? '<a href="https://letterboxd.com/film/' + e.FilmSlug + '/" target="_blank" style="color:#e8b84b;">' + e.FilmTitle + '</a>' : e.FilmTitle;
                                     var ts = new Date(e.Timestamp);
                                     var timeStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});

@@ -98,13 +98,15 @@ public class SeerrClient : IDisposable
         => (await GetMovieInfoAsync(tmdbId).ConfigureAwait(false)).Status;
 
     /// <summary>
-    /// Single movie lookup returning both the Seerr MediaStatus and the set of Seerr
-    /// user IDs that already have a request for the title. Status is null when Seerr has no
-    /// record of the title (safe to request) or the call fails; the requester set is empty in
-    /// those cases. Status enum: 1=UNKNOWN, 2=PENDING, 3=PROCESSING, 4=PARTIALLY_AVAILABLE,
-    /// 5=AVAILABLE, 6=BLOCKLISTED, 7=DELETED.
+    /// Single movie lookup returning the Seerr MediaStatus, the set of Seerr user IDs that
+    /// already have a request for the title, and the movie's title. Status is null when Seerr
+    /// has no record of the title (safe to request) or the call fails; the requester set is
+    /// empty and Title is null in those cases. Status enum: 1=UNKNOWN, 2=PENDING,
+    /// 3=PROCESSING, 4=PARTIALLY_AVAILABLE, 5=AVAILABLE, 6=BLOCKLISTED, 7=DELETED.
+    /// Title comes from the same response body as the status pre-check (Jellyseerr proxies
+    /// full TMDb movie details at the JSON root), so resolving it here costs no extra HTTP call.
     /// </summary>
-    private async Task<(int? Status, HashSet<int> RequesterUserIds)> GetMovieInfoAsync(int tmdbId)
+    private async Task<(int? Status, HashSet<int> RequesterUserIds, string? Title)> GetMovieInfoAsync(int tmdbId)
     {
         var requesters = new HashSet<int>();
         var url = $"{_baseUrl}/api/v1/movie/{tmdbId}";
@@ -115,14 +117,20 @@ public class SeerrClient : IDisposable
             {
                 _logger.LogDebug("Seerr movie lookup non-success for TMDb {TmdbId}: {Status}",
                     tmdbId, (int)response.StatusCode);
-                return (null, requesters);
+                return (null, requesters, null);
             }
 
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
+
+            string? title = null;
+            if (doc.RootElement.TryGetProperty("title", out var titleEl) &&
+                titleEl.ValueKind == JsonValueKind.String)
+                title = titleEl.GetString();
+
             if (!doc.RootElement.TryGetProperty("mediaInfo", out var mediaInfo) ||
                 mediaInfo.ValueKind != JsonValueKind.Object)
-                return (null, requesters);
+                return (null, requesters, title);
 
             int? status = null;
             if (mediaInfo.TryGetProperty("status", out var statusEl) &&
@@ -143,13 +151,49 @@ public class SeerrClient : IDisposable
                 }
             }
 
-            return (status, requesters);
+            return (status, requesters, title);
         }
         catch (Exception ex)
         {
             _logger.LogDebug("Seerr movie lookup errored for TMDb {TmdbId}: {Message}",
                 tmdbId, ex.Message);
-            return (null, requesters);
+            return (null, requesters, null);
+        }
+    }
+
+    /// <summary>
+    /// Single TV show lookup returning just the show's title (TMDb TV objects use "name",
+    /// not "title"). Best-effort like <see cref="GetMovieInfoAsync"/>: returns null on any
+    /// non-success response or error, never throws. Unlike the movie path,
+    /// <see cref="RequestSeriesAsync"/> has no status pre-check to piggyback on, so this is
+    /// a dedicated call made purely to resolve a human-readable title for activity recording.
+    /// </summary>
+    private async Task<string?> GetSeriesInfoAsync(int tmdbId)
+    {
+        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
+        try
+        {
+            using var response = await _http.GetAsync(url).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("Seerr TV lookup non-success for TMDb {TmdbId}: {Status}",
+                    tmdbId, (int)response.StatusCode);
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("name", out var nameEl) &&
+                nameEl.ValueKind == JsonValueKind.String)
+                return nameEl.GetString();
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Seerr TV lookup errored for TMDb {TmdbId}: {Message}",
+                tmdbId, ex.Message);
+            return null;
         }
     }
 
@@ -180,15 +224,15 @@ public class SeerrClient : IDisposable
     /// holds the single active request, Seerr returns 409 and we report <see cref="RequestResult.AlreadyExists"/>.
     /// </para>
     /// </summary>
-    public async Task<RequestResult> RequestMovieAsync(int tmdbId, int jellyseerrUserId, bool backfillAvailable = false)
+    public async Task<(RequestResult Result, string? Title)> RequestMovieAsync(int tmdbId, int jellyseerrUserId, bool backfillAvailable = false)
     {
-        var (status, requesters) = await GetMovieInfoAsync(tmdbId).ConfigureAwait(false);
+        var (status, requesters, title) = await GetMovieInfoAsync(tmdbId).ConfigureAwait(false);
 
         // Never request blocklisted media (6), regardless of mode.
         if (status == 6)
         {
             _logger.LogDebug("Skipping Seerr request for TMDb {TmdbId}: blocklisted", tmdbId);
-            return RequestResult.AlreadyExists;
+            return (RequestResult.AlreadyExists, title);
         }
 
         if (backfillAvailable)
@@ -199,7 +243,7 @@ public class SeerrClient : IDisposable
             {
                 _logger.LogDebug("Skipping Seerr backfill for TMDb {TmdbId}: user {UserId} already has a request",
                     tmdbId, jellyseerrUserId);
-                return RequestResult.AlreadyExists;
+                return (RequestResult.AlreadyExists, title);
             }
         }
         else
@@ -209,7 +253,7 @@ public class SeerrClient : IDisposable
             {
                 _logger.LogDebug("Skipping Seerr request for TMDb {TmdbId}: already has status {Status}",
                     tmdbId, status.Value);
-                return RequestResult.AlreadyExists;
+                return (RequestResult.AlreadyExists, title);
             }
         }
 
@@ -219,7 +263,7 @@ public class SeerrClient : IDisposable
 
         using var response = await _http.PostAsync(url, content).ConfigureAwait(false);
         if (response.IsSuccessStatusCode)
-            return RequestResult.Requested;
+            return (RequestResult.Requested, title);
 
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         // Belt-and-braces: Seerr returns 409 when an active request already exists; treat as a no-op.
@@ -227,12 +271,12 @@ public class SeerrClient : IDisposable
         {
             _logger.LogDebug("Seerr already has request for TMDb {TmdbId} (user {UserId}): {Body}",
                 tmdbId, jellyseerrUserId, Truncate(responseBody, 200));
-            return RequestResult.AlreadyExists;
+            return (RequestResult.AlreadyExists, title);
         }
 
         _logger.LogWarning("Seerr request failed for TMDb {TmdbId} (user {UserId}): {Status} {Body}",
             tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
-        return RequestResult.Failed;
+        return (RequestResult.Failed, title);
     }
 
     /// <summary>
@@ -242,9 +286,14 @@ public class SeerrClient : IDisposable
     /// for an already-available show resolves (so <paramref name="backfillAvailable"/> callers
     /// get an attributed request when possible and a harmless no-op otherwise).
     /// </summary>
-    public async Task<RequestResult> RequestSeriesAsync(int tmdbId, int jellyseerrUserId, IReadOnlyList<int> seasonNumbers, bool backfillAvailable = false)
+    public async Task<(RequestResult Result, string? Title)> RequestSeriesAsync(int tmdbId, int jellyseerrUserId, IReadOnlyList<int> seasonNumbers, bool backfillAvailable = false)
     {
         _ = backfillAvailable; // Behaviour is driven by the caller's candidate set; Seerr's 409 handling covers the available case.
+
+        // Best-effort, resolved regardless of outcome so a Failed/AlreadyExists result still
+        // carries a title for activity recording. Unlike the movie path there's no pre-check
+        // to piggyback on, so this is one dedicated GET.
+        var title = await GetSeriesInfoAsync(tmdbId).ConfigureAwait(false);
 
         var url = $"{_baseUrl}/api/v1/request";
         var seasonsJson = seasonNumbers.Count > 0 ? "[" + string.Join(",", seasonNumbers) + "]" : "\"all\"";
@@ -266,19 +315,19 @@ public class SeerrClient : IDisposable
                 "Seerr TV request TMDb {TmdbId} S[{Seasons}] → {Outcome} (HTTP {Status}): {Body}",
                 tmdbId, seasonsLabel, available ? "already available (no-op)" : "requested",
                 (int)response.StatusCode, Truncate(responseBody, 400));
-            return available ? RequestResult.AlreadyExists : RequestResult.Requested;
+            return (available ? RequestResult.AlreadyExists : RequestResult.Requested, title);
         }
 
         if (IsAlreadyExistsResponse(response.StatusCode, responseBody))
         {
             _logger.LogInformation("Seerr TV request TMDb {TmdbId} S[{Seasons}] → already exists (HTTP {Status})",
                 tmdbId, seasonsLabel, (int)response.StatusCode);
-            return RequestResult.AlreadyExists;
+            return (RequestResult.AlreadyExists, title);
         }
 
         _logger.LogWarning("Seerr TV request failed for TMDb {TmdbId} S[{Seasons}] (user {UserId}): {Status} {Body}",
             tmdbId, seasonsLabel, jellyseerrUserId, (int)response.StatusCode, Truncate(responseBody, 200));
-        return RequestResult.Failed;
+        return (RequestResult.Failed, title);
     }
 
     /// <summary>

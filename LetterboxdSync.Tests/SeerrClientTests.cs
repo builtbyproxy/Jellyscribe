@@ -35,10 +35,62 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted, "request endpoint should have been called");
+    }
+
+    [Fact]
+    public async Task RequestMovieAsync_TitleInResponseBody_IsResolvedAtNoExtraCall()
+    {
+        var movieLookups = 0;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
+            {
+                movieLookups++;
+                return JsonResponse("{\"id\":100,\"title\":\"Inception\"}");
+            }
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created);
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, title) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal("Inception", title);
+        Assert.Equal(1, movieLookups); // status pre-check and title resolution share one GET
+    }
+
+    [Fact]
+    public async Task RequestMovieAsync_LookupFails_TitleIsNullButRequestStillProceeds()
+    {
+        var posted = false;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+            {
+                posted = true;
+                return new HttpResponseMessage(HttpStatusCode.Created);
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, title) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Null(title);
+        Assert.True(posted, "a failed title lookup must not block the request itself");
     }
 
     [Theory]
@@ -62,7 +114,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
         Assert.False(posted, "request endpoint must not be called when media is already known");
@@ -87,7 +139,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted);
@@ -114,7 +166,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
     }
@@ -141,7 +193,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
+        var (result, _) = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted, "backfill should request an available title that has no request");
@@ -162,7 +214,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
+        var (result, _) = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
         Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
         Assert.False(posted, "backfill must not duplicate this user's own request");
@@ -190,7 +242,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
+        var (result, _) = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted);
@@ -210,7 +262,7 @@ public class SeerrClientTests
         });
 
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
+        var (result, _) = await client.RequestMovieAsync(100, 7, backfillAvailable: true);
 
         Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
         Assert.False(posted, "blocklisted media must never be requested");
@@ -517,7 +569,7 @@ public class SeerrClientTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var result = await client.RequestSeriesAsync(500, 7, seasons);
+        var (result, _) = await client.RequestSeriesAsync(500, 7, seasons);
         return (result, postedBody);
     }
 
@@ -531,6 +583,59 @@ public class SeerrClientTests
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.Contains("\"mediaType\":\"tv\"", body);
         Assert.Contains("\"seasons\":[1,2]", body);
+    }
+
+    [Fact]
+    public async Task RequestSeriesAsync_NameInLookupBody_IsResolvedAsTitle()
+    {
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/tv/500"))
+                return JsonResponse("{\"id\":500,\"name\":\"Better Call Saul\"}");
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
+                };
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, title) = await client.RequestSeriesAsync(500, 7, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal("Better Call Saul", title);
+    }
+
+    [Fact]
+    public async Task RequestSeriesAsync_LookupFails_TitleIsNullButRequestStillProceeds()
+    {
+        var posted = false;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/tv/500"))
+                return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+            {
+                posted = true;
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, title) = await client.RequestSeriesAsync(500, 7, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Null(title);
+        Assert.True(posted, "a failed title lookup must not block the request itself");
     }
 
     [Fact]

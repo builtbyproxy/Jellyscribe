@@ -28,7 +28,7 @@
                     --ws-border: rgba(255,255,255,.085); --ws-border-strong: rgba(255,255,255,.16);
                     --ws-text: #edeff5; --ws-muted: #9aa1b5; --ws-faint: #6b7280;
                     --ws-film: #e8b84b; --ws-tv: #90a6ee; --ws-primary: #e8b84b;
-                    --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8;
+                    --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8; --ws-requested: #a78bfa;
                     --ws-film-soft: rgba(232,184,75,.13); --ws-tv-soft: rgba(144,166,238,.14); --ws-primary-soft: rgba(232,184,75,.16);
                     --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55);
                     --ws-mono: 'WS Mono', ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
@@ -82,6 +82,7 @@
                 #letterboxdUserPage .ws-chip.on[data-s="Reviewed"] { border-color: var(--ws-warn); background: rgba(245,166,35,.14); box-shadow: inset 0 0 0 1px var(--ws-warn); }
                 #letterboxdUserPage .ws-chip.on[data-s="Skipped"] { border-color: var(--ws-faint); background: var(--ws-raise); box-shadow: inset 0 0 0 1px var(--ws-faint); }
                 #letterboxdUserPage .ws-chip.on[data-s="Failed"] { border-color: var(--ws-crit); background: rgba(242,88,94,.14); box-shadow: inset 0 0 0 1px var(--ws-crit); }
+                #letterboxdUserPage .ws-chip.on[data-s="Requested"] { border-color: var(--ws-requested); background: rgba(167,139,250,.14); box-shadow: inset 0 0 0 1px var(--ws-requested); }
                 #letterboxdUserPage .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
                 #letterboxdUserPage .ws-dot.film { background: var(--ws-film); } #letterboxdUserPage .ws-dot.tv { background: var(--ws-tv); }
                 #letterboxdUserPage .ws-tiles { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin: 10px 0 22px; }
@@ -113,6 +114,7 @@
                 #letterboxdUserPage .ws-info-i { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid currentColor; font-size: 9px; font-style: italic; line-height: 1; opacity: .8; }
                 #letterboxdUserPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
                 #letterboxdUserPage .ws-pill.Failed { color: var(--ws-crit); background: rgba(242,88,94,.14); }
+                #letterboxdUserPage .ws-pill.Requested { color: var(--ws-requested); background: rgba(167,139,250,.14); }
                 #letterboxdUserPage .ws-when { font-family: var(--ws-mono); font-size: 12px; color: var(--ws-muted); white-space: nowrap; }
                 #letterboxdUserPage .ws-src { color: var(--ws-faint); font-size: 12px; }
                 #letterboxdUserPage .ws-review-btn { border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-family: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
@@ -248,6 +250,7 @@
                                 <button type="button" class="ws-chip" data-s="Reviewed">Reviewed</button>
                                 <button type="button" class="ws-chip" data-s="Skipped">Skipped</button>
                                 <button type="button" class="ws-chip" data-s="Failed">Failed</button>
+                                <button type="button" class="ws-chip" data-s="Requested">Requested</button>
                             </div>
                             <div class="ws-panel" style="overflow-x:auto;"><table class="ws-table"><thead><tr><th>Title</th><th>Status</th><th>Source</th><th>When</th><th></th></tr></thead><tbody id="historyBody"><tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">Loading…</td></tr></tbody></table></div>
                             <div id="historyPagination" style="display:none;margin-top:12px;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;"><button type="button" class="ws-btn" id="historyPrev">‹ Prev</button><span id="historyPageInfo" class="ws-muted ws-mono" style="margin:0 8px;"></span><button type="button" class="ws-btn" id="historyNext">Next ›</button></div>
@@ -390,7 +393,7 @@
                         },
                         statusOf: function (e) {
                             if (e.Source === 'review') return 'Reviewed';
-                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success');
+                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested'][e.Status] || 'Success');
                         },
                         matchesStatus: function (e) {
                             var s = this.ovStatus || 'all';
@@ -408,7 +411,7 @@
                             var start = (this.ovPage || 0) * ps;
                             document.getElementById('historyBody').innerHTML = all.slice(start, start + ps).map(function (e) {
                                 var svc = e._svc === 'serializd' ? 'tv' : 'film';
-                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success';
+                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested'][e.Status] || 'Success';
                                 var title = (e.FilmTitle || '').split(' · '), t = title[0], m = title[1] || '';
                                 var ts = new Date(e.Timestamp), when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                 var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';

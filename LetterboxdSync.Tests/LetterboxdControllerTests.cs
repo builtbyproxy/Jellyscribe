@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Jellyfin.Database.Implementations.Entities;
@@ -71,12 +72,78 @@ public class LetterboxdControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         var t = ok.Value!.GetType();
         // We don't assert exact numbers because SyncHistory persists across tests;
-        // we assert only the response shape (all five stat keys present, integers).
+        // we assert only the response shape (all six stat keys present, integers).
         Assert.NotNull(t.GetProperty("total"));
         Assert.NotNull(t.GetProperty("success"));
         Assert.NotNull(t.GetProperty("failed"));
         Assert.NotNull(t.GetProperty("skipped"));
         Assert.NotNull(t.GetProperty("rewatches"));
+        Assert.NotNull(t.GetProperty("requested"));
+    }
+
+    [Fact]
+    public void GetStats_RequestedEvents_AreCountedSeparatelyFromOtherStatuses()
+    {
+        // Unlike GetStats_ReturnsCurrentStats above, this isolates SyncHistory to a temp
+        // file so it can assert an exact requested count against a known mix of statuses,
+        // Seerr auto-request activity (Status=Requested) must not bleed into success/failed/
+        // skipped/rewatches, and vice versa.
+        var dataPath = Path.Combine(Path.GetTempPath(), "lbs-stats-" + Guid.NewGuid().ToString("N") + ".jsonl");
+        SyncHistory.DataPathOverride = dataPath;
+        SyncHistory.ResetForTesting();
+        try
+        {
+            // ControllerTestHarness.SetUsers substitutes the concrete Jellyfin User class,
+            // which NSubstitute can't proxy (no parameterless constructor). Build a real
+            // User instead, matching the pattern WatchlistSyncRunnerTests uses, and derive
+            // the harness's currentUserId from its actual generated Id.
+            var user = new User("alice", "test-provider-id", "test-reset-id");
+            var userIdHex = user.Id.ToString("N");
+
+            using var h = new ControllerTestHarness(currentUserId: userIdHex);
+            h.UserManager.GetUsers().Returns(new List<User> { user });
+
+            SyncHistory.Record(new SyncEvent
+            {
+                FilmTitle = "Sinners",
+                TmdbId = 1,
+                Username = "alice",
+                Timestamp = DateTime.UtcNow,
+                Status = SyncStatus.Success
+            });
+            SyncHistory.Record(new SyncEvent
+            {
+                FilmTitle = "Requested Film",
+                TmdbId = 2,
+                Username = "alice",
+                Timestamp = DateTime.UtcNow,
+                Status = SyncStatus.Requested,
+                Source = SyncEventSources.SeerrAutoRequestFilm
+            });
+            SyncHistory.Record(new SyncEvent
+            {
+                FilmTitle = "Requested Show",
+                TmdbId = 3,
+                Username = "alice",
+                Timestamp = DateTime.UtcNow,
+                Status = SyncStatus.Requested,
+                Source = SyncEventSources.SeerrAutoRequestTv
+            });
+
+            var result = h.Controller.GetStats();
+
+            var ok = Assert.IsType<OkObjectResult>(result);
+            var t = ok.Value!.GetType();
+            Assert.Equal(3, (int)t.GetProperty("total")!.GetValue(ok.Value)!);
+            Assert.Equal(1, (int)t.GetProperty("success")!.GetValue(ok.Value)!);
+            Assert.Equal(2, (int)t.GetProperty("requested")!.GetValue(ok.Value)!);
+        }
+        finally
+        {
+            SyncHistory.DataPathOverride = null;
+            SyncHistory.ResetForTesting();
+            try { File.Delete(dataPath); } catch { }
+        }
     }
 
     [Fact]

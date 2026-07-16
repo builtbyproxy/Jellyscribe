@@ -198,7 +198,7 @@ public class LetterboxdController : JellyfinUserApiController
     public ActionResult GetStats()
     {
         var jellyfinUsername = GetJellyfinUsername();
-        var (total, success, failed, skipped, rewatches) = SyncHistory.GetStats(jellyfinUsername);
+        var (total, success, failed, skipped, rewatches, requested) = SyncHistory.GetStats(jellyfinUsername);
         return Ok(new
         {
             total,
@@ -206,6 +206,7 @@ public class LetterboxdController : JellyfinUserApiController
             failed,
             skipped,
             rewatches,
+            requested,
             watchlist = WatchlistStats.GetFilm(GetCurrentUserId() ?? string.Empty)
         });
     }

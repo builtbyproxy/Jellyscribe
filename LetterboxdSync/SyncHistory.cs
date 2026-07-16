@@ -13,7 +13,12 @@ public enum SyncStatus
     Success,
     Skipped,
     Failed,
-    Rewatch
+    Rewatch,
+
+    /// <summary>A watchlist sync successfully auto-requested a title via Seerr. Not a
+    /// watch/diary outcome; see <see cref="SyncEventSources.SeerrAutoRequestFilm"/>/
+    /// <see cref="SyncEventSources.SeerrAutoRequestTv"/> for which watchlist triggered it.</summary>
+    Requested
 }
 
 /// <summary>
@@ -24,6 +29,12 @@ public static class SyncEventSources
 {
     /// <summary>DiaryImportTask marked a Jellyfin item played because it appeared on the user's Letterboxd diary.</summary>
     public const string DiaryImport = "diary-import";
+
+    /// <summary>WatchlistSyncRunner's Seerr auto-request step, for a Letterboxd (film) watchlist.</summary>
+    public const string SeerrAutoRequestFilm = "seerr-auto-request-film";
+
+    /// <summary>SerializdWatchlistSyncRunner's Seerr auto-request step, for a Serializd (TV) watchlist.</summary>
+    public const string SeerrAutoRequestTv = "seerr-auto-request-tv";
 }
 
 public class SyncEvent
@@ -350,7 +361,7 @@ public static class SyncHistory
         return false;
     }
 
-    public static (int Total, int Success, int Failed, int Skipped, int Rewatches) GetStats(string? username = null)
+    public static (int Total, int Success, int Failed, int Skipped, int Rewatches, int Requested) GetStats(string? username = null)
     {
         lock (_lock)
         {
@@ -366,7 +377,8 @@ public static class SyncHistory
                 list.Count(e => e.Status == SyncStatus.Success),
                 list.Count(e => e.Status == SyncStatus.Failed),
                 list.Count(e => e.Status == SyncStatus.Skipped),
-                list.Count(e => e.Status == SyncStatus.Rewatch)
+                list.Count(e => e.Status == SyncStatus.Rewatch),
+                list.Count(e => e.Status == SyncStatus.Requested)
             );
         }
     }
