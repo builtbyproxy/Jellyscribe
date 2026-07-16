@@ -101,8 +101,13 @@ separately, and no domain/DNS change ships until 0.1/0.2 are verified.
 
 ## 5. Infra
 
-- [ ] 5.1 `worker/` telemetry ingest Origin allowlist: add the new domain,
-      keep the old one live for the 301 transition period.
+- [x] 5.1 N/A: `worker/src/index.ts` has no Origin/CORS check to update.
+      The `/logs` and telemetry POST endpoints are authenticated
+      server-to-server (plugin → worker via `x-lbsync-key`), and the site's
+      manifest fetches (`site/src/pages/index.astro`,
+      `site/src/pages/releases.astro`) run in Astro frontmatter at build
+      time, not from browser JS. This task assumed an allowlist that was
+      never implemented; nothing to change.
 - [x] 5.2 DNS: point the new domain at the existing site host; configure
       `letterboxdsync.dev` → new domain 301. Keep the old domain registered
       (per design.md, never let it lapse to a squatter). Done via a
@@ -110,10 +115,11 @@ separately, and no domain/DNS change ships until 0.1/0.2 are verified.
       placeholder A records for `@`/`www` and two Page Rules 301'ing both
       to `https://jellyscribe.dev/$1`; MX/SPF records carried over so email
       forwarding survived the cutover.
-- [ ] 5.3 Confirm the plugin repository URL end users already have configured
-      (`https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`)
-      is unchanged by any of the above. This is the one item in this whole
-      change that must NOT move.
+- [x] 5.3 Confirmed: `curl -I https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
+      still returns 200 and the body still serves the `"name": "Jellyscribe"`
+      manifest entry. This URL lives on `workers.dev`, entirely independent
+      of the `letterboxdsync.dev`/`jellyscribe.dev` DNS cutover in 5.2, so
+      it was never at risk, verified anyway per the "must NOT move" note.
 - [ ] 5.4 Test: after 5.1-5.3 land, a manual check that a fresh Jellyfin
       instance can still add the existing repository URL and see the plugin
       (proves the worker/manifest path survived the domain change).
