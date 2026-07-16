@@ -1,23 +1,27 @@
 Was blocked on `add-serializd-tv-sync` shipping to `main` first; the
 maintainer chose to bundle both into `feat/serializd-tv-scrobble` instead
-(2026-07-15) rather than wait. Sections 0-4 below are executed on that
-branch. Section 5 (infra: DNS/domain) and the GitHub repo rename itself
-(6.3) remain explicitly deferred, the maintainer is doing the repo rename
-separately, and no domain/DNS change ships until 0.1/0.2 are verified.
+(2026-07-15) rather than wait. That branch has since merged to `main`
+(PR #94, `2.0.0.0`, followed by the `2.1.0.0` follow-up release).
+Sections 0-6 are all done as of 2026-07-16 except 4.3 (private agent-infra
+docs, separate repo/session) and 6.4 (too recent to confirm, re-check in a
+few days).
 
 ## 0. Verify before committing to anything
 
-- [ ] 0.1 `curl -I` the current
-      `raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json`
-      against GitHub's documented repo-rename redirect behavior (or a
-      throwaway test rename) to confirm raw content 301s survive a repo
-      rename. Record the result in this file. If redirects don't hold, keep
-      the repo name and rename display + domain only. Not run, deferred to
-      whenever the maintainer does the actual repo rename.
-- [ ] 0.2 Check `jellyscribe.dev` against a live registrar (design.md's
-      research only ruled out project-name collisions, not registration
-      status). `jellyscribe.app` and `jellyscribe.com` as fallbacks if taken.
-      Not checked yet.
+- [x] 0.1 Confirmed empirically: the repo is already renamed to
+      `builtbyproxy/Jellyscribe` on GitHub (see 6.3). `curl -I
+      https://raw.githubusercontent.com/builtbyproxy/jellyfin-plugin-letterboxd/main/manifest.json`
+      still returns 200 with the identical etag as the new-name path;
+      `https://github.com/builtbyproxy/jellyfin-plugin-letterboxd` 301s
+      to `.../Jellyscribe`; `git ls-remote` against the old URL resolves
+      fine. GitHub's docs don't explicitly cover raw.githubusercontent.com
+      redirects (only git ops and web traffic), so this was worth the
+      empirical check, redirects hold in practice, no repo-name rollback
+      needed.
+- [x] 0.2 `jellyscribe.dev` confirmed registered via RDAP
+      (`rdap.org/domain/jellyscribe.dev`): registrar Namecheap, status
+      active, registered 2026-07-14, expires 2027-07-14. Already the live
+      site domain (DNS/5.2), so no `.app`/`.com` fallback needed.
 - [x] 0.3 Decide the exact `AssemblyName` value. **Decided: `Jellyscribe`**
       (plain, matches the product name, no continuity suffix needed). See
       design.md's open question 3.
@@ -29,12 +33,19 @@ separately, and no domain/DNS change ships until 0.1/0.2 are verified.
       design.md's original brass pitch, see design.md's Palette section),
       replacing the Letterboxd-three-circles SVG. Same mark shipped inline
       in the site header/footer.
-- [ ] 1.2 App icon / OG-social image derived from the same mark, for link
-      previews (Twitter/Discord/Slack unfurls). Not done, no domain to
-      point them at yet (blocked on 0.2).
-- [ ] 1.3 Test: a visual regression baseline capture of the new favicon at
-      16/32/96px. Not done, no automated visual regression harness wired up
-      for `site/` yet.
+- [x] 1.2 Done. `site/public/og-image.png` (1200x630, bookmark-ribbon mark,
+      Midnight + Gold palette, hero copy) wired into
+      `site/src/layouts/Layout.astro`'s `og:image`/`twitter:image` meta tags
+      via `new URL('/og-image.png', Astro.site)`. Confirmed live at
+      `https://jellyscribe.dev/og-image.png` (200, byte-identical to the
+      local file), now that 0.2 confirmed the domain.
+- [x] 1.3 Done, as a manual baseline rather than automated harness (matches
+      2.3's precedent, `site/` has no visual regression/CI tooling at all
+      to hook into, e.g. no test framework in `site/package.json`, standing
+      one up was out of scope here). Rasterized `favicon.svg` via
+      `rsvg-convert` into `site/tests/visual-baselines/favicon-{16,32,96}.png`
+      plus a README explaining they're manual-diff references, not
+      CI-enforced.
 
 ## 2. Site rebuild
 
@@ -101,29 +112,72 @@ separately, and no domain/DNS change ships until 0.1/0.2 are verified.
 
 ## 5. Infra
 
-- [ ] 5.1 `worker/` telemetry ingest Origin allowlist: add the new domain,
-      keep the old one live for the 301 transition period.
-- [ ] 5.2 DNS: point the new domain at the existing site host; configure
+- [x] 5.1 N/A: `worker/src/index.ts` has no Origin/CORS check to update.
+      The `/logs` and telemetry POST endpoints are authenticated
+      server-to-server (plugin → worker via `x-lbsync-key`), and the site's
+      manifest fetches (`site/src/pages/index.astro`,
+      `site/src/pages/releases.astro`) run in Astro frontmatter at build
+      time, not from browser JS. This task assumed an allowlist that was
+      never implemented; nothing to change.
+- [x] 5.2 DNS: point the new domain at the existing site host; configure
       `letterboxdsync.dev` → new domain 301. Keep the old domain registered
-      (per design.md, never let it lapse to a squatter).
-- [ ] 5.3 Confirm the plugin repository URL end users already have configured
-      (`https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`)
-      is unchanged by any of the above. This is the one item in this whole
-      change that must NOT move.
-- [ ] 5.4 Test: after 5.1-5.3 land, a manual check that a fresh Jellyfin
-      instance can still add the existing repository URL and see the plugin
-      (proves the worker/manifest path survived the domain change).
+      (per design.md, never let it lapse to a squatter). Done via a
+      Cloudflare zone (nameservers moved off Namecheap) with proxied
+      placeholder A records for `@`/`www` and two Page Rules 301'ing both
+      to `https://jellyscribe.dev/$1`; MX/SPF records carried over so email
+      forwarding survived the cutover.
+- [x] 5.3 Confirmed: `curl -I https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
+      still returns 200 and the body still serves the `"name": "Jellyscribe"`
+      manifest entry. This URL lives on `workers.dev`, entirely independent
+      of the `letterboxdsync.dev`/`jellyscribe.dev` DNS cutover in 5.2, so
+      it was never at risk, verified anyway per the "must NOT move" note.
+- [x] 5.4 Done, end-to-end, on a throwaway container on the real media
+      server (`servarr`, via Tailscale, `jellyfin/jellyfin:latest`,
+      isolated name/port/no shared volumes, torn down after). Ran the
+      startup wizard and repository-add via the Jellyfin REST API: added
+      the exact repository URL end users have configured
+      (`https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`),
+      confirmed "Jellyscribe" appears in `/Packages` with `2.1.0.0` at the
+      top of its version list, installed it, restarted the server, and
+      confirmed via `/Plugins` it loads as `"Status": "Active"` with no
+      errors in the container logs (`Loaded plugin: Jellyscribe 2.1.0.0`,
+      sidebar injection task ran clean). Container removed afterward,
+      real `jellyfin` container on the host confirmed untouched throughout.
 
 ## 6. Ship
 
-- [ ] 6.1 One deliberate version bump (minor, not patch, a display-name and
-      branding change is significant enough to signal, even though nothing
-      structurally breaking changed) in `Directory.Build.props` +
-      `LetterboxdSync/LetterboxdSync.csproj`.
-- [ ] 6.2 `## Release notes` PR section + `site/src/data/release-notes.ts`
-      entry: user-facing prose explaining the rename, reassuring existing
-      users that nothing else changed (no re-install, no re-linking accounts,
-      auto-update continues working).
-- [ ] 6.3 GitHub repo renamed (only after 0.1 confirms the redirect holds).
-- [ ] 6.4 Confirm the ~190-server fleet still auto-updates post-rename
-      (download/telemetry counts keep ticking in the days after release).
+- [x] 6.1 Done, but as a *major* bump not minor: PR #94 (`6cd868e`) shipped
+      the rename alongside TV/Serializd support and bumped
+      `AssemblyVersion`/`FileVersion` `1.19.6.0` → `2.0.0.0` in both
+      `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`.
+      Per CLAUDE.md's own policy the version magnitude is the breaking
+      signal, not a PR-title `!`, so bundling the rename with a genuinely
+      new feature surface justified 2.0.0 over a minor bump. `2.1.0.0`
+      followed as a small follow-up release (dashboard credit line, TV
+      telemetry, Logs tab fix).
+- [x] 6.2 Done. The `v2.0.0.0` manifest changelog (confirmed live via
+      `raw.githubusercontent.com/.../manifest.json`) explains the rename in
+      user-facing prose and explicitly reassures on auto-update/account
+      continuity/unchanged repository URL. `site/src/data/release-notes.ts`
+      has the matching structured `2.0.0` entry (headline, summary, `new`
+      highlights) plus the `2.1.0` follow-up entry.
+- [x] 6.3 Already done: `gh api repos/builtbyproxy/Jellyscribe` and
+      `gh api repos/builtbyproxy/jellyfin-plugin-letterboxd` both resolve to
+      the same repo (`full_name: "builtbyproxy/Jellyscribe"`); local
+      `origin` remote already points at the new URL too. Confirmed by 0.1's
+      redirect test.
+- [~] 6.4 Partially checked, genuinely too early to close out. D1 query
+      (`install_hits`) shows manifest-poll traffic holding steady
+      post-rename: 449 unique IPs polling `manifest.json` the week of
+      2026-07-06, 398 the week of 2026-07-13 (v2.0.0 shipped mid-week,
+      v2.1.0 shipped 2026-07-15), no cliff. But the opt-in weekly telemetry
+      `pings` table shows *no* instance has reported in on `2.0.0.0` or
+      `2.1.0.0` yet as of 2026-07-16, latest weekly ping is still
+      `1.18.3.0` from 2026-07-13, the opt-in fleet is a small, low-single-
+      digit-percent slice of the ~190 total (order of tens of pings/week vs.
+      hundreds of manifest polls), and both releases are too recent (1-4
+      days) for a full weekly ping cycle to have completed. Re-check the
+      `pings` table in a few days for `2.x` version strings before calling
+      this confirmed; the manifest-poll numbers alone are a good but
+      incomplete signal (they show the fleet is still requesting updates,
+      not that the update itself succeeded).
