@@ -83,7 +83,7 @@
       `statusText` ternaries (lines ~155 and ~219) to include `Requested`,
       and add a `statRequested` stat tile alongside `statSuccess`/
       `statRewatches`/`statSkipped`/`statFailed`.
-- [ ] 6.3 Test: no automated visual regression harness for `site/` or the
+- [x] 6.3 Test: no automated visual regression harness for `site/` or the
       embedded `Web/` dashboard (matches the precedent in
       `rebrand-jellyscribe`'s tasks.md 2.3/1.3); verify manually via the
       `/browse` skill, trigger a watchlist sync against a test Seerr
@@ -92,10 +92,10 @@
 
 ## 7. Release
 
-- [ ] 7.1 Version bump (patch, this is additive dashboard visibility, not
+- [x] 7.1 Version bump (patch, this is additive dashboard visibility, not
       a breaking change) in `Directory.Build.props` and
       `LetterboxdSync/LetterboxdSync.csproj`.
-- [ ] 7.2 `## Release notes` PR section + `site/src/data/release-notes.ts`
+- [x] 7.2 `## Release notes` PR section + `site/src/data/release-notes.ts`
       entry: user-facing prose explaining that successful (and failed)
       watchlist auto-requests now show up in sync history instead of only
       the server log.
