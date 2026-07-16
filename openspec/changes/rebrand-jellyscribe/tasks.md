@@ -103,9 +103,13 @@ separately, and no domain/DNS change ships until 0.1/0.2 are verified.
 
 - [ ] 5.1 `worker/` telemetry ingest Origin allowlist: add the new domain,
       keep the old one live for the 301 transition period.
-- [ ] 5.2 DNS: point the new domain at the existing site host; configure
+- [x] 5.2 DNS: point the new domain at the existing site host; configure
       `letterboxdsync.dev` → new domain 301. Keep the old domain registered
-      (per design.md, never let it lapse to a squatter).
+      (per design.md, never let it lapse to a squatter). Done via a
+      Cloudflare zone (nameservers moved off Namecheap) with proxied
+      placeholder A records for `@`/`www` and two Page Rules 301'ing both
+      to `https://jellyscribe.dev/$1`; MX/SPF records carried over so email
+      forwarding survived the cutover.
 - [ ] 5.3 Confirm the plugin repository URL end users already have configured
       (`https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`)
       is unchanged by any of the above. This is the one item in this whole
