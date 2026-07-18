@@ -118,7 +118,7 @@ These apply the same way whether the account is a Letterboxd (film) or Serializd
 ### Dashboard
 
 The **Dashboard** tab shows the same for both Letterboxd and Serializd accounts:
-- Sync statistics (total, synced, rewatches, skipped, failed)
+- Sync statistics (total, synced, rewatches, skipped, failed, requested)
 - Recent activity with links to each title on Letterboxd or Serializd
 - **Run Sync Now** button to trigger a sync on demand
 - **Review** buttons to write and post reviews directly to Letterboxd or Serializd
