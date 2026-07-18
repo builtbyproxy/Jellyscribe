@@ -14,9 +14,9 @@
 - **What's new:** [release notes for every version](https://jellyscribe.dev/releases/)
 - **Built with AI:** most of this plugin is AI-written, human-reviewed, [full transparency in AI.md](AI.md)
 
-Automatically sync your Jellyfin watch history to your Letterboxd diary. Films are logged in real-time when you finish watching, with a daily scheduled sync as a safety net.
+Automatically sync your Jellyfin watch history to your Letterboxd diary (films) and Serializd diary (TV). Titles are logged in real-time when you finish watching, with a daily scheduled sync as a safety net.
 
-Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
+Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`) and Serializd's API.
 
 <img alt="Jellyscribe dashboard inside the Jellyfin admin UI, showing sync stats and recent activity" src="docs/images/dashboard.png" />
 
@@ -24,34 +24,36 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 
 ### Syncing
 
-- **Real-time sync**, films logged to your diary the moment you finish watching
+- **Real-time sync**, titles logged to your diary the moment you finish watching
 - **Daily catch-up**, scheduled task picks up anything missed
-- **Multi-user**, each Jellyfin user can link their own Letterboxd account
-- **TMDb matching**, films matched by TMDb ID, so foreign titles and special characters work
-- **Duplicate detection**, won't log the same film twice on the same day
+- **Multi-user, multi-account**, each Jellyfin user can link their own Letterboxd account, Serializd account, or both
+- **TMDb matching**, films and episodes matched by TMDb ID, so foreign titles and special characters work
+- **Duplicate detection**, won't log the same title twice on the same day
 - **Rewatch detection**, real-time playback automatically marks rewatches
-- **Date filtering**, limit catch-up syncs to recently watched films
+- **Date filtering**, limit catch-up syncs to recently watched titles
 
 ### Ratings, reviews & diary
 
-- **Rating sync, both ways**, Jellyfin ratings (0-10) mapped to Letterboxd stars (0.5-5.0), and Letterboxd ratings seed your Jellyfin user ratings
-- **Favorites**, sync Jellyfin favorites as Letterboxd likes
-- **Reviews**, write and post reviews to Letterboxd from the plugin dashboard
-- **Diary import**, mark Jellyfin movies as played if they're in your Letterboxd diary
+- **Rating sync, both ways**, Jellyfin ratings (0-10) map to Letterboxd stars (0.5-5.0) or Serializd's 1-10 scale, and ratings you set on either service seed your Jellyfin user rating back
+- **Favorites**, sync Jellyfin favorites as Letterboxd likes or Serializd likes
+- **Reviews**, write and post reviews to Letterboxd (films) or Serializd (shows or individual episodes) from the plugin dashboard
+- **Diary import**, mark Jellyfin movies or episodes as played if they're already in your Letterboxd or Serializd diary
 
-### TV shows → Serializd (beta)
+### TV shows → Serializd
 
-- **TV sync**, finished TV episodes are logged to your [Serializd](https://www.serializd.com) watched list in real time, the TV counterpart to the Letterboxd film sync
-- **Per-user accounts**, each Jellyfin user links their own Serializd account (by email or username) on the TV / Serializd tab, with a Verify login button and passwords encrypted at rest
+Full feature parity with the Letterboxd side: real-time sync, ratings, reviews, favorites, diary import, rewatch detection, watchlist sync, and Seerr auto-request/backfill/mirror all work the same way for [Serializd](https://www.serializd.com) as they do for Letterboxd, just scoped to TV episodes instead of films.
+
+- **TV sync**, finished TV episodes are logged to your Serializd watched list in real time, the TV counterpart to the Letterboxd film sync
+- **Per-user accounts**, each Jellyfin user links their own Serializd account (by email or username), with a Verify login button and passwords encrypted at rest
 - **Daily catch-up**, a "Sync watched TV to Serializd" scheduled task picks up anything real-time missed, plus a Sync TV Now button
 - **TMDb matching**, episodes matched by their series' TMDb id + season/episode number
 - **Isolated from Letterboxd**, films still sync to Letterboxd; a Serializd failure never blocks the Letterboxd path, or vice versa
-- Ratings, reviews, and backdated diary entries for TV are planned next
+- **No cookie fallback needed**, Serializd's API never needs the Cloudflare cookie workaround Letterboxd sometimes does (see [Cloudflare issues](#cloudflare-issues) below), so TV sync has nothing to babysit
 
 ### Watchlist & Seerr
 
-- **Watchlist sync**, import your Letterboxd watchlist as a Jellyfin playlist
-- **Seerr integration**, auto-request watchlist films missing from your library, attributed to the right user; optionally backfill requests for films that arrived outside Seerr, and mirror your Letterboxd watchlist into Seerr
+- **Watchlist sync**, import your Letterboxd or Serializd watchlist as a Jellyfin playlist (Serializd also gets a Jellyfin collection for the shows themselves)
+- **Seerr integration**, auto-request watchlisted films or shows missing from your library, attributed to the right user; optionally backfill requests for titles that arrived outside Seerr, and mirror your Letterboxd or Serializd watchlist into Seerr
 
 ### Dashboard & diagnostics
 
@@ -92,30 +94,34 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`).
 
 That's it. Watch a movie and check your Letterboxd diary.
 
+Adding a Serializd account works the same way, just enter your Serializd email/username and password instead; a Jellyfin user can link a Letterboxd account, a Serializd account, or both.
+
 ### Settings per account
+
+These apply the same way whether the account is a Letterboxd (film) or Serializd (TV) account, just scoped to the matching media type.
 
 | Setting | Description |
 |---|---|
 | **Enabled** | Master switch for this account; nothing syncs while unchecked, saved settings are kept |
-| **Favorites as liked** | Marks films as "liked" on Letterboxd if favorited in Jellyfin |
-| **Recently played only** | Limits daily catch-up to films played in the last N days |
-| **Primary account** | When one Jellyfin user links multiple Letterboxd accounts, the primary wins on rating-import conflicts and is preselected in the review modal |
-| **Watchlist to playlist** | Mirrors your Letterboxd watchlist into a Jellyfin playlist daily; each account gets its own playlist (name configurable) |
-| **Auto-request via Seerr** | Watchlisted films missing from your library are requested in Seerr, attributed to this user's Seerr account (set the Seerr URL and API key above the account list) |
-| **Backfill available requests** | Extends auto-request to films already in the library that have no request record, so films that arrived outside Seerr still show a requester; never triggers re-downloads |
-| **Mirror into Seerr watchlist** | Two-way mirror of your Letterboxd watchlist into your Seerr user's own watchlist (movies only) |
-| **Import diary as played** | Marks Jellyfin movies as played if they appear in your Letterboxd diary |
-| **Skip previously synced** | Uses the plugin's local sync history to skip films already logged without hitting Letterboxd; recommended, especially on large libraries |
-| **Stop on failure** | Halts the run at the first failed film to avoid inflaming rate limits; the rest are picked up next run |
-| **Raw Cookies** | For Cloudflare bypass, see below |
+| **Favorites as liked** | Marks the title as "liked" on Letterboxd or Serializd if favorited in Jellyfin |
+| **Recently played only** | Limits daily catch-up to titles played in the last N days |
+| **Primary account** | When one Jellyfin user links multiple accounts on the same service, the primary wins on rating-import conflicts and is preselected in the review modal |
+| **Watchlist to playlist** | Mirrors your Letterboxd or Serializd watchlist into a Jellyfin playlist daily; each account gets its own playlist (name configurable) |
+| **Auto-request via Seerr** | Watchlisted films or shows missing from your library are requested in Seerr, attributed to this user's Seerr account (set the Seerr URL and API key above the account list) |
+| **Backfill available requests** | Extends auto-request to titles already in the library that have no request record, so titles that arrived outside Seerr still show a requester; never triggers re-downloads |
+| **Mirror into Seerr watchlist** | Two-way mirror of your watchlist into your Seerr user's own watchlist (movies for Letterboxd accounts, TV for Serializd accounts) |
+| **Import diary as played** | Marks Jellyfin movies or episodes as played if they appear in your Letterboxd or Serializd diary |
+| **Skip previously synced** | Uses the plugin's local sync history to skip titles already logged without hitting Letterboxd/Serializd; recommended, especially on large libraries |
+| **Stop on failure** | Halts the run at the first failure to avoid inflaming rate limits; the rest are picked up next run |
+| **Raw Cookies** | For Cloudflare bypass, Letterboxd accounts only, see below |
 
 ### Dashboard
 
-The **Dashboard** tab shows:
+The **Dashboard** tab shows the same for both Letterboxd and Serializd accounts:
 - Sync statistics (total, synced, rewatches, skipped, failed)
-- Recent activity with links to each film on Letterboxd
+- Recent activity with links to each title on Letterboxd or Serializd
 - **Run Sync Now** button to trigger a sync on demand
-- **Review** buttons to write and post reviews directly to Letterboxd
+- **Review** buttons to write and post reviews directly to Letterboxd or Serializd
 
 ### Cloudflare issues
 
@@ -153,11 +159,13 @@ When enabled, one small ping is sent per week, plus one extra ping (capped at on
   "schema_version": 1,
   "instance_id": "8a6f4f6e-1f2b-4c43-9a57-2f0e6f3b9d1c",
   "ping_type": "weekly",
-  "plugin_version": "1.16.0.0",
+  "plugin_version": "2.1.0.0",
   "jellyfin_version": "10.11.11",
-  "features": { "watchlist_sync": true, "diary_import": false, "...": "booleans of which settings are enabled" },
-  "buckets": { "accounts": "1", "library": "2k-10k", "syncs_per_week": "1-10", "syncs_ever": "11-100" },
-  "errors": { "cloudflare_403": 0, "auth_failure": 0, "tmdb_lookup": 0, "jellyseerr_error": 0, "other": 0,
+  "features": { "watchlist_sync": true, "diary_import": false, "tv_watchlist_sync": false, "tv_diary_import": false,
+                 "...": "booleans of which Letterboxd and Serializd settings are enabled" },
+  "buckets": { "accounts": "1", "library": "2k-10k", "syncs_per_week": "1-10", "syncs_ever": "11-100",
+               "tv_syncs_per_week": "0", "tv_syncs_ever": "0" },
+  "errors": { "cloudflare_403": 0, "auth_failure": 0, "tmdb_lookup": 0, "jellyseerr_error": 0, "rate_limit": 0, "other": 0,
               "state": { "cloudflare_403": false, "...": "which error types are currently occurring" } }
 }
 ```
@@ -187,8 +195,8 @@ Unlike the anonymous telemetry above, **logs are not anonymous**, they can conta
 
 - Jellyfin 10.11+ (current releases are also known to run on the Jellyfin 12.0 release candidates; official 12.0 support will be declared once 12.0 stable ships and passes verification, see `openspec/changes/add-jellyfin-12-support/`)
   - Migrating your server to Jellyfin 12? It is safe to follow Jellyfin's advice and remove the plugin first: your accounts, settings, and sync history all survive a reinstall from the catalog.
-- A Letterboxd account
-- [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), required for the Letterboxd link to appear in the Jellyfin sidebar (everything else works without it)
+- A Letterboxd and/or Serializd account
+- [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), required for the Jellyscribe link to appear in the Jellyfin sidebar (everything else works without it)
 - Optional: a [Seerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations
 
 ## Building from source
