@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.1.1.0",
+        "changelog": "Watchlist auto-requests now show up in your sync history. If your watchlist syncs with \"auto-request via Jellyseerr\" turned on, a successful request used to only ever show up in the server log, there was no way to see it from the dashboard itself. Now every title your watchlist successfully requests (film or TV) gets its own entry in your sync history, with the real title, right alongside your regular Letterboxd and Serializd activity. A request that fails shows up too, so if Jellyseerr rejects something you can see exactly what and when instead of wondering why your watchlist \"isn't working.\"",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.1.1/jellyfin-plugin-letterboxd-v2.1.1.zip",
+        "checksum": "c3ade98e110dba8200035b65a18dfefa",
+        "timestamp": "2026-07-18T04:41:15Z"
+      },
+      {
         "version": "2.1.0.0",
         "changelog": "A few follow-ups to the 2.0.0 rebrand. The admin and user dashboard headers lost their \"by Lachlan Young and AI\" credit line during the redesign, it's back. The opt-in anonymous telemetry, which only ever counted Letterboxd film syncs, now counts Serializd TV syncs and errors too, since that pipeline was never touched when TV support was built. And the Logs tab's Refresh button, which had been dumping a raw JSON blob into the panel instead of readable log lines, now shows the actual logs.",
         "targetAbi": "10.11.9.0",
