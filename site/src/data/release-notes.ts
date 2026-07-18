@@ -10,6 +10,19 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.1.1',
+    headline: 'Watchlist auto-requests now show up in your sync history',
+    summary:
+      'If your watchlist syncs with "auto-request via Jellyseerr" turned on, a successful request used to only ever show up in the server log, there was no way to see it from the dashboard itself. Now every title your watchlist successfully requests (film or TV) gets its own entry in your sync history, with the real title, right alongside your regular Letterboxd and Serializd activity. A request that fails shows up too, so if Jellyseerr rejects something you can see exactly what and when instead of wondering why your watchlist "isn\'t working."',
+    highlights: {
+      new: [
+        'Sync history gets a new "Requested" entry for every title your watchlist successfully auto-requests via Jellyseerr, film or TV, with its real title.',
+        'Failed auto-requests show up too, so a Jellyseerr rejection is visible on the dashboard instead of only in the server log.',
+        'The Stats page counts these separately from your regular sync activity.',
+      ],
+    },
+  },
+  {
     version: '2.1.0',
     headline: 'Telemetry now covers TV syncs, the dashboard credit is back, and Logs actually refresh',
     summary:

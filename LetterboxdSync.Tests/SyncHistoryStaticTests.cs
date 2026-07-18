@@ -163,15 +163,17 @@ public class SyncHistoryStaticTests : IDisposable
         SyncHistory.Record(MakeEvent("alice", 3, SyncStatus.Failed));
         SyncHistory.Record(MakeEvent("alice", 4, SyncStatus.Skipped));
         SyncHistory.Record(MakeEvent("alice", 5, SyncStatus.Rewatch));
+        SyncHistory.Record(MakeEvent("alice", 6, SyncStatus.Requested));
         SyncHistory.ResetForTesting();
 
-        var (total, success, failed, skipped, rewatches) = SyncHistory.GetStats();
+        var (total, success, failed, skipped, rewatches, requested) = SyncHistory.GetStats();
 
-        Assert.Equal(5, total);
+        Assert.Equal(6, total);
         Assert.Equal(2, success);
         Assert.Equal(1, failed);
         Assert.Equal(1, skipped);
         Assert.Equal(1, rewatches);
+        Assert.Equal(1, requested);
     }
 
     [Fact]
@@ -182,11 +184,64 @@ public class SyncHistoryStaticTests : IDisposable
         SyncHistory.Record(MakeEvent("bob", 3, SyncStatus.Failed));
         SyncHistory.ResetForTesting();
 
-        var (total, success, failed, _, _) = SyncHistory.GetStats(username: "bob");
+        var (total, success, failed, _, _, _) = SyncHistory.GetStats(username: "bob");
 
         Assert.Equal(2, total);
         Assert.Equal(1, success);
         Assert.Equal(1, failed);
+    }
+
+    [Fact]
+    public void Record_SeerrAutoRequestEvents_SurviveJsonlRoundTrip()
+    {
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = "Requested Film",
+            TmdbId = 111,
+            Username = "alice",
+            Timestamp = DateTime.UtcNow,
+            Status = SyncStatus.Requested,
+            Source = SyncEventSources.SeerrAutoRequestFilm
+        });
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = "Requested Show",
+            TmdbId = 222,
+            Username = "alice",
+            Timestamp = DateTime.UtcNow,
+            Status = SyncStatus.Requested,
+            Source = SyncEventSources.SeerrAutoRequestTv
+        });
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = "Failed Request",
+            TmdbId = 333,
+            Username = "alice",
+            Timestamp = DateTime.UtcNow,
+            Status = SyncStatus.Failed,
+            Source = SyncEventSources.SeerrAutoRequestFilm,
+            Error = "Seerr request failed for TMDb 333: 500"
+        });
+
+        // Force a reload from disk so this exercises the JSONL (de)serialization path,
+        // not just the in-memory list Record() also appended to.
+        SyncHistory.ResetForTesting();
+
+        var (events, total) = SyncHistory.GetPage(0, 10, "alice");
+
+        Assert.Equal(3, total);
+        var requestedFilm = events.Single(e => e.TmdbId == 111);
+        Assert.Equal(SyncStatus.Requested, requestedFilm.Status);
+        Assert.Equal(SyncEventSources.SeerrAutoRequestFilm, requestedFilm.Source);
+
+        var requestedTv = events.Single(e => e.TmdbId == 222);
+        Assert.Equal(SyncStatus.Requested, requestedTv.Status);
+        Assert.Equal(SyncEventSources.SeerrAutoRequestTv, requestedTv.Source);
+
+        var failedRequest = events.Single(e => e.TmdbId == 333);
+        Assert.Equal(SyncStatus.Failed, failedRequest.Status);
+        Assert.Equal(SyncEventSources.SeerrAutoRequestFilm, failedRequest.Source);
+        Assert.Equal("Seerr request failed for TMDb 333: 500", failedRequest.Error);
     }
 
     [Fact]

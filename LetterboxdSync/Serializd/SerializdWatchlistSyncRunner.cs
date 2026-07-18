@@ -264,12 +264,55 @@ public class SerializdWatchlistSyncRunner
             foreach (var (tmdb, seasons) in requests)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var result = await seerr.RequestSeriesAsync(tmdb, seerrUserId.Value, seasons, account.BackfillAvailableRequests).ConfigureAwait(false);
-                switch (result)
+                try
                 {
-                    case SeerrClient.RequestResult.Requested: requested++; break;
-                    case SeerrClient.RequestResult.AlreadyExists: existing++; break;
-                    default: failed++; break;
+                    var (result, title) = await seerr.RequestSeriesAsync(tmdb, seerrUserId.Value, seasons, account.BackfillAvailableRequests).ConfigureAwait(false);
+                    switch (result)
+                    {
+                        case SeerrClient.RequestResult.Requested:
+                            requested++;
+                            SyncHistory.Record(new SyncEvent
+                            {
+                                FilmTitle = title ?? $"TMDb {tmdb}",
+                                TmdbId = tmdb,
+                                Username = user.Username!,
+                                Timestamp = DateTime.UtcNow,
+                                Status = SyncStatus.Requested,
+                                Source = SyncEventSources.SeerrAutoRequestTv
+                            });
+                            break;
+                        case SeerrClient.RequestResult.AlreadyExists:
+                            existing++;
+                            break;
+                        default:
+                            failed++;
+                            SyncHistory.Record(new SyncEvent
+                            {
+                                FilmTitle = title ?? $"TMDb {tmdb}",
+                                TmdbId = tmdb,
+                                Username = user.Username!,
+                                Timestamp = DateTime.UtcNow,
+                                Status = SyncStatus.Failed,
+                                Source = SyncEventSources.SeerrAutoRequestTv,
+                                Error = $"Seerr TV request failed for TMDb {tmdb}"
+                            });
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Seerr TV request errored for TMDb {TmdbId}: {Message}", tmdb, ex.Message);
+                    failed++;
+                    SyncHistory.Record(new SyncEvent
+                    {
+                        FilmTitle = $"TMDb {tmdb}",
+                        TmdbId = tmdb,
+                        Username = user.Username!,
+                        Timestamp = DateTime.UtcNow,
+                        Status = SyncStatus.Failed,
+                        Source = SyncEventSources.SeerrAutoRequestTv,
+                        Error = ex.Message
+                    });
                 }
             }
 

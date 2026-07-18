@@ -305,18 +305,53 @@ public class WatchlistSyncRunner
                 cancellationToken.ThrowIfCancellationRequested();
                 try
                 {
-                    var result = await jellyseerr!.RequestMovieAsync(tmdbId, jellyseerrUserId.Value, account.BackfillAvailableRequests).ConfigureAwait(false);
+                    var (result, title) = await jellyseerr!.RequestMovieAsync(tmdbId, jellyseerrUserId.Value, account.BackfillAvailableRequests).ConfigureAwait(false);
                     switch (result)
                     {
-                        case SeerrClient.RequestResult.Requested: requested++; break;
-                        case SeerrClient.RequestResult.AlreadyExists: alreadyExists++; break;
-                        default: failed++; break;
+                        case SeerrClient.RequestResult.Requested:
+                            requested++;
+                            SyncHistory.Record(new SyncEvent
+                            {
+                                FilmTitle = title ?? $"TMDb {tmdbId}",
+                                TmdbId = tmdbId,
+                                Username = user.Username!,
+                                Timestamp = DateTime.UtcNow,
+                                Status = SyncStatus.Requested,
+                                Source = SyncEventSources.SeerrAutoRequestFilm
+                            });
+                            break;
+                        case SeerrClient.RequestResult.AlreadyExists:
+                            alreadyExists++;
+                            break;
+                        default:
+                            failed++;
+                            SyncHistory.Record(new SyncEvent
+                            {
+                                FilmTitle = title ?? $"TMDb {tmdbId}",
+                                TmdbId = tmdbId,
+                                Username = user.Username!,
+                                Timestamp = DateTime.UtcNow,
+                                Status = SyncStatus.Failed,
+                                Source = SyncEventSources.SeerrAutoRequestFilm,
+                                Error = $"Seerr request failed for TMDb {tmdbId}"
+                            });
+                            break;
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning("Seerr request errored for TMDb {TmdbId}: {Message}", tmdbId, ex.Message);
                     failed++;
+                    SyncHistory.Record(new SyncEvent
+                    {
+                        FilmTitle = $"TMDb {tmdbId}",
+                        TmdbId = tmdbId,
+                        Username = user.Username!,
+                        Timestamp = DateTime.UtcNow,
+                        Status = SyncStatus.Failed,
+                        Source = SyncEventSources.SeerrAutoRequestFilm,
+                        Error = ex.Message
+                    });
                 }
             }
             _logger.LogInformation(

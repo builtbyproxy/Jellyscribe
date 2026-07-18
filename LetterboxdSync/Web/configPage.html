@@ -613,7 +613,7 @@
                                     btn = '<button type="button" class="ws-review-btn" onclick="WS.openReview(\'' + source + '\',' + (e.TmdbId || 0) + ',\'' + show + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>';
                                 }
                                 if (e.Source === 'review') status = 'Reviewed';
-                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'FL') + '</span>' +
+                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'MV') + '</span>' +
                                     '<div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td>' +
                                     '<td>' + self.pillHtml(status, e.Error) + '</td>' +
                                     '<td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
@@ -724,7 +724,7 @@
                             else feats = [['Favourites', a.SyncFavorites], ['Watchlist', a.EnableWatchlistSync], ['Seerr', a.AutoRequestWatchlist], ['Import', a.EnableDiaryImport], ['Cookies', !!a.RawCookies]];
                             var chips = feats.map(function (f) { return self.featChip(f[0], f[1]); }).join('');
                             return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '">' +
-                                '<div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'FL') + '</span>' +
+                                '<div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'MV') + '</span>' +
                                 '<div style="min-width:0;"><div class="u" title="' + uname + '">' + uname + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' +
                                 (a.IsPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div>' +
                                 '<div class="ws-featchips">' + chips + '</div>' +
