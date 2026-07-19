@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using LetterboxdSync;
 using MediaBrowser.Model.Tasks;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -12,6 +14,23 @@ namespace LetterboxdSync.Tests;
 
 public class SidebarInjectionTaskTests
 {
+    /// <summary>Captures log entries (including the passed exception) for assertions.</summary>
+    private sealed class ListLogger<T> : ILogger<T>
+    {
+        public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            lock (Entries) { Entries.Add((logLevel, formatter(state, exception), exception)); }
+        }
+    }
+
+    private static Func<TimeSpan, CancellationToken, Task> NoOpDelay(List<TimeSpan> recorded) =>
+        (delay, _) => { lock (recorded) recorded.Add(delay); return Task.CompletedTask; };
+
+
     [Fact]
     public void Metadata_NameKeyDescriptionCategory_AreSet()
     {
@@ -70,6 +89,102 @@ public class SidebarInjectionTaskTests
         private readonly List<T> _values = new();
         public IReadOnlyList<T> Values { get { lock (_lock) return _values.ToList(); } }
         public void Report(T value) { lock (_lock) _values.Add(value); }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RegisterSucceedsFirstTry_DoesNotRetry()
+    {
+        var logs = new ListLogger<SidebarInjectionTask>();
+        var delays = new List<TimeSpan>();
+        var attempts = 0;
+        var task = new SidebarInjectionTask(logs)
+        {
+            RegisterAttemptOverride = () => attempts++,
+            DelayOverride = NoOpDelay(delays),
+        };
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Equal(1, attempts);
+        Assert.Empty(delays);
+        Assert.Contains(logs.Entries, e => e.Level == LogLevel.Information
+            && e.Message.Contains("registered successfully"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RegisterFailsThenSucceeds_RetriesAndSucceeds()
+    {
+        var logs = new ListLogger<SidebarInjectionTask>();
+        var delays = new List<TimeSpan>();
+        var attempts = 0;
+        var task = new SidebarInjectionTask(logs)
+        {
+            RegisterAttemptOverride = () =>
+            {
+                attempts++;
+                if (attempts < SidebarInjectionTask.MaxAttempts)
+                    throw new InvalidOperationException("File Transformation not ready yet");
+            },
+            DelayOverride = NoOpDelay(delays),
+        };
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Equal(SidebarInjectionTask.MaxAttempts, attempts);
+        Assert.Equal(SidebarInjectionTask.MaxAttempts - 1, delays.Count);
+        Assert.Contains(logs.Entries, e => e.Level == LogLevel.Information
+            && e.Message.Contains("registered successfully"));
+        Assert.DoesNotContain(logs.Entries, e => e.Level == LogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RegisterAlwaysFails_RetriesMaxAttemptsThenLogsWarning()
+    {
+        var logs = new ListLogger<SidebarInjectionTask>();
+        var delays = new List<TimeSpan>();
+        var attempts = 0;
+        var task = new SidebarInjectionTask(logs)
+        {
+            RegisterAttemptOverride = () =>
+            {
+                attempts++;
+                throw new InvalidOperationException("File Transformation still not ready");
+            },
+            DelayOverride = NoOpDelay(delays),
+        };
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Equal(SidebarInjectionTask.MaxAttempts, attempts);
+        Assert.Equal(SidebarInjectionTask.MaxAttempts - 1, delays.Count);
+
+        var warning = Assert.Single(logs.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains($"after {SidebarInjectionTask.MaxAttempts} attempt", warning.Message);
+        Assert.DoesNotContain(logs.Entries, e => e.Message.Contains("registered successfully"));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_UnwrapsTargetInvocationException_LogsRealInnerException()
+    {
+        // The production failure path goes through reflection (MethodInfo.Invoke), which
+        // always wraps the real exception in a TargetInvocationException whose own .Message
+        // is a generic, useless string. This is the class of bug that made the original
+        // production failure undiagnosable without temporarily raising the log level.
+        var logs = new ListLogger<SidebarInjectionTask>();
+        var delays = new List<TimeSpan>();
+        var inner = new NullReferenceException("File Transformation's internal registry wasn't initialized yet");
+        var task = new SidebarInjectionTask(logs)
+        {
+            RegisterAttemptOverride = () => throw new TargetInvocationException(inner),
+            DelayOverride = NoOpDelay(delays),
+        };
+
+        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+
+        var warning = Assert.Single(logs.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Same(inner, warning.Exception);
+        Assert.Contains(inner.Message, warning.Message);
+        Assert.DoesNotContain("target of an invocation", warning.Message);
     }
 }
 

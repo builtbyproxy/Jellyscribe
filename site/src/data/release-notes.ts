@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.1.2',
+    headline: 'Sidebar link now reliably survives a Jellyfin restart',
+    summary:
+      'The sidebar link this plugin adds to Jellyfin\'s nav is injected by registering with the File Transformation plugin once, at Jellyfin startup. That registration was racing File Transformation\'s own startup init, so on some restarts (including scheduled ones) it silently failed and the link just never appeared, with nothing in the logs beyond a generic, undiagnosable error. Registration now retries a few times before giving up, and a real failure logs the actual cause instead of a useless wrapper message.',
+    highlights: {
+      fixes: [
+        'Sidebar link registration now retries (with a short delay) instead of giving up after a single attempt, so it no longer depends on winning a startup race against the File Transformation plugin on every Jellyfin restart.',
+        'A registration failure now logs the real underlying exception instead of reflection\'s generic "Exception has been thrown by the target of an invocation" message.',
+      ],
+    },
+  },
+  {
     version: '2.1.1',
     headline: 'Watchlist auto-requests now show up in your sync history',
     summary:
