@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.1.2.0",
+        "changelog": "The sidebar link this plugin adds to Jellyfin's nav is injected by registering with the File Transformation plugin once, at Jellyfin startup. That registration was racing File Transformation's own startup init, so on some restarts (including scheduled ones) it silently failed and the link just never appeared, with nothing in the logs beyond a generic, undiagnosable error. Registration now retries a few times before giving up, and a real failure logs the actual cause instead of a useless wrapper message.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.1.2/jellyfin-plugin-letterboxd-v2.1.2.zip",
+        "checksum": "6ed61337e3143e5c078be862569cb885",
+        "timestamp": "2026-07-19T06:29:42Z"
+      },
+      {
         "version": "2.1.1.0",
         "changelog": "Watchlist auto-requests now show up in your sync history. If your watchlist syncs with \"auto-request via Jellyseerr\" turned on, a successful request used to only ever show up in the server log, there was no way to see it from the dashboard itself. Now every title your watchlist successfully requests (film or TV) gets its own entry in your sync history, with the real title, right alongside your regular Letterboxd and Serializd activity. A request that fails shows up too, so if Jellyseerr rejects something you can see exactly what and when instead of wondering why your watchlist \"isn't working.\"",
         "targetAbi": "10.11.9.0",
