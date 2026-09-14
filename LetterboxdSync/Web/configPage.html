@@ -317,6 +317,7 @@
                                 <p class="ws-muted" style="font-size:12.5px;margin-top:0;">Auto-request titles missing from the library (films and TV shows).</p>
                                 <div class="ws-row"><label class="ws-field">Seerr URL</label><input type="text" class="ws-input" id="jellyseerrUrl" placeholder="http://192.168.1.122:5055" /></div>
                                 <div class="ws-row"><label class="ws-field">Seerr API key</label><input type="password" class="ws-input" id="jellyseerrApiKey" placeholder="Settings → General → API Key" /></div>
+                                <label class="ws-checks" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px;margin:4px 0 12px;"><input type="checkbox" id="autoApproveJellyseerr" /><span>Auto-approve requests created by Jellyscribe<span class="desc" style="display:block;color:var(--ws-faint);font-size:11.5px;">Seerr only sends a request to Radarr/Sonarr once it's approved, and it decides that from the permissions of the user the request belongs to — not from this API key. Without this, requests from users who lack Auto-Approve sit in Seerr's pending queue and nothing downloads. Turn it off to review them yourself.</span></span></label>
                                 <div style="display:flex;gap:10px;align-items:center;"><button type="button" class="ws-btn" id="testJellyseerrBtn">Test connection</button><span id="jellyseerrTestStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
                             </div>
                             <div class="ws-panel" style="padding:18px;">
@@ -427,6 +428,9 @@
                                     self.loadOverview();
                                     document.getElementById('jellyseerrUrl').value = c.JellyseerrUrl || '';
                                     document.getElementById('jellyseerrApiKey').value = c.JellyseerrApiKey || '';
+                                    // Default on: older configs predate the field, and the option exists
+                                    // because pending requests never reach Radarr/Sonarr.
+                                    document.getElementById('autoApproveJellyseerr').checked = c.AutoApproveJellyseerrRequests !== false;
                                     document.getElementById('telemetryEnabled').checked = !!(c.Telemetry && c.Telemetry.Enabled);
                                 });
                         },
@@ -943,6 +947,7 @@
                             var self = this;
                             self.config.JellyseerrUrl = document.getElementById('jellyseerrUrl').value.trim() || null;
                             self.config.JellyseerrApiKey = document.getElementById('jellyseerrApiKey').value.trim() || null;
+                            self.config.AutoApproveJellyseerrRequests = document.getElementById('autoApproveJellyseerr').checked;
                             self.config.Telemetry = self.config.Telemetry || {};
                             self.config.Telemetry.Enabled = document.getElementById('telemetryEnabled').checked;
                             ApiClient.updatePluginConfiguration(self.PluginId, self.config).then(function () { Dashboard.processPluginConfigurationUpdateResult(); });

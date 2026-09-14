@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using LetterboxdSync;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -39,6 +40,174 @@ public class SeerrClientTests
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
         Assert.True(posted, "request endpoint should have been called");
+    }
+
+    /// <summary>
+    /// Regression test for #110. A 2xx from POST /api/v1/request only means Seerr stored the
+    /// request; Seerr hands it to Radarr only once it is APPROVED, and it decides auto-approval
+    /// from the permissions of the user the request is attributed to, not from the admin API key
+    /// used to create it. So requests for users without Auto-Approve came back PENDING and never
+    /// downloaded. The client now follows up with the approve endpoint.
+    /// </summary>
+    [Fact]
+    public async Task RequestMovieAsync_PendingRequest_IsApproved()
+    {
+        string? approvedPath = null;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
+                return JsonResponse("{\"id\":100}");
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"id\":42,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
+                };
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/approve"))
+            {
+                approvedPath = req.RequestUri.AbsolutePath;
+                return JsonResponse("{\"id\":42,\"status\":2}");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal("/api/v1/request/42/approve", approvedPath);
+    }
+
+    /// <summary>An already-approved request (status 2) needs no follow-up call.</summary>
+    [Fact]
+    public async Task RequestMovieAsync_AlreadyApproved_DoesNotCallApprove()
+    {
+        var approveCalls = 0;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
+                return JsonResponse("{\"id\":100}");
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"id\":42,\"status\":2}", System.Text.Encoding.UTF8, "application/json")
+                };
+
+            if (req.RequestUri!.AbsolutePath.EndsWith("/approve")) approveCalls++;
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal(0, approveCalls);
+    }
+
+    /// <summary>
+    /// With auto-approve switched off the request is deliberately left in Seerr's moderation
+    /// queue, but the log must say why nothing will download.
+    /// </summary>
+    [Fact]
+    public async Task RequestMovieAsync_AutoApproveDisabled_LeavesPendingAndWarns()
+    {
+        var approveCalls = 0;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
+                return JsonResponse("{\"id\":100}");
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"id\":42,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
+                };
+
+            if (req.RequestUri!.AbsolutePath.EndsWith("/approve")) approveCalls++;
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var logs = new ListLogger();
+        using var client = new SeerrClient(BaseUrl, ApiKey, logs, handler, autoApprove: false);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal(0, approveCalls);
+        Assert.Contains(logs.Entries, e => e.Level == LogLevel.Warning
+            && e.Message.Contains("PENDING", StringComparison.Ordinal)
+            && e.Message.Contains("Radarr", StringComparison.Ordinal));
+    }
+
+    /// <summary>A failed approve must not turn a created request into a reported failure.</summary>
+    [Fact]
+    public async Task RequestMovieAsync_ApproveFails_StillReportsRequested()
+    {
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
+                return JsonResponse("{\"id\":100}");
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"id\":42,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
+                };
+
+            return new HttpResponseMessage(HttpStatusCode.Forbidden);
+        });
+
+        var logs = new ListLogger();
+        using var client = new SeerrClient(BaseUrl, ApiKey, logs, handler);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Contains(logs.Entries, e => e.Level == LogLevel.Warning
+            && e.Message.Contains("Could not approve", StringComparison.Ordinal));
+    }
+
+    /// <summary>The TV path is gated the same way, so it gets the same follow-up.</summary>
+    [Fact]
+    public async Task RequestSeriesAsync_PendingRequest_IsApproved()
+    {
+        string? approvedPath = null;
+        var handler = new SeerrHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.Contains("/api/v1/tv/"))
+                return JsonResponse("{\"id\":200,\"name\":\"Show\"}");
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"id\":77,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
+                };
+
+            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/approve"))
+            {
+                approvedPath = req.RequestUri.AbsolutePath;
+                return JsonResponse("{\"id\":77,\"status\":2}");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        var (result, _) = await client.RequestSeriesAsync(200, 7, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal("/api/v1/request/77/approve", approvedPath);
+    }
+
+    private sealed class ListLogger : ILogger
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
     }
 
     [Fact]
