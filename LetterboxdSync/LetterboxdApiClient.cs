@@ -223,13 +223,14 @@ public class LetterboxdApiClient : ILetterboxdService
     {
         EnsureAuthenticated();
         var tmdbIds = new List<int>();
-        string? cursor = null;
+        var seen = new HashSet<int>();
+        const int perPage = 100;
 
         for (int page = 0; page < 50; page++)
         {
-            var qp = "perPage=100";
-            if (cursor != null)
-                qp += $"&cursor={Uri.EscapeDataString(cursor)}";
+            var qp = $"perPage={perPage}";
+            if (page > 0)
+                qp += $"&start={page * perPage}";
 
             var response = await SendSignedAsync(HttpMethod.Get, $"/member/{Uri.EscapeDataString(_memberId)}/watchlist",
                 queryParams: qp, authenticated: true).ConfigureAwait(false);
@@ -245,13 +246,15 @@ public class LetterboxdApiClient : ILetterboxdService
             foreach (var item in items.EnumerateArray())
             {
                 var tmdbId = ExtractTmdbId(item);
-                if (tmdbId.HasValue)
+                if (tmdbId.HasValue && seen.Add(tmdbId.Value))
                     tmdbIds.Add(tmdbId.Value);
             }
 
-            if (doc.RootElement.TryGetProperty("cursor", out var cursorEl))
-                cursor = cursorEl.GetString();
-            else
+            // Letterboxd signals more pages via `next: "start=N"`, the same shape
+            // GetDiaryFilmEntriesAsync pages on. There is no `cursor` field in the response
+            // (that name is only the request param), so reading one stopped us after page 1
+            // and truncated every watchlist over perPage films. See issue #109.
+            if (!doc.RootElement.TryGetProperty("next", out _))
                 break;
         }
 

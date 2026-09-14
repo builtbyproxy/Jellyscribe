@@ -373,15 +373,20 @@ public class GetDiaryFilmEntriesIntegrationTests
     }
 
     [Fact]
-    public async Task GetWatchlistTmdbIdsAsync_ParsesItemsAndCursor()
+    public async Task GetWatchlistTmdbIdsAsync_FollowsPaginationUntilNextIsAbsent()
     {
+        // Regression test for #109: the watchlist only ever synced its first page. Letterboxd's
+        // FilmsResponse signals a further page with `next: "start=N"` and has no `cursor` field
+        // at all (that name is only the request query param), so the old `cursor` lookup always
+        // missed and broke out after page 1. Paging is by `start` offset, matching
+        // GetDiaryFilmEntriesAsync.
         var pageHits = new List<string>();
         var page1 = @"{
             ""items"": [
                 { ""id"": ""KQMM"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""1233413"" } ] },
                 { ""id"": ""2a9q"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""550"" } ] }
             ],
-            ""cursor"": ""next-page""
+            ""next"": ""start=100""
         }";
         var page2 = @"{
             ""items"": [
@@ -395,7 +400,7 @@ public class GetDiaryFilmEntriesIntegrationTests
             {
                 var q = request.RequestUri.Query;
                 pageHits.Add(q);
-                var body = q.Contains("cursor=") ? page2 : page1;
+                var body = q.Contains("start=") ? page2 : page1;
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(body)
@@ -410,8 +415,46 @@ public class GetDiaryFilmEntriesIntegrationTests
 
         Assert.Equal(new[] { 1233413, 550, 1726 }, ids.ToArray());
         Assert.Equal(2, pageHits.Count);
-        Assert.DoesNotContain("cursor=", pageHits[0]);
-        Assert.Contains("cursor=", pageHits[1]);
+        Assert.DoesNotContain("start=", pageHits[0]);
+        Assert.Contains("start=100", pageHits[1]);
+    }
+
+    /// <summary>
+    /// The pre-#109 failure mode, pinned directly: a first page that carries `next` but no
+    /// `cursor` must still be followed. Before the fix this returned only the first page.
+    /// </summary>
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_FullPageWithNext_DoesNotStopAfterFirstPage()
+    {
+        var requested = 0;
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: (request) =>
+        {
+            if (request.RequestUri?.AbsolutePath.Contains("/watchlist") != true) return null;
+
+            // Three full pages of 100, then a short final page: 335 films, as in issue #109.
+            var m = System.Text.RegularExpressions.Regex.Match(request.RequestUri.Query, @"[?&]start=(\d+)");
+            var start = m.Success ? int.Parse(m.Groups[1].Value) : 0;
+            requested++;
+
+            var count = Math.Min(100, 335 - start);
+            var items = string.Join(",", Enumerable.Range(start, count)
+                .Select(i => $@"{{ ""id"": ""f{i}"", ""links"": [ {{ ""type"": ""tmdb"", ""id"": ""{1000 + i}"" }} ] }}"));
+            var next = start + count < 335 ? $@", ""next"": ""start={start + count}""" : string.Empty;
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent($@"{{ ""items"": [{items}]{next} }}")
+            };
+        });
+
+        using var client = new LetterboxdApiClient(TestLogger, handler);
+        await client.AuthenticateAsync("user", "pass");
+        var ids = await client.GetWatchlistTmdbIdsAsync("user");
+
+        Assert.Equal(335, ids.Count);
+        Assert.Equal(4, requested);
+        Assert.Equal(1000, ids[0]);
+        Assert.Equal(1334, ids[^1]);
     }
 
     [Fact]
