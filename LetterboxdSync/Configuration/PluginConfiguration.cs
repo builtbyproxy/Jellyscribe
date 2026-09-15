@@ -38,6 +38,23 @@ public class PluginConfiguration : BasePluginConfiguration
     }
 
     /// <summary>
+    /// Approve the requests this plugin creates in Seerr, so they actually reach Radarr/Sonarr.
+    /// <para>
+    /// Seerr decides auto-approval from the permissions of the user a request is attributed to,
+    /// not from the API key used to create it. A request attributed to a Seerr user without
+    /// "Auto-Approve" is therefore created as PENDING and never handed to Radarr, even though the
+    /// API key belongs to an admin. That is issue #110: requests show up in Seerr but nothing
+    /// downloads. With this on, the plugin follows a PENDING request with
+    /// POST /api/v1/request/{id}/approve using the admin API key.
+    /// </para>
+    /// <para>
+    /// Defaults to true: enabling per-account auto-request already expresses "go and fetch these".
+    /// Turn it off to keep plugin-created requests in Seerr's manual approval queue.
+    /// </para>
+    /// </summary>
+    public bool AutoApproveJellyseerrRequests { get; set; } = true;
+
+    /// <summary>
     /// Anonymous opt-in usage telemetry state. Off by default; nothing is ever sent
     /// while disabled. See <see cref="TelemetryData"/> for what persists and why.
     /// </summary>

@@ -5,6 +5,11 @@ using Xunit;
 
 namespace LetterboxdSync.Tests;
 
+// AuthBreaker is static, file-backed global state. Without this the class runs in
+// parallel with the other AuthBreaker suites (all of which are in "Plugin") and they
+// race on the same DataPathOverride and the same "u1"/"kostadamus" key, which showed
+// up as State_SurvivesReload intermittently seeing 6 consecutive failures instead of 3.
+[Collection("Plugin")]
 public class AuthBreakerTests : IDisposable
 {
     private readonly string _path;

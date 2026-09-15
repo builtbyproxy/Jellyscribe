@@ -175,7 +175,8 @@ public class WatchlistSyncRunner
         if (JellyseerrClientFactoryOverride != null)
             return JellyseerrClientFactoryOverride(Config.JellyseerrUrl!, Config.JellyseerrApiKey!, _logger);
 
-        return new SeerrClient(Config.JellyseerrUrl!, Config.JellyseerrApiKey!, _logger);
+        return new SeerrClient(Config.JellyseerrUrl!, Config.JellyseerrApiKey!, _logger,
+            autoApprove: Config.AutoApproveJellyseerrRequests);
     }
 
     private async Task SyncOneUserAsync(User user, Account account, SeerrClient? jellyseerr, string source, CancellationToken cancellationToken)

@@ -20,12 +20,16 @@ public class SeerrClient : IDisposable
     private readonly ILogger _logger;
     private readonly string _baseUrl;
 
+    private readonly bool _autoApprove;
+
     private Dictionary<string, int>? _jellyfinIdToJellyseerrId;
 
-    public SeerrClient(string baseUrl, string apiKey, ILogger logger, HttpMessageHandler? handler = null)
+    public SeerrClient(string baseUrl, string apiKey, ILogger logger, HttpMessageHandler? handler = null,
+        bool autoApprove = true)
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _logger = logger;
+        _autoApprove = autoApprove;
         _http = handler != null ? new HttpClient(handler) : new HttpClient();
         _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Api-Key", apiKey);
@@ -262,10 +266,15 @@ public class SeerrClient : IDisposable
         using var content = new StringContent(body, Encoding.UTF8, "application/json");
 
         using var response = await _http.PostAsync(url, content).ConfigureAwait(false);
-        if (response.IsSuccessStatusCode)
-            return (RequestResult.Requested, title);
-
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+        if (response.IsSuccessStatusCode)
+        {
+            await EnsureApprovedAsync(responseBody, tmdbId, jellyseerrUserId, "movie", "Radarr")
+                .ConfigureAwait(false);
+            return (RequestResult.Requested, title);
+        }
+
         // Belt-and-braces: Seerr returns 409 when an active request already exists; treat as a no-op.
         if (IsAlreadyExistsResponse(response.StatusCode, responseBody))
         {
@@ -315,6 +324,12 @@ public class SeerrClient : IDisposable
                 "Seerr TV request TMDb {TmdbId} S[{Seasons}] → {Outcome} (HTTP {Status}): {Body}",
                 tmdbId, seasonsLabel, available ? "already available (no-op)" : "requested",
                 (int)response.StatusCode, Truncate(responseBody, 400));
+
+            // A no-op needs no approval; a real request does, for the same reason as the movie path.
+            if (!available)
+                await EnsureApprovedAsync(responseBody, tmdbId, jellyseerrUserId, "tv", "Sonarr")
+                    .ConfigureAwait(false);
+
             return (available ? RequestResult.AlreadyExists : RequestResult.Requested, title);
         }
 
@@ -513,6 +528,104 @@ public class SeerrClient : IDisposable
            responseBody.Contains("already requested", StringComparison.OrdinalIgnoreCase) ||
            responseBody.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
            responseBody.Contains("already available", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Makes sure a request we just created will actually be handed to Radarr/Sonarr.
+    /// <para>
+    /// A 2xx from POST /api/v1/request only means Seerr stored the request. Seerr calls
+    /// sendToRadarr/sendToSonarr only once a request is APPROVED, and it decides auto-approval
+    /// from the permissions of the user the request is attributed to, <em>not</em> from the API
+    /// key that created it. So a request attributed to a Seerr user without "Auto-Approve" is
+    /// created PENDING and sits there forever, which is exactly issue #110: the requests appear
+    /// in Seerr but never reach Radarr.
+    /// </para>
+    /// <para>
+    /// When auto-approve is on we follow up with POST /api/v1/request/{id}/approve, which the
+    /// admin API key is permitted to do. When it's off we leave the request in the moderation
+    /// queue and say so plainly, so the symptom is diagnosable from the log alone.
+    /// </para>
+    /// </summary>
+    private async Task EnsureApprovedAsync(string responseBody, int tmdbId, int jellyseerrUserId,
+        string mediaType, string arrName)
+    {
+        if (!TryReadPendingRequestId(responseBody, out var requestId))
+            return; // Already approved (or an unparseable body): nothing useful to do.
+
+        if (!_autoApprove)
+        {
+            _logger.LogWarning(
+                "Seerr {MediaType} request {RequestId} for TMDb {TmdbId} (user {UserId}) was created PENDING and "
+                + "will not reach {Arr} until it is approved. The Seerr user it is attributed to lacks Auto-Approve; "
+                + "approve it in Seerr, grant that user Auto-Approve, or enable auto-approve in Jellyscribe.",
+                mediaType, requestId, tmdbId, jellyseerrUserId, arrName);
+            return;
+        }
+
+        var url = $"{_baseUrl}/api/v1/request/{requestId}/approve";
+        try
+        {
+            using var content = new StringContent("{}", Encoding.UTF8, "application/json");
+            using var response = await _http.PostAsync(url, content).ConfigureAwait(false);
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation(
+                    "Approved Seerr {MediaType} request {RequestId} for TMDb {TmdbId} (user {UserId}); handed to {Arr}.",
+                    mediaType, requestId, tmdbId, jellyseerrUserId, arrName);
+                return;
+            }
+
+            var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            _logger.LogWarning(
+                "Could not approve Seerr {MediaType} request {RequestId} for TMDb {TmdbId} (user {UserId}): {Status} {Body}. "
+                + "It stays pending and will not reach {Arr} until approved in Seerr.",
+                mediaType, requestId, tmdbId, jellyseerrUserId, (int)response.StatusCode, Truncate(body, 200), arrName);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex,
+                "Could not approve Seerr {MediaType} request {RequestId} for TMDb {TmdbId}; it stays pending.",
+                mediaType, requestId, tmdbId);
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogWarning(ex,
+                "Timed out approving Seerr {MediaType} request {RequestId} for TMDb {TmdbId}; it stays pending.",
+                mediaType, requestId, tmdbId);
+        }
+    }
+
+    /// <summary>
+    /// Reads the id of a freshly-created MediaRequest when, and only when, it came back PENDING.
+    /// Seerr's MediaRequestStatus is 1 = PENDING, 2 = APPROVED, 3 = DECLINED. Returns false for an
+    /// already-approved request (nothing to do) and for any body we can't parse, so a malformed
+    /// response never triggers a bogus approve call.
+    /// </summary>
+    private static bool TryReadPendingRequestId(string responseBody, out int requestId)
+    {
+        requestId = 0;
+        if (string.IsNullOrWhiteSpace(responseBody)) return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(responseBody);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return false;
+
+            if (!root.TryGetProperty("status", out var st)
+                || st.ValueKind != JsonValueKind.Number
+                || st.GetInt32() != 1)
+                return false;
+
+            if (!root.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.Number)
+                return false;
+
+            requestId = idEl.GetInt32();
+            return requestId > 0;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
 
     private static string Truncate(string s, int max) => s.Length > max ? s.Substring(0, max) + "..." : s;
 

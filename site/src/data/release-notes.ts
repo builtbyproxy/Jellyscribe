@@ -10,6 +10,24 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.4.0',
+    headline: 'Your whole watchlist syncs, and Seerr requests actually reach Radarr',
+    summary:
+      'Two problems that quietly cut the watchlist feature off at the knees. Large watchlists only ever synced their first hundred films: the plugin asked Letterboxd for the next page using the wrong field name, so it always concluded there was nothing more to fetch and stopped. Everything past the first page simply never arrived. Separately, watchlist titles sent to Seerr were created but never downloaded. Seerr only hands a request to Radarr or Sonarr once it is approved, and it decides that from the permissions of the person the request belongs to, not from the admin API key the plugin uses, so requests for anyone without auto-approve sat in the pending queue forever. Jellyscribe now approves the requests it creates, and there is a switch in the Seerr settings to turn that off if you would rather review them yourself.',
+    highlights: {
+      fixes: [
+        'Watchlists longer than one page now sync in full. Previously only the first 100 films were ever imported, no matter how large the watchlist.',
+        'Titles auto-requested through Seerr now reach Radarr and Sonarr instead of sitting in the pending queue and never downloading.',
+      ],
+      new: [
+        'A new "Auto-approve requests created by Jellyscribe" option in the Seerr settings, on by default. Switch it off to keep plugin-created requests in Seerr\'s manual approval queue.',
+      ],
+      improvements: [
+        'When a request cannot be approved, the log now says so plainly, and names the reason it will not reach Radarr, rather than reporting a silent success.',
+      ],
+    },
+  },
+  {
     version: '2.3.1',
     headline: 'Manually marking something watched no longer logs it to 1970',
     summary:

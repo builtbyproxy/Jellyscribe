@@ -339,7 +339,8 @@ public class SerializdWatchlistSyncRunner
         if (SeerrClientFactoryOverride != null)
             return SeerrClientFactoryOverride(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger)!;
 
-        return new SeerrClient(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger);
+        return new SeerrClient(cfg.JellyseerrUrl!, cfg.JellyseerrApiKey!, _logger,
+            autoApprove: cfg.AutoApproveJellyseerrRequests);
     }
 
     /// <summary>
