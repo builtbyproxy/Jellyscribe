@@ -382,6 +382,25 @@ public class WatchlistSyncRunner
             // batch once (not per film) so one outage doesn't inflate the error counter.
             if (failed > 0)
                 TelemetryService.RecordError(TelemetryService.CatJellyseerr);
+
+            // Anything Seerr already had a request for was skipped above without ever being POSTed,
+            // so the approve step attached to request creation never saw it. That leaves requests
+            // stranded as PENDING by an earlier version (issue #110) invisible: they are never
+            // re-requested, and nothing else approves them. Reconcile them here, scoped to this
+            // user and to the watchlist we just synced.
+            if (alreadyExists > 0)
+            {
+                try
+                {
+                    await jellyseerr!.ApprovePendingForUserAsync(jellyseerrUserId.Value, requestIds)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // Best-effort: the sync itself already succeeded, a stuck backlog is not a reason to fail it.
+                    _logger.LogWarning("Seerr backlog reconcile errored for {Username}: {Message}", user.Username, ex.Message);
+                }
+            }
         }
     }
 

@@ -10,6 +10,21 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.4.1',
+    headline: 'Seerr requests that were already stuck now get unstuck',
+    summary:
+      'Version 2.4.0 made sure new Seerr requests get approved so they actually reach Radarr and Sonarr. It did nothing for requests that were already sitting in Seerr waiting for approval, which for anyone who had been hit by the problem was most of them. The reason is that Jellyscribe skips any title Seerr already has a request for, so those requests were never looked at again and nothing ever approved them. Upgrading appeared to change nothing at all. Jellyscribe now checks for watchlist titles left waiting for approval and approves those too, so an existing backlog clears itself on the next watchlist sync instead of needing to be worked through by hand.',
+    highlights: {
+      fixes: [
+        'Seerr requests left waiting for approval by an earlier version are now approved on the next watchlist sync, so a backlog that never reached Radarr or Sonarr clears itself.',
+      ],
+      improvements: [
+        'Only requests belonging to the synced user, for titles on the watchlist just synced, are touched. Anything else awaiting your approval in Seerr is left alone.',
+        'Turning off "Auto-approve requests created by Jellyscribe" also leaves the existing backlog untouched.',
+      ],
+    },
+  },
+  {
     version: '2.4.0',
     headline: 'Your whole watchlist syncs, and Seerr requests actually reach Radarr',
     summary:
