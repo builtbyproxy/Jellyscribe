@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.4.0.0",
+        "changelog": "Two problems that quietly cut the watchlist feature off at the knees. Large watchlists only ever synced their first hundred films, because the plugin asked Letterboxd for the next page using the wrong field name and so always concluded there was nothing more to fetch. Everything past the first page simply never arrived. Separately, watchlist titles sent to Seerr were created but never downloaded: Seerr only hands a request to Radarr or Sonarr once it has been approved, and it decides that from the permissions of the person the request belongs to rather than the admin API key the plugin uses, so requests for anyone without auto-approve sat in the pending queue forever. Jellyscribe now approves the requests it creates, and a new switch in the Seerr settings turns that off if you would rather review them yourself.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.4.0/jellyfin-plugin-letterboxd-v2.4.0.zip",
+        "checksum": "922942006526e86c83f4e0c34de92bed",
+        "timestamp": "2026-09-15T23:30:29Z"
+      },
+      {
         "version": "2.3.1.0",
         "changelog": "Films and episodes that Jellyfin marks watched through real playback have always synced with the correct date. But checking a title watched by hand, using the checkmark rather than actually playing it, could leave Jellyfin's own watched-date field set to January 1st 1970 instead of a real date, and the plugin trusted that value as-is. The fix treats an epoch-adjacent watched date the same way it already treats a missing one: there's no real watch date to log yet, so the sync waits rather than posting a bogus entry to Letterboxd or Serializd. Once Jellyfin records an actual playback date for the title, it syncs normally.",
         "targetAbi": "10.11.9.0",
