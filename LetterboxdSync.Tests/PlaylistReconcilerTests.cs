@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
 using LetterboxdSync;
@@ -74,8 +75,13 @@ public class PlaylistReconcilerTests
             _playlistManager, _libraryManager, NullLogger.Instance, _user, "Watchlist",
             new HashSet<Guid> { kept, newItem }, sourceWasEmpty: false);
 
-        await _playlistManager.Received(1).AddItemToPlaylistAsync(
-            Arg.Any<Guid>(), Arg.Is<Guid[]>(ids => ids.Length == 1 && ids[0] == newItem), _user.Id);
+        // Asserted by method name + arguments rather than by signature: Jellyfin 12 inserted an
+        // `int? position` parameter, so naming the 3-argument overload here stops the test project
+        // compiling against the 12 SDK (which the CI Jellyfin 12 probe does). This also exercises
+        // the real call path through PlaylistManagerCompat.
+        var added = SingleAddCall();
+        Assert.Equal(new[] { newItem }, added.ItemIds);
+        Assert.Equal(_user.Id, added.UserId);
     }
 
     [Fact]
@@ -120,8 +126,7 @@ public class PlaylistReconcilerTests
             _playlistManager, _libraryManager, NullLogger.Instance, _user, "Watchlist",
             new HashSet<Guid> { member }, sourceWasEmpty: false);
 
-        await _playlistManager.DidNotReceive().AddItemToPlaylistAsync(
-            Arg.Any<Guid>(), Arg.Any<Guid[]>(), Arg.Any<Guid>());
+        Assert.Empty(AddCalls());
         await _playlistManager.DidNotReceive().RemoveItemFromPlaylistAsync(
             Arg.Any<string>(), Arg.Any<string[]>());
     }
@@ -230,4 +235,31 @@ public class PlaylistReconcilerTests
         await _collectionManager.DidNotReceive().RemoveFromCollectionAsync(
             Arg.Any<Guid>(), Arg.Any<IEnumerable<Guid>>());
     }
+
+    /// <summary>
+    /// Reads AddItemToPlaylistAsync calls off the substitute without naming its signature.
+    /// Jellyfin 10.11 takes (playlistId, itemIds, userId) and Jellyfin 12 takes
+    /// (playlistId, itemIds, position, userId); this normalises both so the tests compile and pass
+    /// against either SDK. Mirrors the resolution in PlaylistManagerCompat.
+    /// </summary>
+    private (Guid PlaylistId, Guid[] ItemIds, Guid UserId) SingleAddCall()
+    {
+        var calls = AddCalls();
+        Assert.Single(calls);
+        return calls[0];
+    }
+
+    private List<(Guid PlaylistId, Guid[] ItemIds, Guid UserId)> AddCalls()
+        => _playlistManager.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == "AddItemToPlaylistAsync")
+            .Select(c =>
+            {
+                var args = c.GetArguments();
+                var playlistId = (Guid)args[0]!;
+                var itemIds = ((IEnumerable<Guid>)args[1]!).ToArray();
+                // userId is always last; position (12.x only) sits before it when present.
+                var userId = (Guid)args[^1]!;
+                return (playlistId, itemIds, userId);
+            })
+            .ToList();
 }
