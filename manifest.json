@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.4.2.0",
+        "changelog": "When a Letterboxd login fails three times in a row, Jellyscribe pauses that account and shows \"Login failing, sync paused\". Correcting the password was supposed to clear that and resume on the next run. It did if you edited the account from the user page, but not from the admin dashboard, because those two save through different paths and only one of them reset the pause. Admins were left stuck: the password was right, the badge still said failing, and even deleting the account and adding it again changed nothing, because the paused state is remembered per Letterboxd username and a new account simply inherited it. Saving an account from the dashboard now clears the pause whenever its password or cookies changed, so a corrected login is retried on the next sync.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.4.2/jellyfin-plugin-letterboxd-v2.4.2.zip",
+        "checksum": "91b3acfc68c839e17776a81b0537be92",
+        "timestamp": "2026-09-16T01:04:19Z"
+      },
+      {
         "version": "2.4.1.0",
         "changelog": "Version 2.4.0 made sure new Seerr requests get approved so they actually reach Radarr and Sonarr. It did nothing for requests that were already sitting in Seerr waiting for approval, which for anyone who had been hit by the problem was most of them. The reason is that Jellyscribe skips any title Seerr already has a request for, so those requests were never looked at again and nothing ever approved them. Upgrading appeared to change nothing at all. Jellyscribe now checks for watchlist titles left waiting for approval and approves those too, so an existing backlog clears itself on the next watchlist sync instead of needing to be worked through by hand.",
         "targetAbi": "10.11.9.0",
