@@ -101,17 +101,39 @@ jobs:
       - name: Build and test against Jellyfin 12
         id: probe
         continue-on-error: true
+        # The csproj is patched HERE, on the runner, rather than being parameterised with
+        # MSBuild properties. That is deliberate: version-gate.yml greps the literal
+        # Version="..." off Jellyfin.Controller/Jellyfin.Model to enforce SDK == targetAbi.txt
+        # (issue #63, the floor policy). Replacing those literals with $(Property) made them
+        # unreadable and silently broke that guard. The shipped csproj therefore stays literal
+        # and greppable, and the probe edits a throwaway copy of it.
+        #
         # Pinned rather than floating: a probe that silently changes what it tests is not a
-        # probe. Bump this pin deliberately as new 12.x releases ship.
+        # probe. Bump these pins deliberately as new 12.x releases ship.
+        # DataProtection is pinned >= 10.0.7: 10.0.0-10.0.6 are CVE-2026-40372.
         run: |
-          set -o pipefail
-          dotnet test -c Release \
-            -p:PluginTargetFramework=net10.0 \
-            -p:JellyfinSdkVersion=12.1.0 \
-            -p:DataProtectionVersion=10.0.12 \
-            -p:MsExtensionsVersion=10.0.12 \
-            --verbosity normal \
-            --filter "Category!=Integration" 2>&1 | tee probe.log
+          set -euo pipefail
+          PLUGIN=LetterboxdSync/LetterboxdSync.csproj
+          TESTS=LetterboxdSync.Tests/LetterboxdSync.Tests.csproj
+
+          sed -i 's|<TargetFramework>net9.0</TargetFramework>|<TargetFramework>net10.0</TargetFramework>|' "$PLUGIN" "$TESTS"
+          sed -i 's|Include="Jellyfin.Controller" Version="[^"]*"|Include="Jellyfin.Controller" Version="12.1.0"|' "$PLUGIN"
+          sed -i 's|Include="Jellyfin.Model" Version="[^"]*"|Include="Jellyfin.Model" Version="12.1.0"|' "$PLUGIN"
+          sed -i 's|Include="Microsoft.AspNetCore.DataProtection" Version="[^"]*"|Include="Microsoft.AspNetCore.DataProtection" Version="10.0.12"|' "$PLUGIN"
+          sed -i 's|Include="Microsoft.Extensions.DependencyInjection" Version="[^"]*"|Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12"|' "$TESTS"
+          sed -i 's|Include="Microsoft.Extensions.Hosting.Abstractions" Version="[^"]*"|Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12"|' "$TESTS"
+
+          # Assert the rewrite actually landed. A sed that silently fails to match would leave the
+          # probe building 10.11.9 on net10.0 and reporting a meaningless pass, which is worse than
+          # no probe at all. Fail loudly instead.
+          for want in '<TargetFramework>net10.0</TargetFramework>' 'Jellyfin.Controller" Version="12.1.0"' 'Jellyfin.Model" Version="12.1.0"'; do
+            grep -qF "$want" "$PLUGIN" || { echo "::error::probe self-check failed, csproj rewrite did not apply: $want"; exit 1; }
+          done
+          grep -qF '<TargetFramework>net10.0</TargetFramework>' "$TESTS" || { echo "::error::probe self-check failed on test project"; exit 1; }
+          echo "--- patched references ---"
+          grep -nE 'TargetFramework>|Include="Jellyfin|DataProtection' "$PLUGIN"
+
+          dotnet test -c Release --verbosity normal --filter "Category!=Integration" 2>&1 | tee probe.log
 
       - name: Report probe outcome
         if: always()
