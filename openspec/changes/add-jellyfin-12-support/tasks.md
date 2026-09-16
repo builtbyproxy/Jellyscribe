@@ -7,7 +7,7 @@
 - [x] 1.3 csproj: `TargetFramework`, `JellyfinSdkVersion`, `DataProtectionVersion` and `MsExtensionsVersion` are overridable MSBuild properties; defaults unchanged (net9.0 / 10.11.9). Verified: default build/restore identical, and `-p:JellyfinSdkVersion=12.1.0` alone reproduces NU1202, proving the property reaches the PackageReference
 - [x] 1.4 ci.yml: non-blocking `jellyfin-12-prerelease` job: setup-dotnet 9+10, build + unit tests on net10.0 against pinned **`12.1.0` stable** (the RC pin in the original plan is obsolete, see 2.0 below), `continue-on-error`, with a notice on pass and a warning carrying the first errors on fail
 - [ ] 1.5 Verify dependabot surfaces the `12.0.0` stable bump when it ships (allowlist covers `Jellyfin.*`; confirm major bumps are not filtered)
-- [ ] 1.6 Manual smoke test on a 12.0 RC server (newest RC, currently rc3; docker, throwaway library): install current release from the catalog, link an account, sync one film, run watchlist + diary import once. Also confirms our third-party catalog still installs on 12 despite the RC3 "disable all external plugins" guidance
+- [x] 1.6 / 2.4 Smoke test run 2026-09-16 against **12.0.0 stable** (not an RC), throwaway docker container, isolated name/port, no shared volumes, removed after. Shipped v2.4.1 artifact loads on Jellyfin 12: `Loaded assembly Jellyscribe, Version=2.4.1.0` then `Loaded plugin: Jellyscribe 2.4.1.0`, and its own `Jellyscribe Sidebar Registration` scheduled task ran to completion. No errors, server healthy. **Found: Jellyfin 12 moved the plugin directory from `config/data/plugins/` to `config/plugins/`** (marker file `.jellyfin-plugin`); placed in the old path the plugin is silently ignored with no log line at all. Catalog install on 12 and an end-to-end sync were NOT covered (needs real Letterboxd credentials); documented as remaining gaps
 - [ ] 1.7 Private ops repo: add "error categories segmented by jellyfin_version" to the monthly report watch list (tracked there, not here)
 
 ## 2. Phase B: 12.0.0 stable ships
@@ -16,8 +16,8 @@
 
 - [x] 2.1 CI leg points at `12.1.0` stable (newer than `12.0.0`; both are net10.0-only). Whether the suite passes is what the probe now reports on every PR
 - [ ] 2.2 Floor decision on the dependabot SDK-12 PR: default is close-without-merge and stay on the 10.11.9 floor (merging = net10.0 = dropping every 10.11 user; see design)
-- [ ] 2.3 README + site: declare 12.0 support explicitly ("runs on 10.11.x and 12.x from one release"), with migration guidance covering Jellyfin's remove-plugins-before-migrating advice (RC3 notes escalated this to "disable all external plugins") and that config + sync history survive a remove/reinstall
-- [ ] 2.4 Re-run the 1.6 smoke test against stable
+- [x] 2.3 README declares 12.x support explicitly, backed by the 1.6 result, and documents the plugin-directory move. Site release notes carry the same. Original wording: declare 12.0 support explicitly ("runs on 10.11.x and 12.x from one release"), with migration guidance covering Jellyfin's remove-plugins-before-migrating advice (RC3 notes escalated this to "disable all external plugins") and that config + sync history survive a remove/reinstall
+- [x] 2.4 Covered by 1.6 above: the smoke test was run directly against 12.0.0 stable
 
 ## 3. Phase C: SDK adoption / stream split (only when a 12-only API is needed or ABI breaks)
 
