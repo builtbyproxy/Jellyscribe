@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.5.0.0",
+        "changelog": "Jellyfin 12 changed the way plugins add items to a playlist, and Jellyscribe was still asking the old way. The result was that on Jellyfin 12 your watchlist playlist silently stopped being filled in, while everything else carried on working normally. Jellyscribe now detects which version of that API the server offers and uses the right one, so a single release keeps working on Jellyfin 10.11 and Jellyfin 12 alike. If you are on Jellyfin 12 and your watchlist playlist has been sitting empty or stale, this release fixes it and the next watchlist sync will fill it in. Jellyfin 12 is now explicitly supported.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.5.0/jellyfin-plugin-letterboxd-v2.5.0.zip",
+        "checksum": "1073c8cd9a3cc50c11189789616da0d7",
+        "timestamp": "2026-09-16T01:21:09Z"
+      },
+      {
         "version": "2.4.2.0",
         "changelog": "When a Letterboxd login fails three times in a row, Jellyscribe pauses that account and shows \"Login failing, sync paused\". Correcting the password was supposed to clear that and resume on the next run. It did if you edited the account from the user page, but not from the admin dashboard, because those two save through different paths and only one of them reset the pause. Admins were left stuck: the password was right, the badge still said failing, and even deleting the account and adding it again changed nothing, because the paused state is remembered per Letterboxd username and a new account simply inherited it. Saving an account from the dashboard now clears the pause whenever its password or cookies changed, so a corrected login is retried on the next sync.",
         "targetAbi": "10.11.9.0",
