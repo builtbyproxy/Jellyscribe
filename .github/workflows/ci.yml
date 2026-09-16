@@ -106,10 +106,10 @@ jobs:
         run: |
           set -o pipefail
           dotnet test -c Release \
-            -p:TargetFramework=net10.0 \
+            -p:PluginTargetFramework=net10.0 \
             -p:JellyfinSdkVersion=12.1.0 \
-            -p:DataProtectionVersion=10.0.0 \
-            -p:MsExtensionsVersion=10.0.0 \
+            -p:DataProtectionVersion=10.0.12 \
+            -p:MsExtensionsVersion=10.0.2 \
             --verbosity normal \
             --filter "Category!=Integration" 2>&1 | tee probe.log
 

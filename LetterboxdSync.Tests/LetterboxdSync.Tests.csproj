@@ -2,7 +2,8 @@
 
   <PropertyGroup>
     <!-- Follows the plugin project so the Jellyfin 12 CI probe can build and test on net10.0. -->
-    <TargetFramework Condition="'$(TargetFramework)' == ''">net9.0</TargetFramework>
+    <PluginTargetFramework Condition="'$(PluginTargetFramework)' == ''">net9.0</PluginTargetFramework>
+    <TargetFramework>$(PluginTargetFramework)</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
