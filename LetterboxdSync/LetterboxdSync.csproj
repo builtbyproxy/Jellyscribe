@@ -1,7 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- Overridable so CI can probe a Jellyfin 12 build without touching what we ship.
+         Defaults ARE the shipping configuration: net9.0 against SDK 10.11.9 (== targetAbi.txt).
+         Override together, never singly: the 12.x SDK packages ship lib/net10.0 only, so
+         -p:JellyfinSdkVersion=12.1.0 without -p:TargetFramework=net10.0 fails to restore (NU1202).
+         See openspec/changes/add-jellyfin-12-support/. -->
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net9.0</TargetFramework>
+    <JellyfinSdkVersion Condition="'$(JellyfinSdkVersion)' == ''">10.11.9</JellyfinSdkVersion>
+    <DataProtectionVersion Condition="'$(DataProtectionVersion)' == ''">9.0.0</DataProtectionVersion>
     <AssemblyName>Jellyscribe</AssemblyName>
     <RootNamespace>LetterboxdSync</RootNamespace>
     <Nullable>enable</Nullable>
@@ -22,12 +29,12 @@
          (strict binding; proven live on 10.11.10 with a 10.11.11-built DLL, issue #63).
          These MUST equal targetAbi.txt and only move together, deliberately, when we
          need a newer API - never via a routine dependency bump. CI enforces the match. -->
-    <PackageReference Include="Jellyfin.Controller" Version="10.11.9" />
-    <PackageReference Include="Jellyfin.Model" Version="10.11.9" />
+    <PackageReference Include="Jellyfin.Controller" Version="$(JellyfinSdkVersion)" />
+    <PackageReference Include="Jellyfin.Model" Version="$(JellyfinSdkVersion)" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <!-- Encrypts stored secrets (Letterboxd password/cookies, Seerr API key) at rest.
          See LetterboxdSync/Security/SecretProtector.cs for the threat model. -->
-    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="$(DataProtectionVersion)" />
   </ItemGroup>
 
   <ItemGroup>

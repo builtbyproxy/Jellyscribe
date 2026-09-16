@@ -72,3 +72,53 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./TestResults/junit.xml
+
+  jellyfin-12-prerelease:
+    # Non-blocking early-warning probe for the Jellyfin 12 line. Jellyfin 12's SDK packages
+    # ship lib/net10.0 only, so building against them forces net10.0, and a net10.0 assembly
+    # cannot load on Jellyfin 10.11's .NET 9 host. Adopting the 12 SDK is therefore a one-way
+    # split of the release stream, not a routine bump, and is deliberately NOT what this job
+    # does: it only tells us whether our code still compiles and passes tests against 12, weeks
+    # before we would have to care. Shipping defaults (net9.0 / SDK 10.11.9) are untouched.
+    #
+    # A red run here is information, never a gate: continue-on-error keeps it out of required
+    # checks. If it goes red, read it as "12 has drifted", open an issue, and decide
+    # deliberately. See openspec/changes/add-jellyfin-12-support/.
+    name: Jellyfin 12 probe (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET 9 + 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Build and test against Jellyfin 12
+        id: probe
+        continue-on-error: true
+        # Pinned rather than floating: a probe that silently changes what it tests is not a
+        # probe. Bump this pin deliberately as new 12.x releases ship.
+        run: |
+          set -o pipefail
+          dotnet test -c Release \
+            -p:TargetFramework=net10.0 \
+            -p:JellyfinSdkVersion=12.1.0 \
+            -p:DataProtectionVersion=10.0.0 \
+            -p:MsExtensionsVersion=10.0.0 \
+            --verbosity normal \
+            --filter "Category!=Integration" 2>&1 | tee probe.log
+
+      - name: Report probe outcome
+        if: always()
+        run: |
+          if [ "${{ steps.probe.outcome }}" = "success" ]; then
+            echo "::notice::Jellyscribe still builds and tests clean against Jellyfin 12.1.0 (net10.0)."
+          else
+            echo "::warning::Jellyfin 12 probe FAILED against 12.1.0 (net10.0). This does not block the build. It means the 12 line has drifted from what we compile against today; investigate before 12 adoption is forced. First errors:"
+            grep -oE "(error|warning) [A-Z]+[0-9]+.*" probe.log 2>/dev/null | sort -u | head -20 || true
+          fi
