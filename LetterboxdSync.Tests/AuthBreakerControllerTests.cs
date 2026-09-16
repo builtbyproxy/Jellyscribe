@@ -151,4 +151,94 @@ public class AuthBreakerControllerTests : IDisposable
 
         Assert.Equal(new[] { "kostadamus" }, names);
     }
+
+    /// <summary>
+    /// Mirrors how Jellyfin actually saves plugin config: UpdatePluginConfiguration deserializes
+    /// the request body into a NEW PluginConfiguration, so the plugin always receives a distinct
+    /// instance rather than the live one. Tests must do the same or the change comparison has
+    /// nothing to compare against.
+    /// </summary>
+    private static LetterboxdSync.Configuration.PluginConfiguration SaveAsDashboard(
+        params LetterboxdSync.Configuration.Account[] accounts)
+    {
+        var fresh = new LetterboxdSync.Configuration.PluginConfiguration();
+        fresh.Accounts.AddRange(accounts);
+        Plugin.Instance!.UpdateConfiguration(fresh);
+        return fresh;
+    }
+
+    private static LetterboxdSync.Configuration.Account Acct(string user, string username, string password, string? cookies = null)
+        => new() { UserJellyfinId = user, LetterboxdUsername = username, LetterboxdPassword = password, RawCookies = cookies };
+
+    /// <summary>
+    /// Issue #112: the admin dashboard saves accounts through Plugin.UpdateConfiguration, not the
+    /// user-facing /Accounts endpoint, and only that endpoint closed breakers. An admin who fixed a
+    /// stale Letterboxd password stayed stuck on "Login failing - sync paused" indefinitely.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_PasswordChanged_ClosesBreaker()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        SaveAsDashboard(Acct(UserId, "charlie", "old-password"));
+
+        OpenBreaker(UserId, "charlie");
+        Assert.True(AuthBreaker.IsOpen(UserId, "charlie"));
+
+        // Admin edits the password in the dashboard and saves.
+        SaveAsDashboard(Acct(UserId, "charlie", "new-password"));
+
+        Assert.False(AuthBreaker.IsOpen(UserId, "charlie"));
+    }
+
+    /// <summary>
+    /// The reporter also tried deleting the account and creating a fresh one, which didn't help:
+    /// the breaker is keyed on (user, Letterboxd username), so a re-created account inherited the
+    /// old open breaker. A newly added account must start clean.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_AccountRecreated_ClosesInheritedBreaker()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        SaveAsDashboard(); // no accounts
+        OpenBreaker(UserId, "charlie");
+        Assert.True(AuthBreaker.IsOpen(UserId, "charlie"));
+
+        SaveAsDashboard(Acct(UserId, "charlie", "fresh"));
+
+        Assert.False(AuthBreaker.IsOpen(UserId, "charlie"));
+    }
+
+    /// <summary>
+    /// Saving an unrelated setting must NOT reopen the breaker. Blanket-resetting on every config
+    /// write would defeat the breaker and reintroduce the retry storm it exists to stop.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_UnrelatedSettingSaved_LeavesBreakerOpen()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        SaveAsDashboard(Acct(UserId, "charlie", "same-password"));
+
+        OpenBreaker(UserId, "charlie");
+        Assert.True(AuthBreaker.IsOpen(UserId, "charlie"));
+
+        // Credentials identical; something else changes.
+        var fresh = new LetterboxdSync.Configuration.PluginConfiguration { JellyseerrUrl = "http://localhost:5055" };
+        fresh.Accounts.Add(Acct(UserId, "charlie", "same-password"));
+        Plugin.Instance!.UpdateConfiguration(fresh);
+
+        Assert.True(AuthBreaker.IsOpen(UserId, "charlie"));
+    }
+
+    /// <summary>Changing only the raw cookies is a credential change too.</summary>
+    [Fact]
+    public void UpdateConfiguration_CookiesChanged_ClosesBreaker()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        SaveAsDashboard(Acct(UserId, "charlie", "pw"));
+
+        OpenBreaker(UserId, "charlie");
+        SaveAsDashboard(Acct(UserId, "charlie", "pw", "cf_clearance=abc"));
+
+        Assert.False(AuthBreaker.IsOpen(UserId, "charlie"));
+    }
 }

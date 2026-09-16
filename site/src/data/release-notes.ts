@@ -10,6 +10,21 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.4.2',
+    headline: 'Fixing a bad Letterboxd password actually un-pauses syncing again',
+    summary:
+      'When a Letterboxd login fails three times in a row, Jellyscribe pauses that account and shows "Login failing, sync paused". Correcting the password was supposed to clear that and resume on the next run. It did if you edited the account from the user page, but not from the admin dashboard, because those two save through different paths and only one of them reset the pause. Admins were left stuck: the password was right, the badge still said failing, and even deleting the account and adding it again changed nothing, because the paused state is remembered per Letterboxd username and a new account simply inherited it. Saving an account from the dashboard now clears the pause whenever its password or cookies changed, so a corrected login is retried on the next sync.',
+    highlights: {
+      fixes: [
+        'Correcting a Letterboxd password or cookies in the admin dashboard now clears "Login failing, sync paused" instead of leaving the account stuck indefinitely.',
+        'Re-creating an account that was previously paused no longer inherits the old paused state.',
+      ],
+      improvements: [
+        'Saving unrelated settings still leaves a paused account paused, so the protection against hammering Letterboxd with a known-bad password is unchanged.',
+      ],
+    },
+  },
+  {
     version: '2.4.1',
     headline: 'Seerr requests that were already stuck now get unstuck',
     summary:
