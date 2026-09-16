@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using LetterboxdSync;
 using MediaBrowser.Controller.Playlists;
+using NSubstitute;
 using Xunit;
 
 namespace LetterboxdSync.Tests;
@@ -157,14 +159,45 @@ public class PlaylistManagerCompatTests
     }
 
     /// <summary>
-    /// Guards the wiring against the real interface we compile against: on the 10.11 SDK the
-    /// resolver must find the legacy overload rather than throwing. On a 12 host the same code path
-    /// resolves the positional one, which is what the CI Jellyfin 12 probe covers.
+    /// The one test that exercises the REAL Jellyfin interface rather than a stand-in, and so the
+    /// only one that can catch the shim binding the wrong thing on a real server.
+    /// <para>
+    /// It asserts against whatever the SDK in use actually offers, so it is meaningful on both
+    /// lines without being version-specific: built against 10.11 it proves we bind the 3-argument
+    /// overload, and when the CI Jellyfin 12 probe runs the same test against the 12 SDK it proves
+    /// we bind the 4-argument one and pass a null position (append). Previously this only asserted
+    /// that resolution returned something non-null, which would have passed even if the shim picked
+    /// the wrong overload or silently appended at index 0 on every sync.
+    /// </para>
     /// </summary>
     [Fact]
-    public void RealIPlaylistManager_ResolvesAnOverload()
+    public async Task RealIPlaylistManager_BindsTheOverloadThisJellyfinSdkActuallyHas()
     {
+        var overloads = typeof(IPlaylistManager)
+            .GetMethods()
+            .Where(m => m.Name == "AddItemToPlaylistAsync")
+            .ToList();
+        Assert.NotEmpty(overloads);
+
+        var target = Substitute.For<IPlaylistManager>();
         var invoke = PlaylistManagerCompat.BuildInvoker(typeof(IPlaylistManager));
-        Assert.NotNull(invoke);
+        await invoke(target, PlaylistId, new[] { Guid.NewGuid() }, UserId);
+
+        var call = Assert.Single(target.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == "AddItemToPlaylistAsync"));
+        var boundParameters = call.GetMethodInfo().GetParameters();
+        var args = call.GetArguments();
+
+        // Jellyfin 12 added the position parameter; prefer it whenever the SDK has it.
+        var expectedArity = overloads.Any(m => m.GetParameters().Length == 4) ? 4 : 3;
+        Assert.Equal(expectedArity, boundParameters.Length);
+
+        // userId is last in both shapes, and on 12 position must be null so items append.
+        Assert.Equal(UserId, args[^1]);
+        if (boundParameters.Length == 4)
+        {
+            Assert.Equal("position", boundParameters[2].Name);
+            Assert.Null(args[2]);
+        }
     }
 }
