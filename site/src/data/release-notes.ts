@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.5.1',
+    headline: 'Serializd diary import no longer stops at the first season review',
+    summary:
+      'Importing your Serializd diary could fail outright with a confusing error about an element of type Number. The cause was that Serializd diaries contain reviews of whole seasons and whole shows, not just individual episodes, and those entries carry no episode number. Jellyscribe tried to read one anyway and the whole import stopped there, so nothing was imported at all. Those entries are not episode watches, so they are now simply skipped and the rest of the diary imports normally. If your Serializd import has been failing, it should work on the next run with no changes needed at your end.',
+    highlights: {
+      fixes: [
+        'Serializd diary import no longer fails when the diary contains season-level or show-level reviews, which carry no episode number.',
+        'The same fix covers other places a Serializd response can legitimately leave a number empty, so one unusual entry can no longer stop an entire import.',
+      ],
+    },
+  },
+  {
     version: '2.5.0',
     headline: 'Watchlist playlists work on Jellyfin 12',
     summary:

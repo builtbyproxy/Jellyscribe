@@ -162,8 +162,7 @@ public class SerializdApiClient : ISerializdService
         {
             foreach (var s in seasons.EnumerateArray())
             {
-                if (s.TryGetProperty("seasonNumber", out var numEl) && numEl.TryGetInt32(out var num) &&
-                    s.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var id))
+                if (TryGetInt(s, "seasonNumber", out var num) && TryGetInt(s, "id", out var id))
                 {
                     map[num] = id;
                 }
@@ -254,19 +253,20 @@ public class SerializdApiClient : ISerializdService
             {
                 // Watchlist items carry a TMDb `showId` plus `seasonIds` (Serializd's internal
                 // season ids) for the specific seasons watchlisted.
-                if (!it.TryGetProperty("showId", out var sid) || !sid.TryGetInt32(out var showTmdb) || !seen.Add(showTmdb))
+                if (!TryGetInt(it, "showId", out var showTmdb) || !seen.Add(showTmdb))
                     continue;
 
                 var serializdSeasonIds = new List<int>();
                 if (it.TryGetProperty("seasonIds", out var seasonIdsEl) && seasonIdsEl.ValueKind == JsonValueKind.Array)
                     foreach (var s in seasonIdsEl.EnumerateArray())
-                        if (s.TryGetInt32(out var sidVal)) serializdSeasonIds.Add(sidVal);
+                        if (s.ValueKind == JsonValueKind.Number && s.TryGetInt32(out var sidVal))
+                            serializdSeasonIds.Add(sidVal);
 
                 var seasonNumbers = await ResolveSeasonNumbersAsync(showTmdb, serializdSeasonIds).ConfigureAwait(false);
                 entries.Add(new SerializdWatchlistEntry(showTmdb, seasonNumbers));
             }
 
-            var totalPages = doc.RootElement.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var t) ? t : page;
+            var totalPages = TryGetInt(doc.RootElement, "totalPages", out var t) ? t : page;
             if (page >= totalPages) break;
         }
 
@@ -311,9 +311,12 @@ public class SerializdApiClient : ISerializdService
 
             foreach (var r in reviews.EnumerateArray())
             {
-                if (!r.TryGetProperty("showId", out var showEl) || !showEl.TryGetInt32(out var show)) continue;
-                if (!r.TryGetProperty("episodeNumber", out var epEl) || !epEl.TryGetInt32(out var ep) || ep <= 0) continue;
-                if (!r.TryGetProperty("seasonId", out var sidEl) || !sidEl.TryGetInt32(out var seasonId)) continue;
+                // Any of these can be JSON null on a real diary: a review of a whole season or a
+                // whole show carries no episodeNumber, and such entries are simply not episode
+                // watches, so skipping them is correct. See issue #114.
+                if (!TryGetInt(r, "showId", out var show)) continue;
+                if (!TryGetInt(r, "episodeNumber", out var ep) || ep <= 0) continue;
+                if (!TryGetInt(r, "seasonId", out var seasonId)) continue;
 
                 // Resolve the Serializd seasonId to a season number via the entry's own season list.
                 int? seasonNumber = null;
@@ -321,8 +324,8 @@ public class SerializdApiClient : ISerializdService
                 {
                     foreach (var s in seasons.EnumerateArray())
                     {
-                        if (s.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var sid) && sid == seasonId
-                            && s.TryGetProperty("seasonNumber", out var numEl) && numEl.TryGetInt32(out var num))
+                        if (TryGetInt(s, "id", out var sid) && sid == seasonId
+                            && TryGetInt(s, "seasonNumber", out var num))
                         {
                             seasonNumber = num;
                             break;
@@ -335,7 +338,7 @@ public class SerializdApiClient : ISerializdService
                     result.Add(new SerializdDiaryEpisode(show, seasonNumber.Value, ep));
             }
 
-            var totalPages = doc.RootElement.TryGetProperty("totalPages", out var tp) && tp.TryGetInt32(out var t) ? t : page;
+            var totalPages = TryGetInt(doc.RootElement, "totalPages", out var t) ? t : page;
             if (page >= totalPages) break;
         }
 
@@ -524,5 +527,27 @@ public class SerializdApiClient : ISerializdService
     {
         _http.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Reads an integer property, tolerating the property being absent OR JSON null.
+    /// <para>
+    /// This exists because <see cref="JsonElement.TryGetInt32(out int)"/> is not the safe call it
+    /// looks like: it returns false only for format and range problems, and <b>throws</b>
+    /// <see cref="InvalidOperationException"/> when the element's ValueKind is anything other than
+    /// Number. So the natural-looking `TryGetProperty(...) &amp;&amp; el.TryGetInt32(...)` blows up the
+    /// moment Serializd sends `"episodeNumber": null`, which it does for season-level and
+    /// show-level reviews. One such entry anywhere in a diary aborted the entire import with
+    /// "The requested operation requires an element of type 'Number', but the target element has
+    /// type 'Null'". See issue #114.
+    /// </para>
+    /// </summary>
+    private static bool TryGetInt(JsonElement parent, string propertyName, out int value)
+    {
+        value = 0;
+        return parent.ValueKind == JsonValueKind.Object
+            && parent.TryGetProperty(propertyName, out var el)
+            && el.ValueKind == JsonValueKind.Number
+            && el.TryGetInt32(out value);
     }
 }

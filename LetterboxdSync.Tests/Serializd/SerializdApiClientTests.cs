@@ -504,6 +504,72 @@ public class SerializdApiClientTests
         Assert.Contains(diary, d => d.ShowTmdbId == 1396 && d.SeasonNumber == 1 && d.EpisodeNumber == 5);
     }
 
+    /// <summary>
+    /// Regression test for issue #114: a real Serializd diary contains season-level and show-level
+    /// reviews, where episodeNumber (and sometimes seasonId) is JSON null. JsonElement.TryGetInt32
+    /// THROWS on a non-Number element rather than returning false, so a single such entry aborted
+    /// the whole import with "The requested operation requires an element of type 'Number', but the
+    /// target element has type 'Null'". Those entries are not episode watches, so the right
+    /// behaviour is to skip them and keep importing the real ones.
+    /// </summary>
+    [Fact]
+    public async Task GetDiaryEpisodes_NullNumericFields_SkipsEntryInsteadOfThrowing()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath + req.RequestUri.Query;
+            if (path.Contains("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/diary?page=1"))
+                return Json(HttpStatusCode.OK,
+                    "{\"totalPages\":1,\"reviews\":[" +
+                    // season-level review: no episode
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":null,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}," +
+                    // show-level review: no season either
+                    "{\"showId\":1396,\"seasonId\":null,\"episodeNumber\":null,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}," +
+                    // null showId
+                    "{\"showId\":null,\"seasonId\":3572,\"episodeNumber\":2,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}," +
+                    // null inside showSeasons, which is a separate parse path
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":7,\"showSeasons\":[{\"id\":null,\"seasonNumber\":null},{\"id\":3572,\"seasonNumber\":1}]}," +
+                    // the one genuine episode watch in the page
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":5,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}]}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var diary = await client.GetDiaryEpisodesAsync();
+
+        // Episode 7 survives despite a null-bearing entry in its own showSeasons list, and 5 is the
+        // plain case. The three entries with null showId/episodeNumber/seasonId are skipped.
+        Assert.Equal(2, diary.Count);
+        Assert.Contains(diary, d => d.ShowTmdbId == 1396 && d.SeasonNumber == 1 && d.EpisodeNumber == 7);
+        Assert.Contains(diary, d => d.ShowTmdbId == 1396 && d.SeasonNumber == 1 && d.EpisodeNumber == 5);
+    }
+
+    /// <summary>A null totalPages must not throw either; it just ends pagination.</summary>
+    [Fact]
+    public async Task GetDiaryEpisodes_NullTotalPages_DoesNotThrow()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath + req.RequestUri.Query;
+            if (path.Contains("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/diary?page=1"))
+                return Json(HttpStatusCode.OK,
+                    "{\"totalPages\":null,\"reviews\":[" +
+                    "{\"showId\":1396,\"seasonId\":3572,\"episodeNumber\":5,\"showSeasons\":[{\"id\":3572,\"seasonNumber\":1}]}]}");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var diary = await client.GetDiaryEpisodesAsync();
+
+        Assert.Single(diary);
+    }
+
     [Fact]
     public async Task GetDiaryEpisodes_PaginatesUntilLastPage()
     {
