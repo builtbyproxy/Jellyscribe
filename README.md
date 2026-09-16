@@ -193,7 +193,7 @@ Unlike the anonymous telemetry above, **logs are not anonymous**, they can conta
 
 ## Requirements
 
-- **Jellyfin 10.11.9 or newer, including Jellyfin 12.x.** One release serves both: verified on 2026-09-16 by loading the shipped v2.4.1 build on a clean Jellyfin 12.0.0 server, where it loads, initialises, and runs its scheduled tasks. There is no separate Jellyfin 12 build to install and nothing to change in your config.
+- **Jellyfin 10.11.9 or newer.** Jellyfin 12.x is **partially supported**: the plugin loads and runs there (verified on a clean 12.0.0 server on 2026-09-16), and diary sync works, but **watchlist-to-playlist sync is currently broken on Jellyfin 12**. Jellyfin 12 changed the signature of the API used to add items to a playlist, so that one operation fails at runtime on 12.x. Everything else is unaffected. Tracked in `openspec/changes/add-jellyfin-12-support/`; a fix is in progress.
   - **Migrating your server to Jellyfin 12?** Jellyfin advises removing (or disabling) external plugins before the upgrade, and that is safe to follow here: your accounts, settings, and sync history live outside the plugin folder and all survive a reinstall from the catalog.
   - Note that Jellyfin 12 moved where plugins live, from `config/data/plugins/` to `config/plugins/`. Jellyfin handles that move for you on upgrade. It only matters if you install the plugin by hand rather than from the catalog, in which case use the new path on 12.x.
 - A Letterboxd and/or Serializd account
