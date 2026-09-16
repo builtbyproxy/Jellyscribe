@@ -10,6 +10,23 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.5.0',
+    headline: 'Watchlist playlists work on Jellyfin 12',
+    summary:
+      'Jellyfin 12 changed the way plugins add items to a playlist, and Jellyscribe was still asking the old way. The result was that on Jellyfin 12 your watchlist playlist silently stopped being filled in, while everything else carried on working normally. Jellyscribe now detects which version of that API the server offers and uses the right one, so a single release keeps working on Jellyfin 10.11 and Jellyfin 12 alike. If you are on Jellyfin 12 and your watchlist playlist has been sitting empty or stale, this release fixes it and the next watchlist sync will fill it in. Jellyfin 12 is now explicitly supported.',
+    highlights: {
+      fixes: [
+        'Watchlist-to-playlist sync works again on Jellyfin 12. It had been failing silently since Jellyfin 12.0 changed the playlist API.',
+      ],
+      new: [
+        'Jellyfin 12.x is now explicitly supported from the same release that serves Jellyfin 10.11.9 and newer.',
+      ],
+      improvements: [
+        'Every change is now built and tested against the Jellyfin 12 SDK automatically, so this class of breakage is caught before it ships rather than in a bug report.',
+      ],
+    },
+  },
+  {
     version: '2.4.2',
     headline: 'Fixing a bad Letterboxd password actually un-pauses syncing again',
     summary:
