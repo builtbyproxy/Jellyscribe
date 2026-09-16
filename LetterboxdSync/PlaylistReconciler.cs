@@ -54,7 +54,10 @@ internal static class PlaylistReconciler
             // matches and creates duplicates on every run.
             getExistingMembers: container => ((Playlist)container).LinkedChildren
                 .Where(lc => lc.ItemId.HasValue).Select(lc => lc.ItemId!.Value).ToHashSet(),
-            add: (container, toAdd) => playlistManager.AddItemToPlaylistAsync(container.Id, toAdd, user.Id),
+            // Via the compat shim: Jellyfin 12 changed this method's signature, and we compile
+            // against the 10.11 SDK. See PlaylistManagerCompat.
+            add: (container, toAdd) => PlaylistManagerCompat.AddItemToPlaylistAsync(
+                playlistManager, container.Id, toAdd, user.Id),
             remove: (container, toRemove) => playlistManager.RemoveItemFromPlaylistAsync(
                 container.Id.ToString("N"), toRemove.Select(id => id.ToString("N")).ToArray()));
     }
