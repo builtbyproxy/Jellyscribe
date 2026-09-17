@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.5.2.0",
+        "changelog": "If you run Ghostery, uBlock Origin with annoyance lists, AdGuard or Brave shields, the Raw cookies field in the account settings could simply not appear. The label was there, the box was not, and nothing showed up in the browser console to explain it. The cause was on our side: the field was named with the word \"cookie\" in it, and blockers carry sweeping rules that hide anything named that way in order to kill cookie consent banners. Ours got caught in the net. The field has been renamed internally so blockers leave it alone, and it still reads Raw cookies on screen. This mattered more than it sounds, because pasting cookies is exactly what we recommend when Cloudflare or two-factor authentication blocks a normal password login, so the people most in need of that box were the ones least likely to see it.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.5.2/jellyfin-plugin-letterboxd-v2.5.2.zip",
+        "checksum": "a0d5342e634defdf6d72b2d669a1b55b",
+        "timestamp": "2026-09-17T02:39:10Z"
+      },
+      {
         "version": "2.5.1.0",
         "changelog": "Importing your Serializd diary could fail outright with a confusing error about an element of type Number. The cause was that Serializd diaries contain reviews of whole seasons and whole shows, not just individual episodes, and those entries carry no episode number. Jellyscribe tried to read one anyway and the whole import stopped there, so nothing was imported at all. Those entries are not episode watches, so they are now simply skipped and the rest of the diary imports normally. If your Serializd import has been failing, it should work on the next run with no changes needed at your end.",
         "targetAbi": "10.11.9.0",
