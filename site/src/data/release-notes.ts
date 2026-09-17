@@ -10,6 +10,20 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.5.2',
+    headline: 'The Raw cookies box no longer vanishes if you use an ad blocker',
+    summary:
+      'If you run Ghostery, uBlock Origin with annoyance lists, AdGuard or Brave shields, the Raw cookies field in the account settings could simply not appear. The label was there, the box was not, and nothing showed up in the browser console to explain it. The cause was on our side: the field was named with the word "cookie" in it, and blockers carry sweeping rules that hide anything named that way in order to kill cookie consent banners. Ours got caught in the net. The field has been renamed internally so blockers leave it alone, and it still reads Raw cookies on screen. This mattered more than it sounds, because pasting cookies is exactly what we recommend when Cloudflare or two-factor authentication blocks a normal password login, so the people most in need of that box were the ones least likely to see it.',
+    highlights: {
+      fixes: [
+        'The Raw cookies field now appears for everyone, including users running content blockers that were silently hiding it.',
+      ],
+      improvements: [
+        'A test now fails the build if any settings field is named in a way content blockers are known to hide, so this cannot quietly come back.',
+      ],
+    },
+  },
+  {
     version: '2.5.1',
     headline: 'Serializd diary import no longer stops at the first season review',
     summary:
