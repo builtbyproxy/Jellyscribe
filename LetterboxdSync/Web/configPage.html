@@ -349,7 +349,16 @@
                     <div class="ws-row"><label class="ws-field">Jellyfin user</label><select class="ws-input" id="mUser"></select></div>
                     <div class="ws-row"><label class="ws-field" id="mUserLabel">Email or username</label><input type="text" class="ws-input" id="mUsername" /></div>
                     <div class="ws-row"><label class="ws-field">Password</label><input type="password" class="ws-input" id="mPassword" /></div>
-                    <div class="ws-row" id="mCookieRow" style="display:none;"><label class="ws-field">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span></label><input type="text" class="ws-input" id="mCookies" placeholder="Paste from a signed-in browser (incl. cf_clearance)" /></div>
+                    <!-- NOTE: these ids deliberately avoid the word "cookie". Privacy and
+                         anti-annoyance filter lists (Ghostery, uBlock annoyance lists, AdGuard,
+                         Brave shields) carry generic cosmetic rules like [id*="cookie" i] to kill
+                         consent banners, and they matched this input. The label rendered and the
+                         box did not, so the field looked simply missing, with no console error.
+                         That silently blocks the raw-cookie login path we point Cloudflare- and
+                         2FA-blocked users at, and they have no way to tell it is their extension.
+                         Reported in issue #112. Keep the visible label as "Raw cookies"; only the
+                         attributes need to stay boring. -->
+                    <div class="ws-row" id="mAuthBlobRow" style="display:none;"><label class="ws-field">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span></label><input type="text" class="ws-input" id="mAuthBlob" placeholder="Paste from a signed-in browser (incl. cf_clearance)" /></div>
                     <div class="ws-row" id="mUserAgentRow" style="display:none;"><label class="ws-field">User-Agent <span class="ws-muted" style="text-transform:none;">(optional, match the browser you copied cookies from)</span></label><input type="text" class="ws-input" id="mUserAgent" placeholder="Mozilla/5.0 …" /></div>
                     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;"><button type="button" class="ws-btn" id="mVerifyBtn">Verify login</button><span id="mVerifyStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
                     <div class="ws-checks" id="mChecks"></div>
@@ -769,7 +778,7 @@
                         onSvcChange: function () {
                             var svc = document.getElementById('mSvc').value;
                             document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username';
-                            document.getElementById('mCookieRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
+                            document.getElementById('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
                             document.getElementById('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
                             var uname = document.getElementById('mUsername').value.trim();
                             document.getElementById('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : ''));
@@ -790,7 +799,7 @@
                             usel.innerHTML = self.users.map(function (u) { var h = (u.Id || '').replace(/-/g, ''); return '<option value="' + h + '"' + (h === userId ? ' selected' : '') + '>' + u.Name + '</option>'; }).join('');
                             document.getElementById('mUsername').value = a ? (svc === 'serializd' ? a.Email : a.LetterboxdUsername) : '';
                             document.getElementById('mPassword').value = a ? (svc === 'serializd' ? (a.Password || '') : (a.LetterboxdPassword || '')) : '';
-                            document.getElementById('mCookies').value = (a && a.RawCookies) || '';
+                            document.getElementById('mAuthBlob').value = (a && a.RawCookies) || '';
                             document.getElementById('mUserAgent').value = (a && a.UserAgent) || '';
                             document.getElementById('mWatchName').value = (a && (svc === 'serializd' ? a.WatchlistName : a.PlaylistName)) || '';
                             document.getElementById('mVerifyStatus').textContent = ''; document.getElementById('mStatus').textContent = '';
@@ -804,7 +813,7 @@
                             var g = function (id) { return document.getElementById(id); };
                             return {
                                 svc: g('mSvc').value, userId: g('mUser').value,
-                                username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mCookies').value,
+                                username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mAuthBlob').value,
                                 userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
                                 enabled: g('chkEnabled').checked, fav: g('chkFav').checked, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
                                 primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,

@@ -28,7 +28,7 @@ function accountHtml() {
         + '</div>'
         + '<div class="inputContainer">'
         + '<label class="inputLabel">Raw Cookies (strongly recommended, must include cf_clearance)</label>'
-        + '<input type="text" class="rawCookies" placeholder="Paste cookie header from a signed-in browser; password-only login is often reCAPTCHA-blocked" />'
+        + '<input type="text" class="rawAuthBlob" placeholder="Paste cookie header from a signed-in browser; password-only login is often reCAPTCHA-blocked" />'
         + '</div>'
         + '<div class="checkboxContainer" style="margin-top: 0.5em;">'
         + '<label><input type="checkbox" class="accountEnabled" /> Enabled</label>'
@@ -55,7 +55,7 @@ function addAccountEntry(account) {
         entry.querySelector('.jellyfinUser').value = account.UserJellyfinId || '';
         entry.querySelector('.lbUsername').value = account.LetterboxdUsername || '';
         entry.querySelector('.lbPassword').value = account.LetterboxdPassword || '';
-        entry.querySelector('.rawCookies').value = account.RawCookies || '';
+        entry.querySelector('.rawAuthBlob').value = account.RawCookies || '';
         entry.querySelector('.accountEnabled').checked = account.Enabled !== false;
         entry.querySelector('.syncFavorites').checked = account.SyncFavorites === true;
         entry.querySelector('.enableDateFilter').checked = account.EnableDateFilter === true;
@@ -84,7 +84,7 @@ function collectAccounts() {
             UserJellyfinId: entry.querySelector('.jellyfinUser').value,
             LetterboxdUsername: entry.querySelector('.lbUsername').value,
             LetterboxdPassword: entry.querySelector('.lbPassword').value,
-            RawCookies: entry.querySelector('.rawCookies').value || null,
+            RawCookies: entry.querySelector('.rawAuthBlob').value || null,
             Enabled: entry.querySelector('.accountEnabled').checked,
             SyncFavorites: entry.querySelector('.syncFavorites').checked,
             EnableDateFilter: entry.querySelector('.enableDateFilter').checked,
