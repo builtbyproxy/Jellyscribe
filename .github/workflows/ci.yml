@@ -14,23 +14,54 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Validate manifest.json
-        # manifest.json is CI-managed (see release.yml). This guards the two
-        # ways it can be poisoned by hand: a PLACEHOLDER checksum left in,
-        # or a sourceUrl that no longer resolves (release deleted/renamed).
+        # manifest.json is CI-managed (see release.yml). This guards the two ways it can be
+        # poisoned by hand: a PLACEHOLDER checksum left in, or a sourceUrl that no longer
+        # resolves (release deleted/renamed). That is the v1.12.0.0 incident, where the manifest
+        # advertised a 404 to every user.
+        #
+        # Two failure modes are deliberately treated differently:
+        #   - A definitive HTTP answer we don't like (404, 410, 403...) means the manifest is
+        #     actually wrong. Fail the build.
+        #   - A transport error (DNS, TLS, timeout) after retries means we could not reach the
+        #     host. That is evidence about the network, not about the manifest, so warn loudly
+        #     and carry on rather than reporting a manifest problem that may not exist.
+        #
+        # The previous version did neither: it ran under `set -e` with `code=$(curl ...)`, so a
+        # single transient curl failure aborted the step at that line with no message at all. One
+        # TLS blip red-flagged a PR whose diff did not touch manifest.json. With 59 historical
+        # URLs checked on every run, the odds of hitting one grow with each release.
         run: |
-          set -e
           if grep -q PLACEHOLDER manifest.json; then
             echo "::error::manifest.json contains PLACEHOLDER. Manifest entries are inserted by release.yml after a successful build, do not pre-commit them. See CLAUDE.md > Releasing."
             exit 1
           fi
+
           fail=0
+          unreachable=0
+          checked=0
           while IFS= read -r url; do
-            code=$(curl -sIL -o /dev/null -w '%{http_code}' "$url")
-            if [ "$code" != "200" ]; then
+            checked=$((checked + 1))
+            # --retry-all-errors covers connection/TLS resets, which plain --retry ignores.
+            code=$(curl -sIL -o /dev/null -w '%{http_code}' \
+                     --retry 3 --retry-delay 2 --retry-all-errors \
+                     --connect-timeout 10 --max-time 30 \
+                     "$url") || curl_rc=$?
+            curl_rc=${curl_rc:-0}
+
+            if [ "$curl_rc" -ne 0 ]; then
+              echo "::warning::could not reach manifest sourceUrl after retries (curl exit $curl_rc), not treating as a manifest error: $url"
+              unreachable=$((unreachable + 1))
+            elif [ "$code" != "200" ]; then
               echo "::error::manifest sourceUrl returned HTTP $code: $url"
               fail=1
             fi
+            unset curl_rc
           done < <(jq -r '.[0].versions[].sourceUrl' manifest.json)
+
+          echo "checked $checked sourceUrl(s); $unreachable unreachable, $fail hard failure(s)"
+          if [ "$unreachable" -gt 0 ] && [ "$unreachable" -eq "$checked" ]; then
+            echo "::warning::every sourceUrl was unreachable, which points at the runner's network or the download host being down rather than at manifest.json."
+          fi
           exit $fail
 
       - name: Setup .NET
