@@ -280,8 +280,12 @@ public class LetterboxdApiClient : ILetterboxdService
     /// request parameter. There is no offset parameter; an earlier version sent
     /// <c>start=N</c>, which the API ignores, so every "next page" request returned page one
     /// again and lists were silently cut at the first 100 items (issues #109 and #125).
-    /// Stops when <c>next</c> is missing, null or empty. Truncation is never silent: a page
-    /// with no new items, a repeated cursor, or hitting <see cref="MaxPages"/> logs a warning.
+    /// The list ends only when <c>next</c> is absent or null. Anything else that stops the
+    /// read early (an empty or malformed page, an unrecognised <c>next</c>, a page with nothing
+    /// new, a repeated cursor, or the page cap) throws instead of returning a partial list:
+    /// callers treat the result as the complete list (watchlist sync reconciles the playlist
+    /// to it), so a short list would quietly remove films, while a throw is logged by the
+    /// caller and leaves everything as it was.
     /// </summary>
     private async Task ReadAllPagesAsync(string path, string baseQuery, string what, Action<JsonElement> onItem)
     {
@@ -297,9 +301,21 @@ public class LetterboxdApiClient : ILetterboxdService
 
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
-            var items = doc.RootElement.GetProperty("items");
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+                throw IncompleteRead(what, seenItemIds.Count, "a page with no list of items");
+
+            var hasNext = root.TryGetProperty("next", out var nextEl) && nextEl.ValueKind != JsonValueKind.Null;
+            if (hasNext && (nextEl.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(nextEl.GetString())))
+                throw IncompleteRead(what, seenItemIds.Count, $"a next-page marker it could not read ({nextEl.ValueKind})");
+
             if (items.GetArrayLength() == 0)
+            {
+                if (hasNext)
+                    throw IncompleteRead(what, seenItemIds.Count, "an empty page in the middle of the list");
                 return;
+            }
 
             var newItems = 0;
             foreach (var item in items.EnumerateArray())
@@ -314,27 +330,23 @@ public class LetterboxdApiClient : ILetterboxdService
                 onItem(item);
             }
 
-            var next = doc.RootElement.TryGetProperty("next", out var nextEl) && nextEl.ValueKind == JsonValueKind.String
-                ? nextEl.GetString()
-                : null;
-            if (string.IsNullOrEmpty(next))
+            if (!hasNext)
                 return;
 
-            if (newItems == 0 || !seenCursors.Add(next))
-            {
-                _logger.LogWarning(
-                    "Letterboxd kept returning the same page of {What} after {Count} items; stopped reading so the sync does not loop",
-                    what, seenItemIds.Count);
-                return;
-            }
+            var next = nextEl.GetString()!;
+            if (newItems == 0)
+                throw IncompleteRead(what, seenItemIds.Count, "the same page again instead of the next one");
+            if (!seenCursors.Add(next))
+                throw IncompleteRead(what, seenItemIds.Count, "a next-page marker it had already followed");
 
             cursor = next;
         }
 
-        _logger.LogWarning(
-            "Stopped reading {What} after {Pages} pages ({Count} items); anything beyond that was not fetched",
-            what, MaxPages, seenItemIds.Count);
+        throw IncompleteRead(what, seenItemIds.Count, $"more than {MaxPages} pages");
     }
+
+    private static InvalidOperationException IncompleteRead(string what, int count, string reason)
+        => new($"Could not read the whole Letterboxd {what}: after {count} items Letterboxd returned {reason}. Nothing was changed this run.");
 
     /// <summary>
     /// Pull TMDb ID from a FilmSummary's `links` array.

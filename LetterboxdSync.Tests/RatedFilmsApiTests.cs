@@ -416,21 +416,108 @@ public class GetDiaryFilmEntriesIntegrationTests
         Assert.Single(queries);
     }
 
-    [Fact]
-    public async Task GetWatchlistTmdbIdsAsync_ServerRepeatsFirstPage_StopsInsteadOfLooping()
+    /// <summary>Serves the nth watchlist request (0-based) the body from <paramref name="bodyFor"/>.</summary>
+    private static Func<HttpRequestMessage, HttpResponseMessage?> ScriptedWatchlist(Func<int, string> bodyFor, List<string> queries)
+        => request =>
+        {
+            if (request.RequestUri?.AbsolutePath.Contains("/watchlist") != true) return null;
+            var n = queries.Count;
+            queries.Add(Uri.UnescapeDataString(request.RequestUri.Query));
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(bodyFor(n)) };
+        };
+
+    private static string Items(int from, int count)
+        => string.Join(",", Enumerable.Range(from, count).Select(i =>
+            $@"{{ ""id"": ""f{i}"", ""links"": [ {{ ""type"": ""tmdb"", ""id"": ""{1000 + i}"" }} ] }}"));
+
+    private static async Task<InvalidOperationException> WatchlistReadFails(Func<int, string> bodyFor, List<string> queries)
     {
-        // If the API ever ignores the cursor too, the client must notice a page with nothing new
-        // and stop (with a warning) rather than re-fetching page one up to the page cap.
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: ScriptedWatchlist(bodyFor, queries));
+        using var client = new LetterboxdApiClient(TestLogger, handler);
+        await client.AuthenticateAsync("user", "pass");
+        return await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetWatchlistTmdbIdsAsync("user"));
+    }
+
+    // Every way a read can stop early must throw, never return a short list: watchlist sync
+    // reconciles the playlist to whatever comes back, so a partial list would remove films.
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_ServerIgnoresCursor_Throws()
+    {
+        // The API ignoring the cursor (as it ignored `start=` in #125): same items, same next.
         var queries = new List<string>();
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(
             extraHandler: CursorPagedList("/watchlist", 1011, queries, honourCursor: false));
-
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
-        var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
-        Assert.Equal(100, ids.Count);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetWatchlistTmdbIdsAsync("user"));
+
         Assert.Equal(2, queries.Count);
+        Assert.Contains("Nothing was changed", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_SamePageWithFreshCursor_Throws()
+    {
+        // Isolates the "nothing new on this page" guard: the cursor never repeats.
+        var queries = new List<string>();
+        var ex = await WatchlistReadFails(n => $@"{{ ""next"": ""c{n + 1}"", ""items"": [{Items(0, 100)}] }}", queries);
+
+        Assert.Equal(2, queries.Count);
+        Assert.Contains("same page again", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_RepeatedCursorWithNewItems_Throws()
+    {
+        // Isolates the repeated-cursor guard: every page brings new items but the same marker.
+        var queries = new List<string>();
+        var ex = await WatchlistReadFails(n => $@"{{ ""next"": ""c1"", ""items"": [{Items(n * 100, 100)}] }}", queries);
+
+        Assert.Equal(2, queries.Count);
+        Assert.Contains("already followed", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_EmptyPageMidList_Throws()
+    {
+        var queries = new List<string>();
+        var ex = await WatchlistReadFails(n => n == 0
+            ? $@"{{ ""next"": ""c1"", ""items"": [{Items(0, 100)}] }}"
+            : @"{ ""next"": ""c2"", ""items"": [] }", queries);
+
+        Assert.Contains("empty page", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_UnreadableNext_Throws()
+    {
+        var queries = new List<string>();
+        var ex = await WatchlistReadFails(_ => $@"{{ ""next"": 12345, ""items"": [{Items(0, 100)}] }}", queries);
+
+        Assert.Single(queries);
+        Assert.Contains("could not read", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_ResponseWithoutItems_Throws()
+    {
+        var queries = new List<string>();
+        var ex = await WatchlistReadFails(_ => @"{ ""message"": ""Unauthorized"" }", queries);
+
+        Assert.Contains("no list of items", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_NeverEndingList_StopsAtPageCap()
+    {
+        // Fresh items and a fresh cursor forever: only the page cap can stop it.
+        var queries = new List<string>();
+        var ex = await WatchlistReadFails(n => $@"{{ ""next"": ""c{n + 1}"", ""items"": [{Items(n * 100, 100)}] }}", queries);
+
+        Assert.Equal(200, queries.Count);
+        Assert.Contains("more than 200 pages", ex.Message);
     }
 
     [Fact]
