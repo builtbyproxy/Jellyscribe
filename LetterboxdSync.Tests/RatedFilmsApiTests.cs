@@ -300,54 +300,60 @@ public class GetDiaryFilmEntriesIntegrationTests
         Assert.Null(unrated.Rating);
     }
 
-    [Fact]
-    public async Task GetDiaryFilmEntriesAsync_FollowsPagination()
-    {
-        var pageRequests = new List<string>();
-
-        var page1 = @"{
-            ""next"": ""start=2"",
-            ""items"": [
-                { ""type"": ""FilmSummary"", ""id"": ""A"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""1"" } ],
-                  ""relationships"": [ { ""relationship"": { ""rating"": 5.0 } } ] }
-            ]
-        }";
-        var page2 = @"{
-            ""items"": [
-                { ""type"": ""FilmSummary"", ""id"": ""B"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""2"" } ],
-                  ""relationships"": [ { ""relationship"": { ""rating"": 3.5 } } ] }
-            ]
-        }";
-
-        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: (request) =>
+    /// <summary>
+    /// A fake Letterboxd list endpoint that behaves like the documented API, not like our
+    /// assumptions about it (issues #109 and #125): it pages with an opaque cursor taken from
+    /// the previous response's <c>next</c>, ignores any <c>start</c> parameter, and marks the
+    /// last page with <c>"next": null</c>, as the real /films response does. Item ids are
+    /// <c>f{i}</c> and TMDb ids <c>1000 + i</c>; the cursor values are deliberately not
+    /// <c>start=N</c>, so a client that builds offsets itself instead of echoing <c>next</c>
+    /// cannot pass.
+    /// </summary>
+    private static Func<HttpRequestMessage, HttpResponseMessage?> CursorPagedList(
+        string pathPart, int total, List<string> queries, bool honourCursor = true)
+        => request =>
         {
-            if (request.RequestUri?.AbsolutePath.EndsWith("/films") == true &&
-                request.Method == HttpMethod.Get)
+            if (request.RequestUri?.AbsolutePath.Contains(pathPart) != true || request.Method != HttpMethod.Get)
+                return null;
+
+            var query = Uri.UnescapeDataString(request.RequestUri.Query);
+            queries.Add(query);
+            var m = System.Text.RegularExpressions.Regex.Match(query, @"[?&]cursor=opaque-(\d+)");
+            var start = honourCursor && m.Success ? int.Parse(m.Groups[1].Value) : 0;
+
+            var count = Math.Min(100, total - start);
+            var items = string.Join(",", Enumerable.Range(start, count).Select(i =>
+                $@"{{ ""type"": ""FilmSummary"", ""id"": ""f{i}"", ""links"": [ {{ ""type"": ""tmdb"", ""id"": ""{1000 + i}"" }} ],
+                     ""relationships"": [ {{ ""relationship"": {{ ""rating"": 4.0 }} }} ] }}"));
+            var next = start + count < total ? $@"""opaque-{start + count}""" : "null";
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                var q = request.RequestUri.Query;
-                pageRequests.Add(q);
-                var body = q.Contains("start=") ? page2 : page1;
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(body)
-                };
-            }
-            return null;
-        });
+                Content = new StringContent($@"{{ ""next"": {next}, ""items"": [{items}] }}")
+            };
+        };
+
+    [Fact]
+    public async Task GetDiaryFilmEntriesAsync_FollowsCursorAcrossAllPages()
+    {
+        // Issue #125: the diary import paged with `start=`, which the API ignores, so anyone with
+        // more than 100 watched films only ever imported the first 100.
+        var queries = new List<string>();
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: CursorPagedList("/films", 250, queries));
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
         var entries = await client.GetDiaryFilmEntriesAsync("user");
 
-        Assert.Equal(2, pageRequests.Count);
-        Assert.DoesNotContain("start=", pageRequests[0]);
-        Assert.Contains("start=", pageRequests[1]);
-
-        Assert.Equal(2, entries.Count);
-        Assert.Equal(1, entries[0].TmdbId);
-        Assert.Equal(5.0, entries[0].Rating);
-        Assert.Equal(2, entries[1].TmdbId);
-        Assert.Equal(3.5, entries[1].Rating);
+        Assert.Equal(250, entries.Count);
+        Assert.Equal(1000, entries[0].TmdbId);
+        Assert.Equal(1249, entries[^1].TmdbId);
+        Assert.Equal(4.0, entries[^1].Rating);
+        Assert.Equal(3, queries.Count);
+        Assert.DoesNotContain("cursor=", queries[0]);
+        Assert.Contains("cursor=opaque-100", queries[1]);
+        Assert.Contains("cursor=opaque-200", queries[2]);
+        Assert.All(queries, q => Assert.Contains("memberRelationship=Watched", q));
     }
 
     [Fact]
@@ -373,88 +379,58 @@ public class GetDiaryFilmEntriesIntegrationTests
     }
 
     [Fact]
-    public async Task GetWatchlistTmdbIdsAsync_FollowsPaginationUntilNextIsAbsent()
+    public async Task GetWatchlistTmdbIdsAsync_FollowsCursorAcrossAllPages()
     {
-        // Regression test for #109: the watchlist only ever synced its first page. Letterboxd's
-        // FilmsResponse signals a further page with `next: "start=N"` and has no `cursor` field
-        // at all (that name is only the request query param), so the old `cursor` lookup always
-        // missed and broke out after page 1. Paging is by `start` offset, matching
-        // GetDiaryFilmEntriesAsync.
-        var pageHits = new List<string>();
-        var page1 = @"{
-            ""items"": [
-                { ""id"": ""KQMM"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""1233413"" } ] },
-                { ""id"": ""2a9q"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""550"" } ] }
-            ],
-            ""next"": ""start=100""
-        }";
-        var page2 = @"{
-            ""items"": [
-                { ""id"": ""ABCD"", ""links"": [ { ""type"": ""tmdb"", ""id"": ""1726"" } ] }
-            ]
-        }";
-
-        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: (request) =>
-        {
-            if (request.RequestUri?.AbsolutePath.Contains("/watchlist") == true)
-            {
-                var q = request.RequestUri.Query;
-                pageHits.Add(q);
-                var body = q.Contains("start=") ? page2 : page1;
-                return new HttpResponseMessage(HttpStatusCode.OK)
-                {
-                    Content = new StringContent(body)
-                };
-            }
-            return null;
-        });
+        // Issue #125: a 1,011-film watchlist came back as 99 films. The client asked for later
+        // pages with `start=N`, the API ignored it and returned page one each time, and dedupe
+        // collapsed 50 identical pages into one. Pages must be requested with cursor=<next>.
+        var queries = new List<string>();
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: CursorPagedList("/watchlist", 1011, queries));
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
         var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
-        Assert.Equal(new[] { 1233413, 550, 1726 }, ids.ToArray());
-        Assert.Equal(2, pageHits.Count);
-        Assert.DoesNotContain("start=", pageHits[0]);
-        Assert.Contains("start=100", pageHits[1]);
+        Assert.Equal(1011, ids.Count);
+        Assert.Equal(1000, ids[0]);
+        Assert.Equal(2010, ids[^1]);
+        Assert.Equal(11, queries.Count);
+        Assert.DoesNotContain("cursor=", queries[0]);
+        Assert.Contains("cursor=opaque-1000", queries[^1]);
+        Assert.All(queries, q => Assert.DoesNotContain("start=", q));
     }
 
-    /// <summary>
-    /// The pre-#109 failure mode, pinned directly: a first page that carries `next` but no
-    /// `cursor` must still be followed. Before the fix this returned only the first page.
-    /// </summary>
     [Fact]
-    public async Task GetWatchlistTmdbIdsAsync_FullPageWithNext_DoesNotStopAfterFirstPage()
+    public async Task GetWatchlistTmdbIdsAsync_NullNextOnSinglePage_MakesOneRequest()
     {
-        var requested = 0;
-        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: (request) =>
-        {
-            if (request.RequestUri?.AbsolutePath.Contains("/watchlist") != true) return null;
-
-            // Three full pages of 100, then a short final page: 335 films, as in issue #109.
-            var m = System.Text.RegularExpressions.Regex.Match(request.RequestUri.Query, @"[?&]start=(\d+)");
-            var start = m.Success ? int.Parse(m.Groups[1].Value) : 0;
-            requested++;
-
-            var count = Math.Min(100, 335 - start);
-            var items = string.Join(",", Enumerable.Range(start, count)
-                .Select(i => $@"{{ ""id"": ""f{i}"", ""links"": [ {{ ""type"": ""tmdb"", ""id"": ""{1000 + i}"" }} ] }}"));
-            var next = start + count < 335 ? $@", ""next"": ""start={start + count}""" : string.Empty;
-
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent($@"{{ ""items"": [{items}]{next} }}")
-            };
-        });
+        // The real last page carries "next": null. Treating a present-but-null `next` as
+        // "more pages" kept the loop requesting until its cap on every sync.
+        var queries = new List<string>();
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: CursorPagedList("/watchlist", 40, queries));
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
         var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
-        Assert.Equal(335, ids.Count);
-        Assert.Equal(4, requested);
-        Assert.Equal(1000, ids[0]);
-        Assert.Equal(1334, ids[^1]);
+        Assert.Equal(40, ids.Count);
+        Assert.Single(queries);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_ServerRepeatsFirstPage_StopsInsteadOfLooping()
+    {
+        // If the API ever ignores the cursor too, the client must notice a page with nothing new
+        // and stop (with a warning) rather than re-fetching page one up to the page cap.
+        var queries = new List<string>();
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(
+            extraHandler: CursorPagedList("/watchlist", 1011, queries, honourCursor: false));
+
+        using var client = new LetterboxdApiClient(TestLogger, handler);
+        await client.AuthenticateAsync("user", "pass");
+        var ids = await client.GetWatchlistTmdbIdsAsync("user");
+
+        Assert.Equal(100, ids.Count);
+        Assert.Equal(2, queries.Count);
     }
 
     [Fact]
