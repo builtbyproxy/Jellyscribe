@@ -9,7 +9,10 @@ namespace LetterboxdSync.Tests;
 /// Because the backing dictionary is static, every test resets its track via Start()
 /// before asserting, which is the same pattern the real callers use at the top of each run.
 /// </summary>
-[Collection("SyncProgress")]
+// SyncProgress is a process-wide static that the runner, diary-import and controller tests also
+// drive through production code. Those all live in the "Plugin" collection, so this class joins
+// it too; in its own collection it ran in parallel with them and saw their state (flaky CI).
+[Collection("Plugin")]
 public class SyncProgressTests
 {
     private static object Snapshot() => SyncProgress.GetSnapshot();
