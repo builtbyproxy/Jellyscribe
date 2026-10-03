@@ -18,7 +18,7 @@ public class SyncTask : IScheduledTask
     public string Name => "Sync watched movies to Letterboxd";
     public string Key => "LetterboxdSync";
     public string Description => "Syncs your Jellyfin watch history to your Letterboxd diary";
-    public string Category => "Letterboxd";
+    public string Category => "Jellyscribe";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, "scheduled", cancellationToken);

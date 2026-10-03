@@ -19,7 +19,7 @@ public class SerializdWatchlistSyncTask : IScheduledTask
     public string Name => "Sync Serializd watchlist to playlist";
     public string Key => "SerializdWatchlistSync";
     public string Description => "Mirrors your Serializd watchlist into a Jellyfin playlist";
-    public string Category => "Letterboxd";
+    public string Category => "Jellyscribe";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, cancellationToken);

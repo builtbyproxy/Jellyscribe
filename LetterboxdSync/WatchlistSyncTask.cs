@@ -18,7 +18,7 @@ public class WatchlistSyncTask : IScheduledTask
     public string Name => "Sync Letterboxd watchlist to playlist";
     public string Key => "LetterboxdWatchlistSync";
     public string Description => "Creates a Jellyfin playlist from your Letterboxd watchlist";
-    public string Category => "Letterboxd";
+    public string Category => "Jellyscribe";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, "scheduled", cancellationToken);

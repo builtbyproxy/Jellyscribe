@@ -19,7 +19,7 @@ public class SerializdDiaryImportTask : IScheduledTask
     public string Name => "Import Serializd diary to Jellyfin";
     public string Key => "SerializdDiaryImport";
     public string Description => "Marks Jellyfin episodes played if they're on your Serializd diary";
-    public string Category => "Letterboxd";
+    public string Category => "Jellyscribe";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, cancellationToken);
