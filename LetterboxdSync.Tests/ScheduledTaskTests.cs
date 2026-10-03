@@ -67,7 +67,7 @@ public class ScheduledTaskTests : IDisposable
 
         Assert.Equal("Sync watched movies to Letterboxd", task.Name);
         Assert.Equal("LetterboxdSync", task.Key);
-        Assert.Equal("Letterboxd", task.Category);
+        Assert.Equal("Jellyscribe", task.Category);
         Assert.False(string.IsNullOrEmpty(task.Description));
     }
 
@@ -111,7 +111,7 @@ public class ScheduledTaskTests : IDisposable
 
         Assert.Equal("Sync Letterboxd watchlist to playlist", task.Name);
         Assert.Equal("LetterboxdWatchlistSync", task.Key);
-        Assert.Equal("Letterboxd", task.Category);
+        Assert.Equal("Jellyscribe", task.Category);
         Assert.False(string.IsNullOrEmpty(task.Description));
     }
 
@@ -151,7 +151,7 @@ public class ScheduledTaskTests : IDisposable
 
         Assert.Equal("Sync watched TV to Serializd", task.Name);
         Assert.Equal("SerializdSync", task.Key);
-        Assert.Equal("Letterboxd", task.Category);
+        Assert.Equal("Jellyscribe", task.Category);
         Assert.False(string.IsNullOrEmpty(task.Description));
     }
 

@@ -24,7 +24,7 @@ public class SerializdSyncTask : IScheduledTask
     public string Name => "Sync watched TV to Serializd";
     public string Key => "SerializdSync";
     public string Description => "Logs your Jellyfin TV watch history to your Serializd account";
-    public string Category => "Letterboxd";
+    public string Category => "Jellyscribe";
 
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, "scheduled", cancellationToken);

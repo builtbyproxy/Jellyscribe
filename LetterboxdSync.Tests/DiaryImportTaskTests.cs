@@ -440,7 +440,7 @@ public class DiaryImportTaskTests : IDisposable
         // Pinned strings, since these show up in the Jellyfin Scheduled Tasks UI.
         Assert.Equal("Import Letterboxd diary to Jellyfin", _task.Name);
         Assert.Equal("LetterboxdDiaryImport", _task.Key);
-        Assert.Equal("Letterboxd", _task.Category);
+        Assert.Equal("Jellyscribe", _task.Category);
         Assert.False(string.IsNullOrEmpty(_task.Description));
     }
 

@@ -42,7 +42,7 @@ public class DiaryImportTask : IScheduledTask
     public string Name => "Import Letterboxd diary to Jellyfin";
     public string Key => "LetterboxdDiaryImport";
     public string Description => "Marks films in your Jellyfin library as played if they appear in your Letterboxd diary";
-    public string Category => "Letterboxd";
+    public string Category => "Jellyscribe";
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {

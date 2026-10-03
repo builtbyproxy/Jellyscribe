@@ -224,39 +224,14 @@ public class LetterboxdApiClient : ILetterboxdService
         EnsureAuthenticated();
         var tmdbIds = new List<int>();
         var seen = new HashSet<int>();
-        const int perPage = 100;
 
-        for (int page = 0; page < 50; page++)
-        {
-            var qp = $"perPage={perPage}";
-            if (page > 0)
-                qp += $"&start={page * perPage}";
-
-            var response = await SendSignedAsync(HttpMethod.Get, $"/member/{Uri.EscapeDataString(_memberId)}/watchlist",
-                queryParams: qp, authenticated: true).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            using var doc = JsonDocument.Parse(json);
-            var items = doc.RootElement.GetProperty("items");
-
-            if (items.GetArrayLength() == 0)
-                break;
-
-            foreach (var item in items.EnumerateArray())
+        await ReadAllPagesAsync($"/member/{Uri.EscapeDataString(_memberId)}/watchlist", "perPage=100", "watchlist",
+            item =>
             {
                 var tmdbId = ExtractTmdbId(item);
                 if (tmdbId.HasValue && seen.Add(tmdbId.Value))
                     tmdbIds.Add(tmdbId.Value);
-            }
-
-            // Letterboxd signals more pages via `next: "start=N"`, the same shape
-            // GetDiaryFilmEntriesAsync pages on. There is no `cursor` field in the response
-            // (that name is only the request param), so reading one stopped us after page 1
-            // and truncated every watchlist over perPage films. See issue #109.
-            if (!doc.RootElement.TryGetProperty("next", out _))
-                break;
-        }
+            }).ConfigureAwait(false);
 
         return tmdbIds;
     }
@@ -279,42 +254,99 @@ public class LetterboxdApiClient : ILetterboxdService
         EnsureAuthenticated();
         var entries = new List<DiaryFilmEntry>();
         var seen = new HashSet<int>();
-        const int perPage = 100;
 
-        for (int page = 0; page < 50; page++)
+        await ReadAllPagesAsync("/films",
+            $"perPage=100&member={Uri.EscapeDataString(_memberId)}&memberRelationship=Watched&include=MemberRelationship",
+            "watched films",
+            item =>
+            {
+                var tmdbId = ExtractTmdbIdFromLinks(item);
+                if (!tmdbId.HasValue || !seen.Add(tmdbId.Value)) return;
+
+                double? rating = ExtractMemberRating(item);
+                entries.Add(new DiaryFilmEntry(tmdbId.Value, rating));
+            }).ConfigureAwait(false);
+
+        return entries;
+    }
+
+    // 200 pages of 100 is 20,000 films, far beyond any real watchlist or diary; the cap only
+    // exists so a misbehaving API can never loop forever.
+    private const int MaxPages = 200;
+
+    /// <summary>
+    /// Reads every page of a cursored Letterboxd list. Letterboxd paginates with an opaque
+    /// cursor: each response's <c>next</c> value is sent back unchanged as the <c>cursor</c>
+    /// request parameter. There is no offset parameter; an earlier version sent
+    /// <c>start=N</c>, which the API ignores, so every "next page" request returned page one
+    /// again and lists were silently cut at the first 100 items (issues #109 and #125).
+    /// The list ends only when <c>next</c> is absent or null. Anything else that stops the
+    /// read early (an empty or malformed page, an unrecognised <c>next</c>, a page with nothing
+    /// new, a repeated cursor, or the page cap) throws instead of returning a partial list:
+    /// callers treat the result as the complete list (watchlist sync reconciles the playlist
+    /// to it), so a short list would quietly remove films, while a throw is logged by the
+    /// caller and leaves everything as it was.
+    /// </summary>
+    private async Task ReadAllPagesAsync(string path, string baseQuery, string what, Action<JsonElement> onItem)
+    {
+        string? cursor = null;
+        var seenCursors = new HashSet<string>(StringComparer.Ordinal);
+        var seenItemIds = new HashSet<string>(StringComparer.Ordinal);
+
+        for (var page = 0; page < MaxPages; page++)
         {
-            var qp = $"perPage={perPage}&member={Uri.EscapeDataString(_memberId)}" +
-                    "&memberRelationship=Watched&include=MemberRelationship";
-            if (page > 0)
-                qp += $"&start={page * perPage}";
-
-            var response = await SendSignedAsync(HttpMethod.Get, "/films",
-                queryParams: qp, authenticated: true).ConfigureAwait(false);
+            var qp = cursor == null ? baseQuery : $"{baseQuery}&cursor={Uri.EscapeDataString(cursor)}";
+            var response = await SendSignedAsync(HttpMethod.Get, path, queryParams: qp, authenticated: true).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
-            var items = doc.RootElement.GetProperty("items");
+            var root = doc.RootElement;
+
+            if (!root.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+                throw IncompleteRead(what, seenItemIds.Count, "a page with no list of items");
+
+            var hasNext = root.TryGetProperty("next", out var nextEl) && nextEl.ValueKind != JsonValueKind.Null;
+            if (hasNext && (nextEl.ValueKind != JsonValueKind.String || string.IsNullOrEmpty(nextEl.GetString())))
+                throw IncompleteRead(what, seenItemIds.Count, $"a next-page marker it could not read ({nextEl.ValueKind})");
 
             if (items.GetArrayLength() == 0)
-                break;
-
-            foreach (var item in items.EnumerateArray())
             {
-                var tmdbId = ExtractTmdbIdFromLinks(item);
-                if (!tmdbId.HasValue || !seen.Add(tmdbId.Value)) continue;
-
-                double? rating = ExtractMemberRating(item);
-                entries.Add(new DiaryFilmEntry(tmdbId.Value, rating));
+                if (hasNext)
+                    throw IncompleteRead(what, seenItemIds.Count, "an empty page in the middle of the list");
+                return;
             }
 
-            // Letterboxd signals more pages via `next: "start=N"`. Stop when missing.
-            if (!doc.RootElement.TryGetProperty("next", out _))
-                break;
+            var newItems = 0;
+            foreach (var item in items.EnumerateArray())
+            {
+                // Letterboxd's own item id, present on every item whether or not it carries a
+                // TMDb link, so it reliably tells a fresh page from a repeated one.
+                var itemId = item.TryGetProperty("id", out var idEl) && idEl.ValueKind == JsonValueKind.String
+                    ? idEl.GetString()
+                    : null;
+                if (itemId == null || seenItemIds.Add(itemId))
+                    newItems++;
+                onItem(item);
+            }
+
+            if (!hasNext)
+                return;
+
+            var next = nextEl.GetString()!;
+            if (newItems == 0)
+                throw IncompleteRead(what, seenItemIds.Count, "the same page again instead of the next one");
+            if (!seenCursors.Add(next))
+                throw IncompleteRead(what, seenItemIds.Count, "a next-page marker it had already followed");
+
+            cursor = next;
         }
 
-        return entries;
+        throw IncompleteRead(what, seenItemIds.Count, $"more than {MaxPages} pages");
     }
+
+    private static InvalidOperationException IncompleteRead(string what, int count, string reason)
+        => new($"Could not read the whole Letterboxd {what}: after {count} items Letterboxd returned {reason}. Nothing was changed this run.");
 
     /// <summary>
     /// Pull TMDb ID from a FilmSummary's `links` array.
