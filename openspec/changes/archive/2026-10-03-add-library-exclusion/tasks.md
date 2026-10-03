@@ -32,7 +32,7 @@
 - [x] 6.1 `Web/configPage.html`: "Excluded libraries" checklist on each Letterboxd and Serializd account card, saved via the full-config round trip, stale ids dropped on save, hidden when no libraries are listed
 - [x] 6.2 `Web/userPage.html`: same checklist, saved via the account PUT endpoints
 - [x] 6.3 Update visual baselines and check both pages in light and dark themes
-- [ ] 6.4 Manual check on the dev server: exclude a library, play an item from it, confirm no post and the skip log line
+- [x] 6.4 Manual check on the dev server: exclude a library, play an item from it, confirm no post and the skip log line. Done 2026-10-03 on a throwaway Jellyfin 10.11.11 (same image as production): excluded film and episode skipped with the log line and no network call, non-excluded items attempted, scheduled syncs skipped excluded items, restricted user saw only their libraries and kept an admin-set hidden exclusion on save
 
 ## 7. Docs and release
 

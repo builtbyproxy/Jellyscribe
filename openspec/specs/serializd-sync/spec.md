@@ -29,8 +29,8 @@ linked account has an independent enabled/disabled flag.
 ### Requirement: Real-time episode scrobble
 When a Jellyfin `Episode` is played to completion, the plugin SHALL log that
 episode as watched on Serializd for every enabled Serializd account belonging to
-the playing user, keyed by the series TMDb id, the Serializd season id, and the
-episode number.
+the playing user whose excluded libraries do not contain the episode, keyed by the
+series TMDb id, the Serializd season id, and the episode number.
 
 #### Scenario: Episode finished
 - **WHEN** an `Episode` raises `PlaybackStopped` with `PlayedToCompletion` true
@@ -51,6 +51,11 @@ episode number.
 - **WHEN** the episode's series has no TMDb id
 - **THEN** the plugin logs a warning and skips that item without error
 
+#### Scenario: Episode in an excluded library
+- **WHEN** a completed episode sits in a library the Serializd account excludes
+- **THEN** no Serializd request is made for that account and an information line
+  is logged naming the episode and account
+
 ### Requirement: Snake_case write payloads
 All Serializd write requests SHALL serialise their bodies in snake_case
 (`show_id`, `season_ids`, `episode_numbers`), because the API returns HTTP 500 for
@@ -62,11 +67,17 @@ camelCase bodies.
 
 ### Requirement: Scheduled catch-up
 A scheduled task SHALL periodically log any recently-played episodes that are not
-yet recorded on Serializd, without marking them as rewatches.
+yet recorded on Serializd, without marking them as rewatches, skipping episodes
+in libraries the account excludes.
 
 #### Scenario: Missed episode caught up
 - **WHEN** an episode was played but its real-time log failed or was skipped
 - **THEN** the next scheduled run logs it as watched, not as a rewatch
+
+#### Scenario: Excluded episode not caught up
+- **WHEN** a played episode sits in a library the account excludes
+- **THEN** the scheduled run does not log it, records no failure, and reports it
+  in the run's excluded-library skip count
 
 ### Requirement: Service failure isolation
 A Serializd API failure SHALL NOT prevent Letterboxd syncing, and a Letterboxd
