@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.5.4',
+    headline: 'All of Jellyscribe\'s scheduled tasks now sit under one Jellyscribe heading',
+    summary:
+      'In Jellyfin\'s Scheduled Tasks page, most of Jellyscribe\'s tasks were still filed under a heading called Letterboxd, left over from before the plugin was renamed, while one sat under Jellyscribe. That even put the Serializd tasks for TV under Letterboxd. Every Jellyscribe task, film and TV alike, now appears together under Jellyscribe. Nothing about how or when the tasks run has changed.',
+    highlights: {
+      fixes: [
+        'Jellyscribe\'s scheduled tasks, including the Serializd ones, are grouped under a single Jellyscribe heading instead of being split across Letterboxd and Jellyscribe.',
+      ],
+    },
+  },
+  {
     version: '2.5.2',
     headline: 'The Raw cookies box no longer vanishes if you use an ad blocker',
     summary:
