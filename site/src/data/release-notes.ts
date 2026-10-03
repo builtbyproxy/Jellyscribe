@@ -21,6 +21,22 @@ export const releaseNotes: ReleaseNotes[] = [
     },
   },
   {
+    version: '2.5.3',
+    headline: 'Big watchlists and diaries now sync in full, not just the first hundred films',
+    summary:
+      'If your Letterboxd watchlist or your list of watched films was longer than about a hundred titles, Jellyscribe only ever saw the first hundred. A watchlist of a thousand films turned into a playlist of ninety-nine, and the diary import only marked your first hundred watched films as played. The fix shipped in 2.4.0 for this did not hold: it asked Letterboxd for the next page in a way Letterboxd quietly ignores, so every request came back with the first page again and nothing warned that anything was missing. Jellyscribe now asks for each page exactly the way Letterboxd expects, so the whole list comes through, and if Letterboxd ever stops handing over new pages, the sync stops, says so in the log, and leaves your playlist exactly as it was instead of quietly shrinking it. Run a watchlist sync after updating and your playlist will fill in with everything that was missing.',
+    highlights: {
+      fixes: [
+        'Watchlist sync fetches every film on watchlists longer than a hundred, instead of stopping at the first page.',
+        'Diary import marks every watched film as played, not only the first hundred.',
+      ],
+      improvements: [
+        'If a list cannot be read in full, the sync stops with a clear error in the log and changes nothing, rather than quietly working from a short list.',
+        'Short lists finish in a single request instead of repeating it dozens of times.',
+      ],
+    },
+  },
+  {
     version: '2.5.2',
     headline: 'The Raw cookies box no longer vanishes if you use an ad blocker',
     summary:
