@@ -28,7 +28,7 @@
 
 ## 5. Verification + release
 
-- [ ] 5.1 Live verification on a throwaway Jellyfin container: set a rating via `POST /UserItems/{id}/UserData` and confirm it lands on Letterboxd; toggle favorite on the same film and confirm no second push; then install Jellyfin Enhanced 12.10.0.0+ with `MirrorReviewRatingsToJellyfin` on, post a review, and confirm the stars land on Letterboxd
+- [x] 5.1 Live verification on a throwaway Jellyfin container: set a rating via `POST /UserItems/{id}/UserData` and confirm it lands on Letterboxd; toggle favorite on the same film and confirm no second push; then install Jellyfin Enhanced 12.10.0.0+ with `MirrorReviewRatingsToJellyfin` on, post a review, and confirm the stars land on Letterboxd (2026-10-04, throwaway Jellyfin 10.11.11 + Jellyfin Enhanced 12.10.0.0: review edited to 4.5 stars, mirror wrote 9/10, handler pushed 4.5 stars via the official API 11s later and recorded a Rated event; a favorite toggle on the rated film pushed nothing)
 - [x] 5.0 Implementation review gates: security, ai-smells, performance, and domain (shares `ILetterboxdService` with diary sync)
 - [x] 5.2 Update CLAUDE.md: sync-entry-points list gains the handler; the "Service abstraction with fallback" section states that fallback is auth-time only (and the capability-aware selection, if 1.3 added it)
 - [x] 5.2a README "Ratings, reviews & diary": say ratings set after a watch now reach Letterboxd, and name Jellyfin Enhanced 12.10.0.0+ (review rating mirror setting) as a supported source
