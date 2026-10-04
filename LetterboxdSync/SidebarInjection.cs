@@ -38,7 +38,7 @@ public class SidebarInjectionTask : IScheduledTask
 
     public string Key => "LetterboxdSidebarInjection";
 
-    public string Description => "Registers sidebar link with File Transformation plugin.";
+    public string Description => "Registers the sidebar link with the File Transformation plugin, if installed. The link is also added without it.";
 
     public string Category => "Jellyscribe";
 
@@ -192,19 +192,10 @@ public class SidebarInjectionTask : IScheduledTask
 
 public static class SidebarTransformCallback
 {
+    // Only HTML documents are changed (Inject needs a </head>), not JS chunks with
+    // "index-html" in their name; the tag is shared with SidebarScriptStartupFilter.
     public static string Transform(SidebarPatchPayload payload)
-    {
-        var contents = payload.Contents ?? string.Empty;
-
-        // Only transform actual HTML files, not JS chunks with "index-html" in their name
-        if (!contents.Contains("</head>") || contents.Contains("LetterboxdSync/Web/sidebar.js"))
-        {
-            return contents;
-        }
-
-        var injection = "<script src=\"/LetterboxdSync/Web/sidebar.js\" defer></script>";
-        return contents.Replace("</head>", $"{injection}\n</head>");
-    }
+        => SidebarScript.Inject(payload.Contents ?? string.Empty);
 }
 
 public class SidebarPatchPayload

@@ -24,5 +24,8 @@ public class ServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHostedService<PlaybackHandler>();
         serviceCollection.AddHostedService<RatingSyncHandler>();
         serviceCollection.AddHostedService<RepositoryMigrationService>();
+
+        // Adds the sidebar link to the web client without the File Transformation plugin.
+        serviceCollection.AddSingleton<Microsoft.AspNetCore.Hosting.IStartupFilter, SidebarScriptStartupFilter>();
     }
 }

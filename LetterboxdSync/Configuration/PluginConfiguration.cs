@@ -11,6 +11,13 @@ public class PluginConfiguration : BasePluginConfiguration
     public List<Account> Accounts { get; set; } = new List<Account>();
 
     /// <summary>
+    /// Kill switch for <see cref="SidebarScriptStartupFilter"/>, the request-time injection that
+    /// adds the sidebar link without the File Transformation plugin. No dashboard control: set it
+    /// in the plugin's XML config if the injection ever conflicts with another plugin.
+    /// </summary>
+    public bool DisableSidebarScriptMiddleware { get; set; }
+
+    /// <summary>
     /// Serializd (TV) account links, one or more per Jellyfin user. Independent of
     /// <see cref="Accounts"/> (Letterboxd/film); a user can link either, both, or neither.
     /// </summary>

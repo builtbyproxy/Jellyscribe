@@ -200,7 +200,7 @@ public class SidebarTransformTests
 
         var result = SidebarTransformCallback.Transform(payload);
 
-        Assert.Contains("<script src=\"/LetterboxdSync/Web/sidebar.js\" defer></script>", result);
+        Assert.Contains("<script src=\"../LetterboxdSync/Web/sidebar.js\" defer></script>", result);
         Assert.Contains("</head>", result);
         // Script should appear before </head>
         var scriptIdx = result.IndexOf("sidebar.js");

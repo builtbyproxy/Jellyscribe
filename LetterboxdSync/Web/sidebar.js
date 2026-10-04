@@ -12,7 +12,10 @@
         link.addEventListener("click", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            window.location.assign("/web/configurationpage?name=letterboxduser");
+            // Keep any server base URL (e.g. /jellyfin) in front of /web/.
+            var webAt = window.location.pathname.indexOf("/web/");
+            var base = webAt >= 0 ? window.location.pathname.substring(0, webAt) : "";
+            window.location.assign(base + "/web/configurationpage?name=letterboxduser");
         });
         settingsLink.parentElement.insertBefore(link, settingsLink);
     }
