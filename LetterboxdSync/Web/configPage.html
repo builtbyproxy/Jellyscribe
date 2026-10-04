@@ -858,6 +858,7 @@
                         saveAccount: function () {
                             var self = this, m = self.collectModal();
                             if (!m.username) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Username/email is required.</span>'; return; }
+                            if (m.svc === 'letterboxd' && m.username.indexOf('@') >= 0) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Letterboxd no longer accepts an email address to sign in. Use your Letterboxd username, the name in letterboxd.com/&lt;username&gt;/.</span>'; return; }
                             var orig = self.editing.original;
                             var excludedLibs = self.mergeExcluded((orig && orig.ExcludedLibraryIds) || [], m.libs);
                             if (m.svc === 'serializd') {
@@ -882,9 +883,28 @@
                                 document.getElementById('acctModal').classList.remove('show'); self.renderAccounts();
                             });
                         },
+                        verifyMessage: function (ok, d) {
+                            var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+                            d = d || {};
+                            if (ok && d.via === 'api') return '<span class="ws-green">Login OK (official API).</span>';
+                            if (ok) return '<span class="ws-green">Login OK via the website login.</span> <span class="ws-muted">The official API refused it: ' + esc(d.apiError) + '</span>';
+                            var parts = [];
+                            if (d.error && d.error !== 'Login failed.') parts.push(esc(d.error));
+                            if (d.apiError) parts.push('Official API: ' + esc(d.apiError));
+                            if (d.websiteError) parts.push('Website: ' + esc(d.websiteError));
+                            return '<span class="ws-red">Login failed.' + (parts.length ? ' ' + parts.join(' · ') : '') + '</span>';
+                        },
                         verifyAccount: function () {
-                            var svc = document.getElementById('mSvc').value, st = document.getElementById('mVerifyStatus');
-                            if (svc !== 'serializd') { st.innerHTML = '<span class="ws-muted">Verify is available for Serializd; Letterboxd is checked on first sync.</span>'; return; }
+                            var self = this, svc = document.getElementById('mSvc').value, st = document.getElementById('mVerifyStatus');
+                            if (svc === 'letterboxd') {
+                                var lbUser = document.getElementById('mUsername').value.trim(), lbPw = document.getElementById('mPassword').value;
+                                if (!lbUser || !lbPw) { st.innerHTML = '<span class="ws-red">Username and password required.</span>'; return; }
+                                st.innerHTML = '<span class="ws-muted">Verifying… (can take a few seconds)</span>';
+                                ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Verify'), type: 'POST', contentType: 'application/json', data: JSON.stringify({ letterboxdUsername: lbUser, letterboxdPassword: lbPw, rawCookies: document.getElementById('mAuthBlob').value || null, userAgent: document.getElementById('mUserAgent').value.trim() || null }) })
+                                    .then(function (r) { r.json().then(function (d) { st.innerHTML = self.verifyMessage(true, d); }); },
+                                        function (r) { if (r && r.json) r.json().then(function (d) { st.innerHTML = self.verifyMessage(false, d); }, function () { st.innerHTML = self.verifyMessage(false, null); }); else st.innerHTML = self.verifyMessage(false, null); });
+                                return;
+                            }
                             var email = document.getElementById('mUsername').value.trim(), pw = document.getElementById('mPassword').value;
                             if (!email || !pw) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
                             st.innerHTML = '<span class="ws-muted">Verifying…</span>';
