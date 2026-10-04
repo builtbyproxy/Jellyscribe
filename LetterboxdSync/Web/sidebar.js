@@ -88,7 +88,10 @@
             var rect = h.getBoundingClientRect();
             if (rect.height > 0 && getComputedStyle(h).display !== "none") bottom = Math.max(bottom, rect.bottom);
         });
-        if (bottom > 0) page.style.setProperty("padding-top", Math.round(bottom) + "px", "important");
+        // Only the part of the header that overlaps the page: Jellyfin 12 already places its pages
+        // below the toolbar, 10.11 starts them at the top of the window.
+        var overlap = Math.max(0, Math.round(bottom - page.getBoundingClientRect().top));
+        if (bottom > 0) page.style.setProperty("padding-top", overlap + "px", "important");
     }
 
     // A dashboard already in the document outside our page (a configuration-page view Jellyfin is
