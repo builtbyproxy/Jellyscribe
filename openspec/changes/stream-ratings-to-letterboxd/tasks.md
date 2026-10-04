@@ -2,9 +2,9 @@
 
 ## 1. Endpoint research (ordered first; blocks the service surface)
 
-- [ ] 1.1 Probe the official API's film-relationship rating update against a test account (shape, auth, rating scale); record findings in the change dir
-- [ ] 1.2 Probe the site's rate action for the scraping path (URL, CSRF, payload, response); record findings
-- [ ] 1.3 Decide the outcome per design.md Open Questions: both paths work (no factory change), one path works (capability-aware factory selection at construction; never a call-time NotSupported, since the factory's fallback is auth-time only), or neither works (stop: record evidence here, park the change, write no service surface)
+- [x] 1.1 Probe the official API's film-relationship rating update against a test account (shape, auth, rating scale); record findings in the change dir (research.md; `RatingEndpointProbeTests`, 2026-10-04)
+- [ ] 1.2 Probe the site's rate action for the scraping path (URL, CSRF, payload, response); record findings. Shape documented in research.md; still needs one signed-in run with raw cookies (CI hits Cloudflare)
+- [ ] 1.3 Decide the outcome (provisional, research.md: viable via the API path; scraping pending 1.2) per design.md Open Questions: both paths work (no factory change), one path works (capability-aware factory selection at construction; never a call-time NotSupported, since the factory's fallback is auth-time only), or neither works (stop: record evidence here, park the change, write no service surface)
 
 ## 2. Service surface
 

@@ -15,7 +15,7 @@ When a Jellyfin user's rating on a movie changes through a save with reason Upda
 
 #### Scenario: Rating without a watch
 - **WHEN** a user rates a library film they never played
-- **THEN** the rating is still pushed (film rating only; no diary entry is created)
+- **THEN** the rating is still pushed as the film rating; no diary entry is created, and Letterboxd marks the film watched
 
 #### Scenario: Toggle off
 - **WHEN** an account's rating-sync toggle is off and the user rates a film
