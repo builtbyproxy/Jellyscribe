@@ -12,10 +12,14 @@
         link.addEventListener("click", function(e) {
             e.preventDefault();
             e.stopPropagation();
-            // Keep any server base URL (e.g. /jellyfin) in front of /web/.
-            var webAt = window.location.pathname.indexOf("/web/");
-            var base = webAt >= 0 ? window.location.pathname.substring(0, webAt) : "";
-            window.location.assign(base + "/web/configurationpage?name=letterboxduser");
+            // Keep any server base URL (e.g. /jellyfin) in front of /web/. Only a plain path prefix
+            // is accepted, and the URL is built on this page's own origin, so an odd pathname can
+            // never turn this into a navigation to another host.
+            var path = window.location.pathname;
+            var webAt = path.lastIndexOf("/web/");
+            var base = webAt > 0 ? path.substring(0, webAt) : "";
+            if (!/^(\/[A-Za-z0-9._~-]+)*$/.test(base)) base = "";
+            window.location.assign(window.location.origin + base + "/web/configurationpage?name=letterboxduser");
         });
         settingsLink.parentElement.insertBefore(link, settingsLink);
     }

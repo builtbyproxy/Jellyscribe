@@ -23,6 +23,25 @@ public class SidebarControllerTests
         Assert.True(file.FileStream.Length > 0, "embedded sidebar.js should not be empty");
     }
 
+    /// <summary>
+    /// sidebar.js is served anonymously and now injected on every install's login page, so it must
+    /// stay the static embedded file: byte-identical to the resource, no per-user or config data.
+    /// </summary>
+    [Fact]
+    public void GetSidebarJs_ServesTheEmbeddedResourceVerbatim()
+    {
+        var controller = new LetterboxdSync.Api.SidebarController();
+        var file = Assert.IsType<FileStreamResult>(controller.GetSidebarJs());
+        using var served = new System.IO.MemoryStream();
+        file.FileStream.CopyTo(served);
+
+        using var resource = typeof(LetterboxdSync.Api.SidebarController).Assembly.GetManifestResourceStream("LetterboxdSync.Web.sidebar.js")!;
+        using var expected = new System.IO.MemoryStream();
+        resource.CopyTo(expected);
+
+        Assert.Equal(expected.ToArray(), served.ToArray());
+    }
+
     [Fact]
     public void GetSidebarJs_NavLinkLabelIsJellyscribe()
     {

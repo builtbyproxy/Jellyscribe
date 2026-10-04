@@ -2,6 +2,9 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
+using MediaBrowser.Common.Configuration;
+using MediaBrowser.Common.Net;
+using MediaBrowser.Controller.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -47,6 +50,9 @@ internal static class SidebarScript
 /// </summary>
 public sealed class SidebarScriptStartupFilter : IStartupFilter
 {
+    /// <summary>Index pages larger than this are passed through untouched rather than rewritten.</summary>
+    internal const int MaxPageBytes = 1024 * 1024;
+
     private readonly ILogger<SidebarScriptStartupFilter> _logger;
     private int _loggedOnce;
 
@@ -68,7 +74,8 @@ public sealed class SidebarScriptStartupFilter : IStartupFilter
     {
         var config = Plugin.Instance?.Configuration;
         if (config == null || config.DisableSidebarScriptMiddleware
-            || !HttpMethods.IsGet(context.Request.Method) || !IsIndexRequest(context.Request.Path.Value))
+            || !HttpMethods.IsGet(context.Request.Method)
+            || !IsIndexRequest(context.Request.Path.Value, ServerBaseUrl(context)))
         {
             await next().ConfigureAwait(false);
             return;
@@ -98,7 +105,10 @@ public sealed class SidebarScriptStartupFilter : IStartupFilter
         buffer.Seek(0, SeekOrigin.Begin);
         var isHtml = context.Response.StatusCode == StatusCodes.Status200OK
             && (context.Response.ContentType?.Contains("text/html", StringComparison.OrdinalIgnoreCase) ?? false);
-        if (!isHtml)
+        var editable = isHtml
+            && buffer.Length <= MaxPageBytes
+            && !context.Response.Headers.ContainsKey("Content-Encoding");
+        if (!editable)
         {
             await buffer.CopyToAsync(originalBody).ConfigureAwait(false);
             return;
@@ -130,14 +140,28 @@ public sealed class SidebarScriptStartupFilter : IStartupFilter
         await originalBody.WriteAsync(bytes).ConfigureAwait(false);
     }
 
-    /// <summary>The web client's index page, with or without a server base URL.</summary>
-    internal static bool IsIndexRequest(string? path)
+    /// <summary>
+    /// Jellyfin's configured base URL (e.g. "/jellyfin"), or empty. Resolved per request rather
+    /// than in the constructor so a DI problem can never stop the server's pipeline from building.
+    /// </summary>
+    private static string? ServerBaseUrl(HttpContext context)
+        => (context.RequestServices?.GetService(typeof(IServerConfigurationManager)) as IConfigurationManager)
+            ?.GetNetworkConfiguration().BaseUrl;
+
+    /// <summary>
+    /// Exactly the web client's index page: {base}/web/ or {base}/web/index.html. Exact, so another
+    /// route that merely ends in /web/ (another plugin's, say) is never buffered or rewritten.
+    /// </summary>
+    internal static bool IsIndexRequest(string? path, string? baseUrl)
     {
         if (string.IsNullOrEmpty(path))
             return false;
 
-        return path.EndsWith("/web/index.html", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith("/web/", StringComparison.OrdinalIgnoreCase)
-            || path.EndsWith("/web", StringComparison.OrdinalIgnoreCase);
+        var prefix = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+        if (prefix.Length > 0 && prefix[0] != '/')
+            prefix = "/" + prefix;
+
+        return string.Equals(path, prefix + "/web/", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, prefix + "/web/index.html", StringComparison.OrdinalIgnoreCase);
     }
 }

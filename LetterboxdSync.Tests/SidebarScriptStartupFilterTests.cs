@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using LetterboxdSync;
 using LetterboxdSync.Configuration;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Common.Net;
+using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Model.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -87,7 +89,8 @@ public class SidebarScriptStartupFilterTests : IDisposable
     private sealed record Served(int Status, string Body, IHeaderDictionary Headers, IHeaderDictionary SeenRequestHeaders);
 
     private static async Task<Served> Request(string path, string method = "GET", string? body = Page,
-        string contentType = "text/html", int status = 200, Action<HttpRequest>? setup = null, Exception? throwFromApp = null)
+        string contentType = "text/html", int status = 200, Action<HttpRequest>? setup = null, Exception? throwFromApp = null,
+        string baseUrl = "", string? contentEncoding = null)
     {
         var filter = new SidebarScriptStartupFilter(NullLogger<SidebarScriptStartupFilter>.Instance);
         IHeaderDictionary? seen = null;
@@ -101,10 +104,16 @@ public class SidebarScriptStartupFilterTests : IDisposable
             ctx.Response.ContentType = contentType;
             ctx.Response.Headers.ETag = "\"abc\"";
             ctx.Response.Headers.LastModified = "Sat, 04 Oct 2026 00:00:00 GMT";
+            if (contentEncoding != null) ctx.Response.Headers.ContentEncoding = contentEncoding;
             if (body != null) await ctx.Response.WriteAsync(body);
         }))(app);
 
-        var context = new DefaultHttpContext();
+        var serverConfig = Substitute.For<IServerConfigurationManager>();
+        serverConfig.GetConfiguration("network").Returns(new NetworkConfiguration { BaseUrl = baseUrl });
+        var context = new DefaultHttpContext
+        {
+            RequestServices = new ServiceCollection().AddSingleton(serverConfig).BuildServiceProvider()
+        };
         context.Request.Method = method;
         context.Request.Path = path;
         setup?.Invoke(context.Request);
@@ -116,13 +125,15 @@ public class SidebarScriptStartupFilterTests : IDisposable
     }
 
     [Theory]
-    [InlineData("/web/")]
-    [InlineData("/web/index.html")]
-    [InlineData("/web")]
-    [InlineData("/jellyfin/web/")] // server base URL
-    public async Task IndexPage_GetsTheTagOnce(string path)
+    [InlineData("/web/", "")]
+    [InlineData("/web/index.html", "")]
+    [InlineData("/WEB/Index.html", "")]
+    [InlineData("/jellyfin/web/", "/jellyfin")] // server base URL
+    [InlineData("/jellyfin/web/index.html", "/jellyfin/")]
+    [InlineData("/jellyfin/web/", "jellyfin")]
+    public async Task IndexPage_GetsTheTagOnce(string path, string baseUrl)
     {
-        var served = await Request(path);
+        var served = await Request(path, baseUrl: baseUrl);
 
         Assert.Equal(1, CountOf(served.Body, SidebarScript.Marker));
         Assert.Equal(Encoding.UTF8.GetByteCount(served.Body), served.Headers.ContentLength);
@@ -156,12 +167,17 @@ public class SidebarScriptStartupFilterTests : IDisposable
     }
 
     [Theory]
-    [InlineData("/web/main.bundle.js")]
-    [InlineData("/Items/abc")]
-    [InlineData("/LetterboxdSync/Web/sidebar.js")]
-    public async Task OtherPaths_PassThroughUntouched(string path)
+    [InlineData("/web/main.bundle.js", "")]
+    [InlineData("/Items/abc", "")]
+    [InlineData("/LetterboxdSync/Web/sidebar.js", "")]
+    [InlineData("/web", "")]                    // Jellyfin redirects this to /web/ itself
+    [InlineData("/SomePlugin/web/", "")]        // another route that merely ends in /web/
+    [InlineData("/web/", "/jellyfin")]          // not the index when the server has a base URL
+    [InlineData("/other/web/", "/jellyfin")]
+    [InlineData("/jellyfin/web/", "")]
+    public async Task OtherPaths_PassThroughUntouched(string path, string baseUrl)
     {
-        var served = await Request(path, setup: r => r.Headers.AcceptEncoding = "gzip");
+        var served = await Request(path, baseUrl: baseUrl, setup: r => r.Headers.AcceptEncoding = "gzip");
         Assert.Equal(Page, served.Body);
         Assert.True(served.SeenRequestHeaders.ContainsKey("Accept-Encoding"));
         Assert.True(served.Headers.ContainsKey("ETag"));
@@ -181,6 +197,32 @@ public class SidebarScriptStartupFilterTests : IDisposable
         var notModified = await Request("/web/", body: null, status: 304);
         Assert.Equal(304, notModified.Status);
         Assert.Equal(string.Empty, notModified.Body);
+    }
+
+    [Fact]
+    public async Task CompressedOrOversizedPage_PassesThroughUntouched()
+    {
+        Assert.Equal(Page, (await Request("/web/", contentEncoding: "gzip")).Body);
+
+        var big = Page.Replace("</body>", new string('x', SidebarScriptStartupFilter.MaxPageBytes) + "</body>");
+        Assert.DoesNotContain(SidebarScript.Marker, (await Request("/web/", body: big)).Body);
+    }
+
+    [Fact]
+    public void KillSwitch_DefaultsOff_ForConfigsSavedBeforeIt()
+    {
+        var serializer = new System.Xml.Serialization.XmlSerializer(typeof(PluginConfiguration));
+        using var reader = new StringReader("<?xml version=\"1.0\"?><PluginConfiguration xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\"></PluginConfiguration>");
+        Assert.False(((PluginConfiguration)serializer.Deserialize(reader)!).DisableSidebarScriptMiddleware);
+    }
+
+    [Fact]
+    public void ServiceRegistrator_RegistersTheStartupFilter()
+    {
+        var services = new ServiceCollection();
+        new ServiceRegistrator().RegisterServices(services, null!);
+        Assert.Single(services, d => d.ServiceType == typeof(Microsoft.AspNetCore.Hosting.IStartupFilter)
+            && d.ImplementationType == typeof(SidebarScriptStartupFilter));
     }
 
     [Fact]
