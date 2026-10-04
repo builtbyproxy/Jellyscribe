@@ -79,6 +79,23 @@ public class LetterboxdLiveTests
         return client;
     }
 
+    /// <summary>
+    /// Re-read every 2s until <paramref name="done"/> holds or 30s pass, then return the last
+    /// read. Letterboxd's diary reads lag its writes by a variable amount, and a fixed pause
+    /// made the diary write tests flaky.
+    /// </summary>
+    private static async Task<T> PollAsync<T>(Func<Task<T>> read, Func<T, bool> done)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true)
+        {
+            var value = await read().ConfigureAwait(false);
+            if (done(value) || DateTime.UtcNow >= deadline)
+                return value;
+            await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+        }
+    }
+
     // ----- Read-only tests (residue-free) -----
 
     [SkippableFact]
@@ -277,10 +294,11 @@ public class LetterboxdLiveTests
                 rewatch: false,
                 rating: null).ConfigureAwait(false);
 
-            // Letterboxd's diary is eventually consistent on read; give it a moment.
-            await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-
-            var info = await client.GetDiaryInfoAsync(film.FilmId, user).ConfigureAwait(false);
+            // Letterboxd's diary is eventually consistent on read, sometimes for longer than
+            // a fixed pause allows, so poll until the entry shows up.
+            var info = await PollAsync(
+                () => client.GetDiaryInfoAsync(film.FilmId, user),
+                i => i.LastDate.HasValue).ConfigureAwait(false);
             Assert.NotNull(info);
             Assert.True(info.LastDate.HasValue,
                 $"Expected diary entry to be visible after MarkAsWatched (LastDate was null for {film.Slug})");
@@ -293,8 +311,9 @@ public class LetterboxdLiveTests
         }
 
         // Confirm cleanup actually removed the entry.
-        await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-        var afterCleanup = await client.GetDiaryInfoAsync(film.FilmId, user).ConfigureAwait(false);
+        var afterCleanup = await PollAsync(
+            () => client.GetDiaryInfoAsync(film.FilmId, user),
+            i => !i.LastDate.HasValue).ConfigureAwait(false);
         Assert.False(afterCleanup.LastDate.HasValue,
             $"Cleanup should have removed all diary entries for {film.Slug}");
     }
@@ -324,9 +343,9 @@ public class LetterboxdLiveTests
                 rating: 3.5,
                 tmdbId: TmdbPulpFiction).ConfigureAwait(false);
 
-            await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-
-            var entries = await client.GetDiaryFilmEntriesAsync(user).ConfigureAwait(false);
+            var entries = await PollAsync(
+                () => client.GetDiaryFilmEntriesAsync(user),
+                list => list.Any(e => e.TmdbId == TmdbPulpFiction)).ConfigureAwait(false);
             var ours = entries.FirstOrDefault(e => e.TmdbId == TmdbPulpFiction);
             Assert.NotNull(ours);
             // We don't assert on the review text contents because GetDiaryFilmEntriesAsync
