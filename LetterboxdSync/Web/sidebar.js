@@ -30,7 +30,11 @@
         window.location.assign(window.location.origin + basePath() + "/web/configurationpage?name=letterboxduser");
     }
 
-    function onRoute() { return (window.location.hash || "").indexOf(ROUTE) === 0; }
+    // Exactly our route (optionally with a query), never another route that merely starts with it.
+    function onRoute() {
+        var hash = window.location.hash || "";
+        return hash === ROUTE || hash.indexOf(ROUTE + "?") === 0;
+    }
 
     function signedIn() {
         try { return !!(window.ApiClient && window.ApiClient.accessToken()); } catch (e) { return false; }
@@ -136,7 +140,10 @@
         settleTitle();
         startWatcher();
 
+        var attempt = state.mounting + 1; // the token mount() is about to take
         mount(page).catch(function (err) {
+            // Left (or re-opened) while the fetch was in flight: that failure is no longer ours to act on.
+            if (attempt !== state.mounting || !state.visible) return;
             if (window.console) console.warn("[Jellyscribe] in-app page failed, opening the settings page instead:", err && err.message);
             state.visible = false;
             openConfigPage();
@@ -154,6 +161,7 @@
             page.classList.add("hide");
             var slot = page.querySelector("." + SLOT_CLASS);
             if (slot) slot.innerHTML = ""; // unmount: never leave a hidden copy behind
+            try { delete window.WSU; } catch (e) { window.WSU = undefined; } // and drop the data it held
             fire(page, "viewhide", { type: "custom" });
         }
         restoreHeaderTabs();

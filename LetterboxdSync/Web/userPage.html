@@ -335,6 +335,8 @@
                         },
                         init: function () {
                             var self = this;
+                            // Removed before it finished starting (the in-app page was left): stop retrying.
+                            if (!document.getElementById('letterboxdUserPage')) return;
                             self.ensureViewport();
                             if (!self.resolveAuth()) { setTimeout(function () { self.init(); }, 400); return; }
                             self.wire();
@@ -385,7 +387,8 @@
                             });
                             ['acctModal', 'reviewModal'].forEach(function (id) { document.getElementById(id).addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); }); });
                             document.querySelectorAll('.ws-modal-x').forEach(function (x) { x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); }); });
-                            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); });
+                            // Once per document: the in-app page re-runs this script on every visit.
+                            if (!window.__jellyscribeEscapeHandler) { window.__jellyscribeEscapeHandler = true; document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); }); }
                             document.querySelectorAll('#starRating .ws-star').forEach(function (star) {
                                 star.addEventListener('click', function (e) {
                                     var val = parseFloat(this.getAttribute('data-val'));
