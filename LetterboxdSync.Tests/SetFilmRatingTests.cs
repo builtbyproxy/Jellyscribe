@@ -55,6 +55,15 @@ public class SetFilmRatingTests
     }
 
     [Fact]
+    public async Task Api_WholeStarRating_SerializesAsANumber()
+    {
+        var (_, _, body) = await CaptureApiPatch(4.0,
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"messages\":[]}") });
+
+        Assert.Equal(4.0, System.Text.Json.JsonDocument.Parse(body!).RootElement.GetProperty("rating").GetDouble());
+    }
+
+    [Fact]
     public async Task Api_ErrorMessageOnHttp200_Throws()
     {
         // Verified live: an off-scale value returns 200 with this message and leaves the rating unchanged.
@@ -130,6 +139,15 @@ public class SetFilmRatingTests
     }
 
     [Fact]
+    public async Task Site_HtmlPageOnHttp200_Throws()
+    {
+        // A sign-in or Cloudflare challenge page served with 200 must not count as rated.
+        var ex = await Assert.ThrowsAsync<Exception>(() => CaptureSitePost(3.5,
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html><body>Sign in</body></html>") }));
+        Assert.Contains("non-JSON", ex.Message);
+    }
+
+    [Fact]
     public async Task Site_ResultFalseOnHttp200_Throws()
     {
         var ex = await Assert.ThrowsAsync<Exception>(() => CaptureSitePost(3.5,
@@ -145,13 +163,16 @@ public class SetFilmRatingTests
 
     [Theory]
     [InlineData("{\"result\":true}", null)]
-    [InlineData("<html></html>", null)]
-    [InlineData("", null)]
-    [InlineData("{\"result\":false}", "result false")]
+    [InlineData("{\"result\":true,\"csrf\":\"x\"}", null)]
+    [InlineData("<html></html>", "non-JSON response (likely a sign-in or challenge page)")]
+    [InlineData("", "empty response")]
+    [InlineData("{}", "result was not true")]
+    [InlineData("{\"result\":false}", "result was not true")]
     [InlineData("{\"result\":false,\"messages\":[\"a\",\"b\"]}", "a; b")]
-    public void Site_ExtractSiteActionRejection(string body, string? expected)
+    [InlineData("{not json", "unparseable JSON response")]
+    public void Site_SiteActionFailure(string body, string? expected)
     {
-        Assert.Equal(expected, LetterboxdDiary.ExtractSiteActionRejection(body));
+        Assert.Equal(expected, LetterboxdDiary.SiteActionFailure(body));
     }
 
     // ----- Parity -----

@@ -275,10 +275,11 @@ public class LetterboxdDiary
             if ((int)res.StatusCode < 200 || (int)res.StatusCode >= 300)
                 throw new Exception($"Rating {filmSlug} returned {(int)res.StatusCode}: {LetterboxdHttpClient.Truncate(body, 300)}");
 
-            // Site actions can answer 200 with {"result": false, "messages": [...]}.
-            var rejection = ExtractSiteActionRejection(body);
-            if (rejection != null)
-                throw new Exception($"Letterboxd rejected rating {rating} for {filmSlug}: {rejection}");
+            // Only an explicit {"result": true} counts. A 200 can also be a sign-in or challenge
+            // page, and recording that as pushed would suppress every retry of this value.
+            var failure = SiteActionFailure(body);
+            if (failure != null)
+                throw new Exception($"Letterboxd did not confirm rating {rating} for {filmSlug}: {failure}");
 
             _logger.LogInformation("Rated {Slug} {Rating} stars", filmSlug, rating);
             _auth.ResetReauthGuard();
@@ -293,18 +294,20 @@ public class LetterboxdDiary
         => (int)Math.Clamp(Math.Round(rating * 2, MidpointRounding.AwayFromZero), 1, 10);
 
     /// <summary>
-    /// The rejection text when a site action's JSON body says <c>"result": false</c>, else null.
-    /// Non-JSON or result-less bodies count as accepted: the status code already passed.
+    /// Null when a site action's body is JSON with <c>"result": true</c>; otherwise why it does
+    /// not count as success (the messages of a <c>"result": false</c>, or a non-JSON body).
     /// </summary>
-    internal static string? ExtractSiteActionRejection(string body)
+    internal static string? SiteActionFailure(string body)
     {
-        if (string.IsNullOrWhiteSpace(body) || !body.TrimStart().StartsWith('{'))
-            return null;
+        if (string.IsNullOrWhiteSpace(body))
+            return "empty response";
+        if (!body.TrimStart().StartsWith('{'))
+            return "non-JSON response (likely a sign-in or challenge page)";
 
         try
         {
             using var doc = JsonDocument.Parse(body);
-            if (!doc.RootElement.TryGetProperty("result", out var result) || result.ValueKind != JsonValueKind.False)
+            if (doc.RootElement.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.True)
                 return null;
 
             if (doc.RootElement.TryGetProperty("messages", out var messages) && messages.ValueKind == JsonValueKind.Array)
@@ -316,11 +319,11 @@ public class LetterboxdDiary
                     return string.Join("; ", texts);
             }
 
-            return "result false";
+            return "result was not true";
         }
         catch (JsonException)
         {
-            return null;
+            return "unparseable JSON response";
         }
     }
 

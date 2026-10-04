@@ -156,7 +156,7 @@
                                     var tr = document.createElement('tr');
                                     tr.style.borderBottom = '1px solid #343a47';
 
-                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : e.Status === 4 ? '#a78bfa' : '#5b8cff';
+                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : e.Status === 4 ? '#a78bfa' : e.Status === 5 ? '#e8a23c' : '#5b8cff';
                                     var statusText = e.Status === 0 ? 'Synced' : e.Status === 1 ? 'Skipped' : e.Status === 2 ? 'Failed' : e.Status === 4 ? 'Requested' : e.Status === 5 ? 'Rated' : 'Rewatch';
 
                                     var filmLink = e.FilmSlug
@@ -221,7 +221,7 @@
                                 events.forEach(function (e) {
                                     var tr = document.createElement('tr');
                                     tr.style.borderBottom = '1px solid #343a47';
-                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : e.Status === 4 ? '#a78bfa' : '#5b8cff';
+                                    var statusColor = e.Status === 0 ? '#e8b84b' : e.Status === 1 ? '#7c8494' : e.Status === 2 ? '#e0714f' : e.Status === 4 ? '#a78bfa' : e.Status === 5 ? '#e8a23c' : '#5b8cff';
                                     var statusText = e.Status === 0 ? 'Synced' : e.Status === 1 ? 'Skipped' : e.Status === 2 ? 'Failed' : e.Status === 4 ? 'Requested' : e.Status === 5 ? 'Rated' : 'Rewatch';
                                     var filmLink = e.FilmSlug ? '<a href="https://letterboxd.com/film/' + e.FilmSlug + '/" target="_blank" style="color:#e8b84b;">' + e.FilmTitle + '</a>' : e.FilmTitle;
                                     var ts = new Date(e.Timestamp);

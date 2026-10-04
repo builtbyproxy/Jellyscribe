@@ -29,7 +29,7 @@
 ## 5. Verification + release
 
 - [ ] 5.1 Live verification on a throwaway Jellyfin container: set a rating via `POST /UserItems/{id}/UserData` and confirm it lands on Letterboxd; toggle favorite on the same film and confirm no second push; then install Jellyfin Enhanced 12.10.0.0+ with `MirrorReviewRatingsToJellyfin` on, post a review, and confirm the stars land on Letterboxd
-- [ ] 5.0 Implementation review gates: security, ai-smells, performance, and domain (shares `ILetterboxdService` with diary sync)
+- [x] 5.0 Implementation review gates: security, ai-smells, performance, and domain (shares `ILetterboxdService` with diary sync)
 - [x] 5.2 Update CLAUDE.md: sync-entry-points list gains the handler; the "Service abstraction with fallback" section states that fallback is auth-time only (and the capability-aware selection, if 1.3 added it)
 - [x] 5.2a README "Ratings, reviews & diary": say ratings set after a watch now reach Letterboxd, and name Jellyfin Enhanced 12.10.0.0+ (review rating mirror setting) as a supported source
 - [x] 5.3 Version bump to the next free minor at PR time (2.7.0.0 as of 2026-10-04) in `Directory.Build.props` + `LetterboxdSync/LetterboxdSync.csproj`; `feat:` PR with `## Release notes` and `site/src/data/release-notes.ts` entry referencing the user report and the Jellyfin Enhanced mirror; release notes and README state that clearing a rating in Jellyfin does not remove it on Letterboxd. Write the notes only after 1.3 resolves, so they are not conditional

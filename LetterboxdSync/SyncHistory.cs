@@ -268,6 +268,8 @@ public static class SyncHistory
         {
             if (e.TmdbId != tmdbId) continue;
             if (!string.Equals(e.Username, username, StringComparison.Ordinal)) continue;
+            // A rating push says nothing about the film's diary sync, which is what callers rank by.
+            if (e.Status == SyncStatus.Rated) continue;
             if (latest == null || e.Timestamp > latest.Timestamp) latest = e;
         }
         return latest?.Status;
@@ -289,8 +291,11 @@ public static class SyncHistory
 
     internal static int GetConsecutiveFailureCount(IEnumerable<SyncEvent> events, string username, int tmdbId)
     {
+        // Rated events are skipped: a rating push neither continues nor breaks the film's diary
+        // failure streak.
         var ordered = events
-            .Where(e => e.TmdbId == tmdbId && string.Equals(e.Username, username, StringComparison.Ordinal))
+            .Where(e => e.TmdbId == tmdbId && string.Equals(e.Username, username, StringComparison.Ordinal)
+                && e.Status != SyncStatus.Rated)
             .OrderByDescending(e => e.Timestamp);
 
         var count = 0;

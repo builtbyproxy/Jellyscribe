@@ -16,7 +16,6 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
-using NSubstitute.ExceptionExtensions;
 using Xunit;
 
 namespace LetterboxdSync.Tests;
@@ -82,12 +81,15 @@ public class RatingSyncHandlerTests : IDisposable
             return Task.FromResult(service);
         };
 
-        _handler = new RatingSyncHandler(_userDataManager, _userManager, _libraryManager,
-            new LoggerFactory().CreateLogger<RatingSyncHandler>())
-        {
-            UtcNow = () => _now
-        };
+        _handler = NewHandler();
     }
+
+    private RatingSyncHandler NewHandler() =>
+        new(_userDataManager, _userManager, _libraryManager, new LoggerFactory().CreateLogger<RatingSyncHandler>())
+        {
+            UtcNow = () => _now,
+            PushSpacing = TimeSpan.Zero
+        };
 
     public void Dispose()
     {
@@ -118,8 +120,8 @@ public class RatingSyncHandlerTests : IDisposable
         return account;
     }
 
-    private void Save(double? rating, UserDataSaveReason reason = UserDataSaveReason.UpdateUserData, BaseItem? item = null)
-        => _handler.Observe(new UserDataSaveEventArgs
+    private void Save(double? rating, UserDataSaveReason reason = UserDataSaveReason.UpdateUserData, BaseItem? item = null, RatingSyncHandler? handler = null)
+        => (handler ?? _handler).Observe(new UserDataSaveEventArgs
         {
             UserId = _user.Id,
             Item = item ?? _movie,
@@ -127,10 +129,25 @@ public class RatingSyncHandlerTests : IDisposable
             UserData = new UserItemData { Key = "k", Rating = rating }
         });
 
-    private async Task DrainAfterWindow()
+    private async Task DrainAfterWindow(RatingSyncHandler? handler = null)
     {
         _now += RatingSyncHandler.DebounceWindow + TimeSpan.FromSeconds(1);
+        await (handler ?? _handler).DrainDueAsync(CancellationToken.None);
+    }
+
+    private async Task DrainAfterRetryDelay(int attempt)
+    {
+        _now += RatingSyncHandler.RetryDelay * attempt + TimeSpan.FromSeconds(1);
         await _handler.DrainDueAsync(CancellationToken.None);
+    }
+
+    private ILetterboxdService ServiceThatFailsRating(Action? onRate = null)
+    {
+        var service = Substitute.For<ILetterboxdService>();
+        service.LookupFilmByTmdbIdAsync(Arg.Any<int>()).Returns(new FilmResult("sinners-2025", "KQMM", null));
+        service.SetFilmRatingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<double>())
+            .Returns(_ => { onRate?.Invoke(); return Task.FromException(new Exception("Letterboxd 503")); });
+        return service;
     }
 
     [Theory]
@@ -268,29 +285,28 @@ public class RatingSyncHandlerTests : IDisposable
     }
 
     [Fact]
-    public async Task StoreReloadedAfterRestart_StillSuppressesNoOpSave()
+    public async Task AfterRestart_StoreStillSuppressesAlreadyPushedValue()
     {
         AddAccount();
         Save(7);
         await DrainAfterWindow();
 
-        RatingPushStore.ResetForTesting(); // simulates a restart: next read reloads from disk
-        Save(7);
-        await DrainAfterWindow();
+        // A fresh handler (no in-memory state) whose first save of this film arrives before its
+        // baseline is in: the persisted store is what stops the duplicate push.
+        RatingPushStore.ResetForTesting();
+        var restarted = NewHandler();
+        Save(7, handler: restarted);
+        await DrainAfterWindow(restarted);
 
         Assert.Single(_pushes);
     }
 
     [Fact]
-    public async Task PushFailure_LeavesStoreUntouched_RecordsNoFailedEvent_AndRetriesNextSave()
+    public async Task PushFailure_LeavesStoreUntouched_RecordsNoFailedEvent_AndRetriesWithBackoff()
     {
         AddAccount();
-        var failing = Substitute.For<ILetterboxdService>();
-        failing.LookupFilmByTmdbIdAsync(TmdbId).Returns(new FilmResult("sinners-2025", "KQMM", null));
-        failing.SetFilmRatingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<double>())
-            .ThrowsAsync(new Exception("Letterboxd rejected rating"));
         var real = LetterboxdServiceFactory.OverrideForTesting;
-        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(failing);
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(ServiceThatFailsRating());
 
         Save(7);
         await DrainAfterWindow();
@@ -298,11 +314,190 @@ public class RatingSyncHandlerTests : IDisposable
         Assert.Null(RatingPushStore.GetLastPushed(UserId, "lb-user", TmdbId));
         Assert.Empty(SyncHistory.GetPage(0, 10, "lachlan").Events);
         Assert.Equal(0, SyncHistory.GetConsecutiveFailureCount("lachlan", TmdbId));
+        Assert.True(_handler.TryGetPending(_user.Id, _movie.Id, out var queued));
+        Assert.Equal(2, queued.Attempt);
+
+        // Not due again until the backoff passes.
+        await DrainAfterWindow();
+        Assert.Equal(1, _handler.PendingCount);
 
         LetterboxdServiceFactory.OverrideForTesting = real;
+        await DrainAfterRetryDelay(1);
+        Assert.Single(_pushes);
+        Assert.Equal(0, _handler.PendingCount);
+    }
+
+    [Fact]
+    public async Task PushFailure_GivesUpAfterMaxAttempts()
+    {
+        AddAccount();
+        var attempts = 0;
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
+            Task.FromResult(ServiceThatFailsRating(() => attempts++));
+
         Save(7);
         await DrainAfterWindow();
-        Assert.Single(_pushes);
+        for (var attempt = 1; attempt < RatingSyncHandler.MaxAttempts; attempt++)
+            await DrainAfterRetryDelay(attempt);
+
+        Assert.Equal(RatingSyncHandler.MaxAttempts, attempts);
+        Assert.Equal(0, _handler.PendingCount);
+    }
+
+    [Fact]
+    public async Task AuthFailure_IsNotRetried()
+    {
+        AddAccount();
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
+            Task.FromException<ILetterboxdService>(new Exception("bad password"));
+
+        Save(8);
+        await DrainAfterWindow();
+
+        Assert.Equal(0, _handler.PendingCount);
+    }
+
+    [Fact]
+    public void Baseline_UnchangedSaveOfAPreExistingRating_QueuesNothing()
+    {
+        // The reported hazard: a film rated before this version, later re-rated on Letterboxd.
+        // Favoriting it in Jellyfin must not push the stale Jellyfin rating over Letterboxd's.
+        AddAccount();
+        _userManager.GetUsers().Returns(new[] { _user });
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { _movie });
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 8 });
+
+        _handler.SeedBaseline(CancellationToken.None);
+        _handler.MarkBaselineReady();
+
+        Save(8, UserDataSaveReason.UpdateUserRating);
+        Assert.Equal(0, _handler.PendingCount);
+
+        Save(6);
+        Assert.Equal(1, _handler.PendingCount);
+    }
+
+    [Fact]
+    public void Baseline_NeverOverwritesAChangeObservedDuringSeeding()
+    {
+        AddAccount();
+        Save(9); // arrives while the baseline is still being read
+        _userManager.GetUsers().Returns(new[] { _user });
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { _movie });
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 8 });
+
+        _handler.SeedBaseline(CancellationToken.None);
+        _handler.MarkBaselineReady();
+
+        Save(9, UserDataSaveReason.UpdateUserRating);
+        Assert.True(_handler.TryGetPending(_user.Id, _movie.Id, out var pending));
+        Assert.Equal(9, pending.Rating);
+    }
+
+    [Fact]
+    public void AfterBaseline_FirstRatingOfAnUnratedFilm_IsAChange()
+    {
+        AddAccount();
+        _handler.MarkBaselineReady();
+
+        Save(8);
+        Assert.Equal(1, _handler.PendingCount);
+    }
+
+    [Fact]
+    public void ClearingWhilePending_DropsThePendingPush()
+    {
+        AddAccount();
+        Save(8);
+        Save(null);
+        Assert.Equal(0, _handler.PendingCount);
+    }
+
+    [Fact]
+    public void QueueCap_StillUpdatesFilmsAlreadyQueued()
+    {
+        AddAccount();
+        Save(6);
+        for (var i = 1; i < RatingSyncHandler.MaxPending; i++)
+            Save(8, item: new Movie { Id = Guid.NewGuid(), Name = "M" + i });
+
+        Save(9);
+        Assert.True(_handler.TryGetPending(_user.Id, _movie.Id, out var pending));
+        Assert.Equal(9, pending.Rating);
+    }
+
+    [Fact]
+    public async Task TapDuringPush_IsNotLost()
+    {
+        AddAccount();
+        var tapped = false;
+        LetterboxdServiceFactory.OverrideForTesting = (username, _, _, _, _) =>
+        {
+            var service = Substitute.For<ILetterboxdService>();
+            service.LookupFilmByTmdbIdAsync(TmdbId).Returns(new FilmResult("sinners-2025", "KQMM", null));
+            service.SetFilmRatingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<double>())
+                .Returns(ci =>
+                {
+                    lock (_pushes) _pushes.Add((ci.ArgAt<string>(0), ci.ArgAt<string>(1), ci.ArgAt<double>(2), username));
+                    if (!tapped) { tapped = true; Save(9); }
+                    return Task.CompletedTask;
+                });
+            return Task.FromResult(service);
+        };
+
+        Save(7);
+        await DrainAfterWindow();
+        Assert.Equal(1, _handler.PendingCount);
+
+        await DrainAfterWindow();
+        Assert.Equal(new[] { 3.5, 4.5 }, _pushes.Select(p => p.Rating).ToArray());
+    }
+
+    [Fact]
+    public async Task OnePass_LogsInOncePerAccount()
+    {
+        AddAccount();
+        var second = new Movie { Id = Guid.NewGuid(), Name = "Second" };
+        second.SetProviderId(MetadataProvider.Tmdb, TmdbId.ToString());
+        _libraryManager.GetItemById(second.Id).Returns(second);
+
+        Save(7);
+        Save(9, item: second);
+        await DrainAfterWindow();
+
+        Assert.Equal(2, _pushes.Count);
+        Assert.Equal(1, _factoryCalls);
+    }
+
+    [Fact]
+    public async Task AccountFailingInAPass_IsNotHammered_AndBothFilmsAreRequeued()
+    {
+        AddAccount();
+        var attempts = 0;
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
+            Task.FromResult(ServiceThatFailsRating(() => attempts++));
+        var second = new Movie { Id = Guid.NewGuid(), Name = "Second" };
+        second.SetProviderId(MetadataProvider.Tmdb, "238");
+        _libraryManager.GetItemById(second.Id).Returns(second);
+
+        Save(7);
+        Save(9, item: second);
+        await DrainAfterWindow();
+
+        Assert.Equal(1, attempts);
+        Assert.Equal(2, _handler.PendingCount);
+    }
+
+    [Fact]
+    public async Task AlreadyPushedValue_SkipsTheLibraryLookup()
+    {
+        AddAccount().ExcludedLibraryIds = new List<string> { Guid.NewGuid().ToString("N") };
+        RatingPushStore.RecordPushed(UserId, "lb-user", TmdbId, 4.0);
+
+        Save(8);
+        await DrainAfterWindow();
+
+        _libraryManager.DidNotReceive().GetCollectionFolders(Arg.Any<BaseItem>());
     }
 
     [Fact]
@@ -361,8 +556,88 @@ public class RatingSyncHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task ExcludedLibrary_BlocksPushForThatAccountOnly()
+    {
+        var animeLibrary = Guid.NewGuid();
+        AddAccount("excludes-anime").ExcludedLibraryIds = new List<string> { animeLibrary.ToString("N") };
+        AddAccount("keeps-everything");
+        _libraryManager.GetCollectionFolders(_movie)
+            .Returns(new List<Folder> { new CollectionFolder { Id = animeLibrary } });
+
+        Save(8);
+        await DrainAfterWindow();
+
+        Assert.Equal(new[] { "keeps-everything" }, _pushes.Select(p => p.Account).ToArray());
+        Assert.Null(RatingPushStore.GetLastPushed(UserId, "excludes-anime", TmdbId));
+    }
+
+    [Fact]
+    public async Task OtherUsersSave_NeverPushesToThisUsersAccounts()
+    {
+        AddAccount();
+        var other = new User("someone-else", "test-provider-id", "test-reset-id");
+        _userManager.GetUserById(other.Id).Returns(other);
+
+        _handler.Observe(new UserDataSaveEventArgs
+        {
+            UserId = other.Id,
+            Item = _movie,
+            SaveReason = UserDataSaveReason.UpdateUserData,
+            UserData = new UserItemData { Key = "k", Rating = 8 }
+        });
+        await DrainAfterWindow();
+
+        Assert.Equal(0, _factoryCalls);
+    }
+
+    [Fact]
+    public async Task RatingClearedAfterPush_PushesNothingAndKeepsStore()
+    {
+        AddAccount();
+        Save(7);
+        await DrainAfterWindow();
+
+        Save(null);
+        Save(0);
+        await DrainAfterWindow();
+
+        Assert.Single(_pushes);
+        Assert.Equal(3.5, RatingPushStore.GetLastPushed(UserId, "lb-user", TmdbId));
+    }
+
+    [Fact]
+    public async Task ToggleTurnedOffBeforeDrain_PushesNothing()
+    {
+        var account = AddAccount();
+        Save(8);
+        account.SyncRatings = false;
+
+        await DrainAfterWindow();
+
+        Assert.Equal(0, _factoryCalls);
+    }
+
+    [Fact]
+    public async Task OneFilmThrowing_DoesNotBlockOrDropOthersInTheSamePass()
+    {
+        AddAccount();
+        var broken = new Movie { Id = Guid.NewGuid(), Name = "Broken" };
+        broken.SetProviderId(MetadataProvider.Tmdb, "999");
+        _libraryManager.GetItemById(broken.Id).Returns(_ => throw new InvalidOperationException("library mid-scan"));
+
+        Save(8, item: broken);
+        Save(8);
+        await DrainAfterWindow();
+
+        Assert.Single(_pushes);
+        Assert.True(_handler.TryGetPending(_user.Id, broken.Id, out var retry));
+        Assert.Equal(2, retry.Attempt);
+    }
+
+    [Fact]
     public async Task StartThenStop_SubscribesUnsubscribesAndEndsTheLoop()
     {
+        _userManager.GetUsers().Returns(Array.Empty<User>());
         await _handler.StartAsync(CancellationToken.None);
         _userDataManager.Received(1).UserDataSaved += Arg.Any<EventHandler<UserDataSaveEventArgs>>();
 

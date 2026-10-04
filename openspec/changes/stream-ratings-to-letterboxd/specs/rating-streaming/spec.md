@@ -35,6 +35,10 @@ Rating saves originating from the plugin itself SHALL NOT be streamed. All plugi
 ### Requirement: Saves that leave the rating unchanged push nothing
 The plugin SHALL push only when the mapped half-star value differs from the last value it successfully pushed for that user, account, and film. The last pushed value SHALL survive a server restart.
 
+#### Scenario: Rating that existed before the update
+- **WHEN** a film was rated 8/10 in Jellyfin before this version, its Letterboxd rating was later changed to 5 stars, and after the update the user favorites the film in Jellyfin
+- **THEN** no Letterboxd push occurs and the 5-star rating stays
+
 #### Scenario: Favoriting a rated film
 - **WHEN** a user whose film rating was already pushed toggles that film's favorite (a save with reason UpdateUserRating that does not change the rating)
 - **THEN** no Letterboxd push occurs
@@ -47,8 +51,19 @@ The plugin SHALL push only when the mapped half-star value differs from the last
 - **WHEN** a rating already pushed as 3.5 stars changes from 7/10 to 7.2/10
 - **THEN** no Letterboxd push occurs
 
+### Requirement: A failed push is retried a bounded number of times
+A push that fails for a reason other than authentication SHALL be retried with backoff, up to three attempts in total, unless a newer rating for the same film is queued first. An authentication failure SHALL NOT be retried.
+
+#### Scenario: Letterboxd briefly unavailable
+- **WHEN** the push of a 7/10 rating fails with a server error and Letterboxd recovers before the retry
+- **THEN** the retry pushes 3.5 stars and nothing else is needed from the user
+
 ### Requirement: Rapid changes debounce to one push
 Successive rating changes for the same (user, item) within the debounce window SHALL result in exactly one push carrying the final value.
+
+#### Scenario: Rating cleared before it syncs
+- **WHEN** a user sets a film to 8/10 and clears the rating within the debounce window
+- **THEN** nothing is pushed
 
 #### Scenario: Tapping through star values
 - **WHEN** a user changes a film's rating three times within a few seconds, ending on 9/10

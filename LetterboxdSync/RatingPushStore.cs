@@ -21,7 +21,8 @@ namespace LetterboxdSync;
 public static class RatingPushStore
 {
     private static readonly object _lock = new();
-    private static Dictionary<string, double>? _ratings;
+    private static Dictionary<string, Line>? _ratings;
+    private static int _linesOnDisk;
     private static ILogger? _logger;
 
     /// <summary>Test-only hook for the JSONL location. Production uses the plugin configurations dir.</summary>
@@ -66,10 +67,10 @@ public static class RatingPushStore
     private static string Key(string userJellyfinId, string letterboxdUsername, int tmdbId)
         => $"{userJellyfinId}|{letterboxdUsername.ToLowerInvariant()}|{tmdbId}";
 
-    private static Dictionary<string, double> Load()
+    private static Dictionary<string, Line> Load()
     {
         if (_ratings != null) return _ratings;
-        _ratings = new Dictionary<string, double>(StringComparer.Ordinal);
+        _ratings = new Dictionary<string, Line>(StringComparer.Ordinal);
         var lineCount = 0;
         try
         {
@@ -83,7 +84,7 @@ public static class RatingPushStore
                     {
                         var line = JsonSerializer.Deserialize<Line>(raw);
                         if (line != null)
-                            _ratings[Key(line.User, line.Account, line.TmdbId)] = line.Rating;
+                            _ratings[Key(line.User, line.Account, line.TmdbId)] = line;
                     }
                     catch (JsonException)
                     {
@@ -94,10 +95,14 @@ public static class RatingPushStore
         }
         catch (Exception ex)
         {
+            // Not cached: an empty store would make every no-op save push, so retry the read next time.
             _logger?.LogError(ex, "Failed to load rating push history from {Path}", DataPath);
-            return _ratings;
+            var partial = _ratings;
+            _ratings = null;
+            return partial;
         }
 
+        _linesOnDisk = lineCount;
         if (lineCount > _ratings.Count)
             Compact();
 
@@ -111,20 +116,12 @@ public static class RatingPushStore
             var tmp = DataPath + ".tmp";
             using (var writer = new StreamWriter(tmp, append: false))
             {
-                foreach (var (key, rating) in _ratings!)
-                {
-                    var parts = key.Split('|');
-                    writer.WriteLine(JsonSerializer.Serialize(new Line
-                    {
-                        User = parts[0],
-                        Account = parts[1],
-                        TmdbId = int.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture),
-                        Rating = rating
-                    }));
-                }
+                foreach (var line in _ratings!.Values)
+                    writer.WriteLine(JsonSerializer.Serialize(line));
             }
 
             File.Move(tmp, DataPath, overwrite: true);
+            _linesOnDisk = _ratings!.Count;
         }
         catch (Exception ex)
         {
@@ -138,7 +135,7 @@ public static class RatingPushStore
     {
         lock (_lock)
         {
-            return Load().TryGetValue(Key(userJellyfinId, letterboxdUsername, tmdbId), out var rating) ? rating : null;
+            return Load().TryGetValue(Key(userJellyfinId, letterboxdUsername, tmdbId), out var line) ? line.Rating : null;
         }
     }
 
@@ -149,22 +146,28 @@ public static class RatingPushStore
         {
             var ratings = Load();
             var key = Key(userJellyfinId, letterboxdUsername, tmdbId);
-            if (ratings.TryGetValue(key, out var existing) && existing.Equals(rating))
+            if (ratings.TryGetValue(key, out var existing) && existing.Rating.Equals(rating))
                 return;
-            ratings[key] = rating;
+            var line = new Line
+            {
+                User = userJellyfinId,
+                Account = letterboxdUsername.ToLowerInvariant(),
+                TmdbId = tmdbId,
+                Rating = rating
+            };
+            ratings[key] = line;
 
             try
             {
                 var dir = Path.GetDirectoryName(DataPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
-                File.AppendAllText(DataPath, JsonSerializer.Serialize(new Line
-                {
-                    User = userJellyfinId,
-                    Account = letterboxdUsername.ToLowerInvariant(),
-                    TmdbId = tmdbId,
-                    Rating = rating
-                }) + Environment.NewLine);
+                File.AppendAllText(DataPath, JsonSerializer.Serialize(line) + Environment.NewLine);
+                _linesOnDisk++;
+
+                // Re-rates append; compact well before the file is dominated by superseded lines.
+                if (_linesOnDisk > (2 * ratings.Count) + 100)
+                    Compact();
             }
             catch (Exception ex)
             {

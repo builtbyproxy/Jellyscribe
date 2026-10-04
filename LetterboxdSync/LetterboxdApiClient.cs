@@ -235,7 +235,7 @@ public class LetterboxdApiClient : ILetterboxdService
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
-            throw new Exception($"Failed to rate {filmSlug}: {response.StatusCode} {json}");
+            throw new Exception($"Failed to rate {filmSlug}: {response.StatusCode} {LetterboxdHttpClient.Truncate(json, 300)}");
 
         // Business-rule rejections (e.g. InvalidRatingValue) come back as HTTP 200 with an
         // Error message, and the rating is left unchanged.
