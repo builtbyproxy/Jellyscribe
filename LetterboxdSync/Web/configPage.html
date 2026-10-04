@@ -768,7 +768,9 @@
                             var rows = [
                                 ['Enabled', 'chkEnabled', a.Enabled !== false, 'Master switch. When off, nothing syncs for this account.'],
                                 ['Mark favourites as liked', 'chkFav', !!a.SyncFavorites, 'Favourite in Jellyfin → hearted on the diary.']
-                            ].concat(svc === 'letterboxd' ? [['Sync ratings to Letterboxd', 'chkRatings', a.SyncRatings !== false, 'Rate in Jellyfin after watching → the Letterboxd film rating.']] : []).concat([
+                            // Always rendered; onSvcChange shows it only for Letterboxd, so switching the
+                            // service on a new account reveals it without re-rendering the other boxes.
+                            ].concat([['Sync ratings to Letterboxd', 'chkRatings', a.SyncRatings !== false, 'Rate in Jellyfin after watching → the Letterboxd film rating.']]).concat([
                                 ['Only sync recently played', 'chkDate', !!a.EnableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.IsPrimary, 'Wins on tie-breaks when a user has several.'],
                                 ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.SyncWatchlist : !!a.EnableWatchlistSync, svc === 'serializd' ? 'Watchlist → Jellyfin collection + playlist.' : 'Watchlist → Jellyfin playlist.'],
@@ -803,6 +805,8 @@
                             document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username';
                             document.getElementById('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
                             document.getElementById('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
+                            var ratingsBox = document.getElementById('chkRatings');
+                            if (ratingsBox) ratingsBox.closest('label').style.display = svc === 'letterboxd' ? '' : 'none';
                             var uname = document.getElementById('mUsername').value.trim();
                             document.getElementById('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : ''));
                         },
