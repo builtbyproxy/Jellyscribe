@@ -72,4 +72,4 @@ jobs:
           LETTERBOXD_TEST_PASSWORD: ${{ secrets.LETTERBOXD_TEST_PASSWORD }}
           LETTERBOXD_TEST_RAW_COOKIES: ${{ secrets.LETTERBOXD_TEST_RAW_COOKIES }}
           LETTERBOXD_TEST_USER_AGENT: ${{ secrets.LETTERBOXD_TEST_USER_AGENT }}
-        run: dotnet test -c Release --no-build --verbosity normal --filter "Category=Integration"
+        run: dotnet test -c Release --no-build --verbosity normal --logger "console;verbosity=detailed" --filter "Category=Integration"
