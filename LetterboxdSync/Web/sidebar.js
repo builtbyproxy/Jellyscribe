@@ -65,7 +65,30 @@
         content.appendChild(slot);
         page.appendChild(content);
         host.appendChild(page);
+        if (!document.getElementById(PAGE_ID + "-style")) {
+            // The dashboard draws its own full-bleed layout: drop Jellyfin's content gutters and
+            // bottom padding; the top is sized to the real header in fitUnderHeader().
+            var style = document.createElement("style");
+            style.id = PAGE_ID + "-style";
+            style.textContent = "#" + PAGE_ID + " { padding-bottom: 0 !important; }" +
+                " #" + PAGE_ID + " ." + SLOT_CLASS + " { padding: 0 !important; margin: 0 !important; max-width: none !important; }";
+            document.head.appendChild(style);
+        }
         return page;
+    }
+
+    // libraryPage's top padding reserves room for a tab row this page doesn't have, which left a
+    // dark band under the header. Pad by the header actually on screen (Jellyfin 10.11's skin
+    // header, or Jellyfin 12's toolbar) instead.
+    function fitUnderHeader() {
+        var page = document.getElementById(PAGE_ID);
+        if (!page || !state.visible) return;
+        var bottom = 0;
+        Array.prototype.forEach.call(document.querySelectorAll(".skinHeader, .MuiAppBar-root"), function (h) {
+            var rect = h.getBoundingClientRect();
+            if (rect.height > 0 && getComputedStyle(h).display !== "none") bottom = Math.max(bottom, rect.bottom);
+        });
+        if (bottom > 0) page.style.setProperty("padding-top", Math.round(bottom) + "px", "important");
     }
 
     // A dashboard already in the document outside our page (a configuration-page view Jellyfin is
@@ -135,6 +158,8 @@
         page.classList.remove("hide");
         fire(page, "viewshow", { type: "custom", isRestored: false, options: {} });
         fire(page, "pageshow");
+        fitUnderHeader();
+        setTimeout(fitUnderHeader, 400); // after the header settles from hiding the tabs
         // Never remember our own title (or the router's "Page not found") as the one to restore.
         if (document.title !== "Jellyscribe" && document.title !== "Page not found") state.previousTitle = document.title;
         settleTitle();
@@ -242,6 +267,7 @@
         }
     }
 
+    window.addEventListener("resize", fitUnderHeader);
     window.addEventListener("hashchange", interceptNavigation, true);
     window.addEventListener("popstate", interceptNavigation, true);
 
