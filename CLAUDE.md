@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Jellyfin plugin ("Jellyscribe") that syncs watch history to Letterboxd (film) and Serializd (TV). C#/.NET 9, targets Jellyfin 10.11 (`Jellyfin.Controller`/`Jellyfin.Model` 10.11.0). Letterboxd's official endpoint (`/api/v0/production-log-entries`) is preferred; the plugin falls back to web scraping (cookie login, CSRF tokens, HtmlAgilityPack) when the API path fails. Serializd's API needs no such fallback. The C# namespace, project folder, and solution file all still say `LetterboxdSync` (pre-rebrand name, unchanged this release, see `openspec/changes/rebrand-jellyscribe/`); only the compiled `AssemblyName` and every user-visible surface say Jellyscribe.
 
-The sidebar link in the Jellyfin web UI depends on the third-party **File Transformation** plugin; the rest of the plugin works without it.
+The sidebar link in the Jellyfin web UI is injected by `SidebarScriptStartupFilter`, an `IStartupFilter` middleware that adds the `sidebar.js` tag to the web client's index page at request time (the same approach as Jellyfin Enhanced), so no other plugin is needed. The third-party **File Transformation** plugin, when installed, injects the same tag; both paths share `SidebarScript.Inject`, which never adds a second copy. On Jellyfin 12 the web client has no sidebar drawer, so the link is inserted but not visible yet.
 
 ## Build & Test
 
@@ -54,7 +54,7 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellysc
 - `Api/LetterboxdController.cs` and `Api/SidebarController.cs` expose REST endpoints consumed by the config dashboard. `LetterboxdController` also serves the read-only `ItemRating` endpoint the review modal uses to pre-fill its stars from the caller's stored Jellyfin rating.
 - `Api/LibrariesController.cs` lists the film, TV, and mixed libraries the caller can access, for the per-account "Excluded libraries" checklist on both settings pages (Jellyfin's own `/Library/VirtualFolders` is admin-only).
 - `Web/*.html` and `Web/*.js` are embedded resources (see `LetterboxdSync.csproj`) served as the plugin's config pages.
-- `SidebarInjection.cs` registers a transformation with the File Transformation plugin to inject the sidebar link.
+- `SidebarScriptStartupFilter.cs` injects the sidebar link without any other plugin (kill switch: `PluginConfiguration.DisableSidebarScriptMiddleware`, XML only). `SidebarInjection.cs` also registers the same injection with the File Transformation plugin when it is installed.
 
 ## Releasing
 

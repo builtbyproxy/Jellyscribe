@@ -68,22 +68,18 @@ Full feature parity with the Letterboxd side: real-time sync, ratings, reviews, 
 ### Plugin repository (recommended)
 
 1. In Jellyfin, go to **Dashboard > Plugins > Repositories**
-2. Add the **File Transformation** repository (required for the sidebar link):
-   - **Name:** `File Transformation`
-   - **URL:** `https://www.iamparadox.dev/jellyfin/plugins/manifest.json`
-3. Add the Jellyscribe repository:
+2. Add the Jellyscribe repository:
    - **Name:** `Jellyscribe`
    - **URL:** `https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
-4. Go to **Catalog**, install **File Transformation**, then install **Jellyscribe**
-5. Restart Jellyfin
-6. Hard-refresh the Jellyfin web UI (Ctrl/Cmd + Shift + R) so the new sidebar link loads
+3. Go to **Catalog** and install **Jellyscribe**
+4. Restart Jellyfin
+5. Hard-refresh the Jellyfin web UI (Ctrl/Cmd + Shift + R) so the new sidebar link loads
 
 ### Manual install
 
-1. Install the **File Transformation** plugin first (see [iamparadox27/Jellyfin.Plugin.FileTransformation](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation/releases)), required for the sidebar link to appear
-2. Download the latest Jellyscribe ZIP from [Releases](https://github.com/builtbyproxy/Jellyscribe/releases)
-3. Extract `Jellyscribe.dll` and `HtmlAgilityPack.dll` to your Jellyfin plugins directory
-4. Restart Jellyfin
+1. Download the latest Jellyscribe ZIP from [Releases](https://github.com/builtbyproxy/Jellyscribe/releases)
+2. Extract `Jellyscribe.dll` and `HtmlAgilityPack.dll` to your Jellyfin plugins directory
+3. Restart Jellyfin
 
 ## Setup
 
@@ -202,7 +198,7 @@ Unlike the anonymous telemetry above, **logs are not anonymous**, they can conta
   - **Migrating your server to Jellyfin 12?** Jellyfin advises removing (or disabling) external plugins before the upgrade, and that is safe to follow here: your accounts, settings, and sync history live outside the plugin folder and all survive a reinstall from the catalog.
   - Note that Jellyfin 12 moved where plugins live, from `config/data/plugins/` to `config/plugins/`. Jellyfin handles that move for you on upgrade. It only matters if you install the plugin by hand rather than from the catalog, in which case use the new path on 12.x.
 - A Letterboxd and/or Serializd account
-- [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), required for the Jellyscribe link to appear in the Jellyfin sidebar (everything else works without it)
+- The Jellyscribe link in the Jellyfin sidebar needs no other plugin. If you already run the [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), Jellyscribe uses it too, and you still get one link. On Jellyfin 12 the web client moved its menu into the profile button, so the sidebar link doesn't show there yet; open Jellyscribe from **Dashboard > Plugins** instead
 - Optional: a [Seerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations
 
 ## Building from source

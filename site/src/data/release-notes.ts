@@ -10,6 +10,20 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.9.0',
+    headline: 'The Jellyscribe sidebar link no longer needs another plugin',
+    summary:
+      'The Jellyscribe link in Jellyfin\'s sidebar used to appear only if you had also installed the File Transformation plugin, so many people never saw it and had to dig through the dashboard to find their settings. Jellyscribe now adds the link itself, the same way Jellyfin Enhanced adds its own menu, and nothing on your server\'s disk is changed. If you already use File Transformation, nothing changes for you and you still get exactly one link. The link also now works on servers that run Jellyfin under a sub-path such as /jellyfin, where it used to point at the wrong address. On Jellyfin 12, the web client moved its menu into the profile button, so the link doesn\'t show there yet; open Jellyscribe from Dashboard, Plugins instead.',
+    highlights: {
+      new: [
+        'The Jellyscribe sidebar link appears without the File Transformation plugin.',
+      ],
+      fixes: [
+        'The sidebar link works on servers that run Jellyfin under a base URL such as /jellyfin.',
+      ],
+    },
+  },
+  {
     version: '2.8.0',
     headline: 'Check your Letterboxd login before you rely on it',
     summary:
