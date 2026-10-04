@@ -10,6 +10,20 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.8.0',
+    headline: 'Check your Letterboxd login before you rely on it',
+    summary:
+      'Until now the Verify login button only worked for Serializd. For a Letterboxd account it said the login would be checked on the first sync, so a wrong password or a mistyped name went unnoticed until something quietly failed to appear on Letterboxd. Verify login now works for Letterboxd too: it signs in the same way syncing will and tells you whether it got in, and if not, the reason Letterboxd gave. It also catches a common mix-up: Letterboxd no longer lets you sign in with your email address, so Jellyscribe now asks for your Letterboxd username instead and explains why if you enter an email.',
+    highlights: {
+      new: [
+        'Verify login works for Letterboxd accounts, in both the admin dashboard and your own settings page, and shows which sign-in method worked or why it failed.',
+      ],
+      fixes: [
+        'Entering an email address as a Letterboxd account name is caught when you verify or save, with a clear message, instead of failing silently at the first sync.',
+      ],
+    },
+  },
+  {
     version: '2.7.0',
     headline: 'Ratings you give after watching now reach Letterboxd',
     summary:

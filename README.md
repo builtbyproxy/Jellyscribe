@@ -90,9 +90,10 @@ Full feature parity with the Letterboxd side: real-time sync, ratings, reviews, 
 1. Go to **Dashboard > Plugins > Jellyscribe**
 2. Switch to the **Settings** tab
 3. Click **+ Add Account**
-4. Select your Jellyfin user, enter your Letterboxd username and password
-5. Check **Enabled**
-6. Click **Save**
+4. Select your Jellyfin user, enter your Letterboxd **username** (the name in `letterboxd.com/<username>/`, not your email: Letterboxd no longer accepts email sign-in) and password
+5. Click **Verify login** to check it works; it says whether the official API or the website login was used, or why both failed
+6. Check **Enabled**
+7. Click **Save**
 
 That's it. Watch a movie and check your Letterboxd diary.
 
