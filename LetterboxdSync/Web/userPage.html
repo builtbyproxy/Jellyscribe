@@ -514,7 +514,10 @@
                             self.pollProgress();
                         },
                         pollProgress: function () {
-                            var self = this, w = self.watcher; w.ticks++;
+                            var self = this, w = self.watcher;
+                            // The in-app page removes this dashboard when it is left; stop polling then.
+                            if (!document.getElementById('jobWatcher')) { clearInterval(w.timer); w.timer = null; return; }
+                            w.ticks++;
                             self.getProgress().then(function (p) {
                                 if (!p) return;
                                 if (p.isRunning) {

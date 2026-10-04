@@ -57,4 +57,4 @@ None: client-side only. Old links to the configuration page keep working. Rollba
 
 ## Open Questions
 
-- Whether Jellyfin 10.11 renders anything for an unknown `#/jellyscribe` hash on a cold load (affects how much the deep-link path has to undo). Answered by the live check, not blocking the design.
+- Answered live (2026-10-04): on both 10.11 and 12 the router renders its "Page not found" view for `#/jellyscribe`. Capture-phase `hashchange`/`popstate` listeners stop the event before the router for in-app navigation, and on a cold load a `viewshow` that arrives while the location is still `#/jellyscribe` is treated as that not-found view and hidden. Jellyfin 10.11 also needed the native tab-less page classes (`libraryPage noSecondaryNavPage`) and the header tabs hidden, or the dashboard sat under the header.

@@ -198,7 +198,7 @@ Unlike the anonymous telemetry above, **logs are not anonymous**, they can conta
   - **Migrating your server to Jellyfin 12?** Jellyfin advises removing (or disabling) external plugins before the upgrade, and that is safe to follow here: your accounts, settings, and sync history live outside the plugin folder and all survive a reinstall from the catalog.
   - Note that Jellyfin 12 moved where plugins live, from `config/data/plugins/` to `config/plugins/`. Jellyfin handles that move for you on upgrade. It only matters if you install the plugin by hand rather than from the catalog, in which case use the new path on 12.x.
 - A Letterboxd and/or Serializd account
-- The Jellyscribe link in the Jellyfin sidebar needs no other plugin. If you already run the [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), Jellyscribe uses it too, and you still get one link. On Jellyfin 12 the web client moved its menu into the profile button, so the sidebar link doesn't show there yet; open Jellyscribe from **Dashboard > Plugins** instead
+- Jellyscribe opens as its own page inside Jellyfin (no reload, like Jellyfin Enhanced's Bookmarks), from the sidebar on Jellyfin 10.11 or the profile (avatar) menu on Jellyfin 12, and you can bookmark it at `#/jellyscribe`. This needs no other plugin; if you already run the [File Transformation plugin](https://github.com/IAmParadox27/jellyfin-plugin-file-transformation), Jellyscribe uses it too, and you still get one link
 - Optional: a [Seerr](https://github.com/seerr-team/seerr) instance for the auto-request and watchlist-mirror integrations
 
 ## Building from source

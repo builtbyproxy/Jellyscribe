@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.0',
+    headline: 'Jellyscribe now opens inside Jellyfin, on Jellyfin 12 too',
+    summary:
+      'Clicking Jellyscribe used to reload the whole Jellyfin web app and drop you onto a plugin settings page. It now opens as a proper page inside Jellyfin, the way Jellyfin Enhanced\'s Bookmarks does: no reload, Jellyfin\'s header and menu stay put, and the back button takes you straight back to where you were. You can also bookmark it, since it has its own address ending in #/jellyscribe. On Jellyfin 12, where the sidebar was replaced by a menu under your profile picture, Jellyscribe now appears in that menu, so it is reachable there for the first time. Everything on the page works as before, and the old settings-page address still works.',
+    highlights: {
+      new: [
+        'Jellyscribe opens as a page inside Jellyfin with no reload, and has its own bookmarkable address (#/jellyscribe).',
+        'On Jellyfin 12, Jellyscribe appears in the menu under your profile picture.',
+      ],
+    },
+  },
+  {
     version: '2.9.0',
     headline: 'The Jellyscribe sidebar link no longer needs another plugin',
     summary:
