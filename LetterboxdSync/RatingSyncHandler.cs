@@ -17,7 +17,8 @@ namespace LetterboxdSync;
 /// <summary>
 /// Streams Jellyfin movie rating changes to the member's Letterboxd film rating. The diary sync
 /// only carries a rating inside a new diary entry, so a rating set after the watch was logged
-/// (in the web UI, a client, or Jellyfin Enhanced's review mirror) never reached Letterboxd.
+/// (by a client, the API, or Jellyfin Enhanced's review mirror; the web UI itself has no rating
+/// control) never reached Letterboxd.
 ///
 /// Numeric ratings save with <see cref="UserDataSaveReason.UpdateUserData"/>; favorite and like
 /// toggles (and Jellyfin Enhanced's mirror) save with <see cref="UserDataSaveReason.UpdateUserRating"/>.

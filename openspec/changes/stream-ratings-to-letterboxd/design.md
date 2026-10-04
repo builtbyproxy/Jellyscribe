@@ -8,7 +8,7 @@ Which save reason carries a rating change, verified against the Jellyfin 10.11.0
 
 | Writer | Path | Save reason | Touches `Rating`? |
 |---|---|---|---|
-| Web UI / clients setting a numeric rating | `POST /UserItems/{id}/UserData` (`ItemsController.UpdateItemUserData`) | `UpdateUserData` | yes |
+| Clients / API setting a numeric rating (the web UI has no rating control; its rating button is the favorite heart) | `POST /UserItems/{id}/UserData` (`ItemsController.UpdateItemUserData`) | `UpdateUserData` | yes |
 | Favorite toggle | `UserLibraryController.MarkFavorite` | `UpdateUserRating` | no |
 | Like / dislike | `POST`/`DELETE /UserItems/{id}/Rating` | `UpdateUserRating` | no (sets `Likes`) |
 | Jellyfin Enhanced review mirror (12.10.0.0+) | in-process `SaveUserData` | `UpdateUserRating` | yes (stars x2, or cleared) |
@@ -16,7 +16,7 @@ Which save reason carries a rating change, verified against the Jellyfin 10.11.0
 | Jellyscribe diary import | `DiaryImportTask` | `Import` | yes |
 | Jellyscribe review-modal writeback | `WriteJellyfinRating` | `UpdateUserRating` (changes to `Import` here) | yes |
 
-So the save reason alone cannot identify a rating change: the most common rating path uses `UpdateUserData` (which also carries playstate edits), and `UpdateUserRating` fires for favorites and likes that leave the rating untouched. An earlier draft of this design streamed only `UpdateUserRating`; it would have missed every web-UI rating and re-pushed on every favorite toggle.
+So the save reason alone cannot identify a rating change: the most common rating path uses `UpdateUserData` (which also carries playstate edits), and `UpdateUserRating` fires for favorites and likes that leave the rating untouched. An earlier draft of this design streamed only `UpdateUserRating`; it would have missed every client- or API-set rating and re-pushed on every favorite toggle.
 
 ## Goals / Non-Goals
 
@@ -62,7 +62,7 @@ Skip silently when `SyncRatings` is off. Skip with an Information log when the b
 
 ## Risks / Trade-offs
 
-- [Clients that never write ratings to Jellyfin, e.g. Infuse] → Out of plugin control; diagnostics (decision 7) make it provable, and the feature still works for the web UI, the API, and Jellyfin Enhanced reviews.
+- [Clients that never write ratings to Jellyfin, e.g. Infuse] → Out of plugin control; diagnostics (decision 7) make it provable, and the feature still works for clients that write ratings, the API, and Jellyfin Enhanced reviews.
 - [Unknown official-API endpoint shape for rating] → Research task ordered first; if the official API can't set ratings, the scraping path becomes primary for this operation (factory consumers won't notice; the interface hides which one ran).
 - [Per-tap logins under scraping could look bot-like] → Debounce collapses taps; change detection drops no-op saves; the breaker caps sustained failures; ratings are rare events compared to sync runs.
 - [Event volume: UserDataSaved fires for playback progress constantly] → First filter is the save-reason enum comparison. `UpdateUserData` saves from playstate edits pass it but stop at an in-memory observed-rating comparison: no I/O and no log line unless the rating actually changed.
@@ -85,4 +85,4 @@ Additive. New `SyncRatings` account field defaults to true (XML deserialization 
 ## Alternatives considered
 
 - **Poll-based rating sync inside SyncTask** (plan-review suggestion): scan rated items each scheduled run and push un-pushed ratings. Rejected: latency becomes the sync interval (hours) for a feature whose whole point is "rate on the couch, see it on Letterboxd". It needs the same pushed-rating bookkeeping as decision 2 anyway, so that store now exists either way; revisit polling as a catch-up complement if event delivery proves unreliable.
-- **Filter on save reason alone** (the earlier draft of this design): stream only `UpdateUserRating`. Rejected after checking the Jellyfin source: numeric ratings from the web UI and clients save with `UpdateUserData`, and `UpdateUserRating` fires for favorite and like toggles.
+- **Filter on save reason alone** (the earlier draft of this design): stream only `UpdateUserRating`. Rejected after checking the Jellyfin source: numeric ratings from clients and the API save with `UpdateUserData`, and `UpdateUserRating` fires for favorite and like toggles.

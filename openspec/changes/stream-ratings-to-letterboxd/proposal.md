@@ -6,7 +6,7 @@ Users rate films *after* watching them and expect those ratings to reach Letterb
 
 Two concrete sources now hit this gap:
 
-- **The Jellyfin web UI and any client that writes ratings through the user-data API.** (Infuse, the client in the original report, turned out not to write numeric ratings to Jellyfin at all; verified 2026-07-30. That part of the gap is client-side.)
+- **Any client that writes ratings through the user-data API, and the API itself.** (Jellyfin's own web UI has no numeric rating control; its rating button is the favorite heart.) (Infuse, the client in the original report, turned out not to write numeric ratings to Jellyfin at all; verified 2026-07-30. That part of the gap is client-side.)
 - **Jellyfin Enhanced reviews.** Jellyfin Enhanced 12.10.0.0 (released 2026-10-03) added an opt-in `MirrorReviewRatingsToJellyfin` setting that writes a review's 1-5 stars into the user's Jellyfin rating (x2), for movies and series. A review is almost always written after watching, so without this change those ratings reach Jellyfin but stop there.
 
 ## What Changes

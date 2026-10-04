@@ -6,7 +6,7 @@
 When a Jellyfin user's rating on a movie changes through a save with reason UpdateUserData or UpdateUserRating, the plugin SHALL push the mapped half-star value to Letterboxd as the member's film rating for every enabled account of that user whose rating-sync toggle is on, without any user interaction. The film SHALL be resolved by TMDb id; items without one are skipped with a log line.
 
 #### Scenario: Rate after watching in a client app
-- **WHEN** a user finishes a film (already synced to the diary) and later rates it 7/10 in the Jellyfin web UI
+- **WHEN** a user finishes a film (already synced to the diary) and later rates it 7/10 in a Jellyfin client that saves ratings through the user-data API
 - **THEN** the user's Letterboxd film rating becomes 3.5 stars, and a sync-history entry with source "rating" records it
 
 #### Scenario: Rating mirrored from a Jellyfin Enhanced review
