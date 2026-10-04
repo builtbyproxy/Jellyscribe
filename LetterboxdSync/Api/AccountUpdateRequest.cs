@@ -16,6 +16,12 @@ public class AccountUpdateRequest
 
     public bool SyncFavorites { get; set; }
 
+    /// <summary>
+    /// Null means the client did not send the field: PutAccount and PutAccounts then keep the
+    /// stored value, and a new account gets the default (on).
+    /// </summary>
+    public bool? SyncRatings { get; set; }
+
     public bool EnableDateFilter { get; set; }
 
     public int DateFilterDays { get; set; } = 7;

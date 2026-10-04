@@ -49,6 +49,13 @@ public class Account
 
     public bool SyncFavorites { get; set; }
 
+    /// <summary>
+    /// When true, a rating changed in Jellyfin after (or without) a watch is pushed to this
+    /// account's Letterboxd film rating by <see cref="RatingSyncHandler"/>. Defaults on, which is
+    /// also what configs saved before this setting existed deserialize to.
+    /// </summary>
+    public bool SyncRatings { get; set; } = true;
+
     public bool EnableDateFilter { get; set; }
 
     public int DateFilterDays { get; set; } = 7;

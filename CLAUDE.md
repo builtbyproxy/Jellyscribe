@@ -35,7 +35,7 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellysc
 - `LetterboxdApiClient`, preferred, talks to Letterboxd's JSON endpoints.
 - `ScrapingLetterboxdService`, fallback, composes `LetterboxdHttpClient` (cookies/CSRF/Cloudflare retry), `LetterboxdAuth` (login + re-auth on 401), `LetterboxdScraper` (HTML parsing, film lookup, diary/watchlist scraping), and `LetterboxdDiary` (diary writes, review posting).
 
-`LetterboxdServiceFactory.CreateAuthenticatedAsync` tries the API first and silently falls back to scraping if auth fails. The factory also exposes an `internal static OverrideForTesting` hook used via `InternalsVisibleTo` from `LetterboxdSync.Tests` to inject mock services, production code never touches it.
+`LetterboxdServiceFactory.CreateAuthenticatedAsync` tries the API first and silently falls back to scraping if auth fails. That is the only fallback: a method that throws later is never retried on the other implementation, so a capability gap must be handled when the service is selected, not at call time. `FilmResult.FilmId` is the LID on the API path and the numeric id on the scraping path; pass it only back to the instance that returned it. The factory also exposes an `internal static OverrideForTesting` hook used via `InternalsVisibleTo` from `LetterboxdSync.Tests` to inject mock services, production code never touches it.
 
 ### Sync entry points
 
@@ -44,8 +44,9 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellysc
 - `WatchlistSyncTask` / `WatchlistSyncRunner`, imports the user's Letterboxd watchlist as a Jellyfin playlist.
 - `DiaryImportTask`, marks Jellyfin items as played if present in the Letterboxd diary.
 - `PlaybackHandler`, `IHostedService` registered in `ServiceRegistrator`, fires the real-time sync on playback completion.
+- `RatingSyncHandler`, `IHostedService` registered beside it, subscribes to `IUserDataManager.UserDataSaved` and pushes movie rating changes to the member's Letterboxd film rating (`ILetterboxdService.SetFilmRatingAsync`, not a diary entry). Numeric ratings save with `UpdateUserData` and favorite/like toggles with `UpdateUserRating`, so it accepts both and pushes only when the mapped half-star differs from `RatingPushStore`'s last pushed value; plugin-originated rating writes (diary import, the review-modal writeback) save with `Import`, which it ignores. Debounced 10s per (user, film) by one sweep loop. Successes record `SyncStatus.Rated` (never `Success`, which the diary duplicate backstop and stats read); failures are logged only, because `Failed` events feed the diary runner's per-film abandon counter.
 - `LetterboxdSyncRunner`, shared engine used by `SyncTask` and `PlaybackHandler`; `SyncGate`, `SyncHistory`, `SyncProgress`, and `TmdbCache` coordinate dedupe, progress UI, and TMDb lookups.
-- `LibraryExclusion.IsExcluded` is the one per-account "excluded library" rule (issue #124). Every export path (both scheduled runners and `PlaybackHandler`) calls it before handing an item to a service client, so it is a pre-filter above `ILetterboxdService`, never a check inside either implementation. Import paths deliberately ignore it.
+- `LibraryExclusion.IsExcluded` is the one per-account "excluded library" rule (issue #124). Every export path (both scheduled runners, `PlaybackHandler`, and `RatingSyncHandler`) calls it before handing an item to a service client, so it is a pre-filter above `ILetterboxdService`, never a check inside either implementation. Import paths deliberately ignore it.
 
 ### Plugin surface
 

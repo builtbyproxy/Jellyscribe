@@ -219,6 +219,64 @@ public class LetterboxdApiClient : ILetterboxdService
         }
     }
 
+    public async Task SetFilmRatingAsync(string filmSlug, string filmId, double rating)
+    {
+        EnsureAuthenticated();
+
+        var body = JsonSerializer.Serialize(new Dictionary<string, object> { ["rating"] = rating });
+        var response = await SendSignedAsync(HttpMethod.Patch, $"/film/{Uri.EscapeDataString(filmId)}/me", body, "application/json", authenticated: true)
+            .ConfigureAwait(false);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            ClearCachedToken();
+            throw new Exception("Letterboxd API token expired. Will re-authenticate on next sync.");
+        }
+
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+            throw new Exception($"Failed to rate {filmSlug}: {response.StatusCode} {json}");
+
+        // Business-rule rejections (e.g. InvalidRatingValue) come back as HTTP 200 with an
+        // Error message, and the rating is left unchanged.
+        var error = ExtractRelationshipUpdateError(json);
+        if (error != null)
+            throw new Exception($"Letterboxd rejected rating {rating} for {filmSlug}: {error}");
+    }
+
+    /// <summary>
+    /// First Error-type entry in a FilmRelationshipUpdateResponse's messages, as "code: title",
+    /// or null when the update was accepted.
+    /// </summary>
+    internal static string? ExtractRelationshipUpdateError(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("messages", out var messages) || messages.ValueKind != JsonValueKind.Array)
+                return null;
+
+            foreach (var message in messages.EnumerateArray())
+            {
+                if (message.TryGetProperty("type", out var type) && type.GetString() == "Error")
+                {
+                    var code = message.TryGetProperty("code", out var c) ? c.GetString() : null;
+                    var title = message.TryGetProperty("title", out var t) ? t.GetString() : null;
+                    return $"{code ?? "Error"}: {title}";
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+
     public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username)
     {
         EnsureAuthenticated();

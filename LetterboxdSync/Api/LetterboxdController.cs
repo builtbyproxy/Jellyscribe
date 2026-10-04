@@ -248,6 +248,7 @@ public class LetterboxdController : JellyfinUserApiController
                 userAgent = (string?)null,
                 enabled = false,
                 syncFavorites = false,
+                syncRatings = true,
                 enableDateFilter = false,
                 dateFilterDays = 7,
                 enableWatchlistSync = false,
@@ -269,6 +270,7 @@ public class LetterboxdController : JellyfinUserApiController
             userAgent = account.UserAgent,
             enabled = account.Enabled,
             syncFavorites = account.SyncFavorites,
+            syncRatings = account.SyncRatings,
             enableDateFilter = account.EnableDateFilter,
             dateFilterDays = account.DateFilterDays,
             enableWatchlistSync = account.EnableWatchlistSync,
@@ -323,6 +325,7 @@ public class LetterboxdController : JellyfinUserApiController
         account.UserAgent = request.UserAgent;
         account.Enabled = request.Enabled;
         account.SyncFavorites = request.SyncFavorites;
+        account.SyncRatings = request.SyncRatings ?? account.SyncRatings;
         account.EnableDateFilter = request.EnableDateFilter;
         account.DateFilterDays = request.DateFilterDays;
         account.EnableWatchlistSync = request.EnableWatchlistSync;
@@ -380,6 +383,7 @@ public class LetterboxdController : JellyfinUserApiController
                 authPausedSince = AuthBreaker.GetState(userId, a.LetterboxdUsername)?.FirstFailureUtc,
                 enabled = a.Enabled,
                 syncFavorites = a.SyncFavorites,
+                syncRatings = a.SyncRatings,
                 enableDateFilter = a.EnableDateFilter,
                 dateFilterDays = a.DateFilterDays,
                 enableWatchlistSync = a.EnableWatchlistSync,
@@ -443,6 +447,9 @@ public class LetterboxdController : JellyfinUserApiController
                 UserAgent = req.UserAgent,
                 Enabled = req.Enabled,
                 SyncFavorites = req.SyncFavorites,
+                SyncRatings = req.SyncRatings
+                    ?? previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, req.LetterboxdUsername, StringComparison.OrdinalIgnoreCase))?.SyncRatings
+                    ?? true,
                 EnableDateFilter = req.EnableDateFilter,
                 DateFilterDays = req.DateFilterDays,
                 EnableWatchlistSync = req.EnableWatchlistSync,
@@ -933,7 +940,10 @@ public class LetterboxdController : JellyfinUserApiController
             if (userData == null) return;
 
             userData.Rating = jellyfinRating;
-            _userDataManager.SaveUserData(user, movie, userData, UserDataSaveReason.UpdateUserRating, CancellationToken.None);
+            // Import, not UpdateUserRating: the value originates on the Letterboxd side (the review
+            // post already carried it there), and RatingSyncHandler ignores Import saves, so this
+            // mirror can never echo back out as a second push.
+            _userDataManager.SaveUserData(user, movie, userData, UserDataSaveReason.Import, CancellationToken.None);
 
             _logger.LogInformation("Mirrored Letterboxd rating {LbRating} -> Jellyfin {JfRating} for {Title} ({UserId})",
                 letterboxdRating.Value, jellyfinRating.Value, movie.Name, userId);

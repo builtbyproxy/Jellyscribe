@@ -22,6 +22,7 @@ public class ServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<Serializd.SerializdWatchlistSyncRunner>();
         serviceCollection.AddSingleton<Serializd.SerializdDiaryImportRunner>();
         serviceCollection.AddHostedService<PlaybackHandler>();
+        serviceCollection.AddHostedService<RatingSyncHandler>();
         serviceCollection.AddHostedService<RepositoryMigrationService>();
     }
 }

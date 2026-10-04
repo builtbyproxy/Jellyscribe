@@ -113,11 +113,12 @@
                 #letterboxdSyncConfigPage .ws-pill { font-family: var(--ws-mono); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; display: inline-flex; }
                 #letterboxdSyncConfigPage .ws-pill.Success, #letterboxdSyncConfigPage .ws-pill.synced { color: var(--ws-ok); background: rgba(53,194,129,.13); }
                 #letterboxdSyncConfigPage .ws-pill.Rewatch { color: var(--ws-info); background: rgba(71,180,242,.14); }
-                #letterboxdSyncConfigPage .ws-pill.Reviewed { color: var(--ws-warn); background: rgba(245,166,35,.14); }
+                #letterboxdSyncConfigPage .ws-pill.Reviewed, #letterboxdSyncConfigPage .ws-pill.Rated { color: var(--ws-warn); background: rgba(245,166,35,.14); }
                 #letterboxdSyncConfigPage .ws-pill.has-reason { cursor: help; gap: 5px; }
                 #letterboxdSyncConfigPage .ws-info-i { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid currentColor; font-size: 9px; font-style: italic; line-height: 1; opacity: .8; }
                 #letterboxdSyncConfigPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
                 #letterboxdSyncConfigPage .ws-pill.Failed { color: var(--ws-crit); background: rgba(242,88,94,.14); }
+                #letterboxdSyncConfigPage .ws-pill.Requested { color: #a78bfa; background: rgba(167,139,250,.14); }
                 #letterboxdSyncConfigPage .ws-when { font-family: var(--ws-mono); font-size: 12px; color: var(--ws-muted); white-space: nowrap; }
                 #letterboxdSyncConfigPage .ws-src { color: var(--ws-faint); font-size: 12px; }
                 #letterboxdSyncConfigPage .ws-review-btn { border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-family: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
@@ -607,7 +608,7 @@
                         },
                         statusOf: function (e) {
                             if (e.Source === 'review') return 'Reviewed';
-                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success');
+                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success');
                         },
                         matchesStatus: function (e) {
                             var s = this.ovStatus || 'all';
@@ -627,7 +628,7 @@
                             return events.map(function (e) {
                                 var source = e._svc || src;
                                 var svc = source === 'serializd' ? 'tv' : 'film';
-                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch'][e.Status] || 'Success';
+                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success';
                                 var title = (e.FilmTitle || '').split(' · ');
                                 var t = title[0], m = title[1] || '';
                                 var ts = new Date(e.Timestamp);
@@ -766,7 +767,8 @@
                             a = a || {};
                             var rows = [
                                 ['Enabled', 'chkEnabled', a.Enabled !== false, 'Master switch. When off, nothing syncs for this account.'],
-                                ['Mark favourites as liked', 'chkFav', !!a.SyncFavorites, 'Favourite in Jellyfin → hearted on the diary.'],
+                                ['Mark favourites as liked', 'chkFav', !!a.SyncFavorites, 'Favourite in Jellyfin → hearted on the diary.']
+                            ].concat(svc === 'letterboxd' ? [['Sync ratings to Letterboxd', 'chkRatings', a.SyncRatings !== false, 'Rate in Jellyfin after watching → the Letterboxd film rating.']] : []).concat([
                                 ['Only sync recently played', 'chkDate', !!a.EnableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.IsPrimary, 'Wins on tie-breaks when a user has several.'],
                                 ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.SyncWatchlist : !!a.EnableWatchlistSync, svc === 'serializd' ? 'Watchlist → Jellyfin collection + playlist.' : 'Watchlist → Jellyfin playlist.'],
@@ -776,7 +778,7 @@
                                 ['Skip already-synced', 'chkSkip', a.SkipPreviouslySynced !== false, 'Use local history to avoid re-logging.'],
                                 ['Stop on first failure', 'chkStop', !!a.StopOnFailure, 'Halt this account on the first error.'],
                                 ['Import diary as watched', 'chkImport', !!a.EnableDiaryImport, 'Reverse: mark Jellyfin played from the diary.']
-                            ];
+                            ]);
                             return rows.map(function (r) {
                                 return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>';
                             }).join('') +
@@ -838,7 +840,7 @@
                                 svc: g('mSvc').value, userId: g('mUser').value,
                                 username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mAuthBlob').value,
                                 userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
-                                enabled: g('chkEnabled').checked, fav: g('chkFav').checked, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
+                                enabled: g('chkEnabled').checked, fav: g('chkFav').checked, ratings: g('chkRatings') ? g('chkRatings').checked : true, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
                                 primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,
                                 backfill: g('chkBackfill').checked, mirror: g('chkMirror').checked,
                                 skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked,
@@ -855,7 +857,7 @@
                                 self.config.SerializdAccounts.push({ UserJellyfinId: m.userId, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs });
                             } else {
                                 self.config.Accounts = (self.config.Accounts || []).filter(function (x) { return x !== orig; });
-                                self.config.Accounts.push({ UserJellyfinId: m.userId, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs });
+                                self.config.Accounts.push({ UserJellyfinId: m.userId, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs });
                             }
                             document.getElementById('mStatus').textContent = 'Saving…';
                             ApiClient.updatePluginConfiguration(self.PluginId, self.config).then(function () {

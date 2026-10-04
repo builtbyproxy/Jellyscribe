@@ -1136,10 +1136,12 @@ public class LetterboxdControllerTests
 
             Assert.IsType<OkObjectResult>(result);
             // 4.5 Letterboxd stars → 9.0 Jellyfin rating, written back and persisted.
+            // Pinned to Import: RatingSyncHandler ignores Import saves, so this mirror can never
+            // echo back out as a second Letterboxd push. Any other reason reopens that loop.
             Assert.Equal(9.0, userData.Rating);
             h.UserDataManager.Received(1).SaveUserData(
                 user, movie, userData,
-                MediaBrowser.Model.Entities.UserDataSaveReason.UpdateUserRating,
+                MediaBrowser.Model.Entities.UserDataSaveReason.Import,
                 Arg.Any<System.Threading.CancellationToken>());
         }
         finally

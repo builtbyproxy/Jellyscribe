@@ -18,7 +18,12 @@ public enum SyncStatus
     /// <summary>A watchlist sync successfully auto-requested a title via Seerr. Not a
     /// watch/diary outcome; see <see cref="SyncEventSources.SeerrAutoRequestFilm"/>/
     /// <see cref="SyncEventSources.SeerrAutoRequestTv"/> for which watchlist triggered it.</summary>
-    Requested
+    Requested,
+
+    /// <summary>A Jellyfin rating change was pushed to the member's Letterboxd film rating
+    /// (<see cref="SyncEventSources.Rating"/>). Deliberately not Success: it is not a diary
+    /// entry, so it must not count as a sync or satisfy the duplicate-entry backstop.</summary>
+    Rated
 }
 
 /// <summary>
@@ -35,6 +40,9 @@ public static class SyncEventSources
 
     /// <summary>SerializdWatchlistSyncRunner's Seerr auto-request step, for a Serializd (TV) watchlist.</summary>
     public const string SeerrAutoRequestTv = "seerr-auto-request-tv";
+
+    /// <summary>RatingSyncHandler pushed a Jellyfin rating change to the Letterboxd film rating.</summary>
+    public const string Rating = "rating";
 }
 
 public class SyncEvent

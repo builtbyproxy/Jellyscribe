@@ -36,6 +36,7 @@ Uses Letterboxd's current JSON API (`/api/v0/production-log-entries`) and Serial
 ### Ratings, reviews & diary
 
 - **Rating sync, both ways**, Jellyfin ratings (0-10) map to Letterboxd stars (0.5-5.0) or Serializd's 1-10 scale, and ratings you set on either service seed your Jellyfin user rating back
+- **Ratings after the watch**, rate a film any time after you've watched it (or without watching it) and, about ten seconds after you settle on a score, it becomes your Letterboxd rating for that film. Works with the Jellyfin web app, any app that saves ratings to Jellyfin, and [Jellyfin Enhanced](https://github.com/n00bcodr/Jellyfin-Enhanced) 12.10+ reviews when its "mirror review ratings to Jellyfin" option is on. As on Letterboxd, rating a film marks it watched and removes it from your watchlist; clearing a rating in Jellyfin does not unrate it on Letterboxd. Some apps (Infuse, for one) never save ratings to Jellyfin, so their ratings can't be synced. Letterboxd only for now, not Serializd
 - **Favorites**, sync Jellyfin favorites as Letterboxd likes or Serializd likes
 - **Reviews**, write and post reviews to Letterboxd (films) or Serializd (shows or individual episodes) from the plugin dashboard
 - **Diary import**, mark Jellyfin movies or episodes as played if they're already in your Letterboxd or Serializd diary
@@ -105,6 +106,7 @@ These apply the same way whether the account is a Letterboxd (film) or Serializd
 |---|---|
 | **Enabled** | Master switch for this account; nothing syncs while unchecked, saved settings are kept |
 | **Favorites as liked** | Marks the title as "liked" on Letterboxd or Serializd if favorited in Jellyfin |
+| **Sync ratings to Letterboxd** | Letterboxd accounts only, on by default. Sends a film's rating to Letterboxd whenever you change it in Jellyfin, not just when the watch is logged |
 | **Recently played only** | Limits daily catch-up to titles played in the last N days |
 | **Primary account** | When one Jellyfin user links multiple accounts on the same service, the primary wins on rating-import conflicts and is preselected in the review modal |
 | **Watchlist to playlist** | Mirrors your Letterboxd or Serializd watchlist into a Jellyfin playlist daily; each account gets its own playlist (name configurable) |
@@ -113,7 +115,7 @@ These apply the same way whether the account is a Letterboxd (film) or Serializd
 | **Mirror into Seerr watchlist** | Two-way mirror of your watchlist into your Seerr user's own watchlist (movies for Letterboxd accounts, TV for Serializd accounts) |
 | **Import diary as played** | Marks Jellyfin movies or episodes as played if they appear in your Letterboxd or Serializd diary |
 | **Skip previously synced** | Uses the plugin's local sync history to skip titles already logged without hitting Letterboxd/Serializd; recommended, especially on large libraries |
-| **Excluded libraries** | Jellyfin libraries whose films or episodes are never logged to this account's diary, by the scheduled sync or the real-time one. Applies to future syncs only; anything already logged stays on Letterboxd or Serializd. It governs diary logging only: diary import, watchlist sync, and Seerr requests still look at every library |
+| **Excluded libraries** | Jellyfin libraries whose films or episodes are never logged to this account's diary (by the scheduled sync or the real-time one) and whose ratings are never sent. Applies to future syncs only; anything already logged stays on Letterboxd or Serializd. It governs exports only: diary import, watchlist sync, and Seerr requests still look at every library |
 | **Stop on failure** | Halts the run at the first failure to avoid inflaming rate limits; the rest are picked up next run |
 | **Raw Cookies** | For Cloudflare bypass, Letterboxd accounts only, see below |
 

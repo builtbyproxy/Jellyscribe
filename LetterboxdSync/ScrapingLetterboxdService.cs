@@ -49,6 +49,9 @@ public class ScrapingLetterboxdService : ILetterboxdService
     public Task<List<DiaryFilmEntry>> GetDiaryFilmEntriesAsync(string username)
         => _scraper.GetDiaryFilmEntriesAsync(username);
 
+    public Task SetFilmRatingAsync(string filmSlug, string filmId, double rating)
+        => _diary.SetFilmRatingAsync(filmSlug, filmId, rating);
+
     public void Dispose()
     {
         _http.Dispose();

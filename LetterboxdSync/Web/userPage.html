@@ -109,7 +109,7 @@
                 #letterboxdUserPage .ws-pill { font-family: var(--ws-mono); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; display: inline-flex; }
                 #letterboxdUserPage .ws-pill.Success { color: var(--ws-ok); background: rgba(53,194,129,.13); }
                 #letterboxdUserPage .ws-pill.Rewatch { color: var(--ws-info); background: rgba(71,180,242,.14); }
-                #letterboxdUserPage .ws-pill.Reviewed { color: var(--ws-warn); background: rgba(245,166,35,.14); }
+                #letterboxdUserPage .ws-pill.Reviewed, #letterboxdUserPage .ws-pill.Rated { color: var(--ws-warn); background: rgba(245,166,35,.14); }
                 #letterboxdUserPage .ws-pill.has-reason { cursor: help; gap: 5px; }
                 #letterboxdUserPage .ws-info-i { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid currentColor; font-size: 9px; font-style: italic; line-height: 1; opacity: .8; }
                 #letterboxdUserPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
@@ -434,7 +434,7 @@
                         },
                         statusOf: function (e) {
                             if (e.Source === 'review') return 'Reviewed';
-                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested'][e.Status] || 'Success');
+                            return typeof e.Status === 'string' ? e.Status : (['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success');
                         },
                         matchesStatus: function (e) {
                             var s = this.ovStatus || 'all';
@@ -452,7 +452,7 @@
                             var start = (this.ovPage || 0) * ps;
                             document.getElementById('historyBody').innerHTML = all.slice(start, start + ps).map(function (e) {
                                 var svc = e._svc === 'serializd' ? 'tv' : 'film';
-                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested'][e.Status] || 'Success';
+                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success';
                                 var title = (e.FilmTitle || '').split(' · '), t = title[0], m = title[1] || '';
                                 var ts = new Date(e.Timestamp), when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                 var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';
@@ -567,8 +567,9 @@
                         checksFor: function (svc, a) {
                             a = a || {};
                             var rows = [['Enabled', 'chkEnabled', a.enabled !== false, 'Master switch for this account.'],
-                                ['Mark favourites as liked', 'chkFav', !!a.syncFavorites, 'Favourite in Jellyfin → hearted on the diary.'],
-                                ['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
+                                ['Mark favourites as liked', 'chkFav', !!a.syncFavorites, 'Favourite in Jellyfin → hearted on the diary.']]
+                                .concat(svc === 'letterboxd' ? [['Sync ratings to Letterboxd', 'chkRatings', a.syncRatings !== false, 'Rate in Jellyfin after watching → your Letterboxd film rating.']] : [])
+                                .concat([['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
                                 ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist.' : 'playlist.')],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.autoRequestWatchlist, 'Missing from the library → request via Seerr.'],
@@ -576,7 +577,7 @@
                                 ['Mirror watchlist to Seerr', 'chkMirror', !!a.mirrorJellyseerrWatchlist, 'Push this watchlist into your Seerr watchlist (primary account only).'],
                                 ['Skip already-synced', 'chkSkip', a.skipPreviouslySynced !== false, 'Avoid re-logging via local history.'],
                                 ['Stop on first failure', 'chkStop', !!a.stopOnFailure, 'Halt on the first error.'],
-                                ['Import diary as watched', 'chkImport', !!a.enableDiaryImport, 'Mark Jellyfin played from the diary.']];
+                                ['Import diary as watched', 'chkImport', !!a.enableDiaryImport, 'Mark Jellyfin played from the diary.']]);
                             return rows.map(function (r) { return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>'; }).join('') +
                                 '<div class="ws-row" id="dateDaysRow" style="display:' + (a.enableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.dateFilterDays || 7) + '" /></div>';
                         },
@@ -605,7 +606,7 @@
                             var g = function (id) { return document.getElementById(id); };
                             return { svc: g('mSvc').value, username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mAuthBlob').value,
                                 userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
-                                enabled: g('chkEnabled').checked, fav: g('chkFav').checked, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
+                                enabled: g('chkEnabled').checked, fav: g('chkFav').checked, ratings: g('chkRatings') ? g('chkRatings').checked : true, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
                                 primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,
                                 backfill: g('chkBackfill').checked, mirror: g('chkMirror').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked,
                                 libs: Array.prototype.map.call(document.querySelectorAll('#mLibs .mLibChk:checked'), function (x) { return x.getAttribute('data-id'); }) };
@@ -621,7 +622,7 @@
                                 if (self.editing) self.sz[self.editing.i] = item; else self.sz.push(item);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function (r) { self.afterSave(r); });
                             } else {
-                                var itemL = { letterboxdUsername: m.username, letterboxdPassword: m.password, rawCookies: m.cookies || null, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
+                                var itemL = { letterboxdUsername: m.username, letterboxdPassword: m.password, rawCookies: m.cookies || null, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) self.lb[self.editing.i] = itemL; else self.lb.push(itemL);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function (r) { self.afterSave(r); });
                             }

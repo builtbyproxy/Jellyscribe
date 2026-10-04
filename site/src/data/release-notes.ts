@@ -10,6 +10,22 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.7.0',
+    headline: 'Ratings you give after watching now reach Letterboxd',
+    summary:
+      'Jellyscribe sends your rating along when it logs a film to your Letterboxd diary, and that happens the moment the credits roll. Most people rate afterwards, and until now those ratings never left Jellyfin: the film was already logged, so later syncs skipped it. Jellyscribe now notices when you change a film\'s rating and, about ten seconds after you settle on a score, sets it as your Letterboxd rating for that film. It works whether you rate in the Jellyfin web app, in another app that saves ratings to Jellyfin, or by reviewing with Jellyfin Enhanced 12.10 or later with its option to copy review stars into Jellyfin switched on. Only real changes are sent, so favouriting or rewatching a film leaves Letterboxd alone. As on Letterboxd itself, rating a film marks it watched and takes it off your watchlist. Clearing a rating in Jellyfin does not remove it from Letterboxd, and some apps, Infuse among them, keep ratings to themselves and never save them to Jellyfin, so those still cannot be synced. Each Letterboxd account has a new Sync ratings to Letterboxd switch, on by default.',
+    highlights: {
+      new: [
+        'Rating changes in Jellyfin are sent to your Letterboxd film rating within seconds, for films you have already logged and for ones you have not.',
+        'Reviews written with Jellyfin Enhanced 12.10 or later reach Letterboxd too, once its option to copy review stars into Jellyfin is on.',
+        'A Sync ratings to Letterboxd switch on every Letterboxd account, in both the admin dashboard and your own settings page.',
+      ],
+      improvements: [
+        'Each rating sent shows up in the activity list as Rated, with the star value.',
+      ],
+    },
+  },
+  {
     version: '2.6.0',
     headline: 'Keep a whole library off Letterboxd or Serializd',
     summary:
