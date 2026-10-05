@@ -386,7 +386,9 @@ public static class SyncHistory
 
             var list = filtered.ToList();
             return (
-                list.Count,
+                // A rating push is not a logged film (the dashboards show Total as "Films logged"),
+                // the same way Serializd's stats leave reviews out of theirs.
+                list.Count(e => e.Status != SyncStatus.Rated),
                 list.Count(e => e.Status == SyncStatus.Success),
                 list.Count(e => e.Status == SyncStatus.Failed),
                 list.Count(e => e.Status == SyncStatus.Skipped),

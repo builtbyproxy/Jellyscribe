@@ -10,6 +10,7 @@ namespace LetterboxdSync.Tests;
 /// the diary runner reads from history for the same film: the duplicate backstop, "skip
 /// previously synced", the abandon-after-failures counter, and the retry ordering.
 /// </summary>
+[Collection("Plugin")]
 public class RatedHistoryTests
 {
     private const string User = "lachlan";
@@ -52,6 +53,29 @@ public class RatedHistoryTests
             Evt(SyncStatus.Rated, 1)
         };
         Assert.Equal(2, SyncHistory.GetConsecutiveFailureCount(events, User, Film));
+    }
+
+    [Fact]
+    public void Stats_TotalLeavesOutRatedEvents()
+    {
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "lbs-rated-stats-" + Guid.NewGuid().ToString("N") + ".jsonl");
+        SyncHistory.DataPathOverride = path;
+        SyncHistory.ResetForTesting();
+        try
+        {
+            SyncHistory.Record(Evt(SyncStatus.Success, 30, Watched));
+            SyncHistory.Record(Evt(SyncStatus.Rated, 1));
+
+            var stats = SyncHistory.GetStats(User);
+            Assert.Equal(1, stats.Total); // the dashboards show this as "Films logged"
+            Assert.Equal(1, stats.Success);
+        }
+        finally
+        {
+            SyncHistory.DataPathOverride = null;
+            SyncHistory.ResetForTesting();
+            try { System.IO.File.Delete(path); } catch { }
+        }
     }
 
     [Fact]

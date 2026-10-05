@@ -84,7 +84,8 @@
                 #letterboxdSyncConfigPage .ws-chip.on[data-f="serializd"] { border-color: var(--ws-tv); background: var(--ws-tv-soft); box-shadow: inset 0 0 0 1px var(--ws-tv); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Success"] { border-color: var(--ws-ok); background: rgba(53,194,129,.14); box-shadow: inset 0 0 0 1px var(--ws-ok); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Rewatch"] { border-color: var(--ws-info); background: rgba(71,180,242,.14); box-shadow: inset 0 0 0 1px var(--ws-info); }
-                #letterboxdSyncConfigPage .ws-chip.on[data-s="Reviewed"] { border-color: var(--ws-warn); background: rgba(245,166,35,.14); box-shadow: inset 0 0 0 1px var(--ws-warn); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Reviewed"], #letterboxdSyncConfigPage .ws-chip.on[data-s="Rated"] { border-color: var(--ws-warn); background: rgba(245,166,35,.14); box-shadow: inset 0 0 0 1px var(--ws-warn); }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Requested"] { border-color: #a78bfa; background: rgba(167,139,250,.14); box-shadow: inset 0 0 0 1px #a78bfa; }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Skipped"] { border-color: var(--ws-faint); background: var(--ws-raise); box-shadow: inset 0 0 0 1px var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Failed"] { border-color: var(--ws-crit); background: rgba(242,88,94,.14); box-shadow: inset 0 0 0 1px var(--ws-crit); }
                 #letterboxdSyncConfigPage .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -280,6 +281,8 @@
                                 <button type="button" class="ws-chip" data-s="Reviewed">Reviewed</button>
                                 <button type="button" class="ws-chip" data-s="Skipped">Skipped</button>
                                 <button type="button" class="ws-chip" data-s="Failed">Failed</button>
+                                <button type="button" class="ws-chip" data-s="Requested">Requested</button>
+                                <button type="button" class="ws-chip" data-s="Rated">Rated</button>
                             </div>
                             <div class="ws-panel" style="overflow-x:auto;">
                                 <table class="ws-table"><thead><tr><th>Title</th><th>Status</th><th>Source</th><th>When</th><th></th></tr></thead><tbody id="historyBody"><tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">Loading…</td></tr></tbody></table>
@@ -565,7 +568,8 @@
                                 var buckets = new Array(days).fill(0);
                                 self.merged.forEach(function (e) {
                                     var idx = days - 1 - Math.floor((now - new Date(e.Timestamp).getTime()) / dayMs);
-                                    if (e._svc === svc && idx >= 0 && idx < days) buckets[idx]++;
+                                    // Rating pushes (status 5) aren't logged watches; keep them off the trend line.
+                                    if (e._svc === svc && e.Status !== 5 && e.Status !== 'Rated' && idx >= 0 && idx < days) buckets[idx]++;
                                 });
                                 var max = Math.max.apply(null, buckets.concat([1])), w = 120, h = 26, step = w / (days - 1);
                                 var pts = buckets.map(function (v, i) { return [Math.round(i * step), Math.round(h - 2 - (v / max) * (h - 5))]; });
