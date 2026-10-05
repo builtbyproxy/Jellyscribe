@@ -98,7 +98,10 @@ jobs:
       - name: Upload test results to Codecov
         # Codecov Test Analytics: flaky-test detection + failure reporting from the
         # JUnit XML. Runs even on test failure so failing/flaky runs are reported.
+        # Analytics only, like the coverage upload above: an outage on Codecov's side (TLS
+        # handshake failures from 2026-10-05) must not turn a passing build red.
         if: ${{ !cancelled() }}
+        continue-on-error: true
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
