@@ -34,6 +34,12 @@ on:
       - '.github/workflows/integration.yml'
   workflow_dispatch:
 
+# Every run writes to the same live Letterboxd test account (the rating probes set and restore
+# one film's rating), so runs from several PRs at once trample each other's state. Queue them.
+concurrency:
+  group: letterboxd-test-account
+  cancel-in-progress: false
+
 jobs:
   integration:
     runs-on: ubuntu-latest
