@@ -23,7 +23,7 @@
 
 - [x] 4.1 Throwaway Jellyfin 10.11.11 under `/jellyfin`: open from the sidebar (no reload, base URL kept), back button, menu navigation, refresh at `#/jellyscribe`, edit an account in the page (2026-10-04, Jellyfin 10.11.11 under /jellyfin with Jellyfin Enhanced: open without reload keeping /jellyfin, back, Home, cold load at #/jellyscribe, account saved from inside the page; layout matches a native tab-less page: header 57px, tabs hidden, 104px top padding)
 - [x] 4.2 Throwaway Jellyfin 12.0: avatar-menu entry opens the page, navigation away restores Jellyfin (2026-10-04, Jellyfin 12.0.0: avatar-menu item opens the page, back/Home restore Jellyfin, deep link, account saved)
-- [ ] 4.3 The saved test server (`bin/test-server deploy`) for Lachlan's own check
+- [x] 4.3 The saved test server (`bin/test-server deploy`) for Lachlan's own check (2026-10-05: Lachlan checked it on the test server, which led to the padding fix, then approved it; shipped as 2.10.0 in #138)
 
 ## 5. Release
 

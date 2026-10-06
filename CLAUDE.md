@@ -74,6 +74,8 @@ Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellysc
 
 4. `deploy-docs.yml` fires via `workflow_run` on Release completion, rebuilding jellyscribe.dev with the fresh manifest. (The `GITHUB_TOKEN`-authenticated auto-commit can't fire push-based workflows, hence the explicit `workflow_run` trigger.)
 
+5. **Archive the OpenSpec change.** Once a PR that implements an OpenSpec change has merged and its release is out, archive that change straight away, in a follow-up docs-only PR. This is not optional; see the OpenSpec section below for the steps.
+
 ### Breaking changes
 
 The version-bump magnitude is the canonical signal, not a `!` in the PR title. Going `1.x.y` → `2.0.0` means breaking; we do not use `feat!:` / `fix!:`.
@@ -89,6 +91,13 @@ The version-bump magnitude is the canonical signal, not a `!` in the PR title. G
 ## OpenSpec
 
 Spec-driven workflow lives under `openspec/` (`changes/`, `specs/`, `config.yaml`). Use the `/opsx:propose`, `/opsx:apply`, `/opsx:archive`, `/opsx:explore` skills for non-trivial changes when the user requests them.
+
+**Always archive once a change ships** (Lachlan's rule, 2026-10-06). `openspec/changes/` holds only work that has not shipped. When the PR implementing a change has merged and released, without being asked:
+
+1. Branch from `main` and run `openspec archive <change> -y`. It moves the change to `openspec/changes/archive/YYYY-MM-DD-<change>/` and syncs its delta specs into `openspec/specs/`.
+2. Replace the `TBD - created by archiving change ...` Purpose line the CLI writes into any new spec with one real sentence (what it does, the version and PR it shipped in).
+3. Settle every open task. Tick it with dated evidence, or leave it unticked with a note linking a GitHub issue that carries the remaining work. Never tick a task that wasn't done.
+4. Run `openspec validate --specs --strict`, then open a docs-only PR (no version bump or release notes; see "non-shipping" above). Examples: #131, and the 2026-10-06 archive of `stream-ratings-to-letterboxd` and `jellyscribe-in-app-page`.
 
 ## Skill routing
 
