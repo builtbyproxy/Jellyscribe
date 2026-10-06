@@ -389,6 +389,11 @@
                             document.querySelectorAll('.ws-modal-x').forEach(function (x) { x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); }); });
                             // Once per document: the in-app page re-runs this script on every visit.
                             if (!window.__jellyscribeEscapeHandler) { window.__jellyscribeEscapeHandler = true; document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); }); }
+                            document.getElementById('historyBody').addEventListener('click', function (e) {
+                                var b = e.target.closest('.ws-review-btn'); if (!b) return;
+                                self.openReview(b.getAttribute('data-svc'), parseInt(b.getAttribute('data-tmdb'), 10) || 0, b.getAttribute('data-title'),
+                                    b.getAttribute('data-slug'), b.getAttribute('data-season'), b.getAttribute('data-episode'));
+                            });
                             document.querySelectorAll('#starRating .ws-star').forEach(function (star) {
                                 star.addEventListener('click', function (e) {
                                     var val = parseFloat(this.getAttribute('data-val'));
@@ -462,13 +467,14 @@
                                 var ts = new Date(e.Timestamp), when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                                 var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';
                                 var seM = (e._svc === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
-                                var seaN = seM ? seM[1] : '', epN = seM ? seM[2] : '';
-                                var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" onclick="WSU.openReview(\'' + e._svc + '\',' + (e.TmdbId || 0) + ',\'' + t.replace(/'/g, "\\'") + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>' : '';
+                                var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" data-svc="' + self.esc(e._svc) + '" data-tmdb="' + self.esc(e.TmdbId) +
+                                    '" data-title="' + self.esc(t) + '" data-slug="' + self.esc(e.FilmSlug) + '" data-season="' + (seM ? seM[1] : '') + '" data-episode="' + (seM ? seM[2] : '') + '">Review</button>' : '';
                                 if (e.Source === 'review') status = 'Reviewed';
+                                status = self.esc(status);
                                 var pill = e.Error
-                                    ? '<span class="ws-pill ' + status + ' has-reason" title="' + String(e.Error).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '">' + status + ' <span class="ws-info-i">i</span></span>'
+                                    ? '<span class="ws-pill ' + status + ' has-reason" title="' + self.esc(e.Error) + '">' + status + ' <span class="ws-info-i">i</span></span>'
                                     : '<span class="ws-pill ' + status + '">' + status + '</span>';
-                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'MV') + '</span><div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td><td>' + pill + '</td><td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
+                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'MV') + '</span><div><div class="t">' + self.esc(t) + '</div>' + (m ? '<div class="m">' + self.esc(m) + '</div>' : '') + '</div></div></td><td>' + pill + '</td><td class="ws-src">' + self.esc(e.Source) + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
                             }).join('');
                             var pag = document.getElementById('historyPagination');
                             if (total > ps) {
@@ -570,7 +576,7 @@
                                 ? [['Favourites', a.syncFavorites], ['Watchlist', a.syncWatchlist], ['Seerr', a.autoRequestWatchlist], ['Import', a.enableDiaryImport]]
                                 : [['Favourites', a.syncFavorites], ['Watchlist', a.enableWatchlistSync], ['Seerr', a.autoRequestWatchlist], ['Cookies', !!a.rawCookies]];
                             var chips = feats.map(function (f) { return self.feat(f[0], f[1]); }).join('');
-                            return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '"><div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'MV') + '</span><div style="min-width:0;"><div class="u" title="' + uname + '">' + uname + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' + (a.isPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div><div class="ws-featchips">' + chips + '</div><div class="foot"><span class="st">' + (a.authPaused ? '<span class="ws-red" title="Letterboxd login has been failing since ' + (a.authPausedSince ? String(a.authPausedSince).slice(0, 10) : '?') + '. Re-save this account\'s credentials to resume syncing.">Login failing · sync paused</span>' : (a.enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>')) + '</span><button type="button" class="ws-linkbtn" onclick="WSU.openAccount({svc:\'' + svc + '\',i:' + i + '})">Edit ›</button></div></div>';
+                            return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '"><div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'MV') + '</span><div style="min-width:0;"><div class="u" title="' + self.esc(uname) + '">' + self.esc(uname) + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' + (a.isPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div><div class="ws-featchips">' + chips + '</div><div class="foot"><span class="st">' + (a.authPaused ? '<span class="ws-red" title="Letterboxd login has been failing since ' + self.esc(a.authPausedSince ? String(a.authPausedSince).slice(0, 10) : '?') + '. Re-save this account\'s credentials to resume syncing.">Login failing · sync paused</span>' : (a.enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>')) + '</span><button type="button" class="ws-linkbtn" onclick="WSU.openAccount({svc:\'' + svc + '\',i:' + i + '})">Edit ›</button></div></div>';
                         },
                         checksFor: function (svc, a) {
                             a = a || {};
@@ -641,7 +647,7 @@
                         afterSave: function (r) {
                             var self = this;
                             if (r.ok) { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); document.getElementById('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>'; }
-                            else { r.json().then(function (d) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">' + (d.error || 'Save failed') + '</span>'; }); }
+                            else { r.json().then(function (d) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">' + self.esc(d.error || 'Save failed') + '</span>'; }); }
                         },
                         deleteAccount: function () {
                             var self = this; if (!self.editing) return;
@@ -672,7 +678,7 @@
                             var email = document.getElementById('mUsername').value.trim(), pw = document.getElementById('mPassword').value;
                             if (!email || !pw) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
                             st.innerHTML = '<span class="ws-muted">Verifying…</span>';
-                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + d.username + ')' : '') + '.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
+                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.esc(d.username) + ')' : '') + '.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
                         },
 
                         /* Paint the star widget to a 0.5-step value (null/0 clears). Single
@@ -729,14 +735,14 @@
                         // /Accounts endpoint only ever returns the calling user's own accounts),
                         // so no extra request is needed here.
                         populateReviewAccountDropdown: function () {
-                            var sel = document.getElementById('reviewAccount'), row = document.getElementById('reviewAccountRow');
+                            var self = this, sel = document.getElementById('reviewAccount'), row = document.getElementById('reviewAccountRow');
                             if (!sel || !row) return;
                             sel.innerHTML = '<option value="">All my Letterboxd accounts</option>';
                             var mine = (this.lb || []).filter(function (a) { return a.enabled !== false; });
                             mine.sort(function (a, b) { return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0); });
                             mine.forEach(function (a) {
                                 var label = a.letterboxdUsername + (a.isPrimary ? ' (primary)' : '');
-                                sel.insertAdjacentHTML('beforeend', '<option value="' + (a.letterboxdUsername || '').replace(/"/g, '&quot;') + '">' + label + '</option>');
+                                sel.insertAdjacentHTML('beforeend', '<option value="' + self.esc(a.letterboxdUsername) + '">' + self.esc(label) + '</option>');
                             });
                             row.style.display = mine.length >= 2 ? '' : 'none';
                         },

@@ -524,6 +524,19 @@
                             document.addEventListener('keydown', function (e) {
                                 if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); });
                             });
+                            ['historyBody', 'actBody'].forEach(function (id) {
+                                document.getElementById(id).addEventListener('click', function (e) {
+                                    var b = e.target.closest('.ws-review-btn'); if (!b) return;
+                                    self.openReview(b.getAttribute('data-svc'), parseInt(b.getAttribute('data-tmdb'), 10) || 0, b.getAttribute('data-title'),
+                                        b.getAttribute('data-slug'), b.getAttribute('data-season'), b.getAttribute('data-episode'));
+                                });
+                            });
+                            document.getElementById('acctGroups').addEventListener('click', function (e) {
+                                var add = e.target.closest('[data-add-for]');
+                                if (add) { self.openAccount(null, add.getAttribute('data-add-for')); return; }
+                                var edit = e.target.closest('[data-edit-svc]');
+                                if (edit) self.openAccount({ svc: edit.getAttribute('data-edit-svc'), user: edit.getAttribute('data-edit-user'), id: edit.getAttribute('data-edit-id') });
+                            });
                             document.getElementById('sendLogsBtn').addEventListener('click', function () { document.getElementById('sendLogsBox').style.display = 'block'; });
                             document.getElementById('sendLogsCancel').addEventListener('click', function () { document.getElementById('sendLogsBox').style.display = 'none'; });
                             document.getElementById('sendLogsConfirm').addEventListener('click', function () { self.sendLogs(); });
@@ -623,6 +636,7 @@
                         },
                         escAttr: function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
                         pillHtml: function (status, reason) {
+                            status = this.escAttr(status);
                             if (!reason) return '<span class="ws-pill ' + status + '">' + status + '</span>';
                             return '<span class="ws-pill ' + status + ' has-reason" title="' + this.escAttr(reason) + '">' + status + ' <span class="ws-info-i">i</span></span>';
                         },
@@ -640,16 +654,16 @@
                                 var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';
                                 var btn = '';
                                 if (canReview && e.TmdbId) {
-                                    var show = t.replace(/'/g, "\\'");
                                     var seM = (source === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
-                                    var seaN = seM ? seM[1] : '', epN = seM ? seM[2] : '';
-                                    btn = '<button type="button" class="ws-review-btn" onclick="WS.openReview(\'' + source + '\',' + (e.TmdbId || 0) + ',\'' + show + '\',\'' + (e.FilmSlug || '') + '\',\'' + seaN + '\',\'' + epN + '\')">Review</button>';
+                                    btn = '<button type="button" class="ws-review-btn" data-svc="' + self.escAttr(source) + '" data-tmdb="' + self.escAttr(e.TmdbId) +
+                                        '" data-title="' + self.escAttr(t) + '" data-slug="' + self.escAttr(e.FilmSlug) +
+                                        '" data-season="' + (seM ? seM[1] : '') + '" data-episode="' + (seM ? seM[2] : '') + '">Review</button>';
                                 }
                                 if (e.Source === 'review') status = 'Reviewed';
                                 return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'MV') + '</span>' +
-                                    '<div><div class="t">' + t + '</div>' + (m ? '<div class="m">' + m + '</div>' : '') + '</div></div></td>' +
+                                    '<div><div class="t">' + self.escAttr(t) + '</div>' + (m ? '<div class="m">' + self.escAttr(m) + '</div>' : '') + '</div></div></td>' +
                                     '<td>' + self.pillHtml(status, e.Error) + '</td>' +
-                                    '<td class="ws-src">' + (e.Source || '') + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
+                                    '<td class="ws-src">' + self.escAttr(e.Source) + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
                             }).join('');
                         },
 
@@ -744,8 +758,9 @@
                             self.users.forEach(function (u) { var h = (u.Id || '').replace(/-/g, ''); if (!byUser[h]) byUser[h] = []; });
                             var html = Object.keys(byUser).map(function (uid) {
                                 var cards = byUser[uid].map(function (row) { return self.acctCard(row.svc, row.a); }).join('') +
-                                    '<button type="button" class="ws-add" onclick="WS.openAccount(null,\'' + uid + '\')"><span class="plus">+</span>Link a diary<span class="ws-label">Film or TV</span></button>';
-                                return '<div class="ws-ugroup"><div class="ws-uhead"><span class="ws-avatar">' + (self.userName(uid)[0] || '?').toUpperCase() + '</span><b>' + self.userName(uid) + '</b><span class="ws-label">' + byUser[uid].length + ' linked</span></div><div class="ws-cardgrid">' + cards + '</div></div>';
+                                    '<button type="button" class="ws-add" data-add-for="' + self.escAttr(uid) + '"><span class="plus">+</span>Link a diary<span class="ws-label">Film or TV</span></button>';
+                                var name = String(self.userName(uid) || '');
+                                return '<div class="ws-ugroup"><div class="ws-uhead"><span class="ws-avatar">' + self.escAttr((name[0] || '?').toUpperCase()) + '</span><b>' + self.escAttr(name) + '</b><span class="ws-label">' + byUser[uid].length + ' linked</span></div><div class="ws-cardgrid">' + cards + '</div></div>';
                             }).join('');
                             document.getElementById('acctGroups').innerHTML = html;
                         },
@@ -760,11 +775,11 @@
                             var chips = feats.map(function (f) { return self.featChip(f[0], f[1]); }).join('');
                             return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '">' +
                                 '<div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'MV') + '</span>' +
-                                '<div style="min-width:0;"><div class="u" title="' + uname + '">' + uname + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' +
+                                '<div style="min-width:0;"><div class="u" title="' + self.escAttr(uname) + '">' + self.escAttr(uname) + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' +
                                 (a.IsPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div>' +
                                 '<div class="ws-featchips">' + chips + '</div>' +
-                                '<div class="foot"><span class="st">' + (paused ? '<span class="ws-red" title="Letterboxd login has been failing since ' + paused + '. Re-save this account\'s credentials to resume syncing.">Login failing · sync paused</span>' : (a.Enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>')) + '</span>' +
-                                '<button type="button" class="ws-linkbtn" onclick="WS.openAccount({svc:\'' + svc + '\',user:\'' + a.UserJellyfinId + '\',id:\'' + encodeURIComponent(uname) + '\'})">Edit ›</button></div></div>';
+                                '<div class="foot"><span class="st">' + (paused ? '<span class="ws-red" title="Letterboxd login has been failing since ' + self.escAttr(paused) + '. Re-save this account\'s credentials to resume syncing.">Login failing · sync paused</span>' : (a.Enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>')) + '</span>' +
+                                '<button type="button" class="ws-linkbtn" data-edit-svc="' + svc + '" data-edit-user="' + self.escAttr(a.UserJellyfinId) + '" data-edit-id="' + self.escAttr(encodeURIComponent(uname)) + '">Edit ›</button></div></div>';
                         },
 
                         checksFor: function (svc, a) {
@@ -827,7 +842,7 @@
                             document.getElementById('mSvc').value = svc || 'serializd';
                             document.getElementById('mSvc').disabled = !!a;
                             var usel = document.getElementById('mUser');
-                            usel.innerHTML = self.users.map(function (u) { var h = (u.Id || '').replace(/-/g, ''); return '<option value="' + h + '"' + (h === userId ? ' selected' : '') + '>' + u.Name + '</option>'; }).join('');
+                            usel.innerHTML = self.users.map(function (u) { var h = (u.Id || '').replace(/-/g, ''); return '<option value="' + self.escAttr(h) + '"' + (h === userId ? ' selected' : '') + '>' + self.escAttr(u.Name) + '</option>'; }).join('');
                             document.getElementById('mUsername').value = a ? (svc === 'serializd' ? a.Email : a.LetterboxdUsername) : '';
                             document.getElementById('mPassword').value = a ? (svc === 'serializd' ? (a.Password || '') : (a.LetterboxdPassword || '')) : '';
                             document.getElementById('mAuthBlob').value = (a && a.RawCookies) || '';
@@ -909,7 +924,7 @@
                             if (!email || !pw) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
                             st.innerHTML = '<span class="ws-muted">Verifying…</span>';
                             ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify'), type: 'POST', contentType: 'application/json', data: JSON.stringify({ email: email, password: pw }) })
-                                .then(function (r) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + d.username + ')' : '') + '.</span>'; }); },
+                                .then(function (r) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.escAttr(d.username) + ')' : '') + '.</span>'; }); },
                                     function () { st.innerHTML = '<span class="ws-red">Login failed. Check email and password.</span>'; });
                         },
 
@@ -980,7 +995,7 @@
                                 mine.sort(function (a, b) { return (b.IsPrimary ? 1 : 0) - (a.IsPrimary ? 1 : 0); });
                                 mine.forEach(function (a) {
                                     var label = a.LetterboxdUsername + (a.IsPrimary ? ' (primary)' : '');
-                                    sel.insertAdjacentHTML('beforeend', '<option value="' + (a.LetterboxdUsername || '').replace(/"/g, '&quot;') + '">' + label + '</option>');
+                                    sel.insertAdjacentHTML('beforeend', '<option value="' + self.escAttr(a.LetterboxdUsername) + '">' + self.escAttr(label) + '</option>');
                                 });
                                 row.style.display = mine.length >= 2 ? '' : 'none';
                             });
@@ -1022,7 +1037,7 @@
                             if (!url || !key) { st.innerHTML = '<span class="ws-red">URL and API key required.</span>'; return; }
                             st.innerHTML = '<span class="ws-muted">Testing…</span>';
                             ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/TestJellyseerr'), type: 'POST', contentType: 'application/json', data: JSON.stringify({ url: url, apiKey: key }) })
-                                .then(function (r) { r.json().then(function (d) { st.innerHTML = d.linkedToCurrentUser ? '<span class="ws-green">Connected. Linked to Seerr user ' + d.jellyseerrUserId + '.</span>' : '<span style="color:var(--ws-info);">Connected, but no Seerr user linked to you.</span>'; }); },
+                                .then(function (r) { r.json().then(function (d) { st.innerHTML = d.linkedToCurrentUser ? '<span class="ws-green">Connected. Linked to Seerr user ' + WS.escAttr(d.jellyseerrUserId) + '.</span>' : '<span style="color:var(--ws-info);">Connected, but no Seerr user linked to you.</span>'; }); },
                                     function () { st.innerHTML = '<span class="ws-red">Connection failed.</span>'; });
                         },
                         loadLogs: function () {
@@ -1040,7 +1055,7 @@
                             var st = document.getElementById('sendLogsStatus'); st.innerHTML = '<span class="ws-muted">Sending…</span>';
                             ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Telemetry/SendLogs'), type: 'POST', contentType: 'application/json', data: JSON.stringify({ Note: document.getElementById('sendLogsNote').value || null }) })
                                 .then(function (r) { r.json().then(function (d) {
-                                    st.innerHTML = '<span class="ws-green">Sent. Reference <b class="ws-mono">' + d.refCode + '</b></span>' + (d.warning ? ' <span class="ws-muted">— ' + d.warning + '</span>' : '');
+                                    st.innerHTML = '<span class="ws-green">Sent. Reference <b class="ws-mono">' + WS.escAttr(d.refCode) + '</b></span>' + (d.warning ? ' <span class="ws-muted">— ' + WS.escAttr(d.warning) + '</span>' : '');
                                 }); }, function () { st.innerHTML = '<span class="ws-red">Send failed. Try Refresh first, then resend.</span>'; });
                         }
                     };
