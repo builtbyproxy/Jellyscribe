@@ -29,13 +29,15 @@ public class SerializdApiClient : ISerializdService
     private readonly ILogger _logger;
     private string _email = string.Empty;
     private string _password = string.Empty;
+    private string _cacheKey = string.Empty;
     private string _token = string.Empty;
     private string _username = string.Empty;
 
     /// <summary>Serializd username returned by the most recent fresh login (null when a cached token was reused).</summary>
     public string? Username { get; private set; }
 
-    // Token reuse across sync events within a process. Keyed by email. Serializd
+    // Token reuse across sync events within a process. Keyed by Helpers.TokenCacheKey (email +
+    // password hash), so knowing the email alone never yields another account's token. Serializd
     // does not advertise a token TTL, so we trust a cached token until a 401, then
     // clear + re-login once (see SendAsync).
     private static readonly ConcurrentDictionary<string, string> TokenCache = new();
@@ -84,8 +86,9 @@ public class SerializdApiClient : ISerializdService
     {
         _email = email;
         _password = password;
+        _cacheKey = Helpers.TokenCacheKey(email, password);
 
-        if (TokenCache.TryGetValue(email, out var cached) && !string.IsNullOrEmpty(cached))
+        if (TokenCache.TryGetValue(_cacheKey, out var cached) && !string.IsNullOrEmpty(cached))
         {
             _token = cached;
             _logger.LogDebug("Reusing cached Serializd token for {Email}", email);
@@ -104,6 +107,7 @@ public class SerializdApiClient : ISerializdService
     {
         _email = email;
         _password = password;
+        _cacheKey = Helpers.TokenCacheKey(email, password);
         await LoginAsync().ConfigureAwait(false);
         return Username;
     }
@@ -132,7 +136,7 @@ public class SerializdApiClient : ISerializdService
         Username = doc.RootElement.TryGetProperty("username", out var u) ? u.GetString() : null;
         _username = Username ?? string.Empty;
 
-        TokenCache[_email] = _token;
+        TokenCache[_cacheKey] = _token;
         _logger.LogDebug("Authenticated with Serializd as {Email}", _email);
     }
 
@@ -533,7 +537,7 @@ public class SerializdApiClient : ISerializdService
         {
             _logger.LogWarning("Serializd token rejected (401), re-authenticating for {Email}", _email);
             response.Dispose();
-            TokenCache.TryRemove(_email, out _);
+            TokenCache.TryRemove(_cacheKey, out _);
             _token = string.Empty;
             await LoginAsync().ConfigureAwait(false);
             return await SendAsync(method, path, body, authenticated, isRetry: true).ConfigureAwait(false);

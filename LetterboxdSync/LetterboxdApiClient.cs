@@ -18,10 +18,12 @@ public class LetterboxdApiClient : ILetterboxdService
 {
     private readonly HttpClient _http;
     private readonly ILogger _logger;
-    private string _username = string.Empty;
+    private string _cacheKey = string.Empty;
     private string _memberId = string.Empty;
     private string _accessToken = string.Empty;
 
+    // Keyed by Helpers.TokenCacheKey (username + password hash): a caller that only knows the
+    // username must never get, or refresh, another account's token.
     private static readonly ConcurrentDictionary<string, TokenInfo> TokenCache = new();
 
     public LetterboxdApiClient(ILogger logger, HttpMessageHandler? handler = null)
@@ -34,10 +36,10 @@ public class LetterboxdApiClient : ILetterboxdService
 
     public async Task AuthenticateAsync(string username, string password, string? rawCookies = null)
     {
-        _username = username;
+        _cacheKey = Helpers.TokenCacheKey(username, password);
 
         // Check token cache first
-        if (TokenCache.TryGetValue(username, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow.AddMinutes(5))
+        if (TokenCache.TryGetValue(_cacheKey, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow.AddMinutes(5))
         {
             _accessToken = cached.AccessToken;
             _memberId = cached.MemberId;
@@ -72,7 +74,7 @@ public class LetterboxdApiClient : ILetterboxdService
         }
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        ParseTokenResponse(json, username);
+        ParseTokenResponse(json);
 
         // Fetch member ID
         await FetchMemberIdAsync().ConfigureAwait(false);
@@ -567,7 +569,7 @@ public class LetterboxdApiClient : ILetterboxdService
         return Convert.ToHexStringLower(hash);
     }
 
-    private void ParseTokenResponse(string json, string username)
+    private void ParseTokenResponse(string json)
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
@@ -576,7 +578,7 @@ public class LetterboxdApiClient : ILetterboxdService
         var refreshToken = root.TryGetProperty("refresh_token", out var rt) ? rt.GetString() ?? string.Empty : string.Empty;
         var expiresIn = root.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
 
-        TokenCache[username] = new TokenInfo(
+        TokenCache[_cacheKey] = new TokenInfo(
             _accessToken,
             refreshToken,
             DateTime.UtcNow.AddSeconds(expiresIn),
@@ -591,7 +593,7 @@ public class LetterboxdApiClient : ILetterboxdService
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        ParseTokenResponse(json, _username);
+        ParseTokenResponse(json);
         await FetchMemberIdAsync().ConfigureAwait(false);
     }
 
@@ -605,15 +607,15 @@ public class LetterboxdApiClient : ILetterboxdService
         _memberId = doc.RootElement.GetProperty("member").GetProperty("id").GetString()!;
 
         // Update cache with member ID
-        if (TokenCache.TryGetValue(_username, out var cached))
+        if (TokenCache.TryGetValue(_cacheKey, out var cached))
         {
-            TokenCache[_username] = cached with { MemberId = _memberId };
+            TokenCache[_cacheKey] = cached with { MemberId = _memberId };
         }
     }
 
     private void ClearCachedToken()
     {
-        TokenCache.TryRemove(_username, out _);
+        TokenCache.TryRemove(_cacheKey, out _);
         _accessToken = string.Empty;
         _logger.LogWarning("API token expired, cleared cache");
     }

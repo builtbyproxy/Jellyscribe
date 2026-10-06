@@ -179,6 +179,105 @@ public class ApiClientAuthTests
     }
 }
 
+public class ApiClientTokenCacheIsolationTests
+{
+    private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
+
+    /// <summary>
+    /// Accepts the password grant only for "right" and records every grant it sees. expiresIn below
+    /// the client's 5-minute margin leaves the cached token stale, so the next login tries a refresh.
+    /// </summary>
+    private static ApiMockHandler TokenHandler(List<string> grants, int expiresIn = 3600) => new(request =>
+    {
+        var path = request.RequestUri?.AbsolutePath ?? "";
+        if (path.EndsWith("/auth/token"))
+        {
+            var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            grants.Add(body);
+            if (body.Contains("grant_type=password") && !body.Contains("password=right"))
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent("{\"error\":\"invalid_grant\"}")
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    access_token = "victim-token",
+                    expires_in = expiresIn,
+                    refresh_token = "victim-refresh"
+                }))
+            };
+        }
+
+        if (path.EndsWith("/me"))
+        {
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"member\":{\"id\":\"m1\",\"username\":\"victim\"}}")
+            };
+        }
+
+        return new HttpResponseMessage(HttpStatusCode.NotFound);
+    });
+
+    [Fact]
+    public async Task AuthenticateAsync_SameUsernameWrongPassword_DoesNotReuseCachedToken()
+    {
+        var grants = new List<string>();
+        var handler = TokenHandler(grants);
+        var username = "isolation_" + Guid.NewGuid().ToString("N");
+
+        using var owner = new LetterboxdApiClient(TestLogger, handler);
+        await owner.AuthenticateAsync(username, "right");
+
+        using var attacker = new LetterboxdApiClient(TestLogger, handler);
+        await Assert.ThrowsAsync<Exception>(() => attacker.AuthenticateAsync(username, "wrong"));
+
+        Assert.Equal(2, grants.Count);
+        Assert.Contains("password=wrong", grants[1]);
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_SameUsernameRightPassword_ReusesCachedToken()
+    {
+        var grants = new List<string>();
+        var handler = TokenHandler(grants);
+        var username = "isolation_" + Guid.NewGuid().ToString("N");
+
+        using var first = new LetterboxdApiClient(TestLogger, handler);
+        await first.AuthenticateAsync(username, "right");
+
+        using var second = new LetterboxdApiClient(TestLogger, handler);
+        await second.AuthenticateAsync(username, "right");
+
+        Assert.Single(grants);
+    }
+
+    [Fact]
+    public async Task AuthenticateAsync_StaleTokenWrongPassword_DoesNotUseRefreshToken()
+    {
+        var grants = new List<string>();
+        var handler = TokenHandler(grants, expiresIn: 60);
+        var username = "isolation_" + Guid.NewGuid().ToString("N");
+
+        using var owner = new LetterboxdApiClient(TestLogger, handler);
+        await owner.AuthenticateAsync(username, "right");
+
+        using var attacker = new LetterboxdApiClient(TestLogger, handler);
+        await Assert.ThrowsAsync<Exception>(() => attacker.AuthenticateAsync(username, "wrong"));
+        Assert.DoesNotContain(grants, g => g.Contains("grant_type=refresh_token"));
+
+        // The owner's own stale token still goes through the refresh path.
+        using var ownerAgain = new LetterboxdApiClient(TestLogger, handler);
+        await ownerAgain.AuthenticateAsync(username, "right");
+        Assert.Contains("grant_type=refresh_token", grants[^1]);
+    }
+}
+
 public class ApiClientFilmLookupTests
 {
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");

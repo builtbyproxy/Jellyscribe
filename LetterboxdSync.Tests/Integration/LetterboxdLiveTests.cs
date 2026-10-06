@@ -109,7 +109,7 @@ public class LetterboxdLiveTests
     /// API auth with bad credentials throws. The factory wraps this in a silent
     /// fallback to scraping (documented behavior), so this asserts against the
     /// API client directly. Uses a fresh nonexistent username on every run so the
-    /// client's static TokenCache (which is keyed by username) can't hide the
+    /// client's static TokenCache (keyed by username + password hash) can't hide the
     /// failure with a leftover good token from another test.
     /// </summary>
     [SkippableFact]

@@ -50,6 +50,35 @@ public class SerializdApiClientTests
     }
 
     [Fact]
+    public async Task Authenticate_SameEmailWrongPassword_DoesNotReuseCachedToken()
+    {
+        var logins = new List<string>();
+        var handler = new ApiMockHandler(req =>
+        {
+            if (!req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{}");
+            var body = ReadBody(req);
+            logins.Add(body);
+            return body.Contains("\"right\"")
+                ? Json(HttpStatusCode.OK, "{\"username\":\"victim\",\"token\":\"victim-token\"}")
+                : Json(HttpStatusCode.Unauthorized, "{\"message\":\"Incorrect password.\"}");
+        });
+
+        using var owner = new SerializdApiClient(Log, handler);
+        await owner.AuthenticateAsync("isolation@example.com", "right");
+
+        using var attacker = new SerializdApiClient(Log, handler);
+        var rejected = await Assert.ThrowsAnyAsync<Exception>(() => attacker.AuthenticateAsync("isolation@example.com", "wrong"));
+        Assert.Contains("(401)", rejected.Message);
+
+        using var ownerAgain = new SerializdApiClient(Log, handler);
+        await ownerAgain.AuthenticateAsync("isolation@example.com", "right");
+
+        Assert.Equal(2, logins.Count); // the wrong password hit /login; the right one reused the cache
+        Assert.Contains("\"wrong\"", logins[1]);
+    }
+
+    [Fact]
     public async Task Authenticate_BadCredentials_Throws()
     {
         var handler = new ApiMockHandler(_ =>

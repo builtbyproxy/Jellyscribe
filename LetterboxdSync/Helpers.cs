@@ -1,12 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using HtmlAgilityPack;
 
 namespace LetterboxdSync;
 
 public static class Helpers
 {
+    /// <summary>
+    /// Key for the process-wide token caches: the account plus a SHA-256 of its secret, so a
+    /// cached token is only reused or refreshed by a caller presenting the same secret. Lives in
+    /// memory only; never log it.
+    /// </summary>
+    internal static string TokenCacheKey(string account, string secret)
+        => $"{account}\n{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)))}";
+
     /// <summary>
     /// Map a Jellyfin rating (0-10) to a Letterboxd rating (0.5-5.0 in 0.5 steps).
     /// Returns null if the input is null or out of range.
