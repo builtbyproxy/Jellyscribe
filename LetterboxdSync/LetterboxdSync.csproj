@@ -32,7 +32,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Web\configPage.html" />
-    <EmbeddedResource Include="Web\statsPage.html" />
     <EmbeddedResource Include="Web\userPage.html" />
     <EmbeddedResource Include="Web\sidebar.js" />
   </ItemGroup>

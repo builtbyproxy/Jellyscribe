@@ -93,9 +93,9 @@ public class PluginTests : IDisposable
     [Fact]
     public void GetPages_ContainsAllExpectedPages()
     {
-        // The plugin registers three pages: the main config page, the stats page, and the
-        // sidebar-injected user page. The sidebar.js script is served separately as a
-        // resource via configPage.html.
+        // The plugin registers two pages: the main config page and the sidebar-injected user
+        // page. The sidebar.js script is served separately as a resource via configPage.html.
+        // The standalone stats page was orphaned (nothing linked to it) and was removed.
         var plugin = MakePlugin();
         var names = plugin.GetPages().Select(p => p.Name).ToHashSet();
 
@@ -103,7 +103,7 @@ public class PluginTests : IDisposable
         // The legacy configPage.js companion was dead from March 2026 (configPage.html
         // carries its own inline script) and was removed; nothing may point at it again.
         Assert.DoesNotContain("letterboxdsyncjs", names);
-        Assert.Contains("letterboxdstats", names);
+        Assert.DoesNotContain("letterboxdstats", names);
         Assert.Contains("letterboxduser", names);
     }
 

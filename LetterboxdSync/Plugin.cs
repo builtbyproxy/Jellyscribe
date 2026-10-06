@@ -126,11 +126,6 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
             },
             new PluginPageInfo
             {
-                Name = "letterboxdstats",
-                EmbeddedResourcePath = $"{GetType().Namespace}.Web.statsPage.html",
-            },
-            new PluginPageInfo
-            {
                 Name = "letterboxduser",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Web.userPage.html",
             }
