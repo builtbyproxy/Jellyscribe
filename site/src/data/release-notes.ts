@@ -10,6 +10,19 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.3',
+    headline: 'Security fixes for servers with more than one Jellyfin user',
+    summary:
+      'This release fixes two security problems that affect any server where more than one person uses Jellyscribe, so please update. First, the admin dashboard showed account names, film titles and error messages as raw page content, so a user could save a specially crafted account name that ran code in an admin\'s browser the next time they opened the dashboard. Every value is now shown as plain text, and an old, unused stats page with the same problem has been removed. Second, Jellyscribe remembered Letterboxd and Serializd logins by account name alone, so a user who entered someone else\'s Letterboxd username or Serializd email with any password could end up syncing, reviewing and rating as that person. A remembered login is now only reused when the password matches too. Households that deliberately share one Letterboxd or Serializd account across several Jellyfin users are unaffected. Both problems were found and fixed by Wouter Stulp. Thank you, Wouter.',
+    highlights: {
+      fixes: [
+        'The admin and user dashboards show every account name, title and error as plain text, so saved values can no longer run code in an admin\'s browser.',
+        'A remembered Letterboxd or Serializd login is only reused when the password matches, so one user can no longer act as another user\'s account.',
+        'Removed an old, unused stats page.',
+      ],
+    },
+  },
+  {
     version: '2.10.2',
     headline: 'Later anime seasons log to Serializd instead of being skipped',
     summary:
