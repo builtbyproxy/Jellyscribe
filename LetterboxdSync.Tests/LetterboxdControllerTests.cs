@@ -485,6 +485,40 @@ public class LetterboxdControllerTests
         Assert.Single(mine, a => a.IsPrimary);
     }
 
+    // Households share one Letterboxd account across several Jellyfin users. The token cache is
+    // keyed by username + password hash, so saving a username another user already linked is safe
+    // and must keep working; don't reintroduce an "already linked" rejection.
+    [Fact]
+    public void PutAccounts_UsernameAlsoLinkedByOtherUser_Saves()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(OtherUserId, "household");
+
+        var result = h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = new() { new AccountUpdateRequest { LetterboxdUsername = "household", LetterboxdPassword = "pw", Enabled = true } }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Single(h.Config.Accounts, a => a.UserJellyfinId == UserId && a.LetterboxdUsername == "household");
+        Assert.Single(h.Config.Accounts, a => a.UserJellyfinId == OtherUserId && a.LetterboxdUsername == "household");
+    }
+
+    [Fact]
+    public void PutAccounts_SameUserResavesOwnUsername_Succeeds()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "mine");
+
+        var result = h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = new() { new AccountUpdateRequest { LetterboxdUsername = "mine", LetterboxdPassword = "new", Enabled = true } }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("new", h.Config.Accounts.Single(a => a.UserJellyfinId == UserId).LetterboxdPassword);
+    }
+
     // ----- StartSync -----
 
     [Fact]

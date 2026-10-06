@@ -450,6 +450,46 @@ public class SerializdControllerTests : IDisposable
         Assert.Equal("untouched@example.com", other.Email);
     }
 
+    // A household can share one Serializd account across Jellyfin users; the token cache is keyed
+    // by email + password hash, so this stays allowed.
+    [Fact]
+    public void PutAccounts_EmailAlsoLinkedByOtherUser_Saves()
+    {
+        var (_, idHex) = AddUserWithAccount(email: "mine@example.com");
+        Plugin.Instance!.Configuration.SerializdAccounts.Add(new SerializdAccount
+        {
+            UserJellyfinId = "someone-else",
+            Email = "household@example.com",
+            Password = "pw",
+            Enabled = true,
+        });
+        Authenticate(idHex);
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new() { new SerializdController.AccountItem { Email = "household@example.com", Password = "pw", Enabled = true } }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("household@example.com", Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).Email);
+        Assert.Contains(Plugin.Instance!.Configuration.SerializdAccounts, a => a.UserJellyfinId == "someone-else");
+    }
+
+    [Fact]
+    public void PutAccounts_SameUserResavesOwnEmail_Succeeds()
+    {
+        var (_, idHex) = AddUserWithAccount(email: "mine@example.com");
+        Authenticate(idHex);
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new() { new SerializdController.AccountItem { Email = "mine@example.com", Password = "new", Enabled = true } }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("new", Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).Password);
+    }
+
     // ----- GetStats / GetHistory -----
 
     [Fact]
