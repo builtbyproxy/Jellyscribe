@@ -26,6 +26,16 @@ public abstract class JellyfinUserApiController : ControllerBase
     protected string? GetCurrentUserId()
         => User.Claims.FirstOrDefault(c => c.Type == "Jellyfin-UserId")?.Value?.Replace("-", string.Empty);
 
+    /// <summary>
+    /// Whose stored credentials a verify/test call may fall back to: <paramref name="requestedUserId"/>
+    /// for an administrator (the dashboard edits other users' accounts), the caller otherwise.
+    /// Jellyfin's auth handler puts the Administrator role claim on admin sessions.
+    /// </summary>
+    protected string? GetCredentialOwnerId(string? requestedUserId)
+        => !string.IsNullOrWhiteSpace(requestedUserId) && User.IsInRole("Administrator")
+            ? requestedUserId.Replace("-", string.Empty)
+            : GetCurrentUserId();
+
     /// <summary>The calling Jellyfin user's username, resolved via IUserManager, or null.</summary>
     protected string? GetJellyfinUsername()
     {

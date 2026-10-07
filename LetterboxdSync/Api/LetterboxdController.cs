@@ -280,8 +280,10 @@ public class LetterboxdController : JellyfinUserApiController
     /// <summary>
     /// Checks Letterboxd credentials the way sync will use them: the official API first, then the
     /// website login (with the optional raw cookies and user agent). Reports which one worked, or
-    /// both reasons. Saves nothing and does not touch the auth breaker. Failed checks are
-    /// rate-limited per user and server-wide (<see cref="LoginCheckLimiter"/>), answering 429.
+    /// both reasons. Saves nothing and does not touch the auth breaker. An empty password or cookie
+    /// field uses the stored account with this username, so a saved login can be re-checked
+    /// without the secret ever going back to the browser. Failed checks are rate-limited per
+    /// user and server-wide (<see cref="LoginCheckLimiter"/>), answering 429.
     /// </summary>
     [HttpPost("Verify")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -290,7 +292,13 @@ public class LetterboxdController : JellyfinUserApiController
     public async Task<ActionResult> VerifyLogin([FromBody] LetterboxdVerifyRequest request)
     {
         var username = request?.LetterboxdUsername?.Trim();
-        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(request!.LetterboxdPassword))
+        if (string.IsNullOrEmpty(username))
+            return BadRequest(new { error = "Username and password are required." });
+
+        var stored = Config.FindStored(GetCredentialOwnerId(request!.UserJellyfinId) ?? string.Empty, username);
+        var password = SecretMerge.KeepIfEmpty(request.LetterboxdPassword, stored?.LetterboxdPassword);
+        var rawCookies = request.ClearRawCookies ? null : SecretMerge.KeepIfEmpty(request.RawCookies, stored?.RawCookies);
+        if (string.IsNullOrEmpty(password))
             return BadRequest(new { error = "Username and password are required." });
 
         var emailError = EmailAsUsernameError(username);
@@ -309,12 +317,12 @@ public class LetterboxdController : JellyfinUserApiController
         {
             if (VerifyApiLoginForTesting != null)
             {
-                await VerifyApiLoginForTesting(username, request.LetterboxdPassword).ConfigureAwait(false);
+                await VerifyApiLoginForTesting(username, password).ConfigureAwait(false);
             }
             else
             {
                 using var api = new LetterboxdApiClient(_logger);
-                await api.AuthenticateAsync(username, request.LetterboxdPassword).ConfigureAwait(false);
+                await api.AuthenticateAsync(username, password).ConfigureAwait(false);
             }
 
             LoginCheckLimiter.Letterboxd.Refund(limiterKey, stamp);
@@ -329,12 +337,12 @@ public class LetterboxdController : JellyfinUserApiController
         {
             if (VerifyWebsiteLoginForTesting != null)
             {
-                await VerifyWebsiteLoginForTesting(username, request.LetterboxdPassword, request.RawCookies, request.UserAgent).ConfigureAwait(false);
+                await VerifyWebsiteLoginForTesting(username, password, rawCookies, request.UserAgent).ConfigureAwait(false);
             }
             else
             {
                 using var website = new ScrapingLetterboxdService(_logger, request.UserAgent);
-                await website.AuthenticateAsync(username, request.LetterboxdPassword, request.RawCookies).ConfigureAwait(false);
+                await website.AuthenticateAsync(username, password, rawCookies).ConfigureAwait(false);
             }
 
             LoginCheckLimiter.Letterboxd.Refund(limiterKey, stamp);
@@ -369,8 +377,8 @@ public class LetterboxdController : JellyfinUserApiController
             .Select(a => new
             {
                 letterboxdUsername = a.LetterboxdUsername,
-                letterboxdPassword = a.LetterboxdPassword,
-                rawCookies = a.RawCookies,
+                hasPassword = a.HasPassword,
+                hasCookies = a.HasRawCookies,
                 userAgent = a.UserAgent,
                 authPaused = AuthBreaker.IsOpen(userId, a.LetterboxdUsername),
                 authPausedSince = AuthBreaker.GetState(userId, a.LetterboxdUsername)?.FirstFailureUtc,
@@ -436,12 +444,13 @@ public class LetterboxdController : JellyfinUserApiController
         foreach (var req in request.Accounts)
         {
             var stored = previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, req.LetterboxdUsername, StringComparison.OrdinalIgnoreCase));
-            mine.Add(new Account
+            var account = new Account
             {
                 UserJellyfinId = userId,
                 LetterboxdUsername = req.LetterboxdUsername,
-                LetterboxdPassword = req.LetterboxdPassword,
+                LetterboxdPassword = req.LetterboxdPassword ?? string.Empty,
                 RawCookies = req.RawCookies,
+                ClearRawCookies = req.ClearRawCookies,
                 UserAgent = req.UserAgent,
                 Enabled = req.Enabled,
                 SyncFavorites = req.SyncFavorites,
@@ -464,7 +473,9 @@ public class LetterboxdController : JellyfinUserApiController
                     : stored?.PlaylistName,
                 // A client that omits the field keeps the account's stored exclusions.
                 ExcludedLibraryIds = LibraryExclusion.ResolveForSave(req.ExcludedLibraryIds, stored?.ExcludedLibraryIds)
-            });
+            };
+            account.KeepSecretsFrom(stored);
+            mine.Add(account);
         }
 
         Config.Accounts.Clear();
@@ -497,12 +508,17 @@ public class LetterboxdController : JellyfinUserApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> TestJellyseerr([FromBody] JellyseerrTestRequest request)
     {
-        if (!SeerrClient.IsConfigured(request.Url, request.ApiKey))
+        // An empty key uses the stored one, but only against the stored URL: any signed-in user can
+        // call this, and the key must never be sent to an address the admin didn't save it for.
+        var apiKey = string.IsNullOrEmpty(request.ApiKey) && SecretMerge.IsStoredUrl(request.Url, Config.JellyseerrUrl)
+            ? Config.JellyseerrApiKey
+            : request.ApiKey;
+        if (!SeerrClient.IsConfigured(request.Url, apiKey))
             return BadRequest(new { success = false, error = "URL and API key are required" });
 
         try
         {
-            using var client = new SeerrClient(request.Url!, request.ApiKey!, _logger, SeerrTestHandlerForTesting);
+            using var client = new SeerrClient(request.Url!, apiKey!, _logger, SeerrTestHandlerForTesting);
             var userId = await client.GetJellyseerrUserIdAsync(GetCurrentUserId() ?? string.Empty)
                 .ConfigureAwait(false);
             return Ok(new

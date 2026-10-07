@@ -33,7 +33,20 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Seerr API key (Settings → General → API Key in Seerr).
     /// </summary>
     [XmlIgnore]
+    [JsonIgnore]
     public string? JellyseerrApiKey { get; set; }
+
+    /// <summary>Write-only JSON form of <see cref="JellyseerrApiKey"/>. See <see cref="Account.LetterboxdPasswordInput"/>.</summary>
+    [XmlIgnore]
+    [JsonPropertyName("JellyseerrApiKey")]
+    public string? JellyseerrApiKeyInput
+    {
+        internal get => JellyseerrApiKey;
+        set => JellyseerrApiKey = value;
+    }
+
+    [XmlIgnore]
+    public bool HasJellyseerrApiKey => !string.IsNullOrEmpty(JellyseerrApiKey);
 
     /// <summary>Encrypted on-disk form of <see cref="JellyseerrApiKey"/>. See <see cref="Configuration.Account.LetterboxdPasswordProtected"/> for why this is JsonIgnore'd.</summary>
     [XmlElement("JellyseerrApiKey")]

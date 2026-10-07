@@ -8,7 +8,10 @@ public class AccountUpdateRequest
 
     public string LetterboxdPassword { get; set; } = string.Empty;
 
+    /// <summary>Empty keeps the stored cookies; <see cref="ClearRawCookies"/> drops them.</summary>
     public string? RawCookies { get; set; }
+
+    public bool ClearRawCookies { get; set; }
 
     public string? UserAgent { get; set; }
 

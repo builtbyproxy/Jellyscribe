@@ -18,8 +18,22 @@ public class SerializdAccount
     /// <summary>Serializd login email. Not a secret (it's the account identifier), stored in the clear like the Letterboxd username.</summary>
     public string Email { get; set; } = string.Empty;
 
+    /// <summary>Plaintext password, in memory only. See <see cref="Account.LetterboxdPassword"/>.</summary>
     [XmlIgnore]
+    [JsonIgnore]
     public string Password { get; set; } = string.Empty;
+
+    /// <summary>Write-only JSON form of <see cref="Password"/>. See <see cref="Account.LetterboxdPasswordInput"/>.</summary>
+    [XmlIgnore]
+    [JsonPropertyName("Password")]
+    public string? PasswordInput
+    {
+        internal get => Password;
+        set => Password = value ?? string.Empty;
+    }
+
+    [XmlIgnore]
+    public bool HasPassword => !string.IsNullOrEmpty(Password);
 
     /// <summary>
     /// Encrypted on-disk form of <see cref="Password"/>. XmlElement keeps the on-disk

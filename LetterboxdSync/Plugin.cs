@@ -41,6 +41,13 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         if (configuration is PluginConfiguration cfg)
         {
+            // Secrets are write-only (never in the GET the dashboard round-trips), so the incoming
+            // config holds only the ones the admin just typed. Fill the rest from the stored config
+            // before anything compares or saves it, or every dashboard save would wipe them.
+            var stored = Configuration;
+            if (stored != null && !ReferenceEquals(stored, cfg))
+                cfg.KeepSecretsFrom(stored);
+
             // Close auth breakers for accounts whose credentials just changed. The admin
             // dashboard saves through this method rather than the user-facing /Accounts
             // endpoint, and only that endpoint reset breakers, so an admin who fixed a stale

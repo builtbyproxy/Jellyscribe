@@ -40,9 +40,12 @@ public class AccountUpdateRequestTests
         // a corresponding field on AccountUpdateRequest. The *Protected shadow
         // properties (SecretProtector's encrypted-at-rest XML view of
         // LetterboxdPassword/RawCookies) are storage plumbing, not part of the
-        // request contract, and are deliberately excluded.
+        // request contract, and are deliberately excluded, as are the write-only *Input JSON
+        // forms of the secrets and the read-only Has* flags.
         var accountProps = typeof(Account).GetProperties()
-            .Where(p => p.Name != "UserJellyfinId" && !p.Name.EndsWith("Protected", System.StringComparison.Ordinal))
+            .Where(p => p.Name != "UserJellyfinId" && p.CanWrite
+                && !p.Name.EndsWith("Protected", System.StringComparison.Ordinal)
+                && !p.Name.EndsWith("Input", System.StringComparison.Ordinal))
             .Select(p => p.Name)
             .ToHashSet();
 
