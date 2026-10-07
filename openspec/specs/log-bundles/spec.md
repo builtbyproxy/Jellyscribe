@@ -5,7 +5,7 @@ TBD - created by archiving change add-send-logs. Update Purpose after archive.
 ## Requirements
 ### Requirement: Explicit, disclosed consent before sending
 
-The "Send logs to developer" action SHALL require an explicit click and a confirmation step that discloses, before anything is sent: that the bundle is NOT anonymous and may contain a Letterboxd username or film titles, that it is linked to this instance's telemetry id, and that passwords, cookies, and auth tokens are never logged. A preview of what would be sent MUST be available from the confirmation step, and that preview MUST show the COMPLETE bundle, the actual log lines AND the telemetry snapshot, not just the anonymous portion. The preview and the send MUST be assembled by the same code path so the preview cannot diverge from what is uploaded.
+The "Send logs to developer" action SHALL require an explicit click and a confirmation step that lists, before anything is sent, everything the bundle holds: the recent log lines (naming films, shows, Jellyfin users and Letterboxd usernames, and possibly quoting service error messages, with email addresses masked), the plugin and Jellyfin versions and which log files were read, the telemetry snapshot, this instance's telemetry id (or a one-off id), and the optional note; that the bundle is NOT anonymous; that passwords, cookies, and auth tokens are never logged; and the 90-day retention. A Preview of what would be sent MUST be available from the confirmation step (`GET /Telemetry/PreviewLogs`, given the note typed so far), and that preview MUST show the COMPLETE bundle, the actual log lines AND the telemetry snapshot, not just the anonymous portion. The preview and the send MUST be assembled by the same code path, with the same one-off id when telemetry has none, so the preview cannot diverge from what is uploaded.
 
 #### Scenario: User opens the send dialog
 
@@ -14,8 +14,8 @@ The "Send logs to developer" action SHALL require an explicit click and a confir
 
 #### Scenario: Preview shows the real log lines
 
-- **WHEN** the admin clicks "Preview exactly what's sent"
-- **THEN** the preview renders the exact bundle including the log lines (not only the anonymous telemetry snapshot), byte-for-byte identical to what the send would upload
+- **WHEN** the admin clicks Preview in the confirmation step
+- **THEN** the preview renders the exact bundle including the log lines and the typed note (not only the anonymous telemetry snapshot), byte-for-byte identical to what the send would upload
 
 #### Scenario: User cancels
 
@@ -24,7 +24,12 @@ The "Send logs to developer" action SHALL require an explicit click and a confir
 
 ### Requirement: Bundle contents
 
-The bundle SHALL contain only: recent LetterboxdSync-tagged log lines (the same sanitized lines the Logs tab shows), the current telemetry snapshot, the plugin and Jellyfin versions, an instance id, and an optional user-supplied note. It MUST reuse the existing sanitized log reader so no content beyond the Logs-tab lines is included.
+The bundle SHALL contain only: recent LetterboxdSync-tagged log lines (the same sanitized lines the Logs tab shows), the current telemetry snapshot, the plugin and Jellyfin versions, the collector status (which log files were read, how many lines matched), an instance id, and an optional user-supplied note. It MUST reuse the existing sanitized log reader so no content beyond the Logs-tab lines is included. The reader MUST replace every email address with `[email]`, and the plugin MUST NOT log Serializd account emails (log lines name those accounts by a short hash tag instead).
+
+#### Scenario: Email addresses never leave the server
+
+- **WHEN** a log line holds an email address (an older log, a login typed as an email, or a quoted error message)
+- **THEN** the Logs tab, the preview and the uploaded bundle all show `[email]` in its place
 
 #### Scenario: Bundle assembled from the shared log reader
 
