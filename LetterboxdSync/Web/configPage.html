@@ -825,8 +825,9 @@
                             var b = src === 'serializd' ? 'Jellyfin.Plugin.LetterboxdSync/Serializd' : 'Jellyfin.Plugin.LetterboxdSync';
                             ApiClient.getJSON(ApiClient.getUrl(b + '/History', { count: self.pageSize, offset: self.actOffset }))
                                 .then(function (r) {
-                                    var events = (r && r.events) || []; self.actTotal = (r && r.total) || events.length;
-                                    document.getElementById('actBody').innerHTML = self.rowsHtml(events, src);
+                                    var events = ((r && r.events) || []).map(function (e) { e._svc = src; return e; });
+                                    self.actTotal = (r && r.total) || events.length;
+                                    document.getElementById('actBody').innerHTML = events.length ? self.unitsHtml(self.groupRuns(events)) : self.rowsHtml([], src);
                                     var pg = document.getElementById('actPagination');
                                     pg.style.display = self.actTotal > self.pageSize ? 'flex' : 'none';
                                     document.getElementById('actPrev').disabled = self.actOffset === 0;
