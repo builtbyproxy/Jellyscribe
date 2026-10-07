@@ -45,11 +45,11 @@ public class TelemetryTask : IScheduledTask
     {
         try
         {
-            return _libraryManager.GetItemList(new InternalItemsQuery
+            return _libraryManager.GetCount(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] { BaseItemKind.Movie },
                 Recursive = true
-            }).Count;
+            });
         }
         catch
         {

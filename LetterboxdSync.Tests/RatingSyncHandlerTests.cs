@@ -442,6 +442,55 @@ public class RatingSyncHandlerTests : IDisposable
     }
 
     [Fact]
+    public void Baseline_SkipsUsersWithRatingSyncOff_WithoutReadingTheirLibrary()
+    {
+        AddAccount(syncRatings: false);
+        _userManager.GetUsers().Returns(new[] { _user });
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { _movie });
+
+        _handler.SeedBaseline(CancellationToken.None);
+
+        _libraryManager.DidNotReceive().GetItemList(Arg.Any<InternalItemsQuery>());
+        _userDataManager.DidNotReceive().GetUserData(Arg.Any<User>(), Arg.Any<BaseItem>());
+    }
+
+    // A user who turns rating sync on after startup is seeded by the next pass, so an unchanged
+    // save of a film rated long ago is still recognised as unchanged.
+    [Fact]
+    public void Baseline_UserWhoTurnsRatingSyncOnLater_IsSeededByTheNextPass()
+    {
+        var account = AddAccount(syncRatings: false);
+        _userManager.GetUsers().Returns(new[] { _user });
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { _movie });
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 8 });
+        _handler.SeedBaseline(CancellationToken.None);
+        _handler.MarkBaselineReady();
+
+        account.SyncRatings = true;
+        _handler.SeedNewlyEnabledUsers(CancellationToken.None);
+
+        Save(8, UserDataSaveReason.UpdateUserRating);
+        Assert.Equal(0, _handler.PendingCount);
+        Save(6);
+        Assert.Equal(1, _handler.PendingCount);
+    }
+
+    [Fact]
+    public void Baseline_BeforeTheNextPass_AnUnseededUsersRatedSaveCountsAsAChange()
+    {
+        var account = AddAccount(syncRatings: false);
+        _userManager.GetUsers().Returns(new[] { _user });
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { _movie });
+        _handler.SeedBaseline(CancellationToken.None);
+        _handler.MarkBaselineReady();
+        account.SyncRatings = true;
+
+        Save(8);
+
+        Assert.Equal(1, _handler.PendingCount);
+    }
+
+    [Fact]
     public void AfterBaseline_FirstRatingOfAnUnratedFilm_IsAChange()
     {
         AddAccount();

@@ -54,6 +54,13 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     private readonly ConcurrentDictionary<(Guid User, Guid Item), double> _known = new();
     private volatile bool _baselineReady;
 
+    // Users the seed skipped because none of their accounts syncs ratings. Their saves are read
+    // like saves before the baseline, until a later seed pass picks them up.
+    private readonly ConcurrentDictionary<Guid, byte> _unseededUsers = new();
+
+    /// <summary>How often the sweep loop seeds users who have turned rating sync on since.</summary>
+    internal static readonly TimeSpan ReseedInterval = TimeSpan.FromMinutes(5);
+
     private CancellationTokenSource? _cts;
     private Task? _loop;
 
@@ -145,11 +152,25 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     /// leaves a rating unchanged (a favorite toggle on a film rated before this version, say) is
     /// recognised as such. Never overwrites a value <see cref="Observe"/> recorded meanwhile.
     /// </summary>
-    internal void SeedBaseline(CancellationToken ct)
+    internal void SeedBaseline(CancellationToken ct) => SeedUsers(_userManager.GetUsers(), ct);
+
+    /// <summary>Seeds the users the first pass skipped who have turned rating sync on since.</summary>
+    internal void SeedNewlyEnabledUsers(CancellationToken ct)
+        => SeedUsers(_userManager.GetUsers().Where(u => _unseededUsers.ContainsKey(u.Id)), ct);
+
+    private void SeedUsers(IEnumerable<Jellyfin.Database.Implementations.Entities.User> users, CancellationToken ct)
     {
         var seeded = 0;
-        foreach (var user in _userManager.GetUsers())
+        foreach (var user in users)
         {
+            // Reading every movie's user data is the expensive part, and a user with rating sync
+            // off on every account never pushes anything, so skip them until they turn it on.
+            if (!Config.GetEnabledAccountsForUser(user.Id.ToString("N")).Any(a => a.SyncRatings))
+            {
+                _unseededUsers[user.Id] = 0;
+                continue;
+            }
+
             var movies = _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
                 IncludeItemTypes = new[] { BaseItemKind.Movie },
@@ -164,6 +185,8 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
                 if (rating is > 0 && _known.TryAdd((user.Id, movie.Id), rating.Value))
                     seeded++;
             }
+
+            _unseededUsers.TryRemove(user.Id, out _);
         }
 
         _logger.LogInformation("Rating sync ready: {Count} existing film ratings recorded as the starting point", seeded);
@@ -220,8 +243,10 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
         double? previous = known ? stored : null;
 
         // Before the baseline is in, an unknown film may still have an older rating, so any rated
-        // save counts as a change. After it, unknown means unrated.
-        var changed = known || _baselineReady ? previous != current : current.HasValue;
+        // save counts as a change. After it, unknown means unrated, except for a user the seed
+        // skipped (rating sync was off), whose ratings were never read.
+        var baselineReady = _baselineReady && !_unseededUsers.ContainsKey(e.UserId);
+        var changed = known || baselineReady ? previous != current : current.HasValue;
         if (!changed)
             return;
 
@@ -259,12 +284,19 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     private async Task SweepLoopAsync(CancellationToken ct)
     {
         using var timer = new PeriodicTimer(SweepInterval);
+        var nextReseed = UtcNow() + ReseedInterval;
         try
         {
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
             {
                 try
                 {
+                    if (!_unseededUsers.IsEmpty && UtcNow() >= nextReseed)
+                    {
+                        nextReseed = UtcNow() + ReseedInterval;
+                        SeedNewlyEnabledUsers(ct);
+                    }
+
                     await DrainDueAsync(ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)

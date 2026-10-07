@@ -179,11 +179,11 @@ public class LetterboxdController : JellyfinUserApiController
         int? libraryCount;
         try
         {
-            libraryCount = _libraryManager.GetItemList(new InternalItemsQuery
+            libraryCount = _libraryManager.GetCount(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] { BaseItemKind.Movie },
                 Recursive = true
-            }).Count;
+            });
         }
         catch
         {
@@ -764,11 +764,11 @@ public class LetterboxdController : JellyfinUserApiController
         int? libraryCount;
         try
         {
-            libraryCount = _libraryManager.GetItemList(new InternalItemsQuery
+            libraryCount = _libraryManager.GetCount(new InternalItemsQuery
             {
                 IncludeItemTypes = new[] { BaseItemKind.Movie },
                 Recursive = true
-            }).Count;
+            });
         }
         catch
         {
