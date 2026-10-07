@@ -27,7 +27,7 @@ public class LetterboxdHttpClient : IDisposable
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0";
 
     private readonly ILogger _logger;
-    internal readonly CookieContainer CookieContainer = new();
+    internal readonly CookieContainer CookieContainer;
     private readonly HttpClientHandler _handler;
     internal readonly HttpClient Http;
     internal string Csrf = string.Empty;
@@ -37,9 +37,11 @@ public class LetterboxdHttpClient : IDisposable
     {
     }
 
-    internal LetterboxdHttpClient(ILogger logger, HttpMessageHandler? handler, string? userAgent = null)
+    internal LetterboxdHttpClient(ILogger logger, HttpMessageHandler? handler, string? userAgent = null,
+        CookieContainer? cookies = null)
     {
         _logger = logger;
+        CookieContainer = cookies ?? new CookieContainer();
         _handler = handler as HttpClientHandler ?? new HttpClientHandler
         {
             CookieContainer = CookieContainer,

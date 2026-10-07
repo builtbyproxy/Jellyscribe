@@ -24,10 +24,20 @@ public class ScrapingLetterboxdService : ILetterboxdService
     {
     }
 
-    // Tests inject a mock handler; production passes null and gets the real cookie handler.
-    internal ScrapingLetterboxdService(ILogger logger, System.Net.Http.HttpMessageHandler? handler, string? userAgent = null)
+    /// <summary>
+    /// A service over an existing cookie jar, so a signed-in session outlives the service. The
+    /// factory keeps one jar per account.
+    /// </summary>
+    internal ScrapingLetterboxdService(ILogger logger, string? userAgent, System.Net.CookieContainer cookies)
+        : this(logger, null, userAgent, cookies)
     {
-        _http = new LetterboxdHttpClient(logger, handler, userAgent);
+    }
+
+    // Tests inject a mock handler; production passes null and gets the real cookie handler.
+    internal ScrapingLetterboxdService(ILogger logger, System.Net.Http.HttpMessageHandler? handler, string? userAgent = null,
+        System.Net.CookieContainer? cookies = null)
+    {
+        _http = new LetterboxdHttpClient(logger, handler, userAgent, cookies);
         _auth = new LetterboxdAuth(_http, logger);
         _scraper = new LetterboxdScraper(_http, logger);
         _diary = new LetterboxdDiary(_http, _auth, _scraper, logger);
