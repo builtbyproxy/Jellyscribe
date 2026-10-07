@@ -10,6 +10,30 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.7',
+    headline: 'Every account synced on the right day, once',
+    summary:
+      'Jellyscribe now keeps track of each linked Letterboxd account separately. If two people share one Jellyfin login, the second account gets its own diary entries instead of being skipped because the first account already logged the film. Watches are now logged on the day you watched them in your server\'s time zone, whether real-time sync or the scheduled sync catches them. An evening film no longer lands on the next day, and the two no longer disagree. Films already on your diary for that day are remembered, so later syncs stop checking them again. When Letterboxd has a bad few days, those films are no longer given up on: Jellyscribe only stops trying a film when Letterboxd keeps saying it does not have it, or when it has failed on its own for over a week. If Letterboxd cannot answer the duplicate check, the film is retried later instead of risking a second diary entry. Two quick finishes of the same film now log once. A watchlist that cannot be read in full, on Letterboxd or Serializd, no longer removes anything from your playlist, collection or Seerr watchlist. The scheduled sync now marks rewatches. Ratings the plugin imports no longer get pushed back out to your other accounts. Half-point ratings now round the same way on Letterboxd and Serializd (a 4.5 in Jellyfin is 2.5 stars). Diary dates are sent correctly on servers set to a non-Gregorian calendar. Stopping the server mid-sync no longer marks a film as failed.',
+    highlights: {
+      improvements: [
+        'Half-point ratings round the same way on Letterboxd and Serializd',
+      ],
+      fixes: [
+        'A second Letterboxd account on the same Jellyfin user now gets its own diary entries',
+        'Watches are logged on the day you watched them in your server\'s time zone, by both real-time and scheduled sync',
+        'Films already on your diary are remembered and no longer re-checked on every sync',
+        'A few bad days on Letterboxd no longer make Jellyscribe give up on films',
+        'A failed duplicate check is retried later instead of risking a duplicate diary entry',
+        'Finishing the same film twice in quick succession logs it once',
+        'A watchlist that cannot be read in full no longer removes anything from your playlist, collection or Seerr watchlist',
+        'The scheduled sync now marks rewatches',
+        'Ratings imported by the plugin are no longer pushed to your other Letterboxd accounts',
+        'Diary dates are sent correctly on servers using a non-Gregorian calendar',
+        'Stopping the server during a sync no longer records a failure',
+      ],
+    },
+  },
+  {
     version: '2.10.6',
     headline: 'Saved passwords and keys stay on the server',
     summary:
