@@ -79,6 +79,8 @@ The URL above is an edge-cached mirror of the GitHub manifest that keeps an anon
 
 - **URL:** `https://raw.githubusercontent.com/builtbyproxy/Jellyscribe/main/manifest.json`
 
+The plugin files themselves are still downloaded through the mirror whichever repository you add, and each download is counted; only a [manual install](#manual-install) from GitHub Releases avoids that.
+
 ### Manual install
 
 1. Download the latest Jellyscribe ZIP from [Releases](https://github.com/builtbyproxy/Jellyscribe/releases)

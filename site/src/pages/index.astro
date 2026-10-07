@@ -278,15 +278,17 @@ const infraCards = [
             <li>Open the <strong>Catalog</strong> and install <strong>Jellyscribe</strong>. No other plugin is needed.</li>
             <li>Restart Jellyfin, then hard-refresh the web UI (Ctrl/Cmd + Shift + R) so the Jellyscribe link appears in the sidebar (Jellyfin 10.11) or the profile menu (Jellyfin 12).</li>
           </ol>
-          <p class="install-note">This URL is a mirror of the GitHub manifest that keeps an anonymous count of installs. Prefer not to be counted? Add the GitHub manifest instead, it serves the identical catalog:
-            <span class="install-pill install-pill-inline" data-pill>
+          <div class="install-note">
+            <p>This URL is a mirror of the GitHub manifest that keeps an anonymous count of installs. Prefer the manifest not to be counted? Add the GitHub one instead, it serves the identical catalog:</p>
+            <div class="install-pill install-pill-inline" data-pill>
               <code class="install-pill-url">{rawManifestUrl}</code>
               <button class="install-pill-btn" type="button" data-copy={rawManifestUrl} aria-label="Copy GitHub manifest URL">
                 <span class="copy-icon" aria-hidden="true">⧉</span>
                 <span class="copy-text">Copy</span>
               </button>
-            </span>
-          </p>
+            </div>
+            <p>Plugin downloads still go through the mirror and are counted either way; a manual install from GitHub Releases avoids both.</p>
+          </div>
         </div>
 
         <div class="install-card">
@@ -872,7 +874,9 @@ const infraCards = [
   .install-card .steps { margin-top: 18px; font-size: 1rem; }
   .install-card .steps li { margin-bottom: 12px; }
   .install-card .text-link { font-size: 15px; margin-top: 18px; }
-  .install-note { margin: 18px 0 0; font-size: 14px; color: var(--text-dim); line-height: 1.55; }
+  .install-note { margin-top: 18px; font-size: 14px; color: var(--text-dim); line-height: 1.55; }
+  .install-note p { margin: 0; }
+  .install-note .install-pill { margin: 8px 0; }
   .install-badge { top: 20px; right: 20px; font-size: 11px; padding: 5px 12px; }
 
   @media (max-width: 640px) {

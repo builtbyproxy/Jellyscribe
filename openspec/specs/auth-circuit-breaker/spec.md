@@ -1,7 +1,7 @@
 # auth-circuit-breaker Specification
 
 ## Purpose
-Pauses a Letterboxd account's syncing after three consecutive failed logins, notifies the admin once through Jellyfin's activity log, shows a paused badge on both dashboards, and resumes when the credentials are re-saved. Added in 2.3.0 (#105); re-saving from the admin dashboard also clears it since 2.4.2 (#116).
+Pauses a Letterboxd account's syncing after three consecutive failed logins, notifies the admin once through Jellyfin's activity log, shows a paused badge on both dashboards, and resumes when the credentials are re-saved. Added in 2.3.0 (#105), where the plugin's account endpoints reset it; since 2.4.2 (#116) a re-save from the admin dashboard, which saves the whole plugin configuration instead, clears it too.
 ## Requirements
 ### Requirement: Breaker opens after three consecutive login failures
 The plugin SHALL count consecutive Letterboxd authentication failures per account (keyed by Jellyfin user id + Letterboxd username) across all sync entry points, and SHALL open the account's breaker when the count reaches 3. Only failures of the authentication step itself count; errors occurring after a successful login MUST NOT affect the breaker. A successful login SHALL reset the count to zero.
