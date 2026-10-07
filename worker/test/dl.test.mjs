@@ -2,6 +2,7 @@
 //   node --experimental-strip-types --test worker/test/dl.test.mjs
 // No dependencies: node:test + node:assert against the pure helpers in src/dl.ts.
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import {
   parseDownloadPath, bundleCapExceeded, utcDayStart, BUNDLES_PER_DAY, BUNDLE_BYTES_PER_DAY,
@@ -20,6 +21,13 @@ test("accepts every manifest-style download path", () => {
     const t = parseDownloadPath(`${tag}/jellyfin-plugin-letterboxd-${tag}.zip`);
     assert.deepEqual(t, { tag, asset: `jellyfin-plugin-letterboxd-${tag}.zip` });
   }
+});
+
+test("accepts every download URL the real manifest.json advertises", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../../manifest.json", import.meta.url), "utf8"));
+  const dl = manifest[0].versions.map((v) => new URL(v.sourceUrl)).filter((u) => u.pathname.startsWith("/dl/"));
+  assert.ok(dl.length > 0);
+  for (const u of dl) assert.notEqual(parseDownloadPath(u.pathname.slice("/dl/".length)), null, u.href);
 });
 
 test("rejects the encoded-slash dot-segment open redirect", () => {

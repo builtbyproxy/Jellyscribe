@@ -1,5 +1,5 @@
 // Pure helpers for the install-count GET routes, kept free of Worker bindings so
-// worker/test/dl.test.ts can run them under plain `node`.
+// worker/test/dl.test.mjs can run them under plain `node`.
 
 // A release tag as release.yml writes it: v2.10.3 (or a four-part v1.2.3.4).
 const TAG_RE = /^v\d+(?:\.\d+){2,3}$/;
