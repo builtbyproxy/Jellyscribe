@@ -26,7 +26,8 @@ namespace LetterboxdSync;
 /// handler keeps every user's current movie ratings in memory, seeded from the library at startup,
 /// and acts only on a save whose rating differs from that. Pushes are further gated per account by
 /// <see cref="RatingPushStore"/>. The plugin's own rating writes save with
-/// <see cref="UserDataSaveReason.Import"/> and are ignored, so nothing echoes back.
+/// <see cref="UserDataSaveReason.Import"/>: they update the baseline but are never pushed, so
+/// nothing echoes back.
 ///
 /// The event handler does no I/O. One sweep loop pushes entries that have been quiet for
 /// <see cref="DebounceWindow"/>, so a user tapping through star values produces one push with the
@@ -188,7 +189,8 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     /// </summary>
     internal void Observe(UserDataSaveEventArgs e)
     {
-        if (e.SaveReason != UserDataSaveReason.UpdateUserData && e.SaveReason != UserDataSaveReason.UpdateUserRating)
+        if (e.SaveReason != UserDataSaveReason.UpdateUserData && e.SaveReason != UserDataSaveReason.UpdateUserRating
+            && e.SaveReason != UserDataSaveReason.Import)
             return;
 
         if (e.Item == null || !e.Item.IsMovie())
@@ -196,6 +198,20 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
 
         var key = (e.UserId, e.Item.Id);
         double? current = e.UserData?.Rating is > 0 ? e.UserData.Rating : null;
+
+        // The plugin's own writes (diary import, the review modal) are never pushed, but they do
+        // become the new baseline. Otherwise the next favorite toggle on the film would see the
+        // imported rating as a change and push it to every linked account, overwriting a rating
+        // another account set on Letterboxd itself.
+        if (e.SaveReason == UserDataSaveReason.Import)
+        {
+            if (current is double imported)
+                _known[key] = imported;
+            else
+                _known.TryRemove(key, out _);
+            _pending.TryRemove(key, out _);
+            return;
+        }
         var known = _known.TryGetValue(key, out var stored);
         double? previous = known ? stored : null;
 
@@ -400,6 +416,7 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
                     FilmSlug = film.Slug,
                     TmdbId = tmdbId,
                     Username = user.Username,
+                    Account = account.LetterboxdUsername,
                     Timestamp = UtcNow(),
                     Status = SyncStatus.Rated,
                     Source = SyncEventSources.Rating

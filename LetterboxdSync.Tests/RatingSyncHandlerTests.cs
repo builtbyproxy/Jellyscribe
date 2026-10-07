@@ -162,6 +162,28 @@ public class RatingSyncHandlerTests : IDisposable
         Assert.Equal(0, _handler.PendingCount);
     }
 
+    [Fact]
+    public void ImportSave_BecomesTheBaseline_SoALaterFavoriteToggleIsNotARatingChange()
+    {
+        AddAccount();
+        _handler.MarkBaselineReady();
+        Save(8);                                   // the user's own rating
+        Assert.Equal(1, _handler.PendingCount);
+
+        // Diary import (or the review modal) writes a rating with Import: not pushed, and the
+        // queued 8 is superseded by it.
+        Save(6, UserDataSaveReason.Import);
+        Assert.Equal(0, _handler.PendingCount);
+
+        // A favorite toggle saves the same 6 again: nothing changed, so nothing is queued.
+        Save(6, UserDataSaveReason.UpdateUserRating);
+        Assert.Equal(0, _handler.PendingCount);
+
+        // A real change after that is still picked up.
+        Save(9);
+        Assert.Equal(1, _handler.PendingCount);
+    }
+
     [Theory]
     [InlineData(UserDataSaveReason.UpdateUserData)]
     [InlineData(UserDataSaveReason.UpdateUserRating)]
