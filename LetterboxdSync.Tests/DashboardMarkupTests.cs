@@ -165,6 +165,8 @@ public class DashboardMarkupTests
         Assert.Contains("<dialog class=\"ws-modal-ov\" id=\"logsPreviewModal\" aria-labelledby=\"logsPreviewTitle\">", page, StringComparison.Ordinal);
         foreach (var endpoint in new[] { "Telemetry/Preview'", "Telemetry/PreviewLogs'", "Telemetry/RegenerateId'" })
             Assert.Contains(endpoint, page, StringComparison.Ordinal);
+        // The note goes in a POST body, never in the URL.
+        Assert.Contains("Telemetry/PreviewLogs'), type: 'POST'", page, StringComparison.Ordinal);
         // The notice is answered through the stored flag, and opens hidden until the config says to show it.
         Assert.Contains("BannerDismissed", page, StringComparison.Ordinal);
         Assert.Matches("id=\"telemetryNotice\"[^>]* hidden>", page);

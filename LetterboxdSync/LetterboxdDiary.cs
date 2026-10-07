@@ -213,12 +213,14 @@ public class LetterboxdDiary
             }
 
             // A successful reply can echo the review back, so it is logged by size only. A failed
-            // one usually carries the error, so a short start of it is kept for diagnosis.
+            // one usually carries the error, so a short start of it is kept for diagnosis, with the
+            // review itself cut out in case the error quotes it.
             if ((int)res.StatusCode < 200 || (int)res.StatusCode >= 300)
             {
-                _logger.LogWarning("Review post for {FilmSlug} failed: status={Status}, body={Body}",
-                    filmSlug, (int)res.StatusCode, LetterboxdHttpClient.Truncate(body, 300));
-                throw new Exception($"Review post returned {(int)res.StatusCode} for {filmSlug}: {LetterboxdHttpClient.Truncate(body, 300)}");
+                var excerpt = LetterboxdHttpClient.Truncate(WithoutReview(body, reviewText), 300);
+                _logger.LogWarning("Review post for {FilmSlug} failed: status={Status}, bodyLen={Len}, body={Body}",
+                    filmSlug, (int)res.StatusCode, body.Length, excerpt);
+                throw new Exception($"Review post returned {(int)res.StatusCode} for {filmSlug}: {excerpt}");
             }
 
             _logger.LogInformation("Posted review for {FilmSlug}: status={Status}, bodyLen={Len}",
@@ -228,6 +230,18 @@ public class LetterboxdDiary
         }
 
         throw new Exception($"Failed to post review for {filmSlug} after {LetterboxdHttpClient.MaxRetries} attempts");
+    }
+
+    /// <summary>
+    /// Replaces the review text in a reply body, as typed or as it appears inside a JSON string,
+    /// with "[review]", so an error that quotes the submitted review never reaches a log line.
+    /// </summary>
+    internal static string WithoutReview(string body, string? reviewText)
+    {
+        if (string.IsNullOrEmpty(body) || string.IsNullOrWhiteSpace(reviewText)) return body;
+        var jsonEscaped = JsonSerializer.Serialize(reviewText)[1..^1];
+        return body.Replace(reviewText, "[review]", StringComparison.Ordinal)
+                   .Replace(jsonEscaped, "[review]", StringComparison.Ordinal);
     }
 
     /// <summary>

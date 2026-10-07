@@ -819,6 +819,8 @@ public class LetterboxdController : JellyfinUserApiController
     // preview shows the same id the send then uploads.
     private static readonly string OneOffBundleId = Guid.NewGuid().ToString();
 
+    internal const int MaxNoteLength = 2000;
+
     /// <summary>
     /// Assembles the exact diagnostic bundle JSON for the calling server. Used by both
     /// the preview and the send so they cannot diverge: what the preview shows is byte
@@ -826,6 +828,11 @@ public class LetterboxdController : JellyfinUserApiController
     /// </summary>
     private (string Json, int MatchedLines) BuildLogBundleJson(string? note)
     {
+        // The backend keeps the first 2000 characters of a note; cut it here so the preview
+        // shows what is kept.
+        if (string.IsNullOrEmpty(note)) note = null;
+        else if (note.Length > MaxNoteLength) note = note[..MaxNoteLength];
+
         var (allLines, source, error) = ReadRecentLogLines();
         var matched = allLines.Count;
         var lines = allLines.Count > 500 ? allLines.GetRange(allLines.Count - 500, 500) : allLines;
@@ -870,14 +877,15 @@ public class LetterboxdController : JellyfinUserApiController
     /// Returns the EXACT bundle that "Send logs to developer" would upload, without
     /// sending it, including the note the admin has typed so far. Backs the Logs tab's
     /// Preview so the user sees the real log lines and telemetry snapshot, not just the
-    /// anonymous part.
+    /// anonymous part. A POST so the note travels in the body, never in a URL that request
+    /// and proxy logs keep.
     /// </summary>
-    [HttpGet("Telemetry/PreviewLogs")]
+    [HttpPost("Telemetry/PreviewLogs")]
     [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult PreviewLogs([FromQuery] string? note = null)
+    public ActionResult PreviewLogs([FromBody] SendLogsRequest? request = null)
     {
-        return Content(BuildLogBundleJson(string.IsNullOrEmpty(note) ? null : note).Json, "application/json");
+        return Content(BuildLogBundleJson(request?.Note).Json, "application/json");
     }
 
     /// <summary>

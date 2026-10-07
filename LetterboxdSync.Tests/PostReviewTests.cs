@@ -317,6 +317,21 @@ public class PostReviewTests
         Assert.DoesNotContain(new string('x', 400), entry.Message);
     }
 
+    [Fact]
+    public async Task PostReviewAsync_FailureThatQuotesTheReview_KeepsTheReviewOutOfTheLogAndTheError()
+    {
+        const string review = "my \"secret\" draft\nsecond line";
+        var reply = "{\"error\":\"review too long\",\"review\":{\"text\":" + System.Text.Json.JsonSerializer.Serialize(review) + "}}";
+        var logger = new ListLogger();
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            EchoingReviewEndpoint(HttpStatusCode.BadRequest, reply).CreateDiary(logger).PostReviewAsync("sinners", review, date: null));
+
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("secret"));
+        Assert.DoesNotContain("secret", ex.Message);
+        Assert.Contains(logger.Entries, e => e.Message.Contains("review too long") && e.Message.Contains("[review]"));
+    }
+
     /// <summary>
     /// Self-contained mock handler that wires up an HttpClient + LetterboxdHttpClient
     /// + LetterboxdDiary chain. The Responder captures requests and produces responses;

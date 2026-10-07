@@ -498,6 +498,10 @@ public class TelemetryServiceTests : IDisposable
         var fresh = TelemetryService.RegenerateInstanceId();
 
         var incoming = new PluginConfiguration { Telemetry = new TelemetryData { Enabled = true, InstanceId = fresh } };
+        // Regenerating sends nothing and does not count as answering the opt-in notice.
+        Assert.Empty(_sent);
+        Assert.False(_h.Config.Telemetry.BannerDismissed);
+
         Plugin.Instance!.UpdateConfiguration(incoming);
 
         Assert.Equal(fresh, Plugin.Instance.Configuration.Telemetry.InstanceId);

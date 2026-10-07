@@ -193,7 +193,7 @@ When something goes wrong, the **Logs** tab has a **Send to developer** button. 
 
 - up to the last 500 Jellyscribe log lines from the server's two newest log files, the same kind of lines the Logs tab shows. Email addresses are replaced with `[email]` (Serializd accounts appear as a short tag such as `serializd-3fa2b1`); passwords, cookies, auth tokens and review text are never logged;
 - the plugin and Jellyfin versions, and which log files were read;
-- the telemetry snapshot that Preview shows, and your telemetry instance ID (a one-off ID if you have none);
+- the telemetry snapshot that Preview shows, and your telemetry instance ID (if you have none, a one-off ID that stays the same until the server restarts);
 - your note, if you write one.
 
 Unlike the anonymous telemetry above, **logs are not anonymous**: the lines name films, shows, Jellyfin users and Letterboxd usernames, and can quote error messages from Letterboxd, Serializd and Seerr, and the bundle is linked to your telemetry instance ID. So it is strictly opt-in per use: a confirmation step lists all of this, lets you add a note, and its **Preview** button shows the exact bundle, note included, before anything leaves your server. Works whether or not telemetry is enabled. Uploaded bundles are stored privately and auto-deleted after 90 days.

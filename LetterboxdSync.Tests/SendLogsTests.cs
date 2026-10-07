@@ -157,12 +157,38 @@ public class SendLogsTests : IDisposable
         System.IO.File.WriteAllText(logFile,
             "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.Foo: a diagnostic line\n");
 
-        var preview = Assert.IsType<ContentResult>(_h.Controller.PreviewLogs("sync stops at film 3")).Content!;
+        var preview = Assert.IsType<ContentResult>(_h.Controller.PreviewLogs(new SendLogsRequest { Note = "sync stops at film 3" })).Content!;
         await _h.Controller.SendLogs(new SendLogsRequest { Note = "sync stops at film 3" });
 
         var (_, sent) = Assert.Single(_sent);
         Assert.Equal(preview, sent);
         Assert.Contains("sync stops at film 3", preview);
+    }
+
+    [Fact]
+    public async Task ALongNote_IsCutToWhatTheBackendKeeps_InThePreviewAndTheSend()
+    {
+        var note = new string('n', 2500);
+        var preview = Assert.IsType<ContentResult>(_h.Controller.PreviewLogs(new SendLogsRequest { Note = note })).Content!;
+        await _h.Controller.SendLogs(new SendLogsRequest { Note = note });
+
+        var (_, sent) = Assert.Single(_sent);
+        Assert.Equal(preview, sent);
+        using var doc = JsonDocument.Parse(sent);
+        Assert.Equal(2000, doc.RootElement.GetProperty("note").GetString()!.Length);
+    }
+
+    [Fact]
+    public void TheLogsTab_MasksEmailsToo()
+    {
+        var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");
+        System.IO.File.WriteAllText(logFile,
+            "[2026-06-14 10:00:00.000 +00:00] [ERR] [1] LetterboxdSync.Serializd: catch-up failed for alex as demo@example.com\n");
+
+        var ok = Assert.IsType<OkObjectResult>(_h.Controller.GetLogs());
+        var body = JsonSerializer.Serialize(ok.Value);
+        Assert.DoesNotContain("demo@example.com", body);
+        Assert.Contains("catch-up failed for alex as [email]", body);
     }
 
     [Fact]

@@ -361,7 +361,7 @@
                                     <ul>
                                         <li>up to the last 500 Jellyscribe log lines from the server's two newest log files, like the ones below. They name <b>films, shows, Jellyfin users and Letterboxd usernames</b>, and can quote error messages from Letterboxd, Serializd and Seerr. Email addresses are replaced with [email]; passwords, cookies and tokens are never logged.</li>
                                         <li>the plugin and Jellyfin versions, and which log files were read</li>
-                                        <li>the telemetry snapshot that Integrations › Preview shows, and this server's telemetry ID (a one-off ID if there is none), so the bundle is tied to this server</li>
+                                        <li>the telemetry snapshot that Integrations › Preview shows, and this server's telemetry ID (if it has none, a one-off ID kept until the server restarts), so the bundle is tied to this server</li>
                                         <li>your note, if you write one</li>
                                     </ul>
                                     It is stored privately for 90 days. You get a reference code to quote in a bug report. Nothing is sent until you click Send bundle.</div>
@@ -1429,7 +1429,8 @@
                             var note = root.querySelector('#sendLogsNote').value || '';
                             pre.textContent = 'Loading…';
                             st.textContent = '';
-                            ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Telemetry/PreviewLogs', note ? { note: note } : {}), type: 'GET' })
+                            // A POST, so the note stays out of request URLs (and the logs that keep them).
+                            ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Telemetry/PreviewLogs'), type: 'POST', contentType: 'application/json', data: JSON.stringify({ Note: note || null }) })
                                 .then(function (r) { return r.text(); })
                                 .then(function (text) { pre.textContent = text; }, function () {
                                     pre.textContent = '';

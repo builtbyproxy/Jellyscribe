@@ -16,10 +16,12 @@ internal static class LogRedaction
 {
     public const string EmailPlaceholder = "[email]";
 
-    // NonBacktracking keeps the scan linear on any line, however long or odd.
+    // The @ also as it appears URL-encoded, as an HTML entity or escaped in JSON, since logged
+    // URLs and response bodies carry addresses that way. NonBacktracking keeps the scan linear
+    // on any line, however long or odd.
     private static readonly Regex EmailPattern = new(
-        @"[A-Za-z0-9._%+\-]+@(?:[A-Za-z0-9\-]+\.)+[A-Za-z]{2,}",
-        RegexOptions.NonBacktracking | RegexOptions.CultureInvariant);
+        @"[A-Za-z0-9._%+\-]+(?:@|%40|&#64;|\\u0040)(?:[A-Za-z0-9\-]+\.)+[A-Za-z]{2,}",
+        RegexOptions.NonBacktracking | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     /// <summary>Replaces every email address in <paramref name="line"/> with <see cref="EmailPlaceholder"/>.</summary>
     public static string RedactEmails(string line)
@@ -29,7 +31,8 @@ internal static class LogRedaction
     /// A short, stable label for a Serializd account in log lines, such as <c>serializd-3fa2b1</c>:
     /// the first 6 hex digits of the SHA-256 of the lowercased email. It tells an admin's several
     /// accounts apart in one log without writing the address down. The tag alone does not reveal
-    /// the address, though anyone who already knows an address can check it against the tag.
+    /// the address, though anyone who already knows an address can check it against the tag, and
+    /// the same address gets the same tag on every server. With 24 bits, many addresses share a tag.
     /// </summary>
     public static string AccountTag(string? email)
     {
