@@ -816,13 +816,18 @@
                         },
                         // Each service pages on its own, so past the oldest loaded event of a service that has
                         // more, the merged list would skip that service's rows. Show only what is complete.
-                        visibleEvents: function () {
+                        visibleEvents: function (only) {
                             var cut = null, src = this.histSrc || {};
                             Object.keys(src).forEach(function (svc) {
                                 var h = src[svc];
-                                if (h.loaded < h.total && h.oldest != null && (cut == null || h.oldest > cut)) cut = h.oldest;
+                                if ((!only || only === 'all' || only === svc) && h.loaded < h.total && h.oldest != null && (cut == null || h.oldest > cut)) cut = h.oldest;
                             });
                             return cut == null ? this.merged : this.merged.filter(function (e) { return new Date(e.Timestamp).getTime() >= cut; });
+                        },
+                        // Search and filters cover the loaded events only; say so while older ones are left.
+                        noMatchText: function () {
+                            var src = this.histSrc || {}, more = Object.keys(src).some(function (k) { return src[k].loaded < src[k].total; });
+                            return more ? 'Nothing matches in the loaded history. Load older history to look further back.' : 'No items match these filters.';
                         },
                         renderMore: function () {
                             var lb = this.histSrc.letterboxd, sz = this.histSrc.serializd;
@@ -869,14 +874,14 @@
                         },
                         renderOverview: function () {
                             var self = this, f = this.ovFilter || 'all', q = this.ovQuery || '';
-                            var all = this.visibleEvents().filter(function (e) {
+                            var all = this.visibleEvents(f).filter(function (e) {
                                 return (f === 'all' || e._svc === f) && self.matchesStatus(e) && (!q || (e.FilmTitle || '').toLowerCase().indexOf(q) >= 0);
                             });
                             var units = this.groupRuns(all);
                             var ps = this.ovPageSize || 40, total = units.length, pages = Math.max(1, Math.ceil(total / ps));
                             if ((this.ovPage || 0) >= pages) this.ovPage = pages - 1;
                             var start = (this.ovPage || 0) * ps;
-                            var empty = this.merged.length ? 'No items match these filters.' : null;
+                            var empty = this.merged.length ? this.noMatchText() : null;
                             document.getElementById('historyBody').innerHTML = units.length ? this.unitsHtml(units.slice(start, start + ps)) : this.rowsHtml([], null, empty);
                             var pag = document.getElementById('historyPagination');
                             if (total > ps) {
@@ -964,8 +969,10 @@
                             events.forEach(function (e) {
                                 var parts = (e.FilmTitle || '').split(' · '), last = units[units.length - 1];
                                 var isEpisode = e._svc === 'serializd' && episode.test(parts[1] || '');
-                                if (isEpisode && last && last.show === parts[0]) { last.events.push(e); return; }
-                                units.push({ show: isEpisode ? parts[0] : null, events: [e] });
+                                // One run is one show on one account; another account's watch starts a new row.
+                                var owner = (e.UserId || e.Username || '') + '|' + (e.Account || '');
+                                if (isEpisode && last && last.show === parts[0] && last.owner === owner) { last.events.push(e); return; }
+                                units.push({ show: isEpisode ? parts[0] : null, owner: owner, events: [e] });
                             });
                             return units;
                         },
@@ -978,13 +985,19 @@
                             }).join('');
                         },
                         groupHtml: function (u, id) {
-                            var self = this, newest = u.events[0], oldest = u.events[u.events.length - 1];
-                            var episodeOf = function (e) { return (e.FilmTitle || '').split(' · ')[1]; };
+                            var self = this, newest = u.events[0];
+                            // The range runs from the lowest to the highest episode, whatever order they were watched in.
+                            var eps = u.events.map(function (e) { var m = /^S(\d+)E(\d+)$/.exec((e.FilmTitle || '').split(' · ')[1] || ''); return { s: +m[1], e: +m[2] }; })
+                                .sort(function (a, b) { return a.s - b.s || a.e - b.e; });
+                            var epName = function (x) { return 'S' + x.s + 'E' + x.e; }, first = eps[0], lastEp = eps[eps.length - 1];
+                            var range = epName(first) === epName(lastEp) ? epName(first) : epName(first) + '–' + epName(lastEp);
                             var uniq = function (fn) { return u.events.map(fn).filter(function (v, i, a) { return a.indexOf(v) === i; }); };
                             var statuses = uniq(function (e) { return self.statusOf(e); }), sources = uniq(function (e) { return e.Source || ''; });
-                            var pill = statuses.length === 1 ? self.pillHtml(statuses[0]) : '<span class="ws-pill Skipped">Mixed</span>';
+                            // A failure inside a run must show on its folded row, not only once it is opened.
+                            var failed = u.events.filter(function (e) { return self.statusOf(e) === 'Failed'; }).length;
+                            var pill = statuses.length === 1 ? self.pillHtml(statuses[0]) : (failed ? '<span class="ws-pill Failed">' + failed + ' failed</span>' : '<span class="ws-pill Skipped">Mixed</span>');
                             return '<tr class="ws-grp"><td><button type="button" class="ws-grp-btn ws-tc" data-grp="' + id + '" aria-expanded="false"><span class="ws-badge tv">TV</span><div><div class="t">' + self.escAttr(u.show) +
-                                ' <span class="ws-grp-caret" aria-hidden="true">▸</span></div><div class="m">' + u.events.length + ' episodes · ' + self.escAttr(episodeOf(oldest)) + '–' + self.escAttr(episodeOf(newest)) + '<span class="ws-mwhen"> · ' + self.shortDate(new Date(newest.Timestamp)) + '</span></div></div></button></td><td>' + pill +
+                                ' <span class="ws-grp-caret" aria-hidden="true">▸</span></div><div class="m">' + u.events.length + ' episodes · ' + self.escAttr(range) + '<span class="ws-mwhen"> · ' + self.shortDate(new Date(newest.Timestamp)) + '</span></div></div></button></td><td>' + pill +
                                 '</td><td class="ws-src">' + (sources.length === 1 ? self.escAttr(sources[0]) : '') + '</td><td class="ws-when">' + self.whenOf(newest) + '</td><td></td></tr>';
                         },
                         toggleGroup: function (body, btn) {

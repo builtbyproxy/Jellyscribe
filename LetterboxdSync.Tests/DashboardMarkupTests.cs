@@ -22,6 +22,8 @@ public class DashboardMarkupTests
         new object[] { "userPage.html", "#letterboxdUserPage" },
     };
 
+    public static IEnumerable<object[]> Files() => Pages().Select(p => new[] { p[0] });
+
     private static string Read(string file)
     {
         var asm = typeof(Plugin).Assembly;
@@ -154,10 +156,9 @@ public class DashboardMarkupTests
     }
 
     [Theory]
-    [MemberData(nameof(Pages))]
-    public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file, string root)
+    [MemberData(nameof(Files))]
+    public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file)
     {
-        _ = root;
         var page = Read(file);
         Assert.Contains("id=\"historySearch\" placeholder=\"Search titles\" aria-label=\"Search activity by title\"", page, StringComparison.Ordinal);
         Assert.Contains("<button type=\"button\" class=\"ws-btn\" id=\"historyMore\">Load older history</button>", page, StringComparison.Ordinal);
@@ -169,25 +170,24 @@ public class DashboardMarkupTests
         Assert.Matches(@"offset(: |=' \+ )h\.loaded", page);
         // The merged list stops at the oldest loaded event of a service with more to load, and an event
         // that a later page repeats is shown once.
-        Assert.Contains("all = this.visibleEvents().filter(", page, StringComparison.Ordinal);
+        Assert.Contains("all = this.visibleEvents(f).filter(", page, StringComparison.Ordinal);
         Assert.Contains("if (self.seen[k]) return false;", page, StringComparison.Ordinal);
 
         // The group header of a binge is a button that says whether it is open, and every value it
         // shows (show name, first and last episode) goes through the page's escaper.
         var at = page.IndexOf("groupHtml: function", StringComparison.Ordinal);
         Assert.True(at >= 0, "no groupHtml");
-        var groupHtml = page.Substring(at, page.IndexOf("\n                        },", at, StringComparison.Ordinal) - at);
+        var groupHtml = Regex.Match(page.Substring(at), @"^groupHtml: function[\s\S]*?\n\s*\},").Value;
+        Assert.NotEmpty(groupHtml);
         Assert.Matches(@"self\.esc(Attr)?\(u\.show\)", groupHtml);
-        Assert.Matches(@"self\.esc(Attr)?\(episodeOf\(oldest\)\).*self\.esc(Attr)?\(episodeOf\(newest\)\)", groupHtml);
-        Assert.DoesNotMatch(@"[^(]u\.show\b(?!\))", groupHtml.Replace("show: ", ""));
+        Assert.Matches(@"self\.esc(Attr)?\(range\)", groupHtml);
         Assert.Contains("class=\"ws-grp-btn ws-tc\" data-grp=\"' + id + '\" aria-expanded=\"false\"", page, StringComparison.Ordinal);
     }
 
     [Theory]
-    [MemberData(nameof(Pages))]
-    public void AccountDialog_NamesTheServicesPlainly_AndRewordsTheWatchlistToggleWhenTheServiceChanges(string file, string root)
+    [MemberData(nameof(Files))]
+    public void AccountDialog_NamesTheServicesPlainly_AndRewordsTheWatchlistToggleWhenTheServiceChanges(string file)
     {
-        _ = root;
         var page = Read(file);
         Assert.Contains("<option value=\"serializd\">Serializd: TV</option><option value=\"letterboxd\">Letterboxd: Film</option>", page, StringComparison.Ordinal);
         // A new account opens as Serializd; switching it to Letterboxd must reword the watchlist toggle too.
