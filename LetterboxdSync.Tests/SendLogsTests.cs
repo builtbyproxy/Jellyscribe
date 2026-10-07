@@ -120,6 +120,33 @@ public class SendLogsTests : IDisposable
     }
 
     [Fact]
+    public async Task PreviewAndSend_MaskEveryEmail_AndShowTheSameLines()
+    {
+        // Older logs (and any email typed as a login or quoted in an error) still carry
+        // addresses; none may reach the preview or the upload.
+        var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");
+        System.IO.File.WriteAllText(logFile,
+            "[2026-06-14 10:00:00.000 +00:00] [ERR] [1] LetterboxdSync.Serializd: catch-up failed for alex as demo@example.com: 503\n" +
+            "[2026-06-14 10:00:01.000 +00:00] [INF] [1] LetterboxdSync.Foo: login for First.Last+tv@mail.example.co.uk ok\n" +
+            "    at LetterboxdSync.Foo.Bar() reported by ops@jellyfin.example\n");
+
+        var preview = Assert.IsType<ContentResult>(_h.Controller.PreviewLogs()).Content!;
+        await _h.Controller.SendLogs(new SendLogsRequest { Note = null });
+        var (_, sent) = Assert.Single(_sent);
+
+        foreach (var bundle in new[] { preview, sent })
+        {
+            Assert.DoesNotContain("demo@example.com", bundle);
+            Assert.DoesNotContain("First.Last+tv@mail.example.co.uk", bundle);
+            Assert.DoesNotContain("ops@jellyfin.example", bundle);
+            Assert.Contains("catch-up failed for alex as [email]: 503", bundle);
+            Assert.Contains("login for [email] ok", bundle);
+            Assert.Contains("reported by [email]", bundle);
+        }
+        Assert.Equal(preview, sent);
+    }
+
+    [Fact]
     public async Task SendLogs_Success_ReturnsRefCode()
     {
         var result = await _h.Controller.SendLogs(new SendLogsRequest { Note = "diary broke" });

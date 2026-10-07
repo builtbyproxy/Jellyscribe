@@ -103,8 +103,8 @@ public class SerializdWatchlistSyncRunner
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
-                        user.Username, account.Email, ex.Message);
+                    _logger.LogError("Serializd watchlist sync failed for {Username} as {Account}: {Message}",
+                        user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
                     // No SyncEvent is recorded on this path; hook telemetry directly.
                     TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
                 }
@@ -166,8 +166,8 @@ public class SerializdWatchlistSyncRunner
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Serializd watchlist sync failed for {Username} as {Email}: {Message}",
-                        user.Username, account.Email, ex.Message);
+                    _logger.LogError("Serializd watchlist sync failed for {Username} as {Account}: {Message}",
+                        user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
                     // No SyncEvent is recorded on this path; hook telemetry directly.
                     TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
                 }
@@ -279,7 +279,7 @@ public class SerializdWatchlistSyncRunner
             if (ReferenceEquals(primary, account))
                 await MirrorSerializdWatchlistToSeerrAsync(seerr, seerrUserId.Value, watchlistTmdbIds, user.Username!, cancellationToken).ConfigureAwait(false);
             else
-                _logger.LogInformation("Skipping Seerr watchlist mirror for {Email}: not the primary Serializd account for {Username}", account.Email, user.Username);
+                _logger.LogInformation("Skipping Seerr watchlist mirror for {Account}: not the primary Serializd account for {Username}", LogRedaction.AccountTag(account.Email), user.Username);
         }
 
         if (account.AutoRequestWatchlist)

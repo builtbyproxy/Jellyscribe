@@ -316,8 +316,8 @@ public class PlaybackHandler : IHostedService, IDisposable
                 if (LibraryExclusion.IsExcluded(_libraryManager, episode, account.ExcludedLibraryIds, _logger))
                 {
                     _logger.LogInformation(
-                        "Skipping real-time Serializd sync of {Series} S{Season}E{Episode} for {Email}: in a library this account excludes",
-                        episode.SeriesName ?? episode.Name, epRef.SeasonNumber, episode.IndexNumber, account.Email);
+                        "Skipping real-time Serializd sync of {Series} S{Season}E{Episode} for {Account}: in a library this account excludes",
+                        episode.SeriesName ?? episode.Name, epRef.SeasonNumber, episode.IndexNumber, LogRedaction.AccountTag(account.Email));
                     continue;
                 }
 
@@ -393,9 +393,9 @@ public class PlaybackHandler : IHostedService, IDisposable
                     }
 
                     _logger.LogInformation(
-                        "Logged {Series} S{Season} episodes {Episodes} (TMDb:{TmdbId}) to Serializd for {Username} as {Email}",
+                        "Logged {Series} S{Season} episodes {Episodes} (TMDb:{TmdbId}) to Serializd for {Username} as {Account}",
                         episode.SeriesName, epRef.SeasonNumber, string.Join(",", epRef.EpisodeNumbers),
-                        epRef.ShowTmdbId, user.Username, account.Email);
+                        epRef.ShowTmdbId, user.Username, LogRedaction.AccountTag(account.Email));
                 }
                 catch (Exception ex)
                 {

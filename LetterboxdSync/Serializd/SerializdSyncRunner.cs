@@ -105,8 +105,8 @@ public class SerializdSyncRunner
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Serializd catch-up failed for {Username} as {Email}: {Message}",
-                        user.Username, account.Email, ex.Message);
+                    _logger.LogError("Serializd catch-up failed for {Username} as {Account}: {Message}",
+                        user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
                     // No SyncEvent is recorded on this early-exit path (e.g. an auth failure
                     // before SyncOneAsync reaches any episode); hook telemetry directly.
                     TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
@@ -157,8 +157,8 @@ public class SerializdSyncRunner
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Serializd catch-up failed for {Username} as {Email}: {Message}",
-                        user.Username, account.Email, ex.Message);
+                    _logger.LogError("Serializd catch-up failed for {Username} as {Account}: {Message}",
+                        user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
                     // No SyncEvent is recorded on this early-exit path (e.g. an auth failure
                     // before SyncOneAsync reaches any episode); hook telemetry directly.
                     TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
@@ -241,8 +241,8 @@ public class SerializdSyncRunner
 
         if (skippedExcluded > 0)
             _logger.LogInformation(
-                "Serializd catch-up: skipping {Count} episodes for {Username} as {Email}: in a library this account excludes",
-                skippedExcluded, user.Username, account.Email);
+                "Serializd catch-up: skipping {Count} episodes for {Username} as {Account}: in a library this account excludes",
+                skippedExcluded, user.Username, LogRedaction.AccountTag(account.Email));
 
         if (skippedNoPlayDate > 0)
             _logger.LogInformation(
@@ -287,7 +287,7 @@ public class SerializdSyncRunner
 
         if (needsWatched.Count == 0 && needsLog.Count == 0)
         {
-            _logger.LogDebug("Serializd catch-up: nothing new for {Username} as {Email}", user.Username, account.Email);
+            _logger.LogDebug("Serializd catch-up: nothing new for {Username} as {Account}", user.Username, LogRedaction.AccountTag(account.Email));
             return;
         }
 
@@ -319,8 +319,8 @@ public class SerializdSyncRunner
             if (SyncErrors.IsServiceFailure(ex) && ++failuresInARow >= MaxConsecutiveFailures)
             {
                 _logger.LogWarning(
-                    "Serializd catch-up: {Count} calls in a row failed for {Username} as {Email}; stopping this account until the next run",
-                    failuresInARow, user.Username, account.Email);
+                    "Serializd catch-up: {Count} calls in a row failed for {Username} as {Account}; stopping this account until the next run",
+                    failuresInARow, user.Username, LogRedaction.AccountTag(account.Email));
                 SerializdActivity.Record(new SyncEvent
                 {
                     FilmTitle = "Serializd account paused",
@@ -447,8 +447,8 @@ public class SerializdSyncRunner
         }
 
         if (logged > 0)
-            _logger.LogInformation("Serializd catch-up: created {Count} dated diary logs for {Username} as {Email}",
-                logged, user.Username, account.Email);
+            _logger.LogInformation("Serializd catch-up: created {Count} dated diary logs for {Username} as {Account}",
+                logged, user.Username, LogRedaction.AccountTag(account.Email));
 
         if (stopped)
             return;

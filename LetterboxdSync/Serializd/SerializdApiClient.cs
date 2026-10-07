@@ -115,7 +115,7 @@ public class SerializdApiClient : ISerializdService
         if (TokenCache.TryGetValue(_cacheKey, out var cached) && !string.IsNullOrEmpty(cached))
         {
             _token = cached;
-            _logger.LogDebug("Reusing cached Serializd token for {Email}", email);
+            _logger.LogDebug("Reusing cached Serializd token for {Account}", LogRedaction.AccountTag(email));
             return;
         }
 
@@ -161,7 +161,7 @@ public class SerializdApiClient : ISerializdService
         _username = Username ?? string.Empty;
 
         TokenCache[_cacheKey] = _token;
-        _logger.LogDebug("Authenticated with Serializd as {Email}", _email);
+        _logger.LogDebug("Authenticated with Serializd as {Account}", LogRedaction.AccountTag(_email));
     }
 
     public async Task<int?> ResolveSeasonIdAsync(int showTmdbId, int seasonNumber)
@@ -612,7 +612,7 @@ public class SerializdApiClient : ISerializdService
         if (authenticated && response.StatusCode == HttpStatusCode.Unauthorized && !isRetry
             && !string.IsNullOrEmpty(_email))
         {
-            _logger.LogWarning("Serializd token rejected (401), re-authenticating for {Email}", _email);
+            _logger.LogWarning("Serializd token rejected (401), re-authenticating for {Account}", LogRedaction.AccountTag(_email));
             response.Dispose();
             TokenCache.TryRemove(_cacheKey, out _);
             _token = string.Empty;

@@ -78,8 +78,8 @@ public class SerializdDiaryImportRunner
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("Serializd diary import failed for {Username} as {Email}: {Message}",
-                        user.Username, account.Email, ex.Message);
+                    _logger.LogError("Serializd diary import failed for {Username} as {Account}: {Message}",
+                        user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
                     // No SyncEvent is recorded on this path; hook telemetry directly.
                     TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
                 }
@@ -143,7 +143,7 @@ public class SerializdDiaryImportRunner
         }
 
         if (marked > 0)
-            _logger.LogInformation("Serializd diary import: marked {Count} episodes played for {Username} as {Email}",
-                marked, user.Username, account.Email);
+            _logger.LogInformation("Serializd diary import: marked {Count} episodes played for {Username} as {Account}",
+                marked, user.Username, LogRedaction.AccountTag(account.Email));
     }
 }

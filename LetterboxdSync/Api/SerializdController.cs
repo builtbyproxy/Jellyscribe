@@ -288,8 +288,8 @@ public class SerializdController : JellyfinUserApiController
             }
             catch (Exception ex)
             {
-                _logger.LogError("Serializd review failed for TMDb {TmdbId} as {Email}: {Message}",
-                    request.TmdbId, account.Email, ex.Message);
+                _logger.LogError("Serializd review failed for TMDb {TmdbId} as {Account}: {Message}",
+                    request.TmdbId, LogRedaction.AccountTag(account.Email), ex.Message);
             }
         }
 
