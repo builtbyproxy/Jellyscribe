@@ -26,6 +26,8 @@ CI also collects coverage via `--collect:"XPlat Code Coverage"` into `TestResult
 
 Deploy a build to a Jellyfin server: `JELLYSCRIBE_DEPLOY_TARGET=user@host ./deploy.sh` (scp's `Jellyscribe.dll` + `HtmlAgilityPack.dll` and restarts the container; `JELLYSCRIBE_DEPLOY_PLUGINS_ROOT` overrides the plugins path).
 
+The telemetry/download Worker (`worker/`, deployed by hand with wrangler) has dependency-free tests for its pure helpers: `node --experimental-strip-types --test worker/test/dl.test.mjs` (Node 22.6+).
+
 ## Architecture
 
 ### Service abstraction with fallback
@@ -65,11 +67,11 @@ Deploy a build to a Jellyfin server: `JELLYSCRIBE_DEPLOY_TARGET=user@host ./depl
 
 ## Releasing
 
-**Every merge to `main` that changes what ships, ships a release.** No manual tag pushes, no release-notes files. **We only release when a change affects the user; non-shipping PRs are exempt**: if the whole diff sits in non-shipping paths (any `*.md`, `docs/`, `openspec/`, `site/`, `worker/`, `.github/`, `LetterboxdSync.Tests/`), skip the version bump, the `## Release notes` section, and the `release-notes.ts` entry; the merge then ships no release (release.yml sees the existing tag and stops) and the site still redeploys for `site/**` changes via deploy-docs' push trigger. `manifest.json` is never exempt. The full pipeline is:
+**Every merge to `main` that changes what ships, ships a release.** No manual tag pushes, no release-notes files. **We only release when a change affects the user; non-shipping PRs are exempt**: if the whole diff sits in non-shipping paths (any `*.md`, `docs/`, `openspec/`, `site/`, `worker/`, `.github/`, `LetterboxdSync.Tests/`), skip the version bump, the `## Release notes` section, and the `release-notes.ts` entry; the merge then ships no release (release.yml sees the version already listed in `manifest.json` and stops) and the site still redeploys for `site/**` changes via deploy-docs' push trigger. `manifest.json` is never exempt. The full pipeline is:
 
 1. Open a PR. Unless non-shipping (above), the PR must:
    - Have a **Conventional Commits** title (`feat:`, `fix:`, `chore:`, `docs:`, `ci:`, `refactor:`, `test:`, `perf:`, `build:`, `style:`). Enforced by `pr-title.yml` (this one applies to non-shipping PRs too).
-   - **Bump `AssemblyVersion` / `FileVersion`** in both `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`. Patch bumps (e.g. `1.13.0.0` → `1.13.1.0`) are fine for CI / refactor changes. Enforced by `version-gate.yml`.
+   - **Bump `AssemblyVersion` / `FileVersion`** in both `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`. Patch bumps (e.g. `1.13.0.0` → `1.13.1.0`) are fine for CI / refactor changes. The new version must be higher than main's and not already tagged. Enforced by `version-gate.yml`.
    - Fill in the **`## Release notes`** section in the PR body. `release.yml` extracts text between that heading and the next H2 and uses it verbatim as the manifest changelog field and the GitHub Release body. The PR template primes the section so it's the path of least resistance. Past entries on https://jellyscribe.dev/releases set the tone: one paragraph, user-facing prose, no symbol names / internal jargon.
    - Add a structured entry to **`site/src/data/release-notes.ts`** for the new version (headline + summary + categorised highlights). The site renders these on the Releases page above the raw manifest changelog. Same tone as the manifest changelog but split into `new` / `improvements` / `fixes` / `breaking` bullets.
    - **SDK floor policy (issue #63)**: the `Jellyfin.Controller`/`Jellyfin.Model` PackageReference version MUST equal `targetAbi.txt`, Jellyfin assemblies have per-patch AssemblyVersions, so the SDK we compile against is the real minimum Jellyfin a release can load on. Never bump the SDK routinely (Dependabot PRs are a compile signal, not a merge queue); bump it only when we need a newer API, raising `targetAbi.txt` and the minor version in the same PR. CI enforces the SDK==targetAbi match.
@@ -77,7 +79,7 @@ Deploy a build to a Jellyfin server: `JELLYSCRIBE_DEPLOY_TARGET=user@host ./depl
 
 2. Merge with **Squash and merge**. The squash subject is the PR title with `(#NN)` appended; the release workflow extracts the PR number from that and fetches the PR body via `gh pr view` (the squash commit body itself is not reliable across merge methods).
 
-3. `release.yml` fires automatically on the push to `main`. It reads `AssemblyVersion` from `Directory.Build.props`, checks no tag for that version exists yet (idempotent), builds + tests, packages, creates the GitHub Release with the PR body's `## Release notes` section, inserts the manifest entry using `targetAbi.txt`, and pushes the auto-commit + tag together.
+3. `release.yml` fires automatically on the push to `main` (one run at a time, `concurrency: release`). It reads `AssemblyVersion` from `Directory.Build.props` and stops if `manifest.json` on main already lists it. A read-only `build` job (no stored credentials) builds, tests, packages, and extracts the `## Release notes` section of the PR that bumped the version (comments and HTML stripped, capped at 4000 characters); a `publish` job with `contents: write`, which runs no repository build code, creates the GitHub Release at the built commit and pushes the manifest entry (using `targetAbi.txt`), retrying on a fresh main if the push races. If the tag exists but the manifest entry does not (a run that died half way), a rerun repairs it: it reuses the published asset and its checksum and only writes the manifest. Actions are pinned to commit SHAs; Dependabot's github-actions entry keeps them current.
 
 4. `deploy-docs.yml` fires via `workflow_run` on Release completion, rebuilding jellyscribe.dev with the fresh manifest. (The `GITHUB_TOKEN`-authenticated auto-commit can't fire push-based workflows, hence the explicit `workflow_run` trigger.)
 
