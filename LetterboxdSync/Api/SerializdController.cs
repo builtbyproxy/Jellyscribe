@@ -109,13 +109,16 @@ public class SerializdController : JellyfinUserApiController
             })
             .ToList();
 
-        return Ok(new { accounts });
+        // The collection is visible server-wide, so only an admin may name it.
+        return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator() });
     }
 
     /// <summary>
     /// Bulk-replace the calling user's Serializd accounts. Other users' accounts are
     /// preserved; each submitted account is stamped with the caller's id. Mirrors the
-    /// Letterboxd per-user <c>PUT /Accounts</c>.
+    /// Letterboxd per-user <c>PUT /Accounts</c>. Only an admin's WatchlistName is applied; for
+    /// anyone else each account keeps its stored name, because the collection it names is
+    /// server-wide and a chosen name could point the sync at someone else's collection.
     /// </summary>
     [HttpPut("Accounts")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -137,6 +140,7 @@ public class SerializdController : JellyfinUserApiController
         var config = Plugin.Instance!.Configuration;
         var preserved = config.SerializdAccounts.Where(a => a.UserJellyfinId != userId).ToList();
         var previous = config.SerializdAccounts.Where(a => a.UserJellyfinId == userId).ToList();
+        var canName = CallerIsAdministrator();
         var mine = request.Accounts.Select(req => new Configuration.SerializdAccount
         {
             UserJellyfinId = userId,
@@ -154,11 +158,15 @@ public class SerializdController : JellyfinUserApiController
             AutoRequestWatchlist = req.AutoRequestWatchlist,
             BackfillAvailableRequests = req.BackfillAvailableRequests,
             MirrorJellyseerrWatchlist = req.MirrorJellyseerrWatchlist,
-            WatchlistName = string.IsNullOrWhiteSpace(req.WatchlistName) ? null : req.WatchlistName.Trim(),
+            WatchlistName = canName
+                ? (string.IsNullOrWhiteSpace(req.WatchlistName) ? null : req.WatchlistName.Trim())
+                : Stored(req)?.WatchlistName,
             // A client that omits the field keeps the account's stored exclusions.
-            ExcludedLibraryIds = LibraryExclusion.ResolveForSave(req.ExcludedLibraryIds,
-                previous.FirstOrDefault(p => string.Equals(p.Email, req.Email!.Trim(), StringComparison.OrdinalIgnoreCase))?.ExcludedLibraryIds),
+            ExcludedLibraryIds = LibraryExclusion.ResolveForSave(req.ExcludedLibraryIds, Stored(req)?.ExcludedLibraryIds),
         }).ToList();
+
+        SerializdAccount? Stored(AccountItem req)
+            => previous.FirstOrDefault(p => string.Equals(p.Email, req.Email!.Trim(), StringComparison.OrdinalIgnoreCase));
 
         config.SerializdAccounts.Clear();
         config.SerializdAccounts.AddRange(preserved);

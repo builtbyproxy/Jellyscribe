@@ -242,6 +242,63 @@ public class LetterboxdControllerTests
         Assert.DoesNotContain("someone-else", usernames);
     }
 
+    private static void SetRole(ControllerTestHarness h, bool admin)
+        => h.Controller.ControllerContext.HttpContext.User = new System.Security.Claims.ClaimsPrincipal(
+            new System.Security.Claims.ClaimsIdentity(new[]
+            {
+                new System.Security.Claims.Claim("Jellyfin-UserId", UserId),
+                new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.Role, admin ? "Administrator" : "User"),
+            }, "Test"));
+
+    [Fact]
+    public void PutAccounts_NonAdmin_CannotNameThePlaylist_KeepsTheStoredName()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "mine").PlaylistName = "Named By Admin";
+        SetRole(h, admin: false);
+
+        var result = h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = new List<AccountUpdateRequest>
+            {
+                new() { LetterboxdUsername = "mine", Enabled = true, PlaylistName = "Staff Picks" },
+                new() { LetterboxdUsername = "fresh", Enabled = true, PlaylistName = "Staff Picks" },
+            }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal("Named By Admin", h.Config.Accounts.Single(a => a.LetterboxdUsername == "mine").PlaylistName);
+        Assert.Null(h.Config.Accounts.Single(a => a.LetterboxdUsername == "fresh").PlaylistName);
+    }
+
+    [Fact]
+    public void PutAccounts_Admin_CanNameThePlaylist()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "mine");
+        SetRole(h, admin: true);
+
+        h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = new List<AccountUpdateRequest> { new() { LetterboxdUsername = "mine", PlaylistName = " Our Films " } }
+        });
+
+        Assert.Equal("Our Films", h.Config.Accounts.Single(a => a.LetterboxdUsername == "mine").PlaylistName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GetAccounts_TellsThePageWhetherTheCallerMayNameThePlaylist(bool admin)
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "mine");
+        SetRole(h, admin);
+
+        var ok = Assert.IsType<OkObjectResult>(h.Controller.GetAccounts());
+        Assert.Equal(admin, Prop<bool>(ok, "canSetWatchlistName"));
+    }
+
     [Fact]
     public void GetAccounts_OrdersPrimaryFirst()
     {

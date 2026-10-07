@@ -559,7 +559,12 @@
                             var self = this;
                             Promise.all([self.get('Jellyfin.Plugin.LetterboxdSync/Accounts').then(function (r) { return r.json(); }).catch(function () { return { accounts: [] }; }),
                                 self.get('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts').then(function (r) { return r.json(); }).catch(function () { return { accounts: [] }; })])
-                                .then(function (res) { self.lb = (res[0] && res[0].accounts) || []; self.sz = (res[1] && res[1].accounts) || []; self.renderAccounts(); });
+                                .then(function (res) {
+                                    self.lb = (res[0] && res[0].accounts) || []; self.sz = (res[1] && res[1].accounts) || [];
+                                    // Watchlist collections and playlists are named by an admin; the server keeps the stored name for anyone else.
+                                    self.canSetWatchlistName = !!((res[0] && res[0].canSetWatchlistName) || (res[1] && res[1].canSetWatchlistName));
+                                    self.renderAccounts();
+                                });
                         },
                         feat: function (l, on) { return '<span class="ws-feat ' + (on ? 'on' : '') + '">' + l + '</span>'; },
                         renderAccounts: function () {
@@ -609,6 +614,7 @@
                             document.getElementById('mAuthBlob').value = (a && a.rawCookies) || '';
                             document.getElementById('mUserAgent').value = (a && a.userAgent) || '';
                             document.getElementById('mWatchName').value = (a && (svc === 'serializd' ? a.watchlistName : a.playlistName)) || '';
+                            document.getElementById('mWatchNameRow').style.display = self.canSetWatchlistName ? '' : 'none';
                             document.getElementById('mVerifyStatus').textContent = ''; document.getElementById('mStatus').textContent = '';
                             document.getElementById('mDeleteBtn').style.display = a ? '' : 'none';
                             document.getElementById('mChecks').innerHTML = self.checksFor(svc, a);

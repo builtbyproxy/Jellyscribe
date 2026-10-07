@@ -88,10 +88,17 @@ public class SerializdControllerTests : IDisposable
         return (user, idHex);
     }
 
-    /// <summary>Points the controller's ControllerContext at an authenticated Jellyfin-UserId claim.</summary>
-    private void Authenticate(string userIdHex)
+    /// <summary>
+    /// Points the controller's ControllerContext at an authenticated Jellyfin-UserId claim, with the
+    /// role claim Jellyfin's authentication handler issues ("Administrator" or "User").
+    /// </summary>
+    private void Authenticate(string userIdHex, bool admin = false)
     {
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("Jellyfin-UserId", userIdHex) }, "Test"));
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim("Jellyfin-UserId", userIdHex),
+            new Claim(ClaimTypes.Role, admin ? "Administrator" : "User"),
+        }, "Test"));
         _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = principal } };
     }
 
@@ -761,5 +768,54 @@ public class SerializdControllerTests : IDisposable
 
         Assert.Equal(new[] { anime },
             Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).ExcludedLibraryIds);
+    }
+
+    // ----- Watchlist name is admin-only -----
+
+    [Fact]
+    public void PutAccounts_NonAdmin_CannotNameTheCollection_KeepsTheStoredName()
+    {
+        var (_, idHex) = AddUserWithAccount(email: "me@example.com");
+        Plugin.Instance!.Configuration.SerializdAccounts[0].WatchlistName = "Named By Admin";
+        Authenticate(idHex);
+
+        var result = _controller.PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new()
+            {
+                new SerializdController.AccountItem { Email = "me@example.com", Enabled = true, WatchlistName = "Staff Picks" },
+                new SerializdController.AccountItem { Email = "new@example.com", Enabled = true, WatchlistName = "Staff Picks" },
+            }
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        var saved = Plugin.Instance!.Configuration.SerializdAccounts.Where(a => a.UserJellyfinId == idHex).ToList();
+        Assert.Equal("Named By Admin", saved.Single(a => a.Email == "me@example.com").WatchlistName);
+        Assert.Null(saved.Single(a => a.Email == "new@example.com").WatchlistName);
+    }
+
+    [Fact]
+    public void PutAccounts_Admin_CanNameTheCollection()
+    {
+        var (_, idHex) = AddUserWithAccount(email: "me@example.com");
+        Authenticate(idHex, admin: true);
+
+        _controller.PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new() { new SerializdController.AccountItem { Email = "me@example.com", WatchlistName = " Our Shows " } }
+        });
+
+        Assert.Equal("Our Shows", Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).WatchlistName);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GetAccounts_TellsThePageWhetherTheCallerMayNameTheCollection(bool admin)
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex, admin);
+
+        Assert.Equal(admin, Prop<bool>(_controller.GetAccounts(), "canSetWatchlistName"));
     }
 }

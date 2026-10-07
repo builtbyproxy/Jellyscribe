@@ -35,6 +35,13 @@ public abstract class JellyfinUserApiController : ControllerBase
     }
 
     /// <summary>
+    /// True when the caller is a Jellyfin administrator. Jellyfin's authentication handler gives
+    /// administrators (and API keys) the "Administrator" role claim, the same signal its
+    /// RequiresElevation policy checks.
+    /// </summary>
+    protected bool CallerIsAdministrator() => User.IsInRole("Administrator");
+
+    /// <summary>
     /// 429 for a login check refused by <see cref="LoginCheckLimiter"/>, with a Retry-After
     /// header and an <c>error</c> the dashboards show as it is.
     /// </summary>

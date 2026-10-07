@@ -392,7 +392,8 @@ public class LetterboxdController : JellyfinUserApiController
             })
             .ToList();
 
-        return Ok(new { accounts });
+        // Naming is admin-only, matching the Serializd collection name it shares a field with.
+        return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator() });
     }
 
     /// <summary>
@@ -430,9 +431,11 @@ public class LetterboxdController : JellyfinUserApiController
         var preserved = Config.Accounts.Where(a => a.UserJellyfinId != userId).ToList();
         var previous = Config.Accounts.Where(a => a.UserJellyfinId == userId).ToList();
 
+        var canName = CallerIsAdministrator();
         var mine = new List<Account>();
         foreach (var req in request.Accounts)
         {
+            var stored = previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, req.LetterboxdUsername, StringComparison.OrdinalIgnoreCase));
             mine.Add(new Account
             {
                 UserJellyfinId = userId,
@@ -442,9 +445,7 @@ public class LetterboxdController : JellyfinUserApiController
                 UserAgent = req.UserAgent,
                 Enabled = req.Enabled,
                 SyncFavorites = req.SyncFavorites,
-                SyncRatings = req.SyncRatings
-                    ?? previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, req.LetterboxdUsername, StringComparison.OrdinalIgnoreCase))?.SyncRatings
-                    ?? true,
+                SyncRatings = req.SyncRatings ?? stored?.SyncRatings ?? true,
                 EnableDateFilter = req.EnableDateFilter,
                 DateFilterDays = req.DateFilterDays,
                 EnableWatchlistSync = req.EnableWatchlistSync,
@@ -455,10 +456,12 @@ public class LetterboxdController : JellyfinUserApiController
                 SkipPreviouslySynced = req.SkipPreviouslySynced,
                 StopOnFailure = req.StopOnFailure,
                 IsPrimary = req.IsPrimary,
-                PlaylistName = string.IsNullOrWhiteSpace(req.PlaylistName) ? null : req.PlaylistName.Trim(),
+                // Admin-only, like the Serializd watchlist name; anyone else keeps the stored value.
+                PlaylistName = canName
+                    ? (string.IsNullOrWhiteSpace(req.PlaylistName) ? null : req.PlaylistName.Trim())
+                    : stored?.PlaylistName,
                 // A client that omits the field keeps the account's stored exclusions.
-                ExcludedLibraryIds = LibraryExclusion.ResolveForSave(req.ExcludedLibraryIds,
-                    previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, req.LetterboxdUsername, StringComparison.OrdinalIgnoreCase))?.ExcludedLibraryIds)
+                ExcludedLibraryIds = LibraryExclusion.ResolveForSave(req.ExcludedLibraryIds, stored?.ExcludedLibraryIds)
             });
         }
 
