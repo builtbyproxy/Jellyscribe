@@ -91,6 +91,7 @@ public class SendLogsTests : IDisposable
     [InlineData("PreviewLogs")]
     [InlineData("GetLogs")]          // raw server logs name every user's Letterboxd account + films
     [InlineData("GetTelemetryPreview")]
+    [InlineData("RegenerateTelemetryId")]
     public void SensitiveEndpoints_RequireElevation(string methodName)
     {
         var method = typeof(LetterboxdController).GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);

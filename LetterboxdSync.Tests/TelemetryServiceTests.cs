@@ -434,6 +434,101 @@ public class TelemetryServiceTests : IDisposable
         Assert.Equal(40, t.LifetimeTvSyncs);
     }
 
+    [Fact]
+    public void Payload_ErrorCounts_AreExactNumbers_AsTheIngestWorkerRequires()
+    {
+        // The ingest Worker stores an error count only when it is a number (anything else
+        // becomes 0) and adds a week's counts together, so they cannot be bucketed strings.
+        // The settings text and README say so instead of promising "no exact numbers".
+        var t = Enable();
+        t.WindowErrAuth = 3;
+        t.WindowErrServerError = 2;
+
+        using var doc = JsonDocument.Parse(TelemetryService.BuildPayload("weekly", libraryCount: 100));
+        var errors = doc.RootElement.GetProperty("errors");
+        Assert.Equal(3, errors.GetProperty("auth_failure").GetInt32());
+        Assert.Equal(2, errors.GetProperty("server_error").GetInt32());
+        // Every category the README's sample payload lists is present.
+        foreach (var c in new[] { "cloudflare_403", "auth_failure", "tmdb_lookup", "jellyseerr_error", "rate_limit",
+                     "server_error", "write_failure", "parse_error", "other" })
+        {
+            Assert.Equal(JsonValueKind.Number, errors.GetProperty(c).ValueKind);
+            Assert.Equal(JsonValueKind.False, errors.GetProperty("state").GetProperty(c).ValueKind);
+        }
+    }
+
+    // ----- Regenerate ID -----
+
+    [Fact]
+    public void RegenerateInstanceId_ReplacesTheId_AndLaterPingsCarryOnlyTheNewOne()
+    {
+        var t = Enable();
+        var old = t.InstanceId!;
+
+        var fresh = TelemetryService.RegenerateInstanceId();
+
+        Assert.NotEqual(old, fresh);
+        Assert.True(Guid.TryParse(fresh, out _));
+        Assert.Equal(fresh, t.InstanceId);
+        Assert.InRange(t.JitterMinutes, 0, 719);
+        var json = TelemetryService.BuildPayload("weekly", libraryCount: 100);
+        Assert.Contains(fresh, json);
+        Assert.DoesNotContain(old, json);
+    }
+
+    [Fact]
+    public void RegenerateEndpoint_ReturnsTheNewId_AndRequiresElevation()
+    {
+        var old = Enable().InstanceId!;
+
+        var ok = Assert.IsType<Microsoft.AspNetCore.Mvc.OkObjectResult>(_h.Controller.RegenerateTelemetryId());
+
+        var body = JsonSerializer.Serialize(ok.Value);
+        Assert.Contains(_h.Config.Telemetry.InstanceId!, body);
+        Assert.NotEqual(old, _h.Config.Telemetry.InstanceId);
+        var attr = typeof(LetterboxdController).GetMethod(nameof(LetterboxdController.RegenerateTelemetryId))!
+            .GetCustomAttribute<AuthorizeAttribute>();
+        Assert.Equal("RequiresElevation", attr?.Policy);
+    }
+
+    [Fact]
+    public void RegenerateInstanceId_WhileOff_IsTheIdUsedWhenTelemetryIsTurnedOn()
+    {
+        Assert.False(_h.Config.Telemetry.Enabled);
+        var fresh = TelemetryService.RegenerateInstanceId();
+
+        var incoming = new PluginConfiguration { Telemetry = new TelemetryData { Enabled = true, InstanceId = fresh } };
+        Plugin.Instance!.UpdateConfiguration(incoming);
+
+        Assert.Equal(fresh, Plugin.Instance.Configuration.Telemetry.InstanceId);
+    }
+
+    // ----- One-time opt-in notice -----
+
+    [Fact]
+    public void TurningTelemetryOn_AnswersTheOptInNotice_SoItNeverReturns()
+    {
+        Plugin.Instance!.UpdateConfiguration(new PluginConfiguration { Telemetry = new TelemetryData { Enabled = true } });
+        var on = Plugin.Instance.Configuration.Telemetry;
+        Assert.True(on.BannerDismissed);
+        Assert.False(string.IsNullOrEmpty(on.InstanceId));
+
+        // Turned off later, the answer stands (the page round-trips the stored flag).
+        Plugin.Instance.UpdateConfiguration(new PluginConfiguration
+        {
+            Telemetry = new TelemetryData { Enabled = false, InstanceId = on.InstanceId, BannerDismissed = on.BannerDismissed }
+        });
+        Assert.True(Plugin.Instance.Configuration.Telemetry.BannerDismissed);
+    }
+
+    [Fact]
+    public void SavingWithTelemetryOff_LeavesTheOptInNoticeUnanswered()
+    {
+        Plugin.Instance!.UpdateConfiguration(new PluginConfiguration { Telemetry = new TelemetryData { Enabled = false } });
+        Assert.False(Plugin.Instance.Configuration.Telemetry.BannerDismissed);
+        Assert.Null(Plugin.Instance.Configuration.Telemetry.InstanceId);
+    }
+
     // ----- Preview endpoint policy -----
 
     [Fact]

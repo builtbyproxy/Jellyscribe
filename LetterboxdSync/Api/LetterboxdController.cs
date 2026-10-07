@@ -168,8 +168,9 @@ public class LetterboxdController : JellyfinUserApiController
     /// <summary>
     /// Returns the exact JSON the next telemetry ping would send. Admin-only: the payload
     /// contains the instance UUID plus a configuration fingerprint, the same policy as
-    /// the config page that displays it. Backs the settings "Preview exact JSON" modal,
-    /// which doubles as a copy-diagnostic-bundle for bug reports.
+    /// the config page that displays it. Backs the Integrations "Preview" dialog and the
+    /// Overview opt-in notice, whose Copy and "Copy + regenerate ID" actions double as a
+    /// diagnostic bundle for bug reports.
     /// </summary>
     [HttpGet("Telemetry/Preview")]
     [Authorize(Policy = "RequiresElevation")]
@@ -192,6 +193,19 @@ public class LetterboxdController : JellyfinUserApiController
 
         var json = TelemetryService.BuildPayload("weekly", libraryCount);
         return Content(json, "application/json");
+    }
+
+    /// <summary>
+    /// Gives this server a new random telemetry instance id, the settings "Regenerate ID" and
+    /// "Copy + regenerate ID" actions. Admin-only, like the preview that shows the id. Later
+    /// pings and log bundles carry only the new id; rows already sent keep the old one.
+    /// </summary>
+    [HttpPost("Telemetry/RegenerateId")]
+    [Authorize(Policy = "RequiresElevation")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult RegenerateTelemetryId()
+    {
+        return Ok(new { instanceId = TelemetryService.RegenerateInstanceId() });
     }
 
     [HttpGet("Stats")]
@@ -865,6 +879,16 @@ public class LetterboxdController : JellyfinUserApiController
         return Content(BuildLogBundleJson(null).Json, "application/json");
     }
 
+    /// <summary>
+    /// User-initiated "send logs to developer". Uploads the bundle from
+    /// <see cref="BuildLogBundleJson"/> (recent log lines with emails masked, the current
+    /// telemetry snapshot, versions and the admin's note) to the private telemetry backend
+    /// and returns a short reference code the user can quote in a bug report. Admin-only.
+    /// Unlike telemetry this is NOT anonymous (log lines name films, shows, Jellyfin users
+    /// and Letterboxd usernames) and only runs on this explicit, disclosed action. Works
+    /// whether or not telemetry is enabled; if no telemetry instance id exists, a one-off
+    /// id is generated for the bundle.
+    /// </summary>
     [HttpPost("Telemetry/SendLogs")]
     [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]

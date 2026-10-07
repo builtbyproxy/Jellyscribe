@@ -398,6 +398,26 @@ internal static class TelemetryService
         return JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = false });
     }
 
+    /// <summary>
+    /// Replaces the instance id with a new random one (and a new jitter slot) and saves it, so
+    /// every later ping and log bundle carries only the new id. Rows already sent under the old
+    /// id stay on the backend, unlinked from the new one. Works while telemetry is off too: the
+    /// new id is the one used when it is turned on. Returns the new id.
+    /// </summary>
+    public static string RegenerateInstanceId()
+    {
+        lock (_lock)
+        {
+            var cfg = Plugin.Instance?.Configuration
+                ?? throw new InvalidOperationException("Plugin configuration is not loaded");
+            cfg.Telemetry ??= new TelemetryData();
+            cfg.Telemetry.InstanceId = Guid.NewGuid().ToString();
+            cfg.Telemetry.JitterMinutes = Random.Shared.Next(0, 720);
+            SaveLocked();
+            return cfg.Telemetry.InstanceId;
+        }
+    }
+
     /// <summary>Set once at startup by TelemetryTask (the only place with IServerApplicationHost access is overkill; the task knows it).</summary>
     internal static string? JellyfinVersion { get; set; }
 

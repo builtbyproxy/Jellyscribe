@@ -32,6 +32,7 @@ public class ControllerAuthorizationTests
         "LetterboxdController.GetLogs",
         "LetterboxdController.GetTelemetryPreview",
         "LetterboxdController.PreviewLogs",
+        "LetterboxdController.RegenerateTelemetryId",
         "LetterboxdController.SendLogs",
         "LetterboxdController.TestJellyseerr",
     };

@@ -17,11 +17,16 @@ public class TelemetryData
     /// <summary>
     /// Random instance identity, generated server-side when telemetry is first enabled
     /// (see Plugin.UpdateConfiguration). Never derived from hardware, network, or Jellyfin
-    /// identifiers. Regenerating unlinks the identifier going forward; old rows remain.
+    /// identifiers. Kept while telemetry is off; regenerating it (TelemetryService.RegenerateInstanceId,
+    /// the settings Regenerate ID action) unlinks the identifier going forward; old rows remain.
     /// </summary>
     public string? InstanceId { get; set; }
 
-    /// <summary>One-time opt-in banner on the dashboard tab: set true on Enable OR No-thanks.</summary>
+    /// <summary>
+    /// The one-time opt-in notice on the admin Overview has been answered: set by its Enable or
+    /// No thanks, and by any save that turns telemetry on (Plugin.UpdateConfiguration). The
+    /// notice shows only while this is false and telemetry is off.
+    /// </summary>
     public bool BannerDismissed { get; set; }
 
     /// <summary>
