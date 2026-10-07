@@ -33,6 +33,8 @@ public class ScrapingLetterboxdService : ILetterboxdService
         _diary = new LetterboxdDiary(_http, _auth, _scraper, logger);
     }
 
+    public bool IsWebsiteSession => true;
+
     public async Task AuthenticateAsync(string username, string password, string? rawCookies = null)
     {
         _http.SetRawCookies(rawCookies);

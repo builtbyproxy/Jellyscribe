@@ -282,6 +282,8 @@ public class ApiClientFilmLookupTests
 {
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
 
+    public ApiClientFilmLookupTests() => LetterboxdApiClient.ResetFilmCacheForTesting(550, 99999999);
+
     [Fact]
     public async Task LookupFilmByTmdbIdAsync_ReturnsFilmResult()
     {
@@ -505,6 +507,8 @@ public class ApiClientDiaryTests
 public class ApiClientRateLimitTests
 {
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
+
+    public ApiClientRateLimitTests() => LetterboxdApiClient.ResetFilmCacheForTesting(123);
 
     [Fact]
     public async Task SendSigned_429_RetriesAfterDelay()

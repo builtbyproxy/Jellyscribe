@@ -28,6 +28,23 @@ public class LetterboxdScraper
     // throttled requests. Never shared with LetterboxdApiClient: FilmId here is the numeric id.
     private static readonly ConcurrentDictionary<int, FilmResult> FilmCache = new();
 
+    /// <summary>
+    /// Test hook: forget cached lookups. With no ids it clears the whole cache; test classes that
+    /// run in parallel with others pass the ids they use, so they never clear a cache another
+    /// class is relying on.
+    /// </summary>
+    internal static void ResetFilmCacheForTesting(params int[] tmdbIds)
+    {
+        if (tmdbIds.Length == 0)
+        {
+            FilmCache.Clear();
+            return;
+        }
+
+        foreach (var id in tmdbIds)
+            FilmCache.TryRemove(id, out _);
+    }
+
     public LetterboxdScraper(LetterboxdHttpClient http, ILogger logger)
     {
         _http = http;

@@ -16,6 +16,9 @@ public class ScraperTests
     private static readonly Uri BaseUri = new("https://letterboxd.com/");
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
 
+    // Lookups are cached process-wide, and two tests here resolve the same id to different films.
+    public ScraperTests() => LetterboxdScraper.ResetFilmCacheForTesting(693134, 99999, 12345);
+
     [Fact]
     public async Task LookupFilmByTmdbId_ValidFilm_ReturnsFilmResult()
     {

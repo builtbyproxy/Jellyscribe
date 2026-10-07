@@ -409,11 +409,7 @@ public class LetterboxdSyncRunner
                 using var filmLock = await FilmSyncLock.AcquireAsync(breakerUserId, lbAccount, tmdbId, cancellationToken)
                     .ConfigureAwait(false);
 
-                // Paces each film's Letterboxd requests. It runs alongside the lookup, so a cache
-                // miss on the scraping path (which throttles itself) isn't made to wait twice.
-                var pacing = Task.Delay(3000 + Random.Shared.Next(2000), cancellationToken);
-                var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
-                await pacing.ConfigureAwait(false);
+                var film = await LookupPacedAsync(service, tmdbId, cancellationToken).ConfigureAwait(false);
 
                 var userData = _userDataManager.GetUserData(user, movie);
                 var viewingDate = ViewingDateFor(userData?.LastPlayedDate);
@@ -546,6 +542,30 @@ public class LetterboxdSyncRunner
         _logger.LogInformation("Letterboxd sync complete for {Username}: {Synced} synced, {Skipped} skipped (+{LocalSkipped} skipped locally), {Failed} failed",
             user.Username, synced, skipped, locallySkipped, failed);
         SyncProgress.Complete(SyncProgress.TrackLetterboxd);
+    }
+
+    /// <summary>Gap between films' Letterboxd requests. A test hook replaces it.</summary>
+    internal static Func<TimeSpan> FilmPacing { get; set; } = () => TimeSpan.FromMilliseconds(3000 + Random.Shared.Next(2000));
+
+    /// <summary>
+    /// Looks the film up and paces the film's requests. On the website the lookup itself requests
+    /// pages (a cache miss throttles before them), so the pause follows it and the diary page is
+    /// never fetched straight after the film page. On the API the pause runs alongside the lookup,
+    /// so a cache miss does not wait twice.
+    /// </summary>
+    internal static async Task<FilmResult> LookupPacedAsync(ILetterboxdService service, int tmdbId, CancellationToken cancellationToken)
+    {
+        if (service.IsWebsiteSession)
+        {
+            var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
+            await Task.Delay(FilmPacing(), cancellationToken).ConfigureAwait(false);
+            return film;
+        }
+
+        var pacing = Task.Delay(FilmPacing(), cancellationToken);
+        var result = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
+        await pacing.ConfigureAwait(false);
+        return result;
     }
 
     internal static bool ShouldAbandon(FailureStreak streak)

@@ -10,6 +10,12 @@ public interface ILetterboxdService : IDisposable
 
     Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId);
 
+    /// <summary>
+    /// True for the website (scraping) session. Its film lookup makes page requests of its own,
+    /// so callers pace the next request after the lookup rather than alongside it.
+    /// </summary>
+    bool IsWebsiteSession => false;
+
     Task<DiaryInfo> GetDiaryInfoAsync(string filmIdOrSlug, string username);
 
     Task MarkAsWatchedAsync(string filmSlug, string filmId, DateTime? date, bool liked,

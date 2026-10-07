@@ -21,6 +21,8 @@ public class ApiClientGapTests
 {
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
 
+    public ApiClientGapTests() => LetterboxdApiClient.ResetFilmCacheForTesting(1091);
+
     [Fact]
     public async Task MarkAsWatchedAsync_NotAuthenticated_Throws()
     {

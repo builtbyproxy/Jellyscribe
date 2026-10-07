@@ -30,6 +30,23 @@ public class LetterboxdApiClient : ILetterboxdService
     // request. Never shared with the scraper: FilmId here is the LID.
     private static readonly ConcurrentDictionary<int, FilmResult> FilmCache = new();
 
+    /// <summary>
+    /// Test hook: forget cached lookups. With no ids it clears the whole cache; test classes that
+    /// run in parallel with others pass the ids they use, so they never clear a cache another
+    /// class is relying on.
+    /// </summary>
+    internal static void ResetFilmCacheForTesting(params int[] tmdbIds)
+    {
+        if (tmdbIds.Length == 0)
+        {
+            FilmCache.Clear();
+            return;
+        }
+
+        foreach (var id in tmdbIds)
+            FilmCache.TryRemove(id, out _);
+    }
+
     // One process-wide client: a client per instance (one per sync, per account and per
     // dashboard request) opened a fresh connection pool and TLS handshake every time. The
     // default headers are the same for every account; the bearer token goes on each request.
