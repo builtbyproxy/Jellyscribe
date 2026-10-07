@@ -10,6 +10,22 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.6',
+    headline: 'Saved passwords and keys stay on the server',
+    summary:
+      'Jellyscribe no longer sends saved passwords, cookies or the Seerr API key back to the browser. Before, the settings pages loaded each linked account\'s Letterboxd or Serializd password and cookies into the form, and the admin settings returned every user\'s password and the Seerr key. Anyone holding a session could read them. Saved values now show as "Saved" with an empty field. Leave it blank to keep the saved value, type to replace it, or tick "Remove saved cookies" or "Remove saved key" to drop it. Verify login works with the saved password, and an admin can move an account to another Jellyfin user or rename it without re-entering its password. Existing saved logins keep working after the upgrade. Thanks to Wouter Stulp, whose fork made stored secrets write-only first; this release builds on his work.',
+    highlights: {
+      improvements: [
+        'Saved passwords, cookies and the Seerr API key show as "Saved" with an empty field: leave it blank to keep it, type to replace it, or tick the remove box to drop it.',
+        'Verify login checks the saved password when the field is left blank.',
+        'Renaming an account, or an admin moving it to another Jellyfin user, keeps its saved password and cookies.',
+      ],
+      fixes: [
+        'Settings pages and the admin configuration no longer send saved Letterboxd and Serializd passwords, cookies or the Seerr API key back to the browser (thanks to Wouter Stulp).',
+      ],
+    },
+  },
+  {
     version: '2.10.5',
     headline: 'Separate Serializd watchlist collections, and Seerr requests made as each person',
     summary:
