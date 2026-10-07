@@ -1060,6 +1060,46 @@ public class SeerrClientTests
             };
     }
 
+
+    [Fact]
+    public async Task InjectedHandler_IsUsed_AndEveryRequestCarriesTheApiKey()
+    {
+        var seen = new List<HttpRequestMessage>();
+        var handler = new SeerrHandler(req =>
+        {
+            seen.Add(req);
+            if (req.Method == HttpMethod.Get)
+                return JsonResponse("{\"id\":100}");
+            return new HttpResponseMessage(HttpStatusCode.Created);
+        });
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        await client.RequestMovieAsync(100, 7);
+        await client.AddToWatchlistAsync(100, 7);
+
+        Assert.Equal(3, seen.Count);
+        Assert.All(seen, req =>
+        {
+            Assert.Equal(ApiKey, Assert.Single(req.Headers.GetValues("X-Api-Key")));
+            Assert.Contains(req.Headers.Accept, a => a.MediaType == "application/json");
+        });
+        Assert.Equal("7", Assert.Single(seen[2].Headers.GetValues("X-API-User")));
+    }
+
+    [Fact]
+    public void ProductionClients_ShareOneHttpClient_WithoutAnApiKeyDefault_AndDisposeLeavesItUsable()
+    {
+        var first = new SeerrClient(BaseUrl, "key-a", NullLogger.Instance);
+        var shared = first.HttpForTesting;
+        first.Dispose();
+
+        using var second = new SeerrClient("http://other.test", "key-b", NullLogger.Instance);
+
+        Assert.Same(shared, second.HttpForTesting);
+        Assert.False(shared.DefaultRequestHeaders.Contains("X-Api-Key"));
+        shared.CancelPendingRequests();
+    }
+
     private class SeerrHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;

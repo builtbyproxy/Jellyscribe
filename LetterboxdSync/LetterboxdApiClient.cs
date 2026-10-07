@@ -30,12 +30,31 @@ public class LetterboxdApiClient : ILetterboxdService
     // request. Never shared with the scraper: FilmId here is the LID.
     private static readonly ConcurrentDictionary<int, FilmResult> FilmCache = new();
 
+    // One process-wide client: a client per instance (one per sync, per account and per
+    // dashboard request) opened a fresh connection pool and TLS handshake every time. The
+    // default headers are the same for every account; the bearer token goes on each request.
+    // The bounded connection lifetime keeps DNS changes visible.
+    private static readonly HttpClient SharedHttp = WithDefaultHeaders(new HttpClient(new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    }));
+
+    private readonly bool _ownsHttp;
+
     public LetterboxdApiClient(ILogger logger, HttpMessageHandler? handler = null)
     {
         _logger = logger;
-        _http = handler != null ? new HttpClient(handler) : new HttpClient();
-        _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("LetterboxdSync/1.6");
+        _ownsHttp = handler != null;
+        _http = handler != null ? WithDefaultHeaders(new HttpClient(handler)) : SharedHttp;
+    }
+
+    internal HttpClient HttpForTesting => _http;
+
+    private static HttpClient WithDefaultHeaders(HttpClient http)
+    {
+        http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("LetterboxdSync/1.6");
+        return http;
     }
 
     public async Task AuthenticateAsync(string username, string password, string? rawCookies = null)
@@ -469,7 +488,8 @@ public class LetterboxdApiClient : ILetterboxdService
 
     public void Dispose()
     {
-        _http.Dispose();
+        if (_ownsHttp)
+            _http.Dispose();
     }
 
     // --- Test-only helpers (InternalsVisibleTo LetterboxdSync.Tests) ---

@@ -544,6 +544,45 @@ public class ApiClientRateLimitTests
     }
 }
 
+public class ApiClientSharedHttpTests
+{
+    private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
+
+    [Fact]
+    public async Task InjectedHandler_IsUsed_AndBearerTokenIsSentPerRequest()
+    {
+        var seen = new List<HttpRequestMessage>();
+        var inner = ApiTestHelpers.CreateAuthenticatedHandler();
+        var handler = new ApiMockHandler(req =>
+        {
+            seen.Add(req);
+            return inner.Invoke(req);
+        });
+
+        using var client = new LetterboxdApiClient(TestLogger, handler);
+        await client.AuthenticateAsync("shared-http-user", "pass");
+
+        var me = Assert.Single(seen, r => r.RequestUri!.AbsolutePath.EndsWith("/me"));
+        Assert.Equal("Bearer", me.Headers.Authorization?.Scheme);
+        Assert.Equal("mock-token", me.Headers.Authorization?.Parameter);
+        Assert.Null(client.HttpForTesting.DefaultRequestHeaders.Authorization);
+        Assert.All(seen, r => Assert.Contains(r.Headers.Accept, a => a.MediaType == "application/json"));
+    }
+
+    [Fact]
+    public void ProductionClients_ShareOneHttpClient_AndDisposeLeavesItUsable()
+    {
+        var first = new LetterboxdApiClient(TestLogger);
+        var shared = first.HttpForTesting;
+        first.Dispose();
+
+        using var second = new LetterboxdApiClient(TestLogger);
+
+        Assert.Same(shared, second.HttpForTesting);
+        shared.CancelPendingRequests();
+    }
+}
+
 internal static class ApiTestHelpers
 {
     internal static ApiMockHandler CreateAuthenticatedHandler(Func<HttpRequestMessage, HttpResponseMessage?>? extraHandler = null)
@@ -589,6 +628,8 @@ internal class ApiMockHandler : HttpMessageHandler
     {
         _handler = handler;
     }
+
+    public HttpResponseMessage Invoke(HttpRequestMessage request) => _handler(request);
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
