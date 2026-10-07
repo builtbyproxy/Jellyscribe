@@ -99,6 +99,17 @@ public class ServiceFactoryCacheTests : IDisposable
         Assert.NotSame(_jars[0], _jars[1]);
     }
 
+    [Theory]
+    [InlineData("other-cookies", null)]
+    [InlineData(null, "Mozilla/5.0 (X11; Linux x86_64) Firefox/140.0")]
+    public async Task NewRawCookiesOrUserAgent_GetANewSession(string? rawCookies, string? userAgent)
+    {
+        await LetterboxdServiceFactory.CreateAuthenticatedAsync("demo-cinephile", "secret", null, Log);
+        await LetterboxdServiceFactory.CreateAuthenticatedAsync("demo-cinephile", "secret", rawCookies, Log, userAgent);
+
+        Assert.NotSame(_jars[0], _jars[1]);
+    }
+
     [Fact]
     public async Task WebsiteLoginFails_ForgetsTheSessionAndDoesNotBlameTheApi()
     {

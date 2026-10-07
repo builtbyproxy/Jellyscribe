@@ -78,7 +78,18 @@ public static class LetterboxdServiceFactory
         }
 
         var sessionKey = Helpers.TokenCacheKey(username, $"{password}\n{rawCookies}\n{userAgent}");
-        var cookies = WebsiteSessions.GetOrAdd(sessionKey, _ => new CookieContainer());
+        var cookies = WebsiteSessions.GetOrAdd(sessionKey, newKey =>
+        {
+            // New credentials, cookies or User-Agent for the account: drop its older sessions.
+            var accountPrefix = username + "\n";
+            foreach (var stale in WebsiteSessions.Keys)
+            {
+                if (stale.StartsWith(accountPrefix, StringComparison.Ordinal))
+                    WebsiteSessions.TryRemove(stale, out _);
+            }
+
+            return new CookieContainer();
+        });
         var scraping = CreateWebsiteClient(logger, userAgent, cookies);
         try
         {

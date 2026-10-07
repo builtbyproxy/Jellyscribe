@@ -1040,6 +1040,35 @@ public class SerializdApiClientTests
         Assert.Equal(1, attempts);
     }
 
+    // The production client is shared by every account, so a token must only ever ride on the
+    // request it belongs to, never on the client's default headers.
+    [Fact]
+    public async Task TwoAccounts_EachRequestCarriesItsOwnToken_AndNoneIsADefaultHeader()
+    {
+        var seen = new List<(string Path, string? Token)>();
+        HttpResponseMessage Respond(HttpRequestMessage req, string token)
+        {
+            seen.Add((req.RequestUri!.AbsolutePath, req.Headers.Authorization?.Parameter));
+            return req.RequestUri.AbsolutePath.EndsWith("/login")
+                ? Json(HttpStatusCode.OK, $"{{\"username\":\"u\",\"token\":\"{token}\"}}")
+                : Json(HttpStatusCode.OK, ShowJson);
+        }
+
+        using var a = new SerializdApiClient(Log, new ApiMockHandler(r => Respond(r, "token-a")));
+        using var b = new SerializdApiClient(Log, new ApiMockHandler(r => Respond(r, "token-b")));
+        await a.AuthenticateAsync("a@example.com", "pw");
+        await b.AuthenticateAsync("b@example.com", "pw");
+        SerializdApiClient.ResetCachesForTesting();
+        await a.ResolveSeasonIdAsync(1396, 1);
+        SerializdApiClient.ResetCachesForTesting();
+        await b.ResolveSeasonIdAsync(1396, 1);
+
+        Assert.Equal(new string?[] { "token-a", "token-b" },
+            seen.Where(s => s.Path.Contains("/show/1396")).Select(s => s.Token).ToArray());
+        Assert.Null(a.HttpForTesting.DefaultRequestHeaders.Authorization);
+        Assert.Null(b.HttpForTesting.DefaultRequestHeaders.Authorization);
+    }
+
     [Fact]
     public void ProductionClients_ShareOneHttpClient_AndDisposeLeavesItUsable()
     {

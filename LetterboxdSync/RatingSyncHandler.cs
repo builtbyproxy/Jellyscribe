@@ -54,12 +54,13 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     private readonly ConcurrentDictionary<(Guid User, Guid Item), double> _known = new();
     private volatile bool _baselineReady;
 
-    // Users the seed skipped because none of their accounts syncs ratings. Their saves are read
-    // like saves before the baseline, until a later seed pass picks them up.
+    // Users the seed skipped because none of their accounts syncs ratings. Their saves only
+    // update the baseline, until a later seed pass picks them up.
     private readonly ConcurrentDictionary<Guid, byte> _unseededUsers = new();
 
-    /// <summary>How often the sweep loop seeds users who have turned rating sync on since.</summary>
-    internal static readonly TimeSpan ReseedInterval = TimeSpan.FromMinutes(5);
+    // Set when the plugin configuration is saved, so the sweep loop seeds anyone who has just
+    // turned rating sync on.
+    private volatile bool _reseedRequested;
 
     private CancellationTokenSource? _cts;
     private Task? _loop;
@@ -100,14 +101,21 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _userDataManager.UserDataSaved += OnUserDataSaved;
+        if (Plugin.Instance != null)
+            Plugin.Instance.ConfigurationChanged += OnConfigurationChanged;
         _cts = new CancellationTokenSource();
         _loop = Task.Run(() => RunAsync(_cts.Token), CancellationToken.None);
         return Task.CompletedTask;
     }
 
+    private void OnConfigurationChanged(object? sender, MediaBrowser.Model.Plugins.BasePluginConfiguration e)
+        => _reseedRequested = true;
+
     public async Task StopAsync(CancellationToken cancellationToken)
     {
         _userDataManager.UserDataSaved -= OnUserDataSaved;
+        if (Plugin.Instance != null)
+            Plugin.Instance.ConfigurationChanged -= OnConfigurationChanged;
         if (_cts == null || _loop == null)
             return;
 
@@ -239,14 +247,24 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
                 _pending.TryRemove(key, out _);
             return;
         }
+        // A user the seed skipped (rating sync was off) has no baseline: this save cannot tell a
+        // change from an old rating, so it becomes the baseline and nothing is pushed. Turning
+        // rating sync on triggers a seed within a second or so (see OnConfigurationChanged).
+        if (_unseededUsers.ContainsKey(e.UserId))
+        {
+            if (current is double absorbed)
+                _known[key] = absorbed;
+            else
+                _known.TryRemove(key, out _);
+            return;
+        }
+
         var known = _known.TryGetValue(key, out var stored);
         double? previous = known ? stored : null;
 
         // Before the baseline is in, an unknown film may still have an older rating, so any rated
-        // save counts as a change. After it, unknown means unrated, except for a user the seed
-        // skipped (rating sync was off), whose ratings were never read.
-        var baselineReady = _baselineReady && !_unseededUsers.ContainsKey(e.UserId);
-        var changed = known || baselineReady ? previous != current : current.HasValue;
+        // save counts as a change. After it, unknown means unrated.
+        var changed = known || _baselineReady ? previous != current : current.HasValue;
         if (!changed)
             return;
 
@@ -284,17 +302,17 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     private async Task SweepLoopAsync(CancellationToken ct)
     {
         using var timer = new PeriodicTimer(SweepInterval);
-        var nextReseed = UtcNow() + ReseedInterval;
         try
         {
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
             {
                 try
                 {
-                    if (!_unseededUsers.IsEmpty && UtcNow() >= nextReseed)
+                    if (_reseedRequested)
                     {
-                        nextReseed = UtcNow() + ReseedInterval;
-                        SeedNewlyEnabledUsers(ct);
+                        _reseedRequested = false;
+                        if (!_unseededUsers.IsEmpty)
+                            SeedNewlyEnabledUsers(ct);
                     }
 
                     await DrainDueAsync(ct).ConfigureAwait(false);

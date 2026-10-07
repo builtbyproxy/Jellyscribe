@@ -902,7 +902,9 @@ public class LetterboxdController : JellyfinUserApiController
             ParentIndexNumber = seasonNumber,
             IndexNumber = episodeNumber
         }).OfType<MediaBrowser.Controller.Entities.TV.Episode>()
-          .FirstOrDefault(ep => ep.ParentIndexNumber == seasonNumber && ep.IndexNumber == episodeNumber);
+          // Re-checked in memory like FindByTmdbId: the episode must belong to the matched series.
+          .FirstOrDefault(ep => seriesIds.Contains(ep.SeriesId)
+              && ep.ParentIndexNumber == seasonNumber && ep.IndexNumber == episodeNumber);
     }
 
     /// <summary>

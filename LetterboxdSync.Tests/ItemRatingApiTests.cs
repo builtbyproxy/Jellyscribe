@@ -105,8 +105,9 @@ public class ItemRatingApiTests
     {
         var (h, user) = MakeHarness();
         using var _ = h;
-        var episode = new Episode { Name = "Ozymandias", ParentIndexNumber = 5, IndexNumber = 14, Id = System.Guid.NewGuid() };
-        SetLibrary(h, MakeSeries(1396), episode);
+        var series = MakeSeries(1396);
+        var episode = new Episode { Name = "Ozymandias", ParentIndexNumber = 5, IndexNumber = 14, Id = System.Guid.NewGuid(), SeriesId = series.Id };
+        SetLibrary(h, series, episode);
         h.UserDataManager.GetUserData(user, episode).Returns(new UserItemData { Key = "k", Rating = 8 });
 
         var (rating, stars) = ReadPayload(
@@ -114,6 +115,24 @@ public class ItemRatingApiTests
 
         Assert.Equal(8, rating);
         Assert.Equal(4, stars);
+    }
+
+    // The library stub ignores the query's filters, so this is the "looser query" case: an
+    // episode with the right numbers from another show must never be taken for this one.
+    [Fact]
+    public void EpisodeOfAnotherSeries_WithTheSameNumbers_IsNeverResolved()
+    {
+        var (h, user) = MakeHarness();
+        using var _ = h;
+        var series = MakeSeries(1396);
+        var other = new Episode { Name = "Other show", ParentIndexNumber = 5, IndexNumber = 14, Id = System.Guid.NewGuid(), SeriesId = System.Guid.NewGuid() };
+        SetLibrary(h, series, other);
+        h.UserDataManager.GetUserData(user, other).Returns(new UserItemData { Key = "k", Rating = 8 });
+
+        var (rating, _) = ReadPayload(
+            h.Controller.GetItemRating(tmdbId: 1396, isShow: true, seasonNumber: 5, episodeNumber: 14));
+
+        Assert.Null(rating);
     }
 
     [Fact]

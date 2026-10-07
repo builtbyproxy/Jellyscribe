@@ -29,6 +29,9 @@ public class AuthBreakerEntry
 
     /// <summary>When the open breaker last let one login attempt through (see <see cref="AuthBreaker.BlocksLogin"/>).</summary>
     public DateTime? LastProbeUtc { get; set; }
+
+    /// <summary>Daily login attempts that failed while the breaker was open.</summary>
+    public int FailedProbes { get; set; }
 }
 
 /// <summary>
@@ -51,6 +54,13 @@ public static class AuthBreaker
     /// open for another day; a successful one closes it.
     /// </summary>
     public static readonly TimeSpan HalfOpenAfter = TimeSpan.FromHours(24);
+
+    /// <summary>
+    /// After this many failed daily attempts the breaker stops trying until credentials are
+    /// re-saved: a week of failures is a wrong password, not an outage, and retrying it for ever
+    /// risks Letterboxd locking the account.
+    /// </summary>
+    public const int MaxFailedProbes = 7;
 
     /// <summary>Test seam for the clock.</summary>
     internal static Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
@@ -115,6 +125,9 @@ public static class AuthBreaker
             if (e?.OpenedAtUtc == null)
                 return false;
 
+            if (e.FailedProbes >= MaxFailedProbes)
+                return true;
+
             var now = UtcNow();
             var lastTry = e.LastProbeUtc ?? e.OpenedAtUtc.Value;
             if (now - lastTry < HalfOpenAfter)
@@ -142,7 +155,8 @@ public static class AuthBreaker
                 FirstFailureUtc = e.FirstFailureUtc,
                 OpenedAtUtc = e.OpenedAtUtc,
                 LastError = e.LastError,
-                LastProbeUtc = e.LastProbeUtc
+                LastProbeUtc = e.LastProbeUtc,
+                FailedProbes = e.FailedProbes
             }).ToList();
         }
     }
@@ -162,7 +176,8 @@ public static class AuthBreaker
                 FirstFailureUtc = e.FirstFailureUtc,
                 OpenedAtUtc = e.OpenedAtUtc,
                 LastError = e.LastError,
-                LastProbeUtc = e.LastProbeUtc
+                LastProbeUtc = e.LastProbeUtc,
+                FailedProbes = e.FailedProbes
             };
         }
     }
@@ -202,6 +217,8 @@ public static class AuthBreaker
             }
 
             var wasOpen = e.OpenedAtUtc != null;
+            if (wasOpen && e.LastProbeUtc != null)
+                e.FailedProbes++;
             e.ConsecutiveFailures++;
             e.FirstFailureUtc ??= UtcNow();
             e.LastError = Sanitize(error);
@@ -249,7 +266,7 @@ public static class AuthBreaker
                 ShortOverview = $"Login has been failing since {since:yyyy-MM-dd HH:mm} UTC.",
                 Overview = $"Letterboxd login for account {letterboxdUsername} has been failing since {since:yyyy-MM-dd HH:mm} UTC. " +
                            "Syncing for this account is paused until its credentials are updated in Jellyscribe settings. " +
-                           "Jellyscribe also tries one login a day, so a Letterboxd outage clears on its own.",
+                           "Jellyscribe also tries one login a day for a week, so a Letterboxd outage clears on its own.",
                 LogSeverity = Microsoft.Extensions.Logging.LogLevel.Warning
             }).ConfigureAwait(false);
         }

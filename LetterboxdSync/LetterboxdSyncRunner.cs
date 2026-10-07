@@ -380,7 +380,7 @@ public class LetterboxdSyncRunner
                 Account = lbAccount,
                 Timestamp = DateTime.UtcNow,
                 Status = SyncStatus.Skipped,
-                Error = $"Login failing since {since:yyyy-MM-dd}; sync paused until credentials are re-saved (one login is retried each day)",
+                Error = $"Login failing since {since:yyyy-MM-dd}; sync paused until credentials are re-saved (one login is retried each day for a week)",
                 Source = source
             });
             SyncProgress.Complete(SyncProgress.TrackLetterboxd);

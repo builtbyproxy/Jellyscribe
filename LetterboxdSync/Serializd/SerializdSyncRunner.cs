@@ -322,7 +322,7 @@ public class SerializdSyncRunner
                     failuresInARow, user.Username, account.Email);
                 SerializdActivity.Record(new SyncEvent
                 {
-                    FilmTitle = $"Account {account.Email} paused",
+                    FilmTitle = "Serializd account paused",
                     Username = user.Username ?? string.Empty,
                     Timestamp = DateTime.UtcNow,
                     Status = SyncStatus.Skipped,

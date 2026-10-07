@@ -193,6 +193,27 @@ public class AuthBreakerTests : IDisposable
     }
 
     [Fact]
+    public void AWeekOfFailedDailyAttempts_StopsTrying_UntilCredentialsAreResaved()
+    {
+        var now = new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc);
+        AuthBreaker.UtcNow = () => now;
+        Open();
+
+        for (var day = 0; day < AuthBreaker.MaxFailedProbes; day++)
+        {
+            now += AuthBreaker.HalfOpenAfter;
+            Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+            AuthBreaker.RecordFailure("u1", "demo-cinephile", "Letterboxd login error: incorrect password");
+        }
+
+        now += TimeSpan.FromDays(30);
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+
+        AuthBreaker.Reset("u1", "demo-cinephile");
+        Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+    }
+
+    [Fact]
     public void ProbeTime_SurvivesARestart()
     {
         var now = new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc);

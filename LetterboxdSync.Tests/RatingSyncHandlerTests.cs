@@ -475,8 +475,10 @@ public class RatingSyncHandlerTests : IDisposable
         Assert.Equal(1, _handler.PendingCount);
     }
 
+    // Until the user is seeded, a save cannot tell an old rating from a new one, so it never
+    // publishes anything; it only becomes the baseline.
     [Fact]
-    public void Baseline_BeforeTheNextPass_AnUnseededUsersRatedSaveCountsAsAChange()
+    public void Baseline_BeforeTheUserIsSeeded_ASaveIsNeverPushed_ButBecomesTheBaseline()
     {
         var account = AddAccount(syncRatings: false);
         _userManager.GetUsers().Returns(new[] { _user });
@@ -485,8 +487,12 @@ public class RatingSyncHandlerTests : IDisposable
         _handler.MarkBaselineReady();
         account.SyncRatings = true;
 
-        Save(8);
+        Save(8, UserDataSaveReason.UpdateUserRating); // a favorite toggle on a film rated long ago
+        Assert.Equal(0, _handler.PendingCount);
 
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 8 });
+        _handler.SeedNewlyEnabledUsers(CancellationToken.None);
+        Save(6);
         Assert.Equal(1, _handler.PendingCount);
     }
 
