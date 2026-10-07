@@ -123,6 +123,11 @@
                 #letterboxdSyncConfigPage .ws-src { color: var(--ws-faint); font-size: 12px; }
                 #letterboxdSyncConfigPage .ws-review-btn { border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-family: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
                 #letterboxdSyncConfigPage .ws-review-btn:hover { color: var(--ws-text); }
+                #letterboxdSyncConfigPage .ws-grp-btn { all: unset; display: flex; align-items: center; gap: 11px; cursor: pointer; }
+                #letterboxdSyncConfigPage .ws-grp-btn:focus-visible { outline: 2px solid var(--ws-primary); outline-offset: 3px; border-radius: 6px; }
+                #letterboxdSyncConfigPage .ws-grp-caret { display: inline-block; color: var(--ws-faint); transition: transform .13s; }
+                #letterboxdSyncConfigPage .ws-grp-btn[aria-expanded="true"] .ws-grp-caret { transform: rotate(90deg); }
+                #letterboxdSyncConfigPage .ws-table tr.ws-grp-item td:first-child { padding-left: 32px; }
                 #letterboxdSyncConfigPage .ws-ugroup { margin-bottom: 22px; }
                 #letterboxdSyncConfigPage .ws-uhead { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
                 #letterboxdSyncConfigPage .ws-avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-family: var(--ws-mono); font-size: 11px; font-weight: 600; background: var(--ws-raise); flex: none; }
@@ -292,6 +297,7 @@
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
                             </div>
                             <div class="ws-sect-title"><h2>Recent activity</h2><span class="rule"></span></div>
+                            <input type="search" class="ws-input" id="historySearch" placeholder="Search titles" style="max-width:320px;margin-bottom:10px;" />
                             <div class="ws-filters" id="ovStatusFilters">
                                 <button type="button" class="ws-chip on" data-s="all">All</button>
                                 <button type="button" class="ws-chip" data-s="hide-skipped">Hide skipped</button>
@@ -640,6 +646,7 @@
                                 self.ovPage = 0;
                                 self.renderOverview();
                             });
+                            document.getElementById('historySearch').addEventListener('input', function () { self.ovQuery = this.value.trim().toLowerCase(); self.ovPage = 0; self.renderOverview(); });
                             document.getElementById('historyPrev').addEventListener('click', function () { if ((self.ovPage || 0) > 0) { self.ovPage--; self.renderOverview(); } });
                             document.getElementById('historyNext').addEventListener('click', function () { self.ovPage = (self.ovPage || 0) + 1; self.renderOverview(); });
                             document.getElementById('actFilters').addEventListener('click', function (e) {
@@ -690,6 +697,8 @@
                             root.addEventListener('viewhide', function () { self.modalIds.forEach(function (id) { self.closeModal(id); }); });
                             ['historyBody', 'actBody'].forEach(function (id) {
                                 document.getElementById(id).addEventListener('click', function (e) {
+                                    var g = e.target.closest('.ws-grp-btn');
+                                    if (g) { self.toggleGroup(this, g); return; }
                                     var b = e.target.closest('.ws-review-btn'); if (!b) return;
                                     self.openReview(b.getAttribute('data-svc'), parseInt(b.getAttribute('data-tmdb'), 10) || 0, b.getAttribute('data-title'),
                                         b.getAttribute('data-slug'), b.getAttribute('data-season'), b.getAttribute('data-episode'));
@@ -793,15 +802,16 @@
                             if (st) st.innerHTML = build('serializd', 'var(--ws-tv)', 'var(--ws-tv-soft)');
                         },
                         renderOverview: function () {
-                            var self = this, f = this.ovFilter || 'all';
+                            var self = this, f = this.ovFilter || 'all', q = this.ovQuery || '';
                             var all = this.merged.filter(function (e) {
-                                return (f === 'all' || e._svc === f) && self.matchesStatus(e);
+                                return (f === 'all' || e._svc === f) && self.matchesStatus(e) && (!q || (e.FilmTitle || '').toLowerCase().indexOf(q) >= 0);
                             });
-                            var ps = this.ovPageSize || 40, total = all.length, pages = Math.max(1, Math.ceil(total / ps));
+                            var units = this.groupRuns(all);
+                            var ps = this.ovPageSize || 40, total = units.length, pages = Math.max(1, Math.ceil(total / ps));
                             if ((this.ovPage || 0) >= pages) this.ovPage = pages - 1;
                             var start = (this.ovPage || 0) * ps;
                             var empty = this.merged.length ? 'No items match these filters.' : null;
-                            document.getElementById('historyBody').innerHTML = this.rowsHtml(all.slice(start, start + ps), null, empty);
+                            document.getElementById('historyBody').innerHTML = units.length ? this.unitsHtml(units.slice(start, start + ps)) : this.rowsHtml([], null, empty);
                             var pag = document.getElementById('historyPagination');
                             if (total > ps) {
                                 pag.style.display = 'flex';
@@ -819,6 +829,8 @@
                                     document.getElementById('actBody').innerHTML = self.rowsHtml(events, src);
                                     var pg = document.getElementById('actPagination');
                                     pg.style.display = self.actTotal > self.pageSize ? 'flex' : 'none';
+                                    document.getElementById('actPrev').disabled = self.actOffset === 0;
+                                    document.getElementById('actNext').disabled = self.actOffset + self.pageSize >= self.actTotal;
                                     document.getElementById('actPageInfo').textContent = (self.actOffset + 1) + '–' + Math.min(self.actOffset + self.pageSize, self.actTotal) + ' of ' + self.actTotal;
                                 }).catch(function () {
                                     document.getElementById('actBody').innerHTML = self.errorRow('the activity log', 'loadActivity');
@@ -851,30 +863,67 @@
                         rowsHtml: function (events, src, emptyMsg) {
                             if (!events.length) return '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">' + (emptyMsg || 'No activity yet. Run a sync to get started.') + '</td></tr>';
                             var self = this;
-                            return events.map(function (e) {
-                                var source = e._svc || src;
-                                var svc = source === 'serializd' ? 'tv' : 'film';
-                                var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success';
-                                var title = (e.FilmTitle || '').split(' · ');
-                                var t = title[0], m = title[1] || '';
-                                var ts = new Date(e.Timestamp);
-                                var when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                var shortWhen = self.shortDate(ts);
-                                // A Letterboxd review needs the film's slug; rows without one (a paused or failed lookup) can't be reviewed.
-                                var canReview = (status === 'Success' || status === 'Rewatch' || status === 'Skipped') && (source === 'serializd' || !!e.FilmSlug);
-                                var btn = '';
-                                if (canReview && e.TmdbId) {
-                                    var seM = (source === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
-                                    btn = '<button type="button" class="ws-review-btn" data-svc="' + self.escAttr(source) + '" data-tmdb="' + self.escAttr(e.TmdbId) +
-                                        '" data-title="' + self.escAttr(t) + '" data-slug="' + self.escAttr(e.FilmSlug) +
-                                        '" data-season="' + (seM ? seM[1] : '') + '" data-episode="' + (seM ? seM[2] : '') + '">Review</button>';
-                                }
-                                if (e.Source === 'review') status = 'Reviewed';
-                                return '<tr><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'MV') + '</span>' +
-                                    '<div><div class="t">' + self.escAttr(t) + '</div><div class="m">' + self.escAttr(m) + '<span class="ws-mwhen">' + (m ? ' · ' : '') + shortWhen + '</span></div></div></div></td>' +
-                                    '<td>' + self.pillHtml(status, e.Error) + '</td>' +
-                                    '<td class="ws-src">' + self.escAttr(e.Source) + '</td><td class="ws-when">' + when + '</td><td>' + btn + '</td></tr>';
+                            return events.map(function (e) { return self.rowHtml(e, src); }).join('');
+                        },
+                        whenOf: function (e) {
+                            var ts = new Date(e.Timestamp);
+                            return ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        },
+                        rowHtml: function (e, src, trAttrs) {
+                            var self = this, source = e._svc || src;
+                            var svc = source === 'serializd' ? 'tv' : 'film';
+                            var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success';
+                            var title = (e.FilmTitle || '').split(' · ');
+                            var t = title[0], m = title[1] || '';
+                            // A Letterboxd review needs the film's slug; rows without one (a paused or failed lookup) can't be reviewed.
+                            var canReview = (status === 'Success' || status === 'Rewatch' || status === 'Skipped') && (source === 'serializd' || !!e.FilmSlug);
+                            var btn = '';
+                            if (canReview && e.TmdbId) {
+                                var seM = (source === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
+                                btn = '<button type="button" class="ws-review-btn" data-svc="' + self.escAttr(source) + '" data-tmdb="' + self.escAttr(e.TmdbId) +
+                                    '" data-title="' + self.escAttr(t) + '" data-slug="' + self.escAttr(e.FilmSlug) +
+                                    '" data-season="' + (seM ? seM[1] : '') + '" data-episode="' + (seM ? seM[2] : '') + '">Review</button>';
+                            }
+                            if (e.Source === 'review') status = 'Reviewed';
+                            return '<tr' + (trAttrs || '') + '><td><div class="ws-titlecell ws-tc"><span class="ws-badge ' + svc + '">' + (svc === 'tv' ? 'TV' : 'MV') + '</span>' +
+                                '<div><div class="t">' + self.escAttr(t) + '</div><div class="m">' + self.escAttr(m) + '<span class="ws-mwhen">' + (m ? ' · ' : '') + self.shortDate(new Date(e.Timestamp)) + '</span></div></div></div></td>' +
+                                '<td>' + self.pillHtml(status, e.Error) + '</td>' +
+                                '<td class="ws-src">' + self.escAttr(e.Source) + '</td><td class="ws-when">' + self.whenOf(e) + '</td><td>' + btn + '</td></tr>';
+                        },
+                        // Consecutive episodes of one show collapse into one expandable row, so a binge
+                        // doesn't push everything else off the page. A run of one stays a plain row.
+                        groupRuns: function (events) {
+                            var units = [], episode = /^S\d+E\d+$/;
+                            events.forEach(function (e) {
+                                var parts = (e.FilmTitle || '').split(' · '), last = units[units.length - 1];
+                                var isEpisode = e._svc === 'serializd' && episode.test(parts[1] || '');
+                                if (isEpisode && last && last.show === parts[0]) { last.events.push(e); return; }
+                                units.push({ show: isEpisode ? parts[0] : null, events: [e] });
+                            });
+                            return units;
+                        },
+                        unitsHtml: function (units) {
+                            var self = this;
+                            return units.map(function (u, i) {
+                                if (u.events.length < 2) return self.rowHtml(u.events[0], null);
+                                var attrs = ' class="ws-grp-item" data-grp-of="' + i + '" hidden';
+                                return self.groupHtml(u, i) + u.events.map(function (e) { return self.rowHtml(e, null, attrs); }).join('');
                             }).join('');
+                        },
+                        groupHtml: function (u, id) {
+                            var self = this, newest = u.events[0], oldest = u.events[u.events.length - 1];
+                            var episodeOf = function (e) { return (e.FilmTitle || '').split(' · ')[1]; };
+                            var uniq = function (fn) { return u.events.map(fn).filter(function (v, i, a) { return a.indexOf(v) === i; }); };
+                            var statuses = uniq(function (e) { return self.statusOf(e); }), sources = uniq(function (e) { return e.Source || ''; });
+                            var pill = statuses.length === 1 ? self.pillHtml(statuses[0]) : '<span class="ws-pill Skipped">Mixed</span>';
+                            return '<tr class="ws-grp"><td><button type="button" class="ws-grp-btn ws-tc" data-grp="' + id + '" aria-expanded="false"><span class="ws-badge tv">TV</span><div><div class="t">' + self.escAttr(u.show) +
+                                ' <span class="ws-grp-caret">▸</span></div><div class="m">' + u.events.length + ' episodes · ' + self.escAttr(episodeOf(oldest)) + '–' + self.escAttr(episodeOf(newest)) + '</div></div></button></td><td>' + pill +
+                                '</td><td class="ws-src">' + (sources.length === 1 ? self.escAttr(sources[0]) : '') + '</td><td class="ws-when">' + self.whenOf(newest) + '</td><td></td></tr>';
+                        },
+                        toggleGroup: function (body, btn) {
+                            var open = btn.getAttribute('aria-expanded') !== 'true';
+                            btn.setAttribute('aria-expanded', String(open));
+                            body.querySelectorAll('[data-grp-of="' + btn.getAttribute('data-grp') + '"]').forEach(function (r) { r.hidden = !open; });
                         },
 
                         /* ===== Sync (honours the All / Film / TV filter) ===== */
