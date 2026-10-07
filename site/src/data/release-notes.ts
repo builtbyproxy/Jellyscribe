@@ -10,6 +10,27 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.10',
+    headline: 'Settings pages that work by keyboard, on phones and in both themes',
+    summary:
+      'The Jellyscribe pages now work properly on a phone, by keyboard and with a screen reader, and they follow your Jellyfin theme. The admin settings page no longer runs off the side of a phone screen, and on a phone each activity row shows its date under the title, an idea from Wouter Stulp. The section menu, the star rating and the account and review windows can all be used with the keyboard. The windows now behave as proper dialogs: they keep focus inside, close with Escape and return you to where you were. Every field is labelled for screen readers. Thanks to Wouter Stulp, buttons and small text are much easier to read, disabled buttons look disabled, and the pages no longer restyle the rest of Jellyfin. The pages now switch between light and dark with your Jellyfin theme instead of your device\'s setting, and in light mode every status colour is readable. "Back to Jellyfin" now works on servers that live under a sub-path such as /jellyfin, and returns you to the page you came from without reloading.',
+    highlights: {
+      improvements: [
+        'The pages follow your Jellyfin theme, light or dark, instead of your device\'s setting.',
+        'The section menu, the star rating and the account and review windows all work by keyboard, and every field is labelled for screen readers.',
+        'Clearer buttons and small text, with disabled buttons that look disabled, thanks to Wouter Stulp.',
+        'Every status colour is readable in light mode.',
+        'On a phone, each activity row shows its date under the title, an idea from Wouter Stulp.',
+      ],
+      fixes: [
+        'The admin settings page no longer runs off the side of a phone screen.',
+        'The Jellyscribe pages no longer restyle the rest of Jellyfin\'s interface, a fix from Wouter Stulp.',
+        '"Back to Jellyfin" works on servers under a sub-path such as /jellyfin and returns you to the page you came from without a reload.',
+        'Leaving the admin page while a sync runs no longer keeps checking its progress in the background.',
+      ],
+    },
+  },
+  {
     version: '2.10.9',
     headline: 'The settings pages never lose or duplicate an account',
     summary:
