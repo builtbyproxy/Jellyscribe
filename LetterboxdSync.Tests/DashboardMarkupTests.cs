@@ -71,7 +71,7 @@ public class DashboardMarkupTests
         var light = dark.ToDictionary(kv => kv.Key, kv => kv.Value);
         foreach (var kv in Tokens(style, root + ".ws-light")) light[kv.Key] = kv.Value;
 
-        var text = new[] { "--ws-text", "--ws-muted", "--ws-faint", "--ws-ok", "--ws-warn", "--ws-crit", "--ws-film", "--ws-tv", "--ws-info", "--ws-requested" };
+        var text = new[] { "--ws-text", "--ws-muted", "--ws-faint", "--ws-primary-text", "--ws-ok", "--ws-warn", "--ws-crit", "--ws-film", "--ws-tv", "--ws-info", "--ws-requested" };
         var surfaces = new[] { "--ws-bg", "--ws-surface", "--ws-surface-2" };
         var failures = new List<string>();
         foreach (var (name, palette) in new[] { ("dark", dark), ("light", light) })
@@ -92,7 +92,11 @@ public class DashboardMarkupTests
         var primary = Regex.Match(style, Regex.Escape(root) + @" \.ws-btn\.primary \{[^}]*background: var\(--ws-primary\);[^}]*color: (#[0-9a-fA-F]{6});");
         Assert.True(primary.Success, "primary button rule not found");
         Assert.True(Contrast(primary.Groups[1].Value, Tokens(style, root)["--ws-primary"]) >= 4.5);
-        Assert.Matches(Regex.Escape(root) + @" \.ws-btn:disabled \{ opacity: \.45; cursor: not-allowed; \}", style);
+        var disabled = Regex.Match(style, Regex.Escape(root) + @" \.ws-btn:disabled \{([^}]*)\}");
+        Assert.True(disabled.Success, "no disabled-button rule");
+        var opacity = Regex.Match(disabled.Groups[1].Value, @"opacity:\s*([\d.]+)");
+        Assert.True(opacity.Success && double.Parse(opacity.Groups[1].Value, CultureInfo.InvariantCulture) <= 0.6, "disabled buttons must be visibly dimmed");
+        Assert.Contains("cursor: not-allowed", disabled.Groups[1].Value, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -140,8 +144,9 @@ public class DashboardMarkupTests
         Assert.NotEmpty(fieldLabels);
         Assert.All(fieldLabels, l => Assert.Contains(" for=\"", l, StringComparison.Ordinal));
 
-        // The diary login sits on Jellyfin's own origin, where the browser keeps the Jellyfin login: it must
-        // never be offered or filled here, or the Jellyfin password would be sent to the diary.
+        // The diary login sits on Jellyfin's own origin, where the browser keeps the Jellyfin login, which must
+        // not be filled here or it would be sent to the diary. new-password is what stops the browser filling
+        // it (some browsers ignore autocomplete="off" on the login field); current-password would invite it.
         Assert.Contains("id=\"mUsername\" autocomplete=\"off\"", page, StringComparison.Ordinal);
         Assert.Contains("id=\"mPassword\" autocomplete=\"new-password\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("current-password", page, StringComparison.Ordinal);

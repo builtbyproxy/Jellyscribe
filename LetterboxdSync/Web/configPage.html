@@ -26,7 +26,7 @@
                     --ws-film: #e8b84b; --ws-tv: #90a6ee; --ws-primary: #e8b84b;
                     --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8; --ws-requested: #a78bfa;
                     --ws-film-soft: rgba(232,184,75,.13); --ws-tv-soft: rgba(144,166,238,.14); --ws-primary-soft: rgba(232,184,75,.16);
-                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55); --ws-focus: #e8b84b;
+                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55); --ws-focus: #e8b84b; --ws-primary-text: #e8b84b;
                     --ws-mono: 'WS Mono', ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
                     --ws-r: 12px;
                     color: var(--ws-text); font-family: 'WS Sans', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; background: var(--ws-bg);
@@ -39,7 +39,7 @@
                     --ws-text: #131922; --ws-muted: #5a6572; --ws-faint: #646e7b;
                     --ws-film: #855e00; --ws-tv: #3d53bd; --ws-info: #2a5bd6; --ws-warn: #94590a; --ws-crit: #b03b1c; --ws-ok: #187457; --ws-requested: #6a40d0;
                     --ws-film-soft: rgba(184,130,20,.14); --ws-tv-soft: rgba(70,90,200,.14); --ws-primary-soft: rgba(184,130,20,.14);
-                    --ws-focus: #855e00;
+                    --ws-focus: #855e00; --ws-primary-text: #855e00;
                     --ws-shadow: 0 10px 30px -18px rgba(16,22,30,.30);
                 }
                 /* Break out of Jellyfin's padded content column so the app fills the screen. */
@@ -60,7 +60,7 @@
                 #letterboxdSyncConfigPage .ws-nav button svg { width: 16px; height: 16px; opacity: .8; }
                 #letterboxdSyncConfigPage .ws-nav button:hover { background: var(--ws-surface-2); color: var(--ws-text); }
                 #letterboxdSyncConfigPage .ws-nav button.active { background: var(--ws-primary-soft); color: var(--ws-text); }
-                #letterboxdSyncConfigPage .ws-nav button.active svg { opacity: 1; color: var(--ws-primary); }
+                #letterboxdSyncConfigPage .ws-nav button.active svg { opacity: 1; color: var(--ws-primary-text); }
                 #letterboxdSyncConfigPage .ws-nav button .ws-count { margin-left: auto; font-family: var(--ws-mono); font-size: 11px; color: var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-main { padding: 24px 28px 40px; min-width: 0; overflow-x: hidden; }
                 #letterboxdSyncConfigPage .ws-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -176,7 +176,7 @@
                 #letterboxdSyncConfigPage .ws-muted { color: var(--ws-muted); }
                 #letterboxdSyncConfigPage .ws-green { color: var(--ws-ok); } #letterboxdSyncConfigPage .ws-red { color: var(--ws-crit); }
                 #letterboxdSyncConfigPage .ws-logs { font-family: var(--ws-mono); font-size: 12px; line-height: 1.6; color: var(--ws-muted); white-space: pre-wrap; word-break: break-word; padding: 16px; max-height: 60vh; overflow: auto; }
-                #letterboxdSyncConfigPage a.ws-link { color: var(--ws-primary); }
+                #letterboxdSyncConfigPage a.ws-link { color: var(--ws-primary-text); }
                 @media (max-width: 820px) {
                     #letterboxdSyncConfigPage .ws { grid-template-columns: minmax(0,1fr); min-height: 0; overflow: visible; }
                     #letterboxdSyncConfigPage .ws-rail, #letterboxdSyncConfigPage .ws-rail-inner, #letterboxdSyncConfigPage .ws-nav { min-width: 0; }
@@ -234,7 +234,7 @@
                         <div class="ws-rail-inner">
                         <div class="ws-brand">
                             <span class="ws-glyph"><svg viewBox="0 0 24 24" fill="#14161c"><path d="M7 5h10v14l-5-4.2L7 19z"/></svg></span>
-                            <div><b>JellyScribe</b><small>Film &amp; TV diaries</small><small>by <a href="https://lachlanyoung.dev/?utm_source=jellyscribe&utm_medium=plugin&utm_campaign=author-link" target="_blank" rel="author" style="color:inherit;text-decoration:underline;">Lachlan Young</a> and <strong style="color:var(--ws-primary);font-weight:650;">AI</strong></small></div>
+                            <div><b>JellyScribe</b><small>Film &amp; TV diaries</small><small>by <a href="https://lachlanyoung.dev/?utm_source=jellyscribe&utm_medium=plugin&utm_campaign=author-link" target="_blank" rel="author" style="color:inherit;text-decoration:underline;">Lachlan Young</a> and <strong style="color:var(--ws-primary-text);font-weight:650;">AI</strong></small></div>
                         </div>
                         <nav class="ws-nav" id="wsNav">
                             <div class="ws-navlabel">You</div>
@@ -273,7 +273,7 @@
                             <div class="ws-tiles" style="margin-top:10px;">
                                 <div class="ws-tile film"><div class="n" id="statFilm">-</div><div class="k ws-label">Films logged · Letterboxd</div><svg class="ws-spark" id="sparkFilm" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
                                 <div class="ws-tile tv"><div class="n" id="statTv">-</div><div class="k ws-label">Episodes logged · Serializd</div><svg class="ws-spark" id="sparkTv" viewBox="0 0 120 26" preserveAspectRatio="none"></svg></div>
-                                <div class="ws-tile" style="--ac:var(--ws-primary);"><div class="n" style="color:var(--ws-primary);" id="statWatchlist">-</div><div class="k ws-label">On watchlists</div><div class="ws-muted" id="statWatchlistSub" style="font-size:11px;margin-top:4px;"></div></div>
+                                <div class="ws-tile" style="--ac:var(--ws-primary);"><div class="n" style="color:var(--ws-primary-text);" id="statWatchlist">-</div><div class="k ws-label">On watchlists</div><div class="ws-muted" id="statWatchlistSub" style="font-size:11px;margin-top:4px;"></div></div>
                                 <div class="ws-tile"><div class="n ws-green" id="statSynced">-</div><div class="k ws-label">Synced</div></div>
                                 <div class="ws-tile"><div class="n" style="color:var(--ws-info);" id="statRewatches">-</div><div class="k ws-label">Rewatches</div></div>
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
@@ -440,11 +440,10 @@
                         applyTheme: function () {
                             var light = null, behind = [document.querySelector('.backgroundContainer')];
                             for (var el = root.parentElement; el; el = el.parentElement) behind.push(el);
-                            behind.forEach(function (el) {
-                                if (!el || light !== null) return;
-                                var c = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(el).backgroundColor || '');
-                                if (c && (c[4] === undefined || parseFloat(c[4]) >= 0.5)) light = 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3] > 140;
-                            });
+                            for (var i = 0; i < behind.length; i++) {
+                                var c = behind[i] && /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(behind[i]).backgroundColor || '');
+                                if (c && (c[4] === undefined || parseFloat(c[4]) >= 0.5)) { light = 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3] > 140; break; }
+                            }
                             if (light === null) {
                                 light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
                                 if (root.parentElement === document.body) document.body.style.margin = '0';
@@ -632,7 +631,7 @@
                             // backdrop counts only when the press started there too: selecting text in a modal and
                             // releasing outside it must not throw the draft away.
                             ['acctModal', 'reviewModal'].forEach(function (id) {
-                                var ov = document.getElementById(id), pressedBackdrop = false;
+                                var ov = root.querySelector('#' + id), pressedBackdrop = false;
                                 ov.addEventListener('pointerdown', function (e) { pressedBackdrop = e.target === ov; });
                                 ov.addEventListener('click', function (e) { if (e.target === ov && pressedBackdrop) self.closeModal(id); pressedBackdrop = false; });
                                 ov.addEventListener('close', function () {
@@ -668,8 +667,8 @@
                             document.getElementById('sendLogsCancel').addEventListener('click', function () { document.getElementById('sendLogsBox').style.display = 'none'; });
                             document.getElementById('sendLogsConfirm').addEventListener('click', function () { self.sendLogs(); });
                             // The rating is a slider: arrows move it by half a star, Home clears it, End is five stars.
-                            document.getElementById('starRating').addEventListener('keydown', function (e) {
-                                var v = parseFloat(document.getElementById('reviewRating').value) || 0;
+                            root.querySelector('#starRating').addEventListener('keydown', function (e) {
+                                var v = parseFloat(root.querySelector('#reviewRating').value) || 0;
                                 var step = { ArrowRight: 0.5, ArrowUp: 0.5, ArrowLeft: -0.5, ArrowDown: -0.5, PageUp: 1, PageDown: -1 }[e.key];
                                 if (e.key === 'Home') v = 0; else if (e.key === 'End') v = 5; else if (step) v = Math.min(5, Math.max(0, v + step)); else return;
                                 e.preventDefault();
@@ -1159,8 +1158,8 @@
                         paintStars: function (val) {
                             document.getElementById('reviewRating').value = val || '';
                             document.getElementById('ratingLabel').textContent = val ? val + ' / 5' : 'No rating';
-                            document.getElementById('starRating').setAttribute('aria-valuenow', val || 0);
-                            document.getElementById('starRating').setAttribute('aria-valuetext', val ? val + ' out of 5 stars' : 'No rating');
+                            root.querySelector('#starRating').setAttribute('aria-valuenow', val || 0);
+                            root.querySelector('#starRating').setAttribute('aria-valuetext', val ? val + ' out of 5 stars' : 'No rating');
                             document.querySelectorAll('#starRating .ws-star').forEach(function (s) {
                                 var sv = parseFloat(s.getAttribute('data-val'));
                                 s.classList.toggle('filled', !!val && sv <= val);
