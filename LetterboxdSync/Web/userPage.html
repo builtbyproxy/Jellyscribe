@@ -408,8 +408,24 @@
                                 return '<label><input type="checkbox" class="mLibChk" data-id="' + self.esc(l.id) + '"' + (excluded.indexOf(l.id) >= 0 ? ' checked' : '') + ' /><span>' + self.esc(l.name) + '<span class="desc">' + ({ movies: 'Films', tvshows: 'TV', mixed: 'Mixed' }[l.collectionType] || 'Mixed') + '</span></span></label>';
                             }).join('');
                         },
+                        /* "Back to Jellyfin". Inside Jellyfin's web client it goes back to the page this one was
+                           opened from when the in-app page added its own history entry, and otherwise to Jellyfin's
+                           home through its router, so neither reloads the app. On its own (the configuration page
+                           opened directly) it opens Jellyfin's start page. Both keep the server's base URL. */
+                        wireBack: function () {
+                            var back = root.querySelector('.ws-back');
+                            var path = window.location.pathname, webAt = path.lastIndexOf('/web/');
+                            var base = webAt > 0 ? path.substring(0, webAt) : '';
+                            if (!/^(\/[A-Za-z0-9._~-]+)*$/.test(base)) base = '';
+                            var inJellyfin = !!root.closest('.mainAnimatedPages');
+                            back.href = inJellyfin ? path + window.location.search + '#/home' : base + '/web/';
+                            back.addEventListener('click', function (e) {
+                                if (inJellyfin && history.state && history.state.page === 'jellyscribe') { e.preventDefault(); history.back(); }
+                            });
+                        },
                         wire: function () {
                             var self = this, nav = byId('wsNav');
+                            self.wireBack();
                             nav.addEventListener('click', function (e) { var a = e.target.closest('button[data-sec]'); if (!a) return; nav.querySelectorAll('button[data-sec]').forEach(function (x) { x.classList.remove('active'); x.removeAttribute('aria-current'); }); a.classList.add('active'); a.setAttribute('aria-current', 'page'); var sec = a.getAttribute('data-sec'); root.querySelectorAll('.ws-view').forEach(function (v) { v.classList.toggle('show', v.getAttribute('data-sec') === sec); }); });
                             byId('ovFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovFilter = c.getAttribute('data-f'); self.ovPage = 0; self.renderOverview(); self.syncLabels(); });
                             byId('ovStatusFilters').addEventListener('click', function (e) { var c = e.target.closest('.ws-chip'); if (!c) return; this.querySelectorAll('.ws-chip').forEach(function (x) { x.classList.remove('on'); }); c.classList.add('on'); self.ovStatus = c.getAttribute('data-s'); self.ovPage = 0; self.renderOverview(); });
