@@ -203,12 +203,12 @@ public class SerializdWatchlistSyncRunner
           .GroupBy(s => s.GetProviderId(MetadataProvider.Tmdb)!)
           .ToDictionary(g => g.Key, g => g.First());
 
-        var allEpisodes = _libraryManager.GetItemList(new InternalItemsQuery(user)
+        var episodesBySeries = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Episode },
             IsVirtualItem = false,
             Recursive = true,
-        }).OfType<Episode>().ToList();
+        }).OfType<Episode>().ToLookup(e => e.SeriesId);
 
         var desiredShows = new HashSet<Guid>();
         var desiredEpisodes = new HashSet<Guid>();
@@ -220,9 +220,8 @@ public class SerializdWatchlistSyncRunner
 
             // Empty SeasonNumbers = no season detail on the watchlist item ⇒ the whole show.
             var seasonFilter = entry.SeasonNumbers.Count > 0 ? new HashSet<int>(entry.SeasonNumbers) : null;
-            foreach (var ep in allEpisodes)
+            foreach (var ep in episodesBySeries[series.Id])
             {
-                if (ep.SeriesId != series.Id) continue;
                 if (seasonFilter != null && !seasonFilter.Contains(ep.ParentIndexNumber ?? -1)) continue;
                 desiredEpisodes.Add(ep.Id);
             }

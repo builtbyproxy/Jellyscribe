@@ -843,6 +843,44 @@ public class SerializdApiClientTests
         Assert.Equal(2, attempts);
     }
 
+    [Fact]
+    public async Task GetWatchlist_ReusesTheCachedSeasonMap_RefetchingOnlyForAnUnknownSeason()
+    {
+        var showFetches = 0;
+        var watchlistSeasonIds = "[515011]";
+        var showJson = "{\"seasons\":[{\"id\":392941,\"seasonNumber\":3},{\"id\":515011,\"seasonNumber\":5}]}";
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/watchlistpage_v2/1"))
+                return Json(HttpStatusCode.OK,
+                    $"{{\"totalPages\":1,\"items\":[{{\"showId\":136315,\"seasonIds\":{watchlistSeasonIds}}}]}}");
+            if (path.Contains("/show/136315"))
+            {
+                showFetches++;
+                return Json(HttpStatusCode.OK, showJson);
+            }
+            return Json(HttpStatusCode.OK, "{\"items\":[]}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        Assert.Equal(new[] { 5 }, Assert.Single(await client.GetWatchlistAsync()).SeasonNumbers);
+        await client.GetWatchlistAsync();
+        Assert.Equal(392941, await client.ResolveSeasonIdAsync(136315, 3)); // same cache as the scrobble path
+        Assert.Equal(1, showFetches);
+
+        // A newly aired season's id isn't in the cached map, so the show is fetched once more.
+        watchlistSeasonIds = "[515011,600001]";
+        showJson = "{\"seasons\":[{\"id\":515011,\"seasonNumber\":5},{\"id\":600001,\"seasonNumber\":6}]}";
+        var entry = Assert.Single(await client.GetWatchlistAsync());
+
+        Assert.Equal(new[] { 5, 6 }, entry.SeasonNumbers);
+        Assert.Equal(2, showFetches);
+    }
+
     // Render cold starts: no status code, just a failed connection or a hung request.
 
     [Fact]

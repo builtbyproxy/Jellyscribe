@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -353,7 +354,15 @@ public class SerializdApiClient : ISerializdService
     {
         if (serializdSeasonIds.Count == 0) return Array.Empty<int>();
 
-        var numberToId = await FetchSeasonMapAsync(showTmdbId).ConfigureAwait(false);
+        // Same cache as ResolveSeasonIdAsync; an id the cached map doesn't know (a season added
+        // since) forces one refetch.
+        if (!SeasonCache.TryGetValue(showTmdbId, out var numberToId)
+            || serializdSeasonIds.Any(sid => !numberToId.Values.Contains(sid)))
+        {
+            numberToId = await FetchSeasonMapAsync(showTmdbId).ConfigureAwait(false);
+            SeasonCache[showTmdbId] = numberToId;
+        }
+
         var idToNumber = new Dictionary<int, int>();
         foreach (var kv in numberToId) idToNumber[kv.Value] = kv.Key;
 
