@@ -302,6 +302,7 @@ public class ScraperTests
     [InlineData("<html><head><title>Attention Required! | Cloudflare</title></head></html>", true)]
     [InlineData("<html><script src=\"/cdn-cgi/challenge-platform/h/b/orchestrate\"></script></html>", true)]
     [InlineData("<html><head><title>Diary</title></head><body><p>Just a moment of silence, attention required.</p></body></html>", false)]
+    [InlineData("<html><head><title>Diary</title></head><body><script src=\"/cdn-cgi/challenge-platform/scripts/jsd/main.js\"></script></body></html>", false)]
     public void IsCloudflareChallenge_LooksAtTheChallengeMarkersNotPageText(string html, bool expected)
     {
         Assert.Equal(expected, LetterboxdScraper.IsCloudflareChallenge(html));

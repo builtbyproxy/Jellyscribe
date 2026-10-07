@@ -103,6 +103,7 @@ public class LetterboxdScraper
     public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username)
     {
         var tmdbIds = new List<int>();
+        var seenSlugs = new HashSet<string>(StringComparer.Ordinal);
         var page = 1;
         // Only a guard against a site that loops: a cap a real watchlist can reach would now stop
         // the sync instead of quietly trimming the list, so it sits far above any real one.
@@ -140,10 +141,12 @@ public class LetterboxdScraper
                 throw WatchlistIncomplete(username, tmdbIds.Count, $"an empty page {page}");
             }
 
+            var newOnPage = 0;
             foreach (var poster in posters)
             {
                 var slug = poster.GetAttributeValue("data-item-slug", string.Empty);
-                if (string.IsNullOrEmpty(slug)) continue;
+                if (string.IsNullOrEmpty(slug) || !seenSlugs.Add(slug)) continue;
+                newOnPage++;
 
                 var tmdbId = await ResolveTmdbIdFromSlugAsync(slug, throwOnHttpError: true).ConfigureAwait(false);
                 if (tmdbId.HasValue)
@@ -152,6 +155,11 @@ public class LetterboxdScraper
                     _logger.LogDebug("Watchlist: {Slug} -> TMDb:{TmdbId}", slug, tmdbId.Value);
                 }
             }
+
+            // A later page with nothing new is the site serving the same page again: stop now
+            // rather than walking to the cap.
+            if (page > 1 && newOnPage == 0)
+                throw WatchlistIncomplete(username, tmdbIds.Count, $"page {page} repeating earlier films");
 
             var nextPage = doc.DocumentNode.SelectSingleNode($"//li[a/text() = '{page + 1}']");
             if (nextPage == null) break;
@@ -164,8 +172,9 @@ public class LetterboxdScraper
     private static InvalidOperationException WatchlistIncomplete(string username, int count, string reason)
         => new($"Could not read the whole Letterboxd watchlist for {username}: after {count} films Letterboxd returned {reason}. Nothing was changed this run.");
 
-    // Matches the challenge page's <title> or Cloudflare's challenge script path, never body
-    // text: a review or a film title reading "just a moment" must not stop a sync.
+    // Matches the challenge page's <title> or the managed-challenge script path, never body text
+    // (a review or a film title reading "just a moment" must not stop a sync) and never the
+    // /cdn-cgi/challenge-platform/scripts/jsd/ snippet Cloudflare also adds to ordinary pages.
     private static readonly System.Text.RegularExpressions.Regex TitleRegex =
         new(@"<title[^>]*>(.*?)</title>", System.Text.RegularExpressions.RegexOptions.IgnoreCase
             | System.Text.RegularExpressions.RegexOptions.Singleline
@@ -173,7 +182,7 @@ public class LetterboxdScraper
 
     internal static bool IsCloudflareChallenge(string html)
     {
-        if (html.Contains("/cdn-cgi/challenge-platform/", StringComparison.OrdinalIgnoreCase))
+        if (html.Contains("/cdn-cgi/challenge-platform/h/", StringComparison.OrdinalIgnoreCase))
             return true;
         var title = TitleRegex.Match(html);
         if (!title.Success) return false;

@@ -325,9 +325,10 @@ public class SyncCorrectnessTests : IDisposable
 
         Assert.Equal(0, SyncHistory.GetConsecutiveFailureCount("lachlan", 111, "lb-user"));
         Assert.Equal(0, SyncHistory.GetConsecutiveFailureCount("lachlan", 222, "lb-user"));
-        // The cleared flags are on disk too, not just in memory.
+        // The outage marks are on disk too, not just in memory.
         SyncHistory.ResetForTesting();
-        Assert.Equal(0, SyncHistory.GetConsecutiveFailureCount("lachlan", 111, "lb-user"));
+        Assert.Equal(new FailureStreak(0, 0, 0), SyncHistory.GetFailureStreak("lachlan", 111, "lb-user"));
+        Assert.Equal(new FailureStreak(0, 0, 0), SyncHistory.GetFailureStreak("lachlan", 222, "lb-user"));
         Assert.Equal(2, SyncHistory.GetRecent(10, "lachlan").Count(e => e.Status == SyncStatus.Failed));
     }
 
@@ -351,6 +352,51 @@ public class SyncCorrectnessTests : IDisposable
 
         await service.Received(LetterboxdSyncRunner.MaxConsecutiveSyncFailures).LookupFilmByTmdbIdAsync(111);
         await service.Received(LetterboxdSyncRunner.MaxConsecutiveSyncFailures).LookupFilmByTmdbIdAsync(222);
+    }
+
+    [Theory]
+    [InlineData(10, 7, true)]
+    [InlineData(10, 6, false)]   // ten failures packed into a bad week: not enough
+    [InlineData(9, 9, false)]
+    public void TransientFailures_AbandonOnlyWhenSpreadOverTime(int count, int days, bool abandoned)
+    {
+        var start = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
+        var events = Enumerable.Range(0, count).Select(i => new SyncEvent
+        {
+            Username = "u",
+            TmdbId = 1,
+            Account = "lb",
+            Status = SyncStatus.Failed,
+            Timestamp = start.AddDays(i % days).AddMinutes(i)
+        }).ToList();
+
+        var streak = SyncHistory.GetFailureStreak(events, "u", 1, "lb");
+
+        Assert.Equal(abandoned, LetterboxdSyncRunner.ShouldAbandon(streak));
+    }
+
+    [Fact]
+    public void OutageFailures_CountTowardNothing_AndASuccessResetsTheStreak()
+    {
+        var start = new DateTime(2026, 9, 1, 12, 0, 0, DateTimeKind.Utc);
+        var outage = Enumerable.Range(0, 20).Select(i => new SyncEvent
+        {
+            Username = "u",
+            TmdbId = 1,
+            Status = SyncStatus.Failed,
+            Outage = true,
+            Timestamp = start.AddDays(i)
+        }).ToList();
+        Assert.Equal(new FailureStreak(0, 0, 0), SyncHistory.GetFailureStreak(outage, "u", 1));
+
+        var reset = new List<SyncEvent>
+        {
+            new() { Username = "u", TmdbId = 1, Status = SyncStatus.Failed, PermanentFailure = true, Timestamp = start },
+            new() { Username = "u", TmdbId = 1, Status = SyncStatus.Failed, PermanentFailure = true, Timestamp = start.AddDays(1) },
+            new() { Username = "u", TmdbId = 1, Status = SyncStatus.Success, Timestamp = start.AddDays(2) },
+            new() { Username = "u", TmdbId = 1, Status = SyncStatus.Failed, PermanentFailure = true, Timestamp = start.AddDays(3) },
+        };
+        Assert.Equal(1, SyncHistory.GetFailureStreak(reset, "u", 1).Permanent);
     }
 
     // ----- REL-6: an unanswered diary check never posts -----

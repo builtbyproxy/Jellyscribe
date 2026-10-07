@@ -340,6 +340,33 @@ public class SerializdApiClientTests
     }
 
     [Fact]
+    public async Task GetWatchlist_MultiplePages_StopsAtTotalPages()
+    {
+        var pagesRead = new List<string>();
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/watchlistpage_v2/"))
+            {
+                lock (pagesRead) pagesRead.Add(path);
+                var show = path.EndsWith("/1") ? 206828 : 136315;
+                return Json(HttpStatusCode.OK, $"{{\"totalPages\":2,\"items\":[{{\"showId\":{show},\"seasonIds\":[]}}]}}");
+            }
+            return Json(HttpStatusCode.OK, "{\"seasons\":[]}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        var entries = await client.GetWatchlistAsync();
+
+        Assert.Equal(new[] { 206828, 136315 }, entries.Select(e => e.ShowTmdbId).ToArray());
+        Assert.Equal(2, pagesRead.Count);
+    }
+
+    [Fact]
     public async Task GetWatchlist_EmptyWatchlist_ReturnsEmpty()
     {
         var handler = new ApiMockHandler(req =>

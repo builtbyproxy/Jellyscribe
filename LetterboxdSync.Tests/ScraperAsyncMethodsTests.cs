@@ -140,6 +140,32 @@ public class ScraperAsyncMethodsTests : IDisposable
     }
 
     [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_SiteRepeatsAPage_StopsAtOnce()
+    {
+        TmdbCache.Set("dune-part-two", 693134);
+        var requests = 0;
+        var handler = new MockHandler((request, _) =>
+        {
+            Interlocked.Increment(ref requests);
+            // Every page serves the same film and links to the next page.
+            var page = (request.RequestUri?.AbsolutePath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries).Last();
+            var next = int.Parse(page) + 1;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    "<div data-component-class='LazyPoster' data-item-slug='dune-part-two'></div>" +
+                    $"<ul><li><a href='/x/watchlist/page/{next}/'>{next}</a></li></ul>")
+            };
+        });
+
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scraper.GetWatchlistTmdbIdsAsync("x"));
+        Assert.Equal(2, requests);
+    }
+
+    [Fact]
     public async Task GetWatchlistTmdbIdsAsync_FilmPageFails_Throws()
     {
         var handler = new MockHandler((request, _) =>

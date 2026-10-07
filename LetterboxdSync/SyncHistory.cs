@@ -75,7 +75,22 @@ public class SyncEvent
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool PermanentFailure { get; set; }
+
+    /// <summary>
+    /// True on a Failed event from a run in which every film tried failed: an account or service
+    /// outage. Such failures count toward nothing (see <see cref="SyncHistory.MarkOutage"/>).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Outage { get; set; }
 }
+
+/// <summary>
+/// The unbroken run of Failed events at the tail of one film's history for one account.
+/// <paramref name="Permanent"/> counts "not found" failures; <paramref name="Transient"/> counts
+/// the others outside outage runs, and <paramref name="TransientDays"/> the distinct UTC days
+/// they fell on.
+/// </summary>
+public readonly record struct FailureStreak(int Permanent, int Transient, int TransientDays);
 
 public static class SyncHistory
 {
@@ -135,11 +150,12 @@ public static class SyncHistory
                 || e.Error.StartsWith(BackstopErrorPrefix, StringComparison.Ordinal));
 
     /// <summary>
-    /// Clears <see cref="SyncEvent.PermanentFailure"/> on events already recorded and rewrites the
-    /// store. The runner calls it when every film it tried in a run failed: that is an account or
-    /// service outage, not a fact about the films, so none of it may count toward abandonment.
+    /// Marks events this process just recorded (the same instances <see cref="Record"/> was given,
+    /// which it keeps) as part of an outage run and rewrites the store. The runner calls it when
+    /// every film it tried in a run failed: that is an account or service outage, not a fact
+    /// about the films, so none of it may count toward abandonment.
     /// </summary>
-    public static void ClearPermanentFailure(IReadOnlyCollection<SyncEvent> recorded)
+    public static void MarkOutage(IReadOnlyCollection<SyncEvent> recorded)
     {
         if (recorded.Count == 0) return;
         lock (_lock)
@@ -147,8 +163,9 @@ public static class SyncHistory
             var changed = false;
             foreach (var e in recorded)
             {
-                if (!e.PermanentFailure) continue;
+                if (e.Outage && !e.PermanentFailure) continue;
                 e.PermanentFailure = false;
+                e.Outage = true;
                 changed = true;
             }
             if (changed && _events != null) SaveAllEvents();
@@ -396,14 +413,25 @@ public static class SyncHistory
     /// abandon a film, and any later success or skip resets it.
     /// </summary>
     public static int GetConsecutiveFailureCount(string username, int tmdbId, string? account = null)
+        => GetFailureStreak(username, tmdbId, account).Permanent;
+
+    internal static int GetConsecutiveFailureCount(IEnumerable<SyncEvent> events, string username, int tmdbId, string? account = null)
+        => GetFailureStreak(events, username, tmdbId, account).Permanent;
+
+    /// <summary>
+    /// The trailing run of Failed events for this user/account/film, most recent first, ending at
+    /// the first non-Failed event (so any later success or skip resets it). One pass gives the
+    /// runner both abandonment signals.
+    /// </summary>
+    public static FailureStreak GetFailureStreak(string username, int tmdbId, string? account = null)
     {
         lock (_lock)
         {
-            return GetConsecutiveFailureCount(LoadEvents(), username, tmdbId, account);
+            return GetFailureStreak(LoadEvents(), username, tmdbId, account);
         }
     }
 
-    internal static int GetConsecutiveFailureCount(IEnumerable<SyncEvent> events, string username, int tmdbId, string? account = null)
+    internal static FailureStreak GetFailureStreak(IEnumerable<SyncEvent> events, string username, int tmdbId, string? account = null)
     {
         // Rated events are skipped: a rating push neither continues nor breaks the film's diary
         // failure streak.
@@ -414,13 +442,22 @@ public static class SyncHistory
                 && e.Status != SyncStatus.Rated)
             .OrderByDescending(e => e.Timestamp);
 
-        var count = 0;
+        int permanent = 0, transient = 0;
+        var days = new HashSet<DateTime>();
         foreach (var e in ordered)
         {
             if (e.Status != SyncStatus.Failed) break;
-            if (e.PermanentFailure) count++;
+            if (e.PermanentFailure)
+            {
+                permanent++;
+            }
+            else if (!e.Outage)
+            {
+                transient++;
+                days.Add(e.Timestamp.Date);
+            }
         }
-        return count;
+        return new FailureStreak(permanent, transient, days.Count);
     }
 
     internal static bool WasSuccessfullySynced(IEnumerable<SyncEvent> events, string username, int tmdbId, DateTime viewingDate, string? account = null)

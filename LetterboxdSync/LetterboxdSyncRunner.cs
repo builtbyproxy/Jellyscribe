@@ -56,6 +56,16 @@ public class LetterboxdSyncRunner
     internal const int MaxConsecutiveSyncFailures = 3;
 
     /// <summary>
+    /// A film whose other failures (an error from Letterboxd on that film alone, while other films
+    /// sync) keep coming back is also given up on, but only after this many in a row spread over
+    /// at least <see cref="MinTransientFailureDays"/> distinct days, so a bad week of Letterboxd
+    /// trouble cannot do it. Failures from outage runs never count.
+    /// </summary>
+    internal const int MaxTransientSyncFailures = 10;
+
+    internal const int MinTransientFailureDays = 7;
+
+    /// <summary>
     /// A run in which at least this many films were tried, every one failed, and at least one
     /// failure was transient (a block, an error status) is treated as an account or service
     /// outage: none of its failures count toward abandonment. A run whose films all failed only
@@ -263,7 +273,7 @@ public class LetterboxdSyncRunner
         movies = movies.Where(m =>
         {
             if (!int.TryParse(m.GetProviderId(MetadataProvider.Tmdb), out var tmdbId)) return true;
-            if (SyncHistory.GetConsecutiveFailureCount(user.Username ?? string.Empty, tmdbId, lbAccount) >= MaxConsecutiveSyncFailures)
+            if (ShouldAbandon(SyncHistory.GetFailureStreak(user.Username ?? string.Empty, tmdbId, lbAccount)))
             {
                 abandonedFailures++;
                 return false;
@@ -273,8 +283,8 @@ public class LetterboxdSyncRunner
 
         if (abandonedFailures > 0)
             _logger.LogInformation(
-                "Skipping {Count} films for {Username} as {LbUser}: not found on Letterboxd {Threshold}+ times in a row, no longer retrying",
-                abandonedFailures, user.Username, lbAccount, MaxConsecutiveSyncFailures);
+                "Skipping {Count} films for {Username} as {LbUser}: failing on every run (not found on Letterboxd {Threshold}+ times, or erroring for {Days}+ days), no longer retrying",
+                abandonedFailures, user.Username, lbAccount, MaxConsecutiveSyncFailures, MinTransientFailureDays);
 
         if (movies.Count == 0)
         {
@@ -527,13 +537,17 @@ public class LetterboxdSyncRunner
         {
             _logger.LogWarning("Every one of the {Count} films tried for {Username} as {LbUser} failed; treating the run as an outage, so none of them counts toward giving up on a film",
                 attempted, user.Username, lbAccount);
-            SyncHistory.ClearPermanentFailure(failures);
+            SyncHistory.MarkOutage(failures);
         }
 
         _logger.LogInformation("Letterboxd sync complete for {Username}: {Synced} synced, {Skipped} skipped (+{LocalSkipped} skipped locally), {Failed} failed",
             user.Username, synced, skipped, locallySkipped, failed);
         SyncProgress.Complete(SyncProgress.TrackLetterboxd);
     }
+
+    internal static bool ShouldAbandon(FailureStreak streak)
+        => streak.Permanent >= MaxConsecutiveSyncFailures
+            || (streak.Transient >= MaxTransientSyncFailures && streak.TransientDays >= MinTransientFailureDays);
 
     /// <summary>
     /// The viewing date for a Jellyfin play timestamp: its day in the server's time zone, the same

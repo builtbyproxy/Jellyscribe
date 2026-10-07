@@ -288,6 +288,7 @@ public class SerializdApiClient : ISerializdService
                 throw WatchlistIncomplete(entries.Count, $"an empty page {page}");
             }
 
+            var before = seen.Count;
             foreach (var it in items.EnumerateArray())
             {
                 // Watchlist items carry a TMDb `showId` plus `seasonIds` (Serializd's internal
@@ -307,13 +308,18 @@ public class SerializdApiClient : ISerializdService
 
             var totalPages = TryGetInt(doc.RootElement, "totalPages", out var t) ? t : page;
             if (page >= totalPages) break;
+
+            // A page with nothing new is the API serving the same page again; stop rather than
+            // walking to the cap.
+            if (page > 1 && seen.Count == before)
+                throw WatchlistIncomplete(entries.Count, $"page {page} repeating earlier shows");
         }
 
         return entries;
     }
 
     // Only a guard against an API that loops; the read normally stops at totalPages.
-    private const int MaxWatchlistPages = 1000;
+    private const int MaxWatchlistPages = 500;
 
     // The watchlist sync reconciles the Jellyfin collection, playlist and Seerr watchlist to this
     // list, so a partial read must throw (leaving all of them as they were) rather than return a
