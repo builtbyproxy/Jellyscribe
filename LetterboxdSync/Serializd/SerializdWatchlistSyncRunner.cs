@@ -69,7 +69,7 @@ public class SerializdWatchlistSyncRunner
             foreach (var (user, account) in pairs)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                SyncProgress.SetPhase(SyncProgress.TrackSerializd, $"Syncing {user.Username}'s watchlist");
+                SyncProgress.SetPhase(SyncProgress.TrackSerializd, "Syncing watchlist");
                 try
                 {
                     await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
@@ -104,7 +104,7 @@ public class SerializdWatchlistSyncRunner
         var accounts = Config.GetEnabledSerializdAccountsForUser(userJellyfinId).Where(a => a.SyncWatchlist).ToList();
         if (accounts.Count == 0) return false;
 
-        SyncProgress.Start(SyncProgress.TrackSerializd, "Serializd watchlist sync", $"Syncing {user.Username}'s watchlist");
+        SyncProgress.Start(SyncProgress.TrackSerializd, "Serializd watchlist sync", "Syncing watchlist");
         SyncProgress.SetTotal(SyncProgress.TrackSerializd, accounts.Count);
         try
         {

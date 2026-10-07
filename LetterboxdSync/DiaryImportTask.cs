@@ -125,7 +125,7 @@ public class DiaryImportTask : IScheduledTask
                 List<DiaryFilmEntry> entries;
                 try
                 {
-                    SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Scanning Letterboxd films for {account.LetterboxdUsername}");
+                    SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Scanning Letterboxd diary");
                     entries = await service.GetDiaryFilmEntriesAsync(account.LetterboxdUsername).ConfigureAwait(false);
                     _logger.LogInformation("Found {Count} films in {LbUser}'s Letterboxd diary",
                         entries.Count, account.LetterboxdUsername);

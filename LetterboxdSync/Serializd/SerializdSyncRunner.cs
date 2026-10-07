@@ -325,7 +325,7 @@ public class SerializdSyncRunner
         }
 
         // 2. Dated Diary logs, one per episode, backdated to the real watch date.
-        SyncProgress.SetPhase(SyncProgress.TrackSerializd, $"Logging {user.Username}'s episodes to Serializd");
+        SyncProgress.SetPhase(SyncProgress.TrackSerializd, "Logging episodes to Serializd");
         SyncProgress.SetTotal(SyncProgress.TrackSerializd, needsLog.Count);
         var logged = 0;
         foreach (var r in needsLog)

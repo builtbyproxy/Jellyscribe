@@ -182,7 +182,7 @@ public class WatchlistSyncRunner
     private async Task SyncOneUserAsync(User user, Account account, SeerrClient? jellyseerr, string source, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting watchlist sync for {Username} (source={Source})", user.Username, source);
-        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Authenticating {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Authenticating");
 
         var breakerUserId = user.Id.ToString("N");
         if (AuthBreaker.IsOpen(breakerUserId, account.LetterboxdUsername))
@@ -214,7 +214,7 @@ public class WatchlistSyncRunner
 
         using var _s = service;
 
-        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Fetching watchlist for {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Fetching watchlist");
         List<int> tmdbIds;
         try
         {
@@ -230,7 +230,7 @@ public class WatchlistSyncRunner
             return;
         }
 
-        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Updating Jellyfin playlist for {user.Username}");
+        SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Updating Jellyfin playlist");
         var allMovies = _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Movie },
@@ -292,7 +292,7 @@ public class WatchlistSyncRunner
             var primary = Config.GetPrimaryAccountForUser(account.UserJellyfinId);
             if (ReferenceEquals(primary, account))
             {
-                SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Mirroring Seerr watchlist for {user.Username}");
+                SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Mirroring Seerr watchlist");
                 await MirrorJellyseerrWatchlistAsync(jellyseerr!, jellyseerrUserId.Value, tmdbIds, user.Username!, cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -313,7 +313,7 @@ public class WatchlistSyncRunner
                 ? tmdbIds
                 : tmdbIds.Where(id => !matchedTmdbIds.Contains(id)).ToList();
 
-            SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr for {user.Username}");
+            SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr");
             if (requestIds.Count == 0) return;
 
             var requested = 0;
