@@ -55,6 +55,8 @@ public class SerializdController : JellyfinUserApiController
         public string? Email { get; set; }
         /// <summary>Empty keeps the stored password for this email.</summary>
         public string? Password { get; set; }
+        /// <summary>The email before the edit, when the user changed it; the stored password follows. Empty means unchanged.</summary>
+        public string? OriginalEmail { get; set; }
         public bool Enabled { get; set; }
         public bool SyncFavorites { get; set; }
         public bool EnableDateFilter { get; set; }
@@ -171,8 +173,9 @@ public class SerializdController : JellyfinUserApiController
             return account;
         }).ToList();
 
+        // A changed email names the one it started from, so the stored secret and settings follow it.
         SerializdAccount? Stored(AccountItem req)
-            => previous.FirstOrDefault(p => string.Equals(p.Email, req.Email!.Trim(), StringComparison.OrdinalIgnoreCase));
+            => previous.FirstOrDefault(p => string.Equals(p.Email?.Trim(), SecretMerge.OriginalOr(req.OriginalEmail, req.Email!).Trim(), StringComparison.OrdinalIgnoreCase));
 
         config.SerializdAccounts.Clear();
         config.SerializdAccounts.AddRange(preserved);
@@ -223,6 +226,9 @@ public class SerializdController : JellyfinUserApiController
 
         /// <summary>Owner of the stored account to fall back to. Honoured for administrators only.</summary>
         public string? UserJellyfinId { get; set; }
+
+        /// <summary>The stored account's email when the form changed it; empty means <see cref="Email"/>.</summary>
+        public string? OriginalEmail { get; set; }
     }
 
     public class ReviewRequest
@@ -323,7 +329,8 @@ public class SerializdController : JellyfinUserApiController
             return BadRequest(new { error = "Email and password are required." });
 
         var password = string.IsNullOrWhiteSpace(request.Password)
-            ? Plugin.Instance!.Configuration.FindStoredSerializd(GetCredentialOwnerId(request.UserJellyfinId) ?? string.Empty, request.Email)?.Password
+            ? Plugin.Instance!.Configuration.FindStoredSerializd(GetCredentialOwnerId(request.UserJellyfinId) ?? string.Empty,
+                SecretMerge.OriginalOr(request.OriginalEmail, request.Email))?.Password
             : request.Password;
         if (string.IsNullOrWhiteSpace(password))
             return BadRequest(new { error = "Email and password are required." });

@@ -13,6 +13,12 @@ public class AccountUpdateRequest
 
     public bool ClearRawCookies { get; set; }
 
+    /// <summary>
+    /// The username this account had before the edit, when the user renamed it. The stored
+    /// password, cookies and other kept settings follow the rename. Empty means unchanged.
+    /// </summary>
+    public string? OriginalLetterboxdUsername { get; set; }
+
     public string? UserAgent { get; set; }
 
     public bool Enabled { get; set; }

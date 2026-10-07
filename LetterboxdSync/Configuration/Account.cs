@@ -74,6 +74,18 @@ public class Account
     [XmlIgnore]
     public bool ClearRawCookies { internal get; set; }
 
+    /// <summary>
+    /// Write-only: the owner this account had before the edit being saved, when an admin moved
+    /// it to another Jellyfin user. Lets <see cref="SecretMerge"/> carry the stored password and
+    /// cookies across the move. Empty means unchanged.
+    /// </summary>
+    [XmlIgnore]
+    public string? OriginalUserJellyfinId { internal get; set; }
+
+    /// <summary>Write-only: the username before a rename, for the same reason as <see cref="OriginalUserJellyfinId"/>.</summary>
+    [XmlIgnore]
+    public string? OriginalLetterboxdUsername { internal get; set; }
+
     /// <summary>Encrypted on-disk form of <see cref="RawCookies"/>. See <see cref="LetterboxdPasswordProtected"/>.</summary>
     [XmlElement("RawCookies")]
     [JsonIgnore]

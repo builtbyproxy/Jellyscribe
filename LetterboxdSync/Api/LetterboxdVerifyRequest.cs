@@ -18,4 +18,7 @@ public class LetterboxdVerifyRequest
 
     /// <summary>Owner of the stored account to fall back to. Honoured for administrators only; others always use their own.</summary>
     public string? UserJellyfinId { get; set; }
+
+    /// <summary>The stored account's username when the form renamed it; empty means <see cref="LetterboxdUsername"/>.</summary>
+    public string? OriginalLetterboxdUsername { get; set; }
 }

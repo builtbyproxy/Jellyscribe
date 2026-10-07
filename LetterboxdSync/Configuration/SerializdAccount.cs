@@ -35,6 +35,14 @@ public class SerializdAccount
     [XmlIgnore]
     public bool HasPassword => !string.IsNullOrEmpty(Password);
 
+    /// <summary>Write-only: the owner before an admin moved the account. See <see cref="Account.OriginalUserJellyfinId"/>.</summary>
+    [XmlIgnore]
+    public string? OriginalUserJellyfinId { internal get; set; }
+
+    /// <summary>Write-only: the email before a rename. See <see cref="Account.OriginalLetterboxdUsername"/>.</summary>
+    [XmlIgnore]
+    public string? OriginalEmail { internal get; set; }
+
     /// <summary>
     /// Encrypted on-disk form of <see cref="Password"/>. XmlElement keeps the on-disk
     /// element name stable; JsonIgnore keeps ciphertext out of the admin config page's

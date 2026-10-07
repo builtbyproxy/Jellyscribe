@@ -295,7 +295,8 @@ public class LetterboxdController : JellyfinUserApiController
         if (string.IsNullOrEmpty(username))
             return BadRequest(new { error = "Username and password are required." });
 
-        var stored = Config.FindStored(GetCredentialOwnerId(request!.UserJellyfinId) ?? string.Empty, username);
+        var stored = Config.FindStored(GetCredentialOwnerId(request!.UserJellyfinId) ?? string.Empty,
+            SecretMerge.OriginalOr(request.OriginalLetterboxdUsername, username));
         var password = SecretMerge.KeepIfEmpty(request.LetterboxdPassword, stored?.LetterboxdPassword);
         var rawCookies = request.ClearRawCookies ? null : SecretMerge.KeepIfEmpty(request.RawCookies, stored?.RawCookies);
         if (string.IsNullOrEmpty(password))
@@ -443,7 +444,9 @@ public class LetterboxdController : JellyfinUserApiController
         var mine = new List<Account>();
         foreach (var req in request.Accounts)
         {
-            var stored = previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, req.LetterboxdUsername, StringComparison.OrdinalIgnoreCase));
+            // A rename names the username it started from, so the stored secrets and settings follow it.
+            var storedName = SecretMerge.OriginalOr(req.OriginalLetterboxdUsername, req.LetterboxdUsername);
+            var stored = previous.FirstOrDefault(p => string.Equals(p.LetterboxdUsername, storedName?.Trim(), StringComparison.OrdinalIgnoreCase));
             var account = new Account
             {
                 UserJellyfinId = userId,
@@ -508,8 +511,8 @@ public class LetterboxdController : JellyfinUserApiController
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> TestJellyseerr([FromBody] JellyseerrTestRequest request)
     {
-        // An empty key uses the stored one, but only against the stored URL: any signed-in user can
-        // call this, and the key must never be sent to an address the admin didn't save it for.
+        // An empty key uses the stored one, but only against the stored URL, so the saved key is
+        // never sent to an address the admin didn't save it for.
         var apiKey = string.IsNullOrEmpty(request.ApiKey) && SecretMerge.IsStoredUrl(request.Url, Config.JellyseerrUrl)
             ? Config.JellyseerrApiKey
             : request.ApiKey;

@@ -30,7 +30,7 @@ public class AccountUpdateRequestTests
         // Security: AccountUpdateRequest must NOT have UserJellyfinId
         // to prevent users from writing to another user's account
         var properties = typeof(AccountUpdateRequest).GetProperties();
-        Assert.DoesNotContain(properties, p => p.Name == "UserJellyfinId");
+        Assert.DoesNotContain(properties, p => p.Name == "UserJellyfinId" || p.Name == "OriginalUserJellyfinId");
     }
 
     [Fact]
@@ -41,9 +41,10 @@ public class AccountUpdateRequestTests
         // properties (SecretProtector's encrypted-at-rest XML view of
         // LetterboxdPassword/RawCookies) are storage plumbing, not part of the
         // request contract, and are deliberately excluded, as are the write-only *Input JSON
-        // forms of the secrets and the read-only Has* flags.
+        // forms of the secrets and the read-only Has* flags. OriginalUserJellyfinId is the admin
+        // dashboard's owner-move marker; the per-user request must never name another owner.
         var accountProps = typeof(Account).GetProperties()
-            .Where(p => p.Name != "UserJellyfinId" && p.CanWrite
+            .Where(p => p.Name != "UserJellyfinId" && p.Name != "OriginalUserJellyfinId" && p.CanWrite
                 && !p.Name.EndsWith("Protected", System.StringComparison.Ordinal)
                 && !p.Name.EndsWith("Input", System.StringComparison.Ordinal))
             .Select(p => p.Name)

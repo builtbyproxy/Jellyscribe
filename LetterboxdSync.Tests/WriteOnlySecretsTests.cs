@@ -42,7 +42,7 @@ public class WriteOnlySecretsTests : IDisposable
     private const string SzEmail = "me@example.com";
     private const string SzPassword = "hunter2-serializd";
     private const string ApiKey = "seerr-api-key-123";
-    private const string SeerrUrl = "http://127.0.0.1:1";
+    private const string SeerrUrl = "http://seerr.local:5055";
 
     private static readonly string[] Secrets = { Password, Cookies, SzPassword, ApiKey };
 
@@ -61,6 +61,7 @@ public class WriteOnlySecretsTests : IDisposable
         LetterboxdController.VerifyWebsiteLoginForTesting = null;
         LetterboxdServiceFactory.OverrideForTesting = null;
         SerializdController.VerifyOverrideForTesting = null;
+        LetterboxdController.SeerrTestHandlerForTesting = null;
         SecretProtector.KeyDirectoryOverride = null;
         SecretProtector.ResetForTesting();
         try { if (Directory.Exists(_keyDir)) Directory.Delete(_keyDir, true); } catch { }
@@ -107,7 +108,10 @@ public class WriteOnlySecretsTests : IDisposable
             Assert.DoesNotContain(secret, json);
     }
 
-    private static string Json(ActionResult result) => JsonSerializer.Serialize(Assert.IsType<OkObjectResult>(result).Value);
+    /// <summary>What Jellyfin's MVC JSON formatter writes for a controller result (JsonDefaults.Options).</summary>
+    private static string Json(object? value) => JsonSerializer.Serialize(value, JsonDefaults.Options);
+
+    private static string Json(ActionResult result) => Json(Assert.IsType<OkObjectResult>(result).Value);
 
     private static void SignIn(ControllerBase controller, string userId, bool admin = false)
     {
@@ -340,14 +344,186 @@ public class WriteOnlySecretsTests : IDisposable
     {
         using var h = new ControllerTestHarness(UserId);
         Seed(h.Config);
+        SignIn(h.Controller, UserId, admin: true);
+        var seerr = new FakeSeerr(ApiKey);
+        LetterboxdController.SeerrTestHandlerForTesting = seerr;
 
         var elsewhere = Assert.IsType<BadRequestObjectResult>(
-            await h.Controller.TestJellyseerr(new JellyseerrTestRequest { Url = "https://attacker.example" }));
-        Assert.Contains("URL and API key are required", JsonSerializer.Serialize(elsewhere.Value));
+            await h.Controller.TestJellyseerr(new JellyseerrTestRequest { Url = "https://seerr-elsewhere.example" }));
+        Assert.Contains("URL and API key are required", Json(elsewhere.Value));
+        Assert.Empty(seerr.Requests);
 
-        // The stored URL refuses connections, so getting that far proves the stored key was used.
-        var stored = Assert.IsType<BadRequestObjectResult>(
+        var stored = Assert.IsType<OkObjectResult>(
             await h.Controller.TestJellyseerr(new JellyseerrTestRequest { Url = SeerrUrl + "/" }));
-        Assert.DoesNotContain("URL and API key are required", JsonSerializer.Serialize(stored.Value));
+        Assert.Contains("\"linkedToCurrentUser\":true", Json(stored.Value));
+        Assert.Equal(new (string, string?)[] { ("seerr.local", ApiKey) }, seerr.Requests);
+    }
+
+    // ----- Renames and owner moves carry the secrets with the account -----
+
+    [Fact]
+    public void JellyfinConfigPost_AdminMovesAccountToAnotherUser_SecretsFollow()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+
+        // What the admin dashboard sends after picking another Jellyfin user in the account modal.
+        var body = JsonNode.Parse(JellyfinGet(h.Config))!;
+        var lb = body["Accounts"]![0]!;
+        lb["OriginalUserJellyfinId"] = UserId;
+        lb["OriginalLetterboxdUsername"] = LbUser;
+        lb["UserJellyfinId"] = OtherUserId;
+        var sz = body["SerializdAccounts"]![0]!;
+        sz["OriginalUserJellyfinId"] = UserId;
+        sz["OriginalEmail"] = SzEmail;
+        sz["UserJellyfinId"] = OtherUserId;
+        JellyfinPost(body.ToJsonString());
+
+        var account = h.Config.Accounts.Single();
+        Assert.Equal(OtherUserId, account.UserJellyfinId);
+        Assert.Equal(Password, account.LetterboxdPassword);
+        Assert.Equal(Cookies, account.RawCookies);
+        var serializd = h.Config.SerializdAccounts.Single();
+        Assert.Equal(OtherUserId, serializd.UserJellyfinId);
+        Assert.Equal(SzPassword, serializd.Password);
+    }
+
+    [Fact]
+    public void JellyfinConfigPost_AdminMovesAndRenamesWhileAnotherUserHasThatLogin_TakesTheEditedAccountsSecrets()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+        h.Config.Accounts.Add(new Account { UserJellyfinId = OtherUserId, LetterboxdUsername = "renamed", LetterboxdPassword = "other-users-password" });
+
+        var body = JsonNode.Parse(JellyfinGet(h.Config))!;
+        var lb = body["Accounts"]![0]!;
+        lb["OriginalUserJellyfinId"] = UserId;
+        lb["OriginalLetterboxdUsername"] = LbUser;
+        lb["UserJellyfinId"] = OtherUserId;
+        lb["LetterboxdUsername"] = "Renamed-Too";
+        JellyfinPost(body.ToJsonString());
+
+        Assert.Equal(Password, h.Config.Accounts[0].LetterboxdPassword);
+        Assert.Equal("other-users-password", h.Config.Accounts[1].LetterboxdPassword);
+    }
+
+    [Fact]
+    public void JellyfinConfigPost_OriginalMarkers_AreNeverStoredOrReturned()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+
+        var body = JsonNode.Parse(JellyfinGet(h.Config))!;
+        body["Accounts"]![0]!["OriginalUserJellyfinId"] = UserId;
+        body["Accounts"]![0]!["OriginalLetterboxdUsername"] = LbUser;
+        body["SerializdAccounts"]![0]!["OriginalEmail"] = SzEmail;
+        JellyfinPost(body.ToJsonString());
+
+        var json = JellyfinGet(h.Config);
+        Assert.DoesNotContain("Original", json);
+        var serializer = new System.Xml.Serialization.XmlSerializer(typeof(PluginConfiguration));
+        using var writer = new StringWriter();
+        serializer.Serialize(writer, h.Config);
+        Assert.DoesNotContain("Original", writer.ToString());
+    }
+
+    [Fact]
+    public void PutAccounts_RenameWithBlankPassword_KeepsTheSecretsAndSettings()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+        h.Config.Accounts[0].ExcludedLibraryIds = new() { "0123456789abcdef0123456789abcdef" };
+
+        h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = { new AccountUpdateRequest { LetterboxdUsername = "demo-cinephile", OriginalLetterboxdUsername = LbUser, Enabled = true } }
+        });
+
+        var account = h.Config.Accounts.Single();
+        Assert.Equal("demo-cinephile", account.LetterboxdUsername);
+        Assert.Equal(Password, account.LetterboxdPassword);
+        Assert.Equal(Cookies, account.RawCookies);
+        Assert.Equal(new[] { "0123456789abcdef0123456789abcdef" }, account.ExcludedLibraryIds);
+    }
+
+    [Fact]
+    public void PutAccounts_OriginalNameOfAnotherUsersAccount_GetsNothing()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config, OtherUserId);
+
+        h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = { new AccountUpdateRequest { LetterboxdUsername = "mine", OriginalLetterboxdUsername = LbUser } }
+        });
+
+        var mine = h.Config.Accounts.Single(a => a.UserJellyfinId == UserId);
+        Assert.Equal(string.Empty, mine.LetterboxdPassword);
+        Assert.Null(mine.RawCookies);
+    }
+
+    [Fact]
+    public void SerializdPutAccounts_EmailChangeWithBlankPassword_KeepsThePassword()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+
+        SerializdControllerFor(UserId).PutAccounts(new SerializdController.AccountsUpdateRequest
+        {
+            Accounts = new() { new SerializdController.AccountItem { Email = "demo@example.com", OriginalEmail = SzEmail } }
+        });
+
+        Assert.Equal(SzPassword, h.Config.SerializdAccounts.Single().Password);
+    }
+
+    [Fact]
+    public async Task VerifyLogin_RenamedInTheForm_UsesTheStoredAccountItStartedFrom()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+        string? user = null, password = null;
+        LetterboxdController.VerifyApiLoginForTesting = (u, p) => { user = u; password = p; return Task.CompletedTask; };
+
+        var result = await h.Controller.VerifyLogin(new LetterboxdVerifyRequest { LetterboxdUsername = "demo-cinephile", OriginalLetterboxdUsername = LbUser });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(("demo-cinephile", Password), (user, password));
+    }
+
+    [Fact]
+    public async Task SerializdVerify_AdminCheckingAnotherUsersAccount_UsesThatAccountsPassword()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config, OtherUserId);
+        string? password = null;
+        SerializdController.VerifyOverrideForTesting = (_, _, p) => { password = p; return Task.FromResult<string?>("me"); };
+        var request = new SerializdController.VerifyRequest { Email = SzEmail, UserJellyfinId = OtherUserId };
+
+        Assert.IsType<BadRequestObjectResult>(await SerializdControllerFor(UserId).Verify(request));
+        Assert.Null(password);
+
+        Assert.IsType<OkObjectResult>(await SerializdControllerFor(UserId, admin: true).Verify(request));
+        Assert.Equal(SzPassword, password);
+    }
+
+    /// <summary>
+    /// Seerr's user list: answers only to the API key it was set up with, as the real
+    /// X-Api-Key check does (anything else gets 403). Records each request's host and key.
+    /// </summary>
+    private sealed class FakeSeerr : HttpMessageHandler
+    {
+        private readonly string _key;
+        public FakeSeerr(string key) => _key = key;
+        public System.Collections.Generic.List<(string Host, string? Key)> Requests { get; } = new();
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var key = request.Headers.TryGetValues("X-Api-Key", out var values) ? values.FirstOrDefault() : null;
+            Requests.Add((request.RequestUri!.Host, key));
+            if (key != _key)
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+            var body = "{\"pageInfo\":{\"pages\":1,\"results\":1},\"results\":[{\"id\":7,\"jellyfinUserId\":\"" + UserId + "\"}]}";
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(body) });
+        }
     }
 }
