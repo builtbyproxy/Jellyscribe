@@ -67,9 +67,30 @@ public static class SerializdActivity
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to load Serializd activity from {Path}", DataPath);
+            return _events; // never compact (and so rewrite) a partial read
+        }
+
+        // Same cap as the Letterboxd history: a failing episode appends a row every run.
+        var dropped = SyncHistory.Compact(_events);
+        if (dropped > 0)
+        {
+            Save(_events);
+            _logger?.LogInformation("Compacted Serializd activity: dropped {Count} old skipped/failed events", dropped);
         }
 
         return _events;
+    }
+
+    private static void Save(List<SyncEvent> events)
+    {
+        try
+        {
+            File.WriteAllLines(DataPath, events.Select(e => JsonSerializer.Serialize(e)));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to save Serializd activity to {Path}", DataPath);
+        }
     }
 
     public static void Record(SyncEvent evt)
@@ -104,14 +125,7 @@ public static class SerializdActivity
             var events = Load();
             var stamped = SyncHistory.StampMissingUserIds(events);
             if (stamped == 0) return 0;
-            try
-            {
-                File.WriteAllLines(DataPath, events.Select(e => JsonSerializer.Serialize(e)));
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogError(ex, "Failed to save Serializd activity to {Path}", DataPath);
-            }
+            Save(events);
             return stamped;
         }
     }

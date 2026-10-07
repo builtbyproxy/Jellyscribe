@@ -96,7 +96,16 @@ public static class SyncHistory
 {
     private static readonly object _lock = new();
     private static List<SyncEvent>? _events;
+    private static Dictionary<int, List<SyncEvent>>? _byTmdbId;
     private static ILogger? _logger;
+
+    /// <summary>
+    /// Skipped/Failed events kept per (user, film) when the file is compacted on load. Every run
+    /// appends another one, so without a cap the history grows forever. Must stay at or above
+    /// <see cref="LetterboxdSyncRunner.MaxConsecutiveSyncFailures"/>, or a capped streak would
+    /// read as too short to abandon the film.
+    /// </summary>
+    internal const int MaxPrunableEventsPerFilm = 5;
 
     /// <summary>
     /// Test-only hook for the JSONL file location, plus a way to clear the in-memory
@@ -108,7 +117,7 @@ public static class SyncHistory
     /// <summary>Test hook: drop the in-memory cache so the next access re-reads from disk.</summary>
     internal static void ResetForTesting()
     {
-        lock (_lock) { _events = null; }
+        lock (_lock) { _events = null; _byTmdbId = null; }
     }
 
     public static void SetLogger(ILogger logger) => _logger = logger;
@@ -224,7 +233,65 @@ public static class SyncHistory
         if (_events != null) return _events;
 
         _events = new List<SyncEvent>();
+        if (ReadEventsFromDisk())
+        {
+            var dropped = Compact(_events);
+            if (dropped > 0)
+            {
+                SaveAllEvents();
+                _logger?.LogInformation("Compacted sync history: dropped {Count} old skipped/failed events", dropped);
+            }
+        }
 
+        _byTmdbId = new Dictionary<int, List<SyncEvent>>();
+        foreach (var evt in _events)
+            IndexEvent(evt);
+
+        return _events;
+    }
+
+    private static void IndexEvent(SyncEvent evt)
+    {
+        if (!_byTmdbId!.TryGetValue(evt.TmdbId, out var list))
+        {
+            list = new List<SyncEvent>();
+            _byTmdbId[evt.TmdbId] = list;
+        }
+
+        list.Add(evt);
+    }
+
+    // Keyed by film only: BelongsTo matches on UserId or Username depending on what each event
+    // carries, so the per-user filter stays in the query over this (small) per-film list.
+    private static List<SyncEvent> EventsForFilm(int tmdbId)
+    {
+        LoadEvents();
+        return _byTmdbId!.TryGetValue(tmdbId, out var list) ? list : new List<SyncEvent>();
+    }
+
+    /// <summary>
+    /// Drops all but the newest <see cref="MaxPrunableEventsPerFilm"/> Skipped/Failed events per
+    /// (user, film), in place, returning how many were dropped. Every other status is a real
+    /// outcome and kept forever, as are diary-import markers (Skipped, but the import-then-export
+    /// loop guard reads them).
+    /// </summary>
+    internal static int Compact(List<SyncEvent> events)
+    {
+        var drop = events
+            .Where(e => (e.Status == SyncStatus.Skipped || e.Status == SyncStatus.Failed)
+                && !string.Equals(e.Source, SyncEventSources.DiaryImport, StringComparison.Ordinal))
+            .GroupBy(e => (
+                User: string.IsNullOrEmpty(e.UserId) ? "name:" + e.Username : "id:" + e.UserId.ToLowerInvariant(),
+                e.TmdbId,
+                e.FilmTitle))
+            .SelectMany(g => g.OrderByDescending(e => e.Timestamp).Skip(MaxPrunableEventsPerFilm))
+            .ToHashSet();
+        return drop.Count == 0 ? 0 : events.RemoveAll(drop.Contains);
+    }
+
+    /// <summary>Reads the JSONL (or migrates the legacy JSON) into <see cref="_events"/>; false if the read failed partway.</summary>
+    private static bool ReadEventsFromDisk()
+    {
         try
         {
             var jsonlPath = DataPath;
@@ -236,11 +303,11 @@ public static class SyncHistory
                     try
                     {
                         var evt = JsonSerializer.Deserialize<SyncEvent>(line);
-                        if (evt != null) _events.Add(evt);
+                        if (evt != null) _events!.Add(evt);
                     }
                     catch { }
                 }
-                return _events;
+                return true;
             }
 
             // Migrate from old JSON format if it exists
@@ -253,13 +320,14 @@ public static class SyncHistory
                 SaveAllEvents();
                 _logger?.LogInformation("Migrated {Count} sync history events from JSON to JSONL", _events.Count);
             }
+
+            return true;
         }
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Failed to load sync history from {Path}", DataPath);
+            return false;
         }
-
-        return _events;
     }
 
     private static void SaveAllEvents()
@@ -292,6 +360,7 @@ public static class SyncHistory
         {
             var events = LoadEvents();
             events.Add(evt);
+            IndexEvent(evt);
 
             try
             {
@@ -368,7 +437,7 @@ public static class SyncHistory
     {
         lock (_lock)
         {
-            return GetLastStatusForFilm(LoadEvents(), username, tmdbId, account);
+            return GetLastStatusForFilm(EventsForFilm(tmdbId), username, tmdbId, account);
         }
     }
 
@@ -382,7 +451,7 @@ public static class SyncHistory
     {
         lock (_lock)
         {
-            return WasSuccessfullySynced(LoadEvents(), username, tmdbId, viewingDate, account);
+            return WasSuccessfullySynced(EventsForFilm(tmdbId), username, tmdbId, viewingDate, account);
         }
     }
 
@@ -427,7 +496,7 @@ public static class SyncHistory
     {
         lock (_lock)
         {
-            return GetFailureStreak(LoadEvents(), username, tmdbId, account);
+            return GetFailureStreak(EventsForFilm(tmdbId), username, tmdbId, account);
         }
     }
 
@@ -484,7 +553,7 @@ public static class SyncHistory
     {
         lock (_lock)
         {
-            return GetLastSuccessfulSyncDate(LoadEvents(), username, tmdbId, account);
+            return GetLastSuccessfulSyncDate(EventsForFilm(tmdbId), username, tmdbId, account);
         }
     }
 
@@ -513,7 +582,7 @@ public static class SyncHistory
     {
         lock (_lock)
         {
-            return WasImportedFromDiary(LoadEvents(), username, tmdbId);
+            return WasImportedFromDiary(EventsForFilm(tmdbId), username, tmdbId);
         }
     }
 
