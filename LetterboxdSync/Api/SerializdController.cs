@@ -172,9 +172,15 @@ public class SerializdController : JellyfinUserApiController
     /// <summary>Serializd activity stats for the dashboard, same shape as the Letterboxd <c>/Stats</c>.</summary>
     [HttpGet("Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult GetStats()
     {
-        var (total, success, failed, skipped, rewatches) = SerializdActivity.GetStats(GetJellyfinUsername());
+        // SerializdActivity treats a null username as "everyone", so an unresolved caller must stop here.
+        var jellyfinUsername = GetJellyfinUsername();
+        if (string.IsNullOrEmpty(jellyfinUsername))
+            return BadRequest(new { error = "Could not determine user" });
+
+        var (total, success, failed, skipped, rewatches) = SerializdActivity.GetStats(jellyfinUsername);
         var watchlist = WatchlistStats.GetTv(GetCurrentUserId() ?? string.Empty);
         return Ok(new { total, success, failed, skipped, rewatches, watchlist });
     }
@@ -182,10 +188,15 @@ public class SerializdController : JellyfinUserApiController
     /// <summary>Paged Serializd activity for the dashboard, same shape as the Letterboxd <c>/History</c>.</summary>
     [HttpGet("History")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult GetHistory([FromQuery] int count = 50, [FromQuery] int offset = 0)
     {
+        var jellyfinUsername = GetJellyfinUsername();
+        if (string.IsNullOrEmpty(jellyfinUsername))
+            return BadRequest(new { error = "Could not determine user" });
+
         var capped = Math.Clamp(count, 1, 500);
-        var (events, total) = SerializdActivity.GetPage(Math.Max(offset, 0), capped, GetJellyfinUsername());
+        var (events, total) = SerializdActivity.GetPage(Math.Max(offset, 0), capped, jellyfinUsername);
         return Ok(new { events, total });
     }
 

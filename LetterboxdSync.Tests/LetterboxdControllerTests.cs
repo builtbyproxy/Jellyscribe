@@ -63,10 +63,41 @@ public class LetterboxdControllerTests
 
     // ----- GetStats / GetHistory -----
 
+    /// <summary>Harness whose caller resolves to a real Jellyfin user, which /Stats and /History require.</summary>
+    private static ControllerTestHarness ResolvedUserHarness()
+    {
+        var user = new User("alice", "test-provider-id", "test-reset-id");
+        var h = new ControllerTestHarness(currentUserId: user.Id.ToString("N"));
+        h.UserManager.GetUsers().Returns(new List<User> { user });
+        return h;
+    }
+
+    [Fact]
+    public void GetStats_UnresolvedUser_ReturnsBadRequest()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+
+        var result = h.Controller.GetStats();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Could not determine user", Prop<string>(result, "error"));
+    }
+
+    [Fact]
+    public void GetHistory_UnresolvedUser_ReturnsBadRequest()
+    {
+        using var h = new ControllerTestHarness(currentUserId: null);
+
+        var result = h.Controller.GetHistory();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Could not determine user", Prop<string>(result, "error"));
+    }
+
     [Fact]
     public void GetStats_ReturnsCurrentStats()
     {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
+        using var h = ResolvedUserHarness();
 
         var result = h.Controller.GetStats();
 
@@ -150,7 +181,7 @@ public class LetterboxdControllerTests
     [Fact]
     public void GetHistory_DefaultParams_ReturnsPageWithCount()
     {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
+        using var h = ResolvedUserHarness();
 
         var result = h.Controller.GetHistory();
 
@@ -162,7 +193,7 @@ public class LetterboxdControllerTests
     [Fact]
     public void GetHistory_CapsCountAt200()
     {
-        using var h = new ControllerTestHarness();
+        using var h = ResolvedUserHarness();
 
         var result = h.Controller.GetHistory(count: 9999);
 
@@ -172,7 +203,7 @@ public class LetterboxdControllerTests
     [Fact]
     public void GetHistory_NegativeOffset_ClampedToZero()
     {
-        using var h = new ControllerTestHarness();
+        using var h = ResolvedUserHarness();
 
         var result = h.Controller.GetHistory(offset: -50);
 

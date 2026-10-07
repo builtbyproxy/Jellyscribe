@@ -493,6 +493,37 @@ public class SerializdControllerTests : IDisposable
     // ----- GetStats / GetHistory -----
 
     [Fact]
+    public void GetStats_UnresolvedUser_ReturnsBadRequest()
+    {
+        AddUserWithAccount();
+        Authenticate("ffffffffffffffffffffffffffffffff");
+
+        var result = _controller.GetStats();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public void GetHistory_UnresolvedUser_ReturnsBadRequest()
+    {
+        var (user, _) = AddUserWithAccount();
+        SerializdActivity.Record(new SyncEvent
+        {
+            FilmTitle = "Silo · S1E1",
+            TmdbId = 1,
+            Username = user.Username!,
+            Timestamp = DateTime.UtcNow,
+            Status = SyncStatus.Success,
+            Source = "playback",
+        });
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
+
+        var result = _controller.GetHistory();
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
     public void GetStats_ReturnsAggregateShape()
     {
         var (user, idHex) = AddUserWithAccount();

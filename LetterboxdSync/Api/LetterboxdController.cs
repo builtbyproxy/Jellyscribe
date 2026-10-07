@@ -196,9 +196,14 @@ public class LetterboxdController : JellyfinUserApiController
 
     [HttpGet("Stats")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult GetStats()
     {
+        // SyncHistory treats a null username as "everyone", so an unresolved caller must stop here.
         var jellyfinUsername = GetJellyfinUsername();
+        if (string.IsNullOrEmpty(jellyfinUsername))
+            return BadRequest(new { error = "Could not determine user" });
+
         var (total, success, failed, skipped, rewatches, requested) = SyncHistory.GetStats(jellyfinUsername);
         return Ok(new
         {
@@ -220,9 +225,13 @@ public class LetterboxdController : JellyfinUserApiController
     /// </summary>
     [HttpGet("History")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public ActionResult GetHistory([FromQuery] int count = 50, [FromQuery] int offset = 0)
     {
         var jellyfinUsername = GetJellyfinUsername();
+        if (string.IsNullOrEmpty(jellyfinUsername))
+            return BadRequest(new { error = "Could not determine user" });
+
         var capped = Math.Min(Math.Max(count, 1), 200);
         var (events, total) = SyncHistory.GetPage(Math.Max(offset, 0), capped, jellyfinUsername);
         return Ok(new { events, total, offset = Math.Max(offset, 0), count = capped });
