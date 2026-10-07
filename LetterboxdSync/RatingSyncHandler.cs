@@ -398,7 +398,7 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
             if (LibraryExclusion.IsExcluded(_libraryManager, item, account.ExcludedLibraryIds, _logger))
                 continue;
 
-            if (AuthBreaker.IsOpen(userIdN, account.LetterboxdUsername))
+            if (AuthBreaker.BlocksLogin(userIdN, account.LetterboxdUsername))
             {
                 _logger.LogInformation(
                     "Not syncing the rating on {Title} for {LbUser}: auth breaker open; it syncs on the next rating change after credentials are re-saved",

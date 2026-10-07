@@ -26,6 +26,9 @@ public class AuthBreakerEntry
     public DateTime? OpenedAtUtc { get; set; }
 
     public string? LastError { get; set; }
+
+    /// <summary>When the open breaker last let one login attempt through (see <see cref="AuthBreaker.BlocksLogin"/>).</summary>
+    public DateTime? LastProbeUtc { get; set; }
 }
 
 /// <summary>
@@ -41,6 +44,16 @@ public class AuthBreakerEntry
 public static class AuthBreaker
 {
     public const int Threshold = 3;
+
+    /// <summary>
+    /// An open breaker lets one login attempt through after this long, so an account paused by
+    /// an outage (rather than by a wrong password) resumes on its own. A failed attempt keeps it
+    /// open for another day; a successful one closes it.
+    /// </summary>
+    public static readonly TimeSpan HalfOpenAfter = TimeSpan.FromHours(24);
+
+    /// <summary>Test seam for the clock.</summary>
+    internal static Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
 
     private static readonly object _lock = new();
     private static List<AuthBreakerEntry>? _entries;
@@ -89,6 +102,33 @@ public static class AuthBreaker
         }
     }
 
+    /// <summary>
+    /// True when a sync entry point must skip the login. Like <see cref="IsOpen"/>, except that
+    /// once a day an open breaker lets one caller through to try: that caller gets false, and
+    /// the next day starts counting from it. Only call it right before a login attempt.
+    /// </summary>
+    public static bool BlocksLogin(string userJellyfinId, string letterboxdUsername)
+    {
+        lock (_lock)
+        {
+            var e = Find(userJellyfinId, letterboxdUsername);
+            if (e?.OpenedAtUtc == null)
+                return false;
+
+            var now = UtcNow();
+            var lastTry = e.LastProbeUtc ?? e.OpenedAtUtc.Value;
+            if (now - lastTry < HalfOpenAfter)
+                return true;
+
+            e.LastProbeUtc = now;
+            Save();
+            _logger?.LogInformation(
+                "Auth breaker for Letterboxd account {Username} has been open since {Since:u}; trying one login",
+                letterboxdUsername, e.OpenedAtUtc);
+            return false;
+        }
+    }
+
     /// <summary>Snapshot of every account whose breaker is currently open (admin dashboard badge).</summary>
     public static List<AuthBreakerEntry> GetOpenEntries()
     {
@@ -101,7 +141,8 @@ public static class AuthBreaker
                 ConsecutiveFailures = e.ConsecutiveFailures,
                 FirstFailureUtc = e.FirstFailureUtc,
                 OpenedAtUtc = e.OpenedAtUtc,
-                LastError = e.LastError
+                LastError = e.LastError,
+                LastProbeUtc = e.LastProbeUtc
             }).ToList();
         }
     }
@@ -120,7 +161,8 @@ public static class AuthBreaker
                 ConsecutiveFailures = e.ConsecutiveFailures,
                 FirstFailureUtc = e.FirstFailureUtc,
                 OpenedAtUtc = e.OpenedAtUtc,
-                LastError = e.LastError
+                LastError = e.LastError,
+                LastProbeUtc = e.LastProbeUtc
             };
         }
     }
@@ -161,10 +203,10 @@ public static class AuthBreaker
 
             var wasOpen = e.OpenedAtUtc != null;
             e.ConsecutiveFailures++;
-            e.FirstFailureUtc ??= DateTime.UtcNow;
+            e.FirstFailureUtc ??= UtcNow();
             e.LastError = Sanitize(error);
             if (!wasOpen && e.ConsecutiveFailures >= Threshold)
-                e.OpenedAtUtc = DateTime.UtcNow;
+                e.OpenedAtUtc = UtcNow();
             Save();
 
             var justOpened = !wasOpen && e.OpenedAtUtc != null;
@@ -206,7 +248,8 @@ public static class AuthBreaker
             {
                 ShortOverview = $"Login has been failing since {since:yyyy-MM-dd HH:mm} UTC.",
                 Overview = $"Letterboxd login for account {letterboxdUsername} has been failing since {since:yyyy-MM-dd HH:mm} UTC. " +
-                           "Syncing for this account is paused until its credentials are updated in Jellyscribe settings.",
+                           "Syncing for this account is paused until its credentials are updated in Jellyscribe settings. " +
+                           "Jellyscribe also tries one login a day, so a Letterboxd outage clears on its own.",
                 LogSeverity = Microsoft.Extensions.Logging.LogLevel.Warning
             }).ConfigureAwait(false);
         }

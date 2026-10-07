@@ -113,7 +113,7 @@ public class DiaryImportTask : IScheduledTask
             foreach (var account in accounts)
             {
                 var breakerUserId = user.Id.ToString("N");
-                if (AuthBreaker.IsOpen(breakerUserId, account.LetterboxdUsername))
+                if (AuthBreaker.BlocksLogin(breakerUserId, account.LetterboxdUsername))
                 {
                     _logger.LogInformation(
                         "Skipping diary import for {LbUser}: auth breaker open; re-save credentials to resume",

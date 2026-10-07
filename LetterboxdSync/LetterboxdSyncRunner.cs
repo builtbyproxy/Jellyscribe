@@ -367,11 +367,11 @@ public class LetterboxdSyncRunner
         }
 
         var breakerUserId = user.Id.ToString("N");
-        if (AuthBreaker.IsOpen(breakerUserId, account.LetterboxdUsername))
+        if (AuthBreaker.BlocksLogin(breakerUserId, account.LetterboxdUsername))
         {
             var since = AuthBreaker.GetState(breakerUserId, account.LetterboxdUsername)?.FirstFailureUtc;
             _logger.LogInformation(
-                "Skipping Letterboxd sync for {Username}: auth breaker open (login failing since {Since:u}); re-save credentials to resume",
+                "Skipping Letterboxd sync for {Username}: auth breaker open (login failing since {Since:u}); re-save credentials to resume, or wait for the daily retry",
                 account.LetterboxdUsername, since);
             SyncHistory.Record(new SyncEvent
             {
@@ -380,7 +380,7 @@ public class LetterboxdSyncRunner
                 Account = lbAccount,
                 Timestamp = DateTime.UtcNow,
                 Status = SyncStatus.Skipped,
-                Error = $"Login failing since {since:yyyy-MM-dd}; sync paused until credentials are re-saved",
+                Error = $"Login failing since {since:yyyy-MM-dd}; sync paused until credentials are re-saved (one login is retried each day)",
                 Source = source
             });
             SyncProgress.Complete(SyncProgress.TrackLetterboxd);

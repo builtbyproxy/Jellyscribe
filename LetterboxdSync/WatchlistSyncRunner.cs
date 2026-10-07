@@ -185,7 +185,7 @@ public class WatchlistSyncRunner
         SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Authenticating");
 
         var breakerUserId = user.Id.ToString("N");
-        if (AuthBreaker.IsOpen(breakerUserId, account.LetterboxdUsername))
+        if (AuthBreaker.BlocksLogin(breakerUserId, account.LetterboxdUsername))
         {
             _logger.LogInformation(
                 "Skipping watchlist sync for {Username}: auth breaker open; re-save credentials to resume",

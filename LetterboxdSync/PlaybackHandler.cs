@@ -118,7 +118,7 @@ public class PlaybackHandler : IHostedService, IDisposable
                 }
 
                 var breakerUserId = user.Id.ToString("N");
-                if (AuthBreaker.IsOpen(breakerUserId, account.LetterboxdUsername))
+                if (AuthBreaker.BlocksLogin(breakerUserId, account.LetterboxdUsername))
                 {
                     _logger.LogInformation(
                         "Skipping real-time sync of {Title} for {LbUser}: auth breaker open; the scheduled task catches up once credentials are re-saved",

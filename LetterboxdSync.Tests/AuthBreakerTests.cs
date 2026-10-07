@@ -23,6 +23,7 @@ public class AuthBreakerTests : IDisposable
 
     public void Dispose()
     {
+        AuthBreaker.UtcNow = () => DateTime.UtcNow;
         AuthBreaker.DataPathOverride = null;
         AuthBreaker.ResetForTesting();
         try { if (File.Exists(_path)) File.Delete(_path); } catch { }
@@ -143,5 +144,75 @@ public class AuthBreakerTests : IDisposable
         Assert.True(AuthBreaker.IsOpen("u1", "kostadamus"));
         AuthBreaker.Reset("u1", "KOSTADAMUS");
         Assert.False(AuthBreaker.IsOpen("u1", "Kostadamus"));
+    }
+
+    private static void Open(string user = "u1", string account = "demo-cinephile")
+    {
+        for (var i = 0; i < AuthBreaker.Threshold; i++)
+            AuthBreaker.RecordFailure(user, account, "Letterboxd returned 503");
+    }
+
+    // An outage during three logins must not pause the account forever: after a day the breaker
+    // lets exactly one login through.
+    [Fact]
+    public void OpenBreaker_LetsOneLoginThroughAfterADay()
+    {
+        var now = new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc);
+        AuthBreaker.UtcNow = () => now;
+        Open();
+
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+        now += AuthBreaker.HalfOpenAfter - TimeSpan.FromMinutes(1);
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+
+        now += TimeSpan.FromMinutes(2);
+        Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+        // A second caller in the same moment is still held back.
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+        Assert.True(AuthBreaker.IsOpen("u1", "demo-cinephile"));
+    }
+
+    [Fact]
+    public void FailedProbe_KeepsItOpenForAnotherDay_AndASuccessfulOneClosesIt()
+    {
+        var now = new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc);
+        AuthBreaker.UtcNow = () => now;
+        Open();
+
+        now += AuthBreaker.HalfOpenAfter;
+        Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+        Assert.False(AuthBreaker.RecordFailure("u1", "demo-cinephile", "Letterboxd returned 503")); // no second notification
+
+        now += TimeSpan.FromHours(12);
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+
+        now += TimeSpan.FromHours(12);
+        Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+        AuthBreaker.RecordSuccess("u1", "demo-cinephile");
+        Assert.False(AuthBreaker.IsOpen("u1", "demo-cinephile"));
+    }
+
+    [Fact]
+    public void ProbeTime_SurvivesARestart()
+    {
+        var now = new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc);
+        AuthBreaker.UtcNow = () => now;
+        Open();
+        now += AuthBreaker.HalfOpenAfter;
+        Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+
+        AuthBreaker.ResetForTesting(); // reload from disk
+
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+    }
+
+    [Fact]
+    public void AdminReset_StillClosesItAtOnce()
+    {
+        Open();
+        AuthBreaker.Reset("u1", "demo-cinephile");
+
+        Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+        Assert.False(AuthBreaker.IsOpen("u1", "demo-cinephile"));
     }
 }
