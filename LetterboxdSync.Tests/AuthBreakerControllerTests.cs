@@ -174,6 +174,23 @@ public class AuthBreakerControllerTests : IDisposable
     }
 
     /// <summary>
+    /// The dashboard never gets the stored password back, so a save that only changes another
+    /// setting posts it blank. The kept password is the same password: the breaker stays open.
+    /// </summary>
+    [Fact]
+    public void UpdateConfiguration_PasswordLeftBlank_KeepsBreakerOpen()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        SaveAsDashboard(Acct(UserId, "charlie", "old-password"));
+        OpenBreaker(UserId, "charlie");
+
+        SaveAsDashboard(Acct(UserId, "charlie", string.Empty));
+
+        Assert.True(AuthBreaker.IsOpen(UserId, "charlie"));
+        Assert.Equal("old-password", h.Config.Accounts.Single().LetterboxdPassword);
+    }
+
+    /// <summary>
     /// The reporter also tried deleting the account and creating a fresh one, which didn't help:
     /// the breaker is keyed on (user, Letterboxd username), so a re-created account inherited the
     /// old open breaker. A newly added account must start clean.

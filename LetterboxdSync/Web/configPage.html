@@ -321,7 +321,7 @@
                                 <div class="ws-sect-title" style="margin-top:0;"><h2>Seerr</h2><span class="rule"></span></div>
                                 <p class="ws-muted" style="font-size:12.5px;margin-top:0;">Auto-request titles missing from the library (films and TV shows).</p>
                                 <div class="ws-row"><label class="ws-field">Seerr URL</label><input type="text" class="ws-input" id="jellyseerrUrl" placeholder="http://seerr.local:5055" /></div>
-                                <div class="ws-row"><label class="ws-field" for="jellyseerrApiKey">Seerr API key<span class="ws-saved" id="jellyseerrApiKeySaved" hidden>Saved</span></label><input type="password" class="ws-input" id="jellyseerrApiKey" autocomplete="new-password" placeholder="Settings → General → API Key" /></div>
+                                <div class="ws-row"><label class="ws-field" for="jellyseerrApiKey">Seerr API key<span class="ws-saved" id="jellyseerrApiKeySaved" hidden>Saved</span></label><input type="password" class="ws-input" id="jellyseerrApiKey" autocomplete="new-password" placeholder="Settings → General → API Key" /><label class="ws-muted" id="jellyseerrApiKeyClearRow" style="display:none;gap:7px;align-items:center;margin-top:6px;font-size:12.5px;"><input type="checkbox" id="jellyseerrApiKeyClear" /> Remove saved key</label></div>
                                 <label class="ws-checks" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px;margin:4px 0 12px;"><input type="checkbox" id="autoApproveJellyseerr" /><span>Auto-approve requests created by Jellyscribe<span class="desc" style="display:block;color:var(--ws-faint);font-size:11.5px;">Requests are made as each user's own Seerr account, so Seerr only approves them straight away for users with Auto-Approve. With this on, Jellyscribe approves the rest with this API key so they reach Radarr/Sonarr. Turn it off to review them in Seerr yourself.</span></span></label>
                                 <div style="display:flex;gap:10px;align-items:center;"><button type="button" class="ws-btn" id="testJellyseerrBtn">Test connection</button><span id="jellyseerrTestStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
                             </div>
@@ -459,10 +459,12 @@
                         /* Saved secrets never come back from the server (only Has* flags), so a secret
                            field always starts empty: blank on save keeps the saved value, typing replaces it. */
                         fillSecret: function (id, saved, keepText, emptyText) {
-                            var el = document.getElementById(id);
+                            var el = document.getElementById(id), clearRow = document.getElementById(id + 'ClearRow');
                             el.value = '';
                             el.placeholder = saved ? keepText : emptyText;
                             document.getElementById(id + 'Saved').hidden = !saved;
+                            // A "Remove saved ..." checkbox, where the field has one, shows only when something is saved.
+                            if (clearRow) { clearRow.style.display = saved ? 'flex' : 'none'; document.getElementById(id + 'Clear').checked = false; }
                         },
                         /* Saves the whole config, then reloads it, so the page never keeps a typed secret
                            and every Saved indicator reflects what the server stored. */
@@ -868,8 +870,6 @@
                             document.getElementById('mUsername').value = a ? (svc === 'serializd' ? a.Email : a.LetterboxdUsername) : '';
                             self.fillSecret('mPassword', !!(a && a.HasPassword), 'Leave blank to keep the saved password', '');
                             self.fillSecret('mAuthBlob', !!(a && a.HasRawCookies), 'Leave blank to keep the saved cookies', 'Paste from a signed-in browser (incl. cf_clearance)');
-                            document.getElementById('mAuthBlobClear').checked = false;
-                            document.getElementById('mAuthBlobClearRow').style.display = a && a.HasRawCookies ? 'flex' : 'none';
                             document.getElementById('mUserAgent').value = (a && a.UserAgent) || '';
                             document.getElementById('mWatchName').value = (a && (svc === 'serializd' ? a.WatchlistName : a.PlaylistName)) || '';
                             document.getElementById('mVerifyStatus').textContent = ''; document.getElementById('mStatus').textContent = '';
@@ -1059,6 +1059,7 @@
                             self.config.JellyseerrUrl = document.getElementById('jellyseerrUrl').value.trim() || null;
                             // Blank keeps the saved key (the server never sends it back); typing replaces it.
                             self.config.JellyseerrApiKey = document.getElementById('jellyseerrApiKey').value.trim() || null;
+                            self.config.ClearJellyseerrApiKey = !self.config.JellyseerrApiKey && document.getElementById('jellyseerrApiKeyClear').checked;
                             self.config.AutoApproveJellyseerrRequests = document.getElementById('autoApproveJellyseerr').checked;
                             self.config.Telemetry = self.config.Telemetry || {};
                             self.config.Telemetry.Enabled = document.getElementById('telemetryEnabled').checked;

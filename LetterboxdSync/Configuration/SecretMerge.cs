@@ -21,21 +21,29 @@ internal static class SecretMerge
     internal static string OriginalOr(string? original, string current)
         => string.IsNullOrWhiteSpace(original) ? current : original;
 
+    /// <summary>Jellyfin user ids are stored without dashes; a client may send either form.</summary>
+    private static bool SameUser(string? a, string? b)
+        => string.Equals(a?.Replace("-", string.Empty), b?.Replace("-", string.Empty), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Typed cookies win; otherwise the clear flag drops the stored ones, or they are kept.</summary>
+    internal static string? CookiesFor(string? incoming, bool clear, string? stored)
+        => !string.IsNullOrEmpty(incoming) ? incoming : clear ? null : stored;
+
     internal static Account? FindStored(this PluginConfiguration stored, string userJellyfinId, string letterboxdUsername)
         => stored.Accounts?.FirstOrDefault(a =>
-            string.Equals(a.UserJellyfinId, userJellyfinId, StringComparison.OrdinalIgnoreCase) &&
+            SameUser(a.UserJellyfinId, userJellyfinId) &&
             string.Equals(a.LetterboxdUsername, letterboxdUsername?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     internal static SerializdAccount? FindStoredSerializd(this PluginConfiguration stored, string userJellyfinId, string email)
         => stored.SerializdAccounts?.FirstOrDefault(a =>
-            string.Equals(a.UserJellyfinId, userJellyfinId, StringComparison.OrdinalIgnoreCase) &&
+            SameUser(a.UserJellyfinId, userJellyfinId) &&
             string.Equals(a.Email?.Trim(), email?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Fills the secrets an incoming account left empty from its stored counterpart.</summary>
     internal static void KeepSecretsFrom(this Account incoming, Account? stored)
     {
         incoming.LetterboxdPassword = KeepIfEmpty(incoming.LetterboxdPassword, stored?.LetterboxdPassword) ?? string.Empty;
-        incoming.RawCookies = incoming.ClearRawCookies ? null : KeepIfEmpty(incoming.RawCookies, stored?.RawCookies);
+        incoming.RawCookies = CookiesFor(incoming.RawCookies, incoming.ClearRawCookies, stored?.RawCookies);
         incoming.ClearRawCookies = false;
     }
 
@@ -65,7 +73,9 @@ internal static class SecretMerge
             account.OriginalEmail = null;
         }
 
-        incoming.JellyseerrApiKey = KeepIfEmpty(incoming.JellyseerrApiKey, stored.JellyseerrApiKey);
+        incoming.JellyseerrApiKey = !string.IsNullOrEmpty(incoming.JellyseerrApiKey) ? incoming.JellyseerrApiKey
+            : incoming.ClearJellyseerrApiKey ? null : stored.JellyseerrApiKey;
+        incoming.ClearJellyseerrApiKey = false;
     }
 
     /// <summary>
@@ -73,6 +83,12 @@ internal static class SecretMerge
     /// secret was saved for, so a test request can't send it anywhere else.
     /// </summary>
     internal static bool IsStoredUrl(string? url, string? storedUrl)
-        => !string.IsNullOrWhiteSpace(url) && !string.IsNullOrWhiteSpace(storedUrl) &&
-           string.Equals(url.Trim().TrimEnd('/'), storedUrl.Trim().TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+    {
+        if (!Uri.TryCreate(url?.Trim().TrimEnd('/'), UriKind.Absolute, out var a) ||
+            !Uri.TryCreate(storedUrl?.Trim().TrimEnd('/'), UriKind.Absolute, out var b))
+            return false;
+        // Scheme and host are case-insensitive (Uri lower-cases them); the path is compared exactly.
+        return a.Scheme == b.Scheme && a.Host == b.Host && a.Port == b.Port &&
+               string.Equals(a.AbsolutePath, b.AbsolutePath, StringComparison.Ordinal);
+    }
 }

@@ -151,6 +151,7 @@ public class WriteOnlySecretsTests : IDisposable
         Assert.Contains("\"HasRawCookies\":true", json);
         Assert.Contains("\"HasJellyseerrApiKey\":true", json);
         Assert.DoesNotContain("ClearRawCookies", json);
+        Assert.DoesNotContain("ClearJellyseerrApiKey", json);
         AssertNoSecret(JsonSerializer.Serialize(h.Config, h.Config.GetType(), JsonDefaults.Options));
     }
 
@@ -229,7 +230,9 @@ public class WriteOnlySecretsTests : IDisposable
         var xml = writer.ToString();
 
         AssertNoSecret(xml);
-        Assert.DoesNotContain("Input", xml);
+        Assert.DoesNotContain("PasswordInput", xml);
+        Assert.DoesNotContain("CookiesInput", xml);
+        Assert.DoesNotContain("ApiKeyInput", xml);
         Assert.DoesNotContain("<Has", xml);
         using var reader = new StringReader(xml);
         var loaded = (PluginConfiguration)serializer.Deserialize(reader)!;
@@ -359,6 +362,57 @@ public class WriteOnlySecretsTests : IDisposable
         Assert.Equal(new (string, string?)[] { ("seerr.local", ApiKey) }, seerr.Requests);
     }
 
+    [Fact]
+    public void JellyfinConfigPost_ClearSeerrKey_DropsIt_ButATypedKeyWins()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+
+        var body = JsonNode.Parse(JellyfinGet(h.Config))!;
+        body["ClearJellyseerrApiKey"] = true;
+        JellyfinPost(body.ToJsonString());
+        Assert.Null(h.Config.JellyseerrApiKey);
+
+        body = JsonNode.Parse(JellyfinGet(h.Config))!;
+        body["JellyseerrApiKey"] = "rotated-key";
+        body["ClearJellyseerrApiKey"] = true;
+        JellyfinPost(body.ToJsonString());
+        Assert.Equal("rotated-key", h.Config.JellyseerrApiKey);
+    }
+
+    [Fact]
+    public async Task TypedCookies_WinOverTheClearFlag_OnSaveAndVerify()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+
+        h.Controller.PutAccounts(new AccountsUpdateRequest
+        {
+            Accounts = { new AccountUpdateRequest { LetterboxdUsername = LbUser, RawCookies = "typed=1", ClearRawCookies = true } }
+        });
+        Assert.Equal("typed=1", h.Config.Accounts.Single().RawCookies);
+
+        string? cookies = "unset";
+        LetterboxdController.VerifyApiLoginForTesting = (_, _) => Task.FromException(new Exception("api down"));
+        LetterboxdController.VerifyWebsiteLoginForTesting = (_, _, c, _) => { cookies = c; return Task.CompletedTask; };
+        await h.Controller.VerifyLogin(new LetterboxdVerifyRequest { LetterboxdUsername = LbUser, RawCookies = "typed=2", ClearRawCookies = true });
+        Assert.Equal("typed=2", cookies);
+        await h.Controller.VerifyLogin(new LetterboxdVerifyRequest { LetterboxdUsername = LbUser, ClearRawCookies = true });
+        Assert.Null(cookies);
+    }
+
+    [Theory]
+    [InlineData("http://SEERR.local:5055/", true)]
+    [InlineData("http://seerr.local:5055/Seerr", false)]
+    [InlineData("http://seerr.local:5056", false)]
+    [InlineData("https://seerr.local:5055", false)]
+    [InlineData("not a url", false)]
+    public void IsStoredUrl_MatchesSchemeHostPortCaseInsensitively_AndThePathExactly(string url, bool expected)
+    {
+        Assert.Equal(expected, SecretMerge.IsStoredUrl(url, SeerrUrl));
+        Assert.False(SecretMerge.IsStoredUrl("http://seerr.local:5055/seerr", "http://seerr.local:5055/Seerr"));
+    }
+
     // ----- Renames and owner moves carry the secrets with the account -----
 
     [Fact]
@@ -405,6 +459,21 @@ public class WriteOnlySecretsTests : IDisposable
 
         Assert.Equal(Password, h.Config.Accounts[0].LetterboxdPassword);
         Assert.Equal("other-users-password", h.Config.Accounts[1].LetterboxdPassword);
+    }
+
+    [Fact]
+    public void JellyfinConfigPost_OriginalOwnerWithDashes_StillMatches()
+    {
+        using var h = new ControllerTestHarness(UserId);
+        Seed(h.Config);
+
+        var body = JsonNode.Parse(JellyfinGet(h.Config))!;
+        body["Accounts"]![0]!["OriginalUserJellyfinId"] = Guid.ParseExact(UserId, "N").ToString("D");
+        body["Accounts"]![0]!["OriginalLetterboxdUsername"] = LbUser;
+        body["Accounts"]![0]!["UserJellyfinId"] = OtherUserId;
+        JellyfinPost(body.ToJsonString());
+
+        Assert.Equal(Password, h.Config.Accounts.Single().LetterboxdPassword);
     }
 
     [Fact]

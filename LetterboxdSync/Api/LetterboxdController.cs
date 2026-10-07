@@ -298,7 +298,7 @@ public class LetterboxdController : JellyfinUserApiController
         var stored = Config.FindStored(GetCredentialOwnerId(request!.UserJellyfinId) ?? string.Empty,
             SecretMerge.OriginalOr(request.OriginalLetterboxdUsername, username));
         var password = SecretMerge.KeepIfEmpty(request.LetterboxdPassword, stored?.LetterboxdPassword);
-        var rawCookies = request.ClearRawCookies ? null : SecretMerge.KeepIfEmpty(request.RawCookies, stored?.RawCookies);
+        var rawCookies = SecretMerge.CookiesFor(request.RawCookies, request.ClearRawCookies, stored?.RawCookies);
         if (string.IsNullOrEmpty(password))
             return BadRequest(new { error = "Username and password are required." });
 

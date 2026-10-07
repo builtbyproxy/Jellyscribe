@@ -605,10 +605,12 @@
                         },
                         onSvcChange: function () { var svc = document.getElementById('mSvc').value; document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; document.getElementById('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; document.getElementById('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; var ratingsBox = document.getElementById('chkRatings'); if (ratingsBox) ratingsBox.closest('label').style.display = svc === 'letterboxd' ? '' : 'none'; var uname = document.getElementById('mUsername').value.trim(); document.getElementById('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : '')); },
                         fillSecret: function (id, saved, keepText, emptyText) {
-                            var el = document.getElementById(id);
+                            var el = document.getElementById(id), clearRow = document.getElementById(id + 'ClearRow');
                             el.value = '';
                             el.placeholder = saved ? keepText : emptyText;
                             document.getElementById(id + 'Saved').hidden = !saved;
+                            // A "Remove saved ..." checkbox, where the field has one, shows only when something is saved.
+                            if (clearRow) { clearRow.style.display = saved ? 'flex' : 'none'; document.getElementById(id + 'Clear').checked = false; }
                         },
                         openAccount: function (ref) {
                             var self = this, svc = ref ? ref.svc : 'serializd', a = null;
@@ -620,8 +622,6 @@
                             // Saved secrets never come back from the server (only has* flags): blank keeps them, typing replaces them.
                             self.fillSecret('mPassword', !!(a && a.hasPassword), 'Leave blank to keep the saved password', '');
                             self.fillSecret('mAuthBlob', !!(a && a.hasCookies), 'Leave blank to keep the saved cookies', 'From a signed-in browser (incl. cf_clearance)');
-                            document.getElementById('mAuthBlobClear').checked = false;
-                            document.getElementById('mAuthBlobClearRow').style.display = a && a.hasCookies ? 'flex' : 'none';
                             document.getElementById('mUserAgent').value = (a && a.userAgent) || '';
                             document.getElementById('mWatchName').value = (a && (svc === 'serializd' ? a.watchlistName : a.playlistName)) || '';
                             document.getElementById('mWatchNameRow').style.display = self.canSetWatchlistName ? '' : 'none';

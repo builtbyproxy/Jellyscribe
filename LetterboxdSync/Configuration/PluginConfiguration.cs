@@ -48,6 +48,10 @@ public class PluginConfiguration : BasePluginConfiguration
     [XmlIgnore]
     public bool HasJellyseerrApiKey => !string.IsNullOrEmpty(JellyseerrApiKey);
 
+    /// <summary>Write-only: true on a config POST drops the stored key, which an empty value would keep.</summary>
+    [XmlIgnore]
+    public bool ClearJellyseerrApiKey { internal get; set; }
+
     /// <summary>Encrypted on-disk form of <see cref="JellyseerrApiKey"/>. See <see cref="Configuration.Account.LetterboxdPasswordProtected"/> for why this is JsonIgnore'd.</summary>
     [XmlElement("JellyseerrApiKey")]
     [JsonIgnore]
