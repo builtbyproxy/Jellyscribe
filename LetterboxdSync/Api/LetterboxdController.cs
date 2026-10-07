@@ -237,63 +237,6 @@ public class LetterboxdController : JellyfinUserApiController
         return Ok(new { events, total, offset = Math.Max(offset, 0), count = capped });
     }
 
-    [HttpGet("Account")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult GetAccount()
-    {
-        var userId = GetCurrentUserId();
-        if (string.IsNullOrEmpty(userId))
-            return BadRequest(new { error = "Could not determine user" });
-
-        var account = Config.Accounts.FirstOrDefault(a => a.UserJellyfinId == userId);
-        if (account == null)
-        {
-            return Ok(new
-            {
-                letterboxdUsername = string.Empty,
-                letterboxdPassword = string.Empty,
-                rawCookies = (string?)null,
-                userAgent = (string?)null,
-                enabled = false,
-                syncFavorites = false,
-                syncRatings = true,
-                enableDateFilter = false,
-                dateFilterDays = 7,
-                enableWatchlistSync = false,
-                enableDiaryImport = false,
-                autoRequestWatchlist = false,
-                mirrorJellyseerrWatchlist = false,
-                skipPreviouslySynced = true,
-                stopOnFailure = false,
-                excludedLibraryIds = new List<string>(),
-                isConfigured = false
-            });
-        }
-
-        return Ok(new
-        {
-            letterboxdUsername = account.LetterboxdUsername,
-            letterboxdPassword = account.LetterboxdPassword,
-            rawCookies = account.RawCookies,
-            userAgent = account.UserAgent,
-            enabled = account.Enabled,
-            syncFavorites = account.SyncFavorites,
-            syncRatings = account.SyncRatings,
-            enableDateFilter = account.EnableDateFilter,
-            dateFilterDays = account.DateFilterDays,
-            enableWatchlistSync = account.EnableWatchlistSync,
-            enableDiaryImport = account.EnableDiaryImport,
-            autoRequestWatchlist = account.AutoRequestWatchlist,
-            backfillAvailableRequests = account.BackfillAvailableRequests,
-            mirrorJellyseerrWatchlist = account.MirrorJellyseerrWatchlist,
-            skipPreviouslySynced = account.SkipPreviouslySynced,
-            stopOnFailure = account.StopOnFailure,
-            excludedLibraryIds = account.ExcludedLibraryIds,
-            isConfigured = true
-        });
-    }
-
     /// <summary>
     /// Open auth breakers across all users, for the admin dashboard's paused badges.
     /// Admin-only: the payload names other users' Letterboxd accounts.
@@ -395,66 +338,10 @@ public class LetterboxdController : JellyfinUserApiController
         }
     }
 
-    [HttpPut("Account")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public ActionResult PutAccount([FromBody] AccountUpdateRequest request)
-    {
-        var userId = GetCurrentUserId();
-        if (string.IsNullOrEmpty(userId))
-            return BadRequest(new { error = "Could not determine user" });
-
-        if (EmailAsUsernameError(request.LetterboxdUsername) is { } emailError)
-            return BadRequest(new { error = emailError });
-
-        var account = Config.Accounts.FirstOrDefault(a => a.UserJellyfinId == userId);
-        if (account == null)
-        {
-            account = new Account { UserJellyfinId = userId };
-            Config.Accounts.Add(account);
-        }
-
-        account.LetterboxdUsername = request.LetterboxdUsername;
-        account.LetterboxdPassword = request.LetterboxdPassword;
-        account.RawCookies = request.RawCookies;
-        account.UserAgent = request.UserAgent;
-        account.Enabled = request.Enabled;
-        account.SyncFavorites = request.SyncFavorites;
-        account.SyncRatings = request.SyncRatings ?? account.SyncRatings;
-        account.EnableDateFilter = request.EnableDateFilter;
-        account.DateFilterDays = request.DateFilterDays;
-        account.EnableWatchlistSync = request.EnableWatchlistSync;
-        account.EnableDiaryImport = request.EnableDiaryImport;
-        account.AutoRequestWatchlist = request.AutoRequestWatchlist;
-        account.BackfillAvailableRequests = request.BackfillAvailableRequests;
-        account.MirrorJellyseerrWatchlist = request.MirrorJellyseerrWatchlist;
-        account.SkipPreviouslySynced = request.SkipPreviouslySynced;
-        account.StopOnFailure = request.StopOnFailure;
-        account.ExcludedLibraryIds = LibraryExclusion.ResolveForSave(request.ExcludedLibraryIds, account.ExcludedLibraryIds);
-
-        // IsPrimary and PlaylistName are deliberately NOT copied from the request.
-        // The userPage form does not expose them; deserialisation would set them to
-        // their type defaults (false / null) and clobber values that only the admin
-        // config page sets. Treat them as admin-managed and let NormalisePrimaryFlags
-        // promote a new account to primary when it's the user's only enabled one.
-        Config.NormalisePrimaryFlags();
-
-        Plugin.Instance!.SaveConfiguration();
-
-        // Credentials were just (re-)persisted: close any open auth breaker so the
-        // next run attempts login with the new values (issue #103's reset path).
-        AuthBreaker.Reset(userId, account.LetterboxdUsername);
-
-        _logger.LogInformation("User {UserId} saved their Letterboxd account settings", userId);
-
-        return Ok(new { success = true });
-    }
-
     /// <summary>
     /// Returns every Letterboxd account belonging to the calling Jellyfin user, in
-    /// config order with primary first. Multi-account companion to the single-account
-    /// /Account endpoint: the userPage uses this to render the full list of accounts
-    /// the user can edit on their own sidebar page.
+    /// config order with primary first. The userPage uses this to render the full list
+    /// of accounts the user can edit on their own sidebar page.
     /// </summary>
     [HttpGet("Accounts")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -578,29 +465,6 @@ public class LetterboxdController : JellyfinUserApiController
 
         _logger.LogInformation("User {UserId} saved {Count} Letterboxd account(s) via /Accounts", userId, mine.Count);
         return Ok(new { success = true, count = mine.Count });
-    }
-
-    [HttpPost("TestConnection")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult> TestConnection([FromBody] TestConnectionRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.LetterboxdUsername) || string.IsNullOrWhiteSpace(request.LetterboxdPassword))
-            return BadRequest(new { success = false, error = "Username and password are required" });
-
-        try
-        {
-            using var service = await LetterboxdServiceFactory.CreateAuthenticatedAsync(
-                request.LetterboxdUsername, request.LetterboxdPassword, request.RawCookies, _logger, request.UserAgent)
-                .ConfigureAwait(false);
-
-            return Ok(new { success = true, letterboxdUsername = request.LetterboxdUsername });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Test connection failed for {Username}: {Message}", request.LetterboxdUsername, ex.Message);
-            return BadRequest(new { success = false, error = ex.Message });
-        }
     }
 
     /// <summary>

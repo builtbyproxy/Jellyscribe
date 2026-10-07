@@ -210,135 +210,6 @@ public class LetterboxdControllerTests
         Assert.Equal(0, Prop<int>(result, "offset"));
     }
 
-    // ----- GetAccount -----
-
-    [Fact]
-    public void GetAccount_NoUserClaim_ReturnsBadRequest()
-    {
-        using var h = new ControllerTestHarness(currentUserId: null);
-
-        var result = h.Controller.GetAccount();
-
-        Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal("Could not determine user", Prop<string>(result, "error"));
-    }
-
-    [Fact]
-    public void GetAccount_NoConfiguredAccount_ReturnsDefaultsWithIsConfiguredFalse()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-
-        var result = h.Controller.GetAccount();
-
-        Assert.IsType<OkObjectResult>(result);
-        Assert.False(Prop<bool>(result, "isConfigured"));
-        Assert.False(Prop<bool>(result, "enabled"));
-        Assert.True(Prop<bool>(result, "skipPreviouslySynced"));
-        Assert.Equal(7, Prop<int>(result, "dateFilterDays"));
-        Assert.Equal(string.Empty, Prop<string>(result, "letterboxdUsername"));
-    }
-
-    [Fact]
-    public void GetAccount_WithConfiguredAccount_ReturnsAccountFields()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-        var account = h.AddAccount(UserId, "8bitproxy");
-        account.SyncFavorites = true;
-        account.EnableDateFilter = true;
-        account.DateFilterDays = 30;
-
-        var result = h.Controller.GetAccount();
-
-        Assert.True(Prop<bool>(result, "isConfigured"));
-        Assert.Equal("8bitproxy", Prop<string>(result, "letterboxdUsername"));
-        Assert.True(Prop<bool>(result, "enabled"));
-        Assert.True(Prop<bool>(result, "syncFavorites"));
-        Assert.True(Prop<bool>(result, "enableDateFilter"));
-        Assert.Equal(30, Prop<int>(result, "dateFilterDays"));
-    }
-
-    [Fact]
-    public void GetAccount_DifferentUserAccount_NotReturned()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-        h.AddAccount(OtherUserId, "someoneelse");
-
-        var result = h.Controller.GetAccount();
-
-        Assert.False(Prop<bool>(result, "isConfigured"));
-    }
-
-    // ----- PutAccount -----
-
-    [Fact]
-    public void PutAccount_NoUserClaim_ReturnsBadRequest()
-    {
-        using var h = new ControllerTestHarness(currentUserId: null);
-
-        var result = h.Controller.PutAccount(new AccountUpdateRequest());
-
-        Assert.IsType<BadRequestObjectResult>(result);
-    }
-
-    [Fact]
-    public void PutAccount_CreatesNewAccountWhenNoneExists()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-
-        var result = h.Controller.PutAccount(new AccountUpdateRequest
-        {
-            LetterboxdUsername = "fresh",
-            LetterboxdPassword = "pw",
-            Enabled = true,
-            DateFilterDays = 14,
-            SyncFavorites = true
-        });
-
-        Assert.IsType<OkObjectResult>(result);
-        var account = h.Config.Accounts.Single(a => a.UserJellyfinId == UserId);
-        Assert.Equal("fresh", account.LetterboxdUsername);
-        Assert.True(account.Enabled);
-        Assert.Equal(14, account.DateFilterDays);
-        Assert.True(account.SyncFavorites);
-    }
-
-    [Fact]
-    public void PutAccount_UpdatesExistingAccountInPlace()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-        h.AddAccount(UserId, "old", enabled: false);
-
-        h.Controller.PutAccount(new AccountUpdateRequest
-        {
-            LetterboxdUsername = "new",
-            LetterboxdPassword = "newpw",
-            Enabled = true
-        });
-
-        Assert.Single(h.Config.Accounts);
-        var account = h.Config.Accounts[0];
-        Assert.Equal("new", account.LetterboxdUsername);
-        Assert.Equal("newpw", account.LetterboxdPassword);
-        Assert.True(account.Enabled);
-    }
-
-    [Fact]
-    public void PutAccount_DoesNotTouchOtherUsersAccounts()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-        h.AddAccount(OtherUserId, "untouched", enabled: true);
-
-        h.Controller.PutAccount(new AccountUpdateRequest
-        {
-            LetterboxdUsername = "mine",
-            Enabled = false
-        });
-
-        var other = h.Config.Accounts.Single(a => a.UserJellyfinId == OtherUserId);
-        Assert.Equal("untouched", other.LetterboxdUsername);
-        Assert.True(other.Enabled);
-    }
-
     // ----- GetAccounts / PutAccounts (multi-account, per-user) -----
 
     [Fact]
@@ -789,32 +660,6 @@ public class LetterboxdControllerTests
         }
     }
 
-    // ----- TestConnection -----
-
-    [Fact]
-    public async Task TestConnection_MissingCredentials_ReturnsBadRequest()
-    {
-        using var h = new ControllerTestHarness();
-
-        var result = await h.Controller.TestConnection(new TestConnectionRequest());
-
-        Assert.IsType<BadRequestObjectResult>(result);
-        Assert.False(Prop<bool>(result, "success"));
-    }
-
-    [Fact]
-    public async Task TestConnection_OnlyUsername_ReturnsBadRequest()
-    {
-        using var h = new ControllerTestHarness();
-
-        var result = await h.Controller.TestConnection(new TestConnectionRequest
-        {
-            LetterboxdUsername = "user"
-        });
-
-        Assert.IsType<BadRequestObjectResult>(result);
-    }
-
     // ----- TestJellyseerr -----
 
     [Fact]
@@ -1090,59 +935,6 @@ public class LetterboxdControllerTests
         Assert.IsType<AcceptedResult>(result);
     }
 
-    // ----- TestConnection: success + failure via the factory seam -----
-
-    [Fact]
-    public async Task TestConnection_AuthSucceeds_ReturnsOk()
-    {
-        using var h = new ControllerTestHarness();
-
-        var service = Substitute.For<ILetterboxdService>();
-        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
-            System.Threading.Tasks.Task.FromResult(service);
-        try
-        {
-            var result = await h.Controller.TestConnection(new TestConnectionRequest
-            {
-                LetterboxdUsername = "8bitproxy",
-                LetterboxdPassword = "secret"
-            });
-
-            Assert.IsType<OkObjectResult>(result);
-            Assert.True(Prop<bool>(result, "success"));
-            Assert.Equal("8bitproxy", Prop<string>(result, "letterboxdUsername"));
-        }
-        finally
-        {
-            LetterboxdServiceFactory.OverrideForTesting = null;
-        }
-    }
-
-    [Fact]
-    public async Task TestConnection_AuthThrows_ReturnsBadRequestWithError()
-    {
-        using var h = new ControllerTestHarness();
-
-        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
-            throw new Exception("bad credentials");
-        try
-        {
-            var result = await h.Controller.TestConnection(new TestConnectionRequest
-            {
-                LetterboxdUsername = "8bitproxy",
-                LetterboxdPassword = "wrong"
-            });
-
-            Assert.IsType<BadRequestObjectResult>(result);
-            Assert.False(Prop<bool>(result, "success"));
-            Assert.Contains("bad credentials", Prop<string>(result, "error") ?? string.Empty);
-        }
-        finally
-        {
-            LetterboxdServiceFactory.OverrideForTesting = null;
-        }
-    }
-
     // ----- PostReview: named-account targeting + Jellyfin rating writeback -----
 
     [Fact]
@@ -1277,19 +1069,6 @@ public class LetterboxdControllerTests
             .Single(a => (string?)a.GetType().GetProperty("letterboxdUsername")!.GetValue(a) == "mine");
         Assert.Equal(new[] { anime },
             (IEnumerable<string>)echoed.GetType().GetProperty("excludedLibraryIds")!.GetValue(echoed)!);
-    }
-
-    [Fact]
-    public void PutAccount_OmittedExcludedLibraryIds_KeepsStoredList()
-    {
-        using var h = new ControllerTestHarness(currentUserId: UserId);
-        var account = h.AddAccount(UserId, "mine");
-        account.ExcludedLibraryIds.Add("0c5b2a1e9f3d4c7a8b6e5d4c3b2a1f0e");
-
-        h.Controller.PutAccount(new AccountUpdateRequest { LetterboxdUsername = "mine", ExcludedLibraryIds = null });
-
-        Assert.Equal(new[] { "0c5b2a1e9f3d4c7a8b6e5d4c3b2a1f0e" },
-            h.Config.Accounts.Single(a => a.UserJellyfinId == UserId).ExcludedLibraryIds);
     }
 
     [Fact]

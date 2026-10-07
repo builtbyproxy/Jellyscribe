@@ -88,17 +88,6 @@ public class SyncRatingsConfigTests
     }
 
     [Fact]
-    public void PutAccount_FieldOmitted_KeepsStoredValue()
-    {
-        using var h = new ControllerTestHarness(UserId);
-        h.AddAccount(UserId, "existing").SyncRatings = false;
-
-        h.Controller.PutAccount(new AccountUpdateRequest { LetterboxdUsername = "existing", LetterboxdPassword = "pw", Enabled = true });
-
-        Assert.False(h.Config.Accounts.Single(a => a.UserJellyfinId == UserId).SyncRatings);
-    }
-
-    [Fact]
     public void GetAccounts_CarriesSyncRatings()
     {
         using var h = new ControllerTestHarness(UserId);

@@ -111,15 +111,6 @@ public class LetterboxdVerifyLoginTests : IDisposable
         Assert.Empty(h.Config.Accounts);
     }
 
-    [Fact]
-    public void PutAccount_EmailAddress_IsRefused()
-    {
-        using var h = new ControllerTestHarness(UserId);
-        var result = h.Controller.PutAccount(new AccountUpdateRequest { LetterboxdUsername = "someone@example.com", LetterboxdPassword = "pw", Enabled = true });
-        Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Empty(h.Config.Accounts);
-    }
-
     [Theory]
     [InlineData(EmailRefusal, "Sign-in via email address has been disabled. Please sign in with username and password instead.")]
     [InlineData("plain failure\nsecond line", "plain failure second line")]

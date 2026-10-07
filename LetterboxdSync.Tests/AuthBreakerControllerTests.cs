@@ -60,23 +60,6 @@ public class AuthBreakerControllerTests : IDisposable
     }
 
     [Fact]
-    public void PutAccount_CredentialSave_ClosesOpenBreaker()
-    {
-        using var h = new ControllerTestHarness(UserId);
-        OpenBreaker(UserId, "kostadamus");
-
-        var result = h.Controller.PutAccount(new AccountUpdateRequest
-        {
-            LetterboxdUsername = "kostadamus",
-            LetterboxdPassword = "new-password",
-            Enabled = true
-        });
-
-        Assert.IsType<OkObjectResult>(result);
-        Assert.False(AuthBreaker.IsOpen(UserId, "kostadamus"));
-    }
-
-    [Fact]
     public void PutAccounts_LeavesOtherUsersBreakersAlone()
     {
         using var h = new ControllerTestHarness(UserId);

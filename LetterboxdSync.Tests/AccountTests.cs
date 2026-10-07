@@ -57,26 +57,6 @@ public class AccountUpdateRequestTests
     }
 }
 
-public class TestConnectionRequestTests
-{
-    [Fact]
-    public void Defaults_AreCorrect()
-    {
-        var req = new TestConnectionRequest();
-
-        Assert.Equal(string.Empty, req.LetterboxdUsername);
-        Assert.Equal(string.Empty, req.LetterboxdPassword);
-        Assert.Null(req.RawCookies);
-    }
-
-    [Fact]
-    public void HasNoUserJellyfinIdField()
-    {
-        var properties = typeof(TestConnectionRequest).GetProperties();
-        Assert.DoesNotContain(properties, p => p.Name == "UserJellyfinId");
-    }
-}
-
 public class PluginConfigurationAccountTests
 {
     [Fact]
@@ -167,7 +147,7 @@ public class PluginConfigurationAccountTests
             EnableDiaryImport = true
         };
 
-        // Simulate the PutAccount field copy
+        // Simulate the PutAccounts field copy
         account.LetterboxdUsername = request.LetterboxdUsername;
         account.LetterboxdPassword = request.LetterboxdPassword;
         account.RawCookies = request.RawCookies;
