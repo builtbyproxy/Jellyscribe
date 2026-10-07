@@ -128,10 +128,7 @@ public static class SerializdSyncHistory
 
             try
             {
-                var dir = Path.GetDirectoryName(DataPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                File.AppendAllText(DataPath, key + Environment.NewLine);
+                JsonlFile.AppendLine(DataPath, key);
             }
             catch (Exception ex)
             {

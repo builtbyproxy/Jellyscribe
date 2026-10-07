@@ -20,13 +20,15 @@ public static class SerializdActivity
 {
     private static readonly object _lock = new();
     private static List<SyncEvent>? _events;
+    private static List<string>? _unreadableLines;
+    private static bool _readFailed;
     private static ILogger? _logger;
 
     internal static string? DataPathOverride { get; set; }
 
     internal static void ResetForTesting()
     {
-        lock (_lock) { _events = null; }
+        lock (_lock) { _events = null; _unreadableLines = null; _readFailed = false; }
     }
 
     public static void SetLogger(ILogger logger) => _logger = logger;
@@ -52,26 +54,35 @@ public static class SerializdActivity
     {
         if (_events != null) return _events;
         _events = new List<SyncEvent>();
+        _unreadableLines = new List<string>();
+        _readFailed = false;
         try
         {
             if (File.Exists(DataPath))
             {
-                var unreadable = 0;
                 foreach (var line in File.ReadLines(DataPath))
                 {
                     if (string.IsNullOrWhiteSpace(line)) continue;
-                    try { var e = JsonSerializer.Deserialize<SyncEvent>(line); if (e != null) _events.Add(e); }
-                    catch { unreadable++; }
+                    SyncEvent? e = null;
+                    try { e = JsonSerializer.Deserialize<SyncEvent>(line); }
+                    catch (Exception) { /* kept verbatim below rather than lost */ }
+                    if (e != null) _events.Add(e);
+                    else _unreadableLines.Add(line);
                 }
-
-                if (unreadable > 0)
-                    _logger?.LogWarning("Skipped {Count} unreadable lines in Serializd activity {Path}", unreadable, DataPath);
             }
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Failed to load Serializd activity from {Path}", DataPath);
-            return _events; // never compact (and so rewrite) a partial read
+            _readFailed = true;
+            _logger?.LogError(ex, "Failed to load Serializd activity from {Path}; it will not be rewritten until it loads cleanly", DataPath);
+            return _events;
+        }
+
+        if (_unreadableLines.Count > 0)
+        {
+            // Never compact (and so rewrite) a file with lines this version cannot read.
+            _logger?.LogWarning("Skipped {Count} unreadable lines in Serializd activity {Path}; they are kept in the file", _unreadableLines.Count, DataPath);
+            return _events;
         }
 
         // Same cap as the Letterboxd history: a failing episode appends a row every run.
@@ -87,12 +98,16 @@ public static class SerializdActivity
 
     private static void Save(List<SyncEvent> events)
     {
+        if (_readFailed)
+        {
+            _logger?.LogWarning("Not rewriting Serializd activity {Path}: it did not load cleanly", DataPath);
+            return;
+        }
+
         try
         {
-            // Write beside the file and swap it in, so a crash mid-write can't truncate the feed.
-            var tmp = DataPath + ".tmp";
-            File.WriteAllLines(tmp, events.Select(e => JsonSerializer.Serialize(e)));
-            File.Move(tmp, DataPath, overwrite: true);
+            JsonlFile.WriteAllLinesAtomic(DataPath,
+                events.Select(e => JsonSerializer.Serialize(e)).Concat(_unreadableLines ?? new List<string>()));
         }
         catch (Exception ex)
         {
@@ -110,9 +125,7 @@ public static class SerializdActivity
             Load().Add(evt);
             try
             {
-                var dir = Path.GetDirectoryName(DataPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                File.AppendAllText(DataPath, JsonSerializer.Serialize(evt) + Environment.NewLine);
+                JsonlFile.AppendLine(DataPath, JsonSerializer.Serialize(evt));
             }
             catch (Exception ex)
             {

@@ -41,14 +41,15 @@ public class AtomicWriteTests : IDisposable
         try { Directory.Delete(_tempDir, true); } catch { }
     }
 
-    private static string[] FailedEvents(int count) => Enumerable.Range(0, count)
+    private static string[] SkippedEvents(int count) => Enumerable.Range(0, count)
         .Select(i => JsonSerializer.Serialize(new SyncEvent
         {
             FilmTitle = "Film",
             TmdbId = 1,
             Username = "u",
             Timestamp = DateTime.UtcNow.AddMinutes(-i),
-            Status = SyncStatus.Failed,
+            Status = SyncStatus.Skipped,
+            Error = "No TMDb ID",
         }))
         .ToArray();
 
@@ -65,7 +66,7 @@ public class AtomicWriteTests : IDisposable
     public void SyncHistory_Rewrite_ReplacesTheFile()
     {
         var path = SyncHistory.DataPathOverride!;
-        File.WriteAllLines(path, FailedEvents(SyncHistory.MaxPrunableEventsPerFilm + 3));
+        File.WriteAllLines(path, SkippedEvents(SyncHistory.MaxPrunableEventsPerFilm + 3));
         var original = File.ReadAllText(path);
         using var handle = OpenOriginal(path);
 
@@ -80,7 +81,7 @@ public class AtomicWriteTests : IDisposable
     public void SerializdActivity_Rewrite_ReplacesTheFile()
     {
         var path = SerializdActivity.DataPathOverride!;
-        File.WriteAllLines(path, FailedEvents(SyncHistory.MaxPrunableEventsPerFilm + 3));
+        File.WriteAllLines(path, SkippedEvents(SyncHistory.MaxPrunableEventsPerFilm + 3));
         var original = File.ReadAllText(path);
         using var handle = OpenOriginal(path);
 
@@ -97,7 +98,7 @@ public class AtomicWriteTests : IDisposable
         var logger = new WarningCounter();
         SyncHistory.SetLogger(logger);
         SerializdActivity.SetLogger(logger);
-        var lines = FailedEvents(1).Concat(new[] { "{not json", "also not json" }).ToArray();
+        var lines = SkippedEvents(1).Concat(new[] { "{not json", "also not json" }).ToArray();
         File.WriteAllLines(SyncHistory.DataPathOverride!, lines);
         File.WriteAllLines(SerializdActivity.DataPathOverride!, lines);
 

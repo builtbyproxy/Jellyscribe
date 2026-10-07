@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
@@ -113,14 +114,7 @@ public static class RatingPushStore
     {
         try
         {
-            var tmp = DataPath + ".tmp";
-            using (var writer = new StreamWriter(tmp, append: false))
-            {
-                foreach (var line in _ratings!.Values)
-                    writer.WriteLine(JsonSerializer.Serialize(line));
-            }
-
-            File.Move(tmp, DataPath, overwrite: true);
+            JsonlFile.WriteAllLinesAtomic(DataPath, _ratings!.Values.Select(line => JsonSerializer.Serialize(line)));
             _linesOnDisk = _ratings!.Count;
         }
         catch (Exception ex)
@@ -159,10 +153,7 @@ public static class RatingPushStore
 
             try
             {
-                var dir = Path.GetDirectoryName(DataPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                File.AppendAllText(DataPath, JsonSerializer.Serialize(line) + Environment.NewLine);
+                JsonlFile.AppendLine(DataPath, JsonSerializer.Serialize(line));
                 _linesOnDisk++;
 
                 // Re-rates append; compact well before the file is dominated by superseded lines.
