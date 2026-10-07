@@ -17,7 +17,7 @@
 - [x] 3.1 `LetterboxdController`: `Reset` on `PUT Account` and `PUT Accounts` when credentials are persisted; `GET Accounts` gains `authPaused`/`authPausedSince`
 - [x] 3.2 Controller tests: re-save resets an open breaker; accounts payload carries paused fields
 - [x] 3.3 Paused badge in `configPage.html` + `userPage.html` account rows
-- [ ] 3.4 NOT DONE at archive (2026-10-07): no live run is on record. Manual verification on live Jellyfin: force-open a breaker (bad password), observe skip + activity entry, re-save credentials, observe recovery. Covered in tests by `AuthBreakerRunnerTests`, `AuthBreakerPlaybackTests` and `AuthBreakerControllerTests`; needs a follow-up GitHub issue to carry the live check, not filed at archive time
+- [ ] 3.4 NOT DONE at archive (2026-10-07): no live run is on record. Manual verification on live Jellyfin: force-open a breaker (bad password), observe skip + activity entry, re-save credentials, observe recovery. Covered in tests by `AuthBreakerRunnerTests`, `AuthBreakerPlaybackTests` and `AuthBreakerControllerTests`; the live check is tracked in #143
 
 ## 4. Release plumbing
 
