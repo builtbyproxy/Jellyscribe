@@ -76,6 +76,9 @@ jobs:
 
       - name: Decide release, repair, or skip
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -e
           ASSEMBLY="${{ steps.version.outputs.assembly }}"
@@ -90,8 +93,18 @@ jobs:
           elif git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null 2>&1; then
             echo "::warning::Tag $TAG exists but manifest.json does not list $ASSEMBLY. Repairing the half-finished release."
             echo "mode=repair" >> "$GITHUB_OUTPUT"
+            # Rebuild only when the release has no asset to reuse, so a flaky
+            # restore or test cannot block a repair that only needs the manifest.
+            if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null \
+               | grep -qxF "jellyfin-plugin-letterboxd-${TAG}.zip"; then
+              echo "Release $TAG already has its asset; skipping the rebuild."
+              echo "build=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "build=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "build=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Select the commit to build
@@ -211,25 +224,25 @@ jobs:
           echo
 
       - name: Setup .NET
-        if: steps.check.outputs.mode != 'skip'
+        if: steps.check.outputs.build == 'true'
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
         with:
           dotnet-version: '9.0.x'
 
       - name: Restore
-        if: steps.check.outputs.mode != 'skip'
+        if: steps.check.outputs.build == 'true'
         run: dotnet restore
 
       - name: Build
-        if: steps.check.outputs.mode != 'skip'
+        if: steps.check.outputs.build == 'true'
         run: dotnet build -c Release --no-restore
 
       - name: Test
-        if: steps.check.outputs.mode != 'skip'
+        if: steps.check.outputs.build == 'true'
         run: dotnet test -c Release --no-build --verbosity normal --filter "Category!=Integration"
 
       - name: Package
-        if: steps.check.outputs.mode != 'skip'
+        if: steps.check.outputs.build == 'true'
         run: |
           set -e
           ZIP="$GITHUB_WORKSPACE/dist/jellyfin-plugin-letterboxd-${{ steps.version.outputs.tag }}.zip"
