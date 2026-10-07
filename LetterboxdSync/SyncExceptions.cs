@@ -25,7 +25,37 @@ public sealed class FilmNotFoundException : Exception
 /// </summary>
 public sealed class DiaryCheckFailedException : Exception
 {
-    public DiaryCheckFailedException(string message) : base(message)
+    public DiaryCheckFailedException(string message, bool blocked = false) : base(message)
+    {
+        Blocked = blocked;
+    }
+
+    /// <summary>True when the check failed because Letterboxd (Cloudflare) blocked the request.</summary>
+    public bool Blocked { get; }
+}
+
+/// <summary>
+/// Letterboxd's website refused a request with a block (a 403, usually Cloudflare), after the
+/// client's own backoff. Every later request in the run is likely to be refused the same way.
+/// </summary>
+public sealed class LetterboxdBlockedException : Exception
+{
+    public LetterboxdBlockedException(string message) : base(message)
     {
     }
+}
+
+public static class SyncErrors
+{
+    /// <summary>
+    /// True when the failure was Letterboxd refusing the request (a 403 or a Cloudflare
+    /// challenge) rather than anything about the film.
+    /// </summary>
+    public static bool IsBlock(Exception ex) => ex switch
+    {
+        LetterboxdBlockedException => true,
+        DiaryCheckFailedException d => d.Blocked,
+        System.Net.Http.HttpRequestException h => h.StatusCode == System.Net.HttpStatusCode.Forbidden,
+        _ => false,
+    };
 }

@@ -110,7 +110,7 @@ public class LetterboxdDiary
                 return MarkResult.NeedsReauth;
 
             if (res.StatusCode == HttpStatusCode.Forbidden)
-                throw new Exception($"Letterboxd returned 403 for {filmSlug}. Likely anti-bot.");
+                throw new LetterboxdBlockedException($"Letterboxd returned 403 for {filmSlug}. Likely anti-bot.");
 
             if ((int)res.StatusCode >= 200 && (int)res.StatusCode < 300)
             {

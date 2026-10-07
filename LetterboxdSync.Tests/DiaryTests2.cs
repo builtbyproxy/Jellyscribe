@@ -113,7 +113,7 @@ public class DiaryOperationTests
         using var _ = http;
         http.Csrf = "csrf";
 
-        var ex = await Assert.ThrowsAsync<Exception>(
+        var ex = await Assert.ThrowsAsync<LetterboxdBlockedException>(
             () => diary.MarkAsWatchedAsync("test-film", "123", DateTime.Now, false, "PROD1"));
 
         Assert.Contains("403", ex.Message);

@@ -104,8 +104,7 @@ public class BuildSyncQueueTests
     [Fact]
     public void FilmsWithoutTmdbIdStayInQueue()
     {
-        // The main loop logs them and records an explicit "No TMDb ID" skip event, so we
-        // mustn't drop them silently here.
+        // The queue never drops them silently; the runner records them (once) before queueing.
         var candidates = new[]
         {
             (Item: "noTmdb", TmdbId: (int?)null, ViewingDate: Today),

@@ -140,6 +140,26 @@ public static class SyncHistory
     /// </summary>
     public const string AlreadyOnDiaryError = "Already on Letterboxd diary for this date";
 
+    /// <summary>Error text of the Skipped event recorded once for a played film with no TMDb id.</summary>
+    public const string NoTmdbIdError = "No TMDb ID";
+
+    /// <summary>
+    /// True if a "no TMDb id" skip is already recorded for this film title, user and account, so
+    /// the sync records it once instead of on every run.
+    /// </summary>
+    public static bool HasNoTmdbIdSkip(string username, string filmTitle, string? account)
+    {
+        lock (_lock)
+        {
+            var userId = ResolveUserId(username);
+            return EventsForFilm(0).Any(e => e.Status == SyncStatus.Skipped
+                && string.Equals(e.Error, NoTmdbIdError, StringComparison.Ordinal)
+                && string.Equals(e.FilmTitle, filmTitle, StringComparison.Ordinal)
+                && BelongsTo(e, username, userId)
+                && MatchesAccount(e, account));
+        }
+    }
+
     /// <summary>Start of the Error text of a Skipped event the local duplicate backstop recorded.
     /// Settled the same way as <see cref="AlreadyOnDiaryError"/>.</summary>
     public const string BackstopErrorPrefix = "Local history shows prior sync on ";

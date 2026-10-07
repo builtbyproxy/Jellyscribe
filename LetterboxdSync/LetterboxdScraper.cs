@@ -61,7 +61,7 @@ public class LetterboxdScraper
         using var res = await _http.GetWithCloudflareRetryAsync($"/tmdb/{tmdbId}").ConfigureAwait(false);
 
         if (res.StatusCode == HttpStatusCode.Forbidden)
-            throw new Exception(
+            throw new LetterboxdBlockedException(
                 $"TMDb lookup returned 403 for /tmdb/{tmdbId} after retries. Cloudflare is blocking. " +
                 "If Raw Cookies and a matching User-Agent are already set, cf_clearance is most likely " +
                 "(1) expired (the token is short-lived, often around 30 minutes), " +
@@ -109,12 +109,13 @@ public class LetterboxdScraper
 
         if (!res.IsSuccessStatusCode)
             throw new DiaryCheckFailedException(
-                $"Could not check the Letterboxd diary for {filmSlug}: returned {(int)res.StatusCode}");
+                $"Could not check the Letterboxd diary for {filmSlug}: returned {(int)res.StatusCode}",
+                blocked: res.StatusCode == HttpStatusCode.Forbidden);
 
         var html = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
         if (IsCloudflareChallenge(html))
             throw new DiaryCheckFailedException(
-                $"Could not check the Letterboxd diary for {filmSlug}: Cloudflare challenge");
+                $"Could not check the Letterboxd diary for {filmSlug}: Cloudflare challenge", blocked: true);
 
         var dates = Helpers.ParseDiaryDates(html);
 

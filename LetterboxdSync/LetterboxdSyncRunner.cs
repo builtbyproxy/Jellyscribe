@@ -74,6 +74,13 @@ public class LetterboxdSyncRunner
     /// </summary>
     internal const int OutageMinAttempts = 2;
 
+    /// <summary>
+    /// After this many films in a row are refused with a block (a Cloudflare 403 or challenge),
+    /// the rest of the account's run waits for the next one. Each blocked film already costs
+    /// about a minute of backoff, so going on would hold the sync for hours and fail every film.
+    /// </summary>
+    internal const int MaxConsecutiveBlocks = 3;
+
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
 
     public async Task RunForAllAsync(IProgress<double> progress, string source, CancellationToken cancellationToken)
@@ -265,10 +272,42 @@ public class LetterboxdSyncRunner
             return;
         }
 
+        // A film without a TMDb id can never be matched on Letterboxd. Say so in one line, and
+        // record it in history once rather than on every run.
+        var lbAccount = account.LetterboxdUsername;
+        var noTmdbId = movies.Where(m => !HasTmdbId(m)).ToList();
+        if (noTmdbId.Count > 0)
+        {
+            _logger.LogInformation(
+                "Skipping {Count} films for {Username} as {LbUser}: no TMDb ID on the Jellyfin item, so Letterboxd cannot match them ({Titles})",
+                noTmdbId.Count, user.Username, lbAccount, string.Join(", ", noTmdbId.Take(5).Select(m => m.Name)) + (noTmdbId.Count > 5 ? ", ..." : string.Empty));
+            foreach (var movie in noTmdbId)
+            {
+                if (SyncHistory.HasNoTmdbIdSkip(user.Username ?? string.Empty, movie.Name, lbAccount)) continue;
+                SyncHistory.Record(new SyncEvent
+                {
+                    FilmTitle = movie.Name,
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    Status = SyncStatus.Skipped,
+                    Error = SyncHistory.NoTmdbIdError,
+                    Source = source,
+                    Account = lbAccount
+                });
+            }
+
+            var excluded = noTmdbId.ToHashSet();
+            movies = movies.Where(m => !excluded.Contains(m)).ToList();
+            if (movies.Count == 0)
+            {
+                SyncProgress.Complete(SyncProgress.TrackLetterboxd);
+                return;
+            }
+        }
+
         // Abandon films Letterboxd keeps saying it does not have. BuildSyncQueue pushes
         // previously-failed films to the head of the queue, so such a film would retry forever.
         // After MaxConsecutiveSyncFailures permanent failures for this account, leave it alone.
-        var lbAccount = account.LetterboxdUsername;
         var abandonedFailures = 0;
         movies = movies.Where(m =>
         {
@@ -376,6 +415,8 @@ public class LetterboxdSyncRunner
         var skipped = 0;
         var failed = 0;
         var attempted = 0;
+        var blocksInARow = 0;
+        var position = 0;
         var failures = new List<SyncEvent>();
 
         SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Syncing films");
@@ -384,24 +425,11 @@ public class LetterboxdSyncRunner
         foreach (var movie in movies)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            position++;
 
-            var tmdbIdStr = movie.GetProviderId(MetadataProvider.Tmdb);
-            if (!int.TryParse(tmdbIdStr, out var tmdbId))
-            {
-                _logger.LogInformation("Skipping {Title}: no TMDb ID on the Jellyfin item", movie.Name);
-                SyncHistory.Record(new SyncEvent
-                {
-                    FilmTitle = movie.Name,
-                    Username = user.Username ?? string.Empty,
-                    Timestamp = DateTime.UtcNow,
-                    Status = SyncStatus.Skipped,
-                    Error = "No TMDb ID",
-                    Source = source,
-                    Account = lbAccount
-                });
-                skipped++;
+            // Films without a TMDb id were set aside before the loop.
+            if (!int.TryParse(movie.GetProviderId(MetadataProvider.Tmdb), out var tmdbId))
                 continue;
-            }
 
             attempted++;
             try
@@ -418,6 +446,7 @@ public class LetterboxdSyncRunner
                 // Throws when the check itself fails, which lands in the catch below as a
                 // retryable failure: an unanswered check must never be read as "not logged".
                 var diaryInfo = await service.GetDiaryInfoAsync(film.FilmId, lbAccount).ConfigureAwait(false);
+                blocksInARow = 0;
                 if (Helpers.IsDuplicate(diaryInfo.LastDate, viewingDate))
                 {
                     _logger.LogInformation("Skipping {Title} (TMDb:{TmdbId}): already on Letterboxd diary for {Date}",
@@ -526,6 +555,26 @@ public class LetterboxdSyncRunner
                         user.Username, synced, skipped, failed);
                     break;
                 }
+
+                blocksInARow = SyncErrors.IsBlock(ex) ? blocksInARow + 1 : 0;
+                if (blocksInARow >= MaxConsecutiveBlocks)
+                {
+                    var remaining = movies.Count - position;
+                    _logger.LogWarning(
+                        "Letterboxd blocked {Count} films in a row for {Username} as {LbUser}; pausing this account's sync until the next run ({Remaining} films left)",
+                        blocksInARow, user.Username, lbAccount, remaining);
+                    SyncHistory.Record(new SyncEvent
+                    {
+                        FilmTitle = $"Account {lbAccount} paused",
+                        Username = user.Username ?? string.Empty,
+                        Account = lbAccount,
+                        Timestamp = DateTime.UtcNow,
+                        Status = SyncStatus.Skipped,
+                        Error = $"Letterboxd blocked {blocksInARow} requests in a row (usually Cloudflare); the other {remaining} films wait for the next sync",
+                        Source = source
+                    });
+                    break;
+                }
             }
         }
 
@@ -568,6 +617,8 @@ public class LetterboxdSyncRunner
         return result;
     }
 
+    private static bool HasTmdbId(BaseItem item) => int.TryParse(item.GetProviderId(MetadataProvider.Tmdb), out _);
+
     internal static bool ShouldAbandon(FailureStreak streak)
         => streak.Permanent >= MaxConsecutiveSyncFailures
             || (streak.Transient >= MaxTransientSyncFailures && streak.TransientDays >= MinTransientFailureDays);
@@ -582,8 +633,8 @@ public class LetterboxdSyncRunner
 
     /// <summary>
     /// Filter out already-synced candidates and order the rest with previously-failed first,
-    /// never-attempted next. Items with no TMDb ID stay in the queue at the lowest priority so the
-    /// main loop can record an explicit skip event with reason. Pure function for testability.
+    /// never-attempted next. Items with no TMDb ID stay in the queue at the lowest priority rather
+    /// than vanish (the runner sets them aside before calling this). Pure function for testability.
     /// </summary>
     internal static (List<T> Queue, int LocallySkipped) BuildSyncQueue<T>(
         IEnumerable<(T Item, int? TmdbId, DateTime ViewingDate)> candidates,
@@ -598,7 +649,7 @@ public class LetterboxdSyncRunner
         {
             if (c.TmdbId is not int tid)
             {
-                // No TMDb ID, main loop logs and records an explicit skip event with reason.
+                // No TMDb ID: kept, never dropped silently.
                 remaining.Add((c.Item, 1));
                 continue;
             }
