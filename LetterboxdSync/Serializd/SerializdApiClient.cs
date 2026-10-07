@@ -259,18 +259,28 @@ public class SerializdApiClient : ISerializdService
 
         var entries = new List<SerializdWatchlistEntry>();
         var seen = new HashSet<int>();
-        for (var page = 1; page <= 100; page++)
+        for (var page = 1; ; page++)
         {
+            if (page > MaxWatchlistPages)
+                throw WatchlistIncomplete(entries.Count, $"more than {MaxWatchlistPages} pages");
+
             using var resp = await SendAsync(HttpMethod.Get,
                 $"/user/{Uri.EscapeDataString(_username)}/watchlistpage_v2/{page}?sort_by=date_added_desc")
                 .ConfigureAwait(false);
-            if (!resp.IsSuccessStatusCode) break;
+            if (!resp.IsSuccessStatusCode)
+                throw WatchlistIncomplete(entries.Count, $"status {(int)resp.StatusCode} on page {page}");
 
             var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("items", out var items)
-                || items.ValueKind != JsonValueKind.Array || items.GetArrayLength() == 0)
-                break;
+            if (!doc.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+                throw WatchlistIncomplete(entries.Count, $"a page {page} with no list of items");
+
+            if (items.GetArrayLength() == 0)
+            {
+                // An empty first page is an empty watchlist; an empty later page is a short read.
+                if (page == 1) break;
+                throw WatchlistIncomplete(entries.Count, $"an empty page {page}");
+            }
 
             foreach (var it in items.EnumerateArray())
             {
@@ -295,6 +305,14 @@ public class SerializdApiClient : ISerializdService
 
         return entries;
     }
+
+    private const int MaxWatchlistPages = 100;
+
+    // The watchlist sync reconciles the Jellyfin collection, playlist and Seerr watchlist to this
+    // list, so a partial read must throw (leaving all of them as they were) rather than return a
+    // short list that would remove shows still on the watchlist.
+    private static InvalidOperationException WatchlistIncomplete(int count, string reason)
+        => new($"Could not read the whole Serializd watchlist: after {count} shows Serializd returned {reason}. Nothing was changed this run.");
 
     /// <summary>Maps Serializd internal season ids to season numbers via the show's season map.</summary>
     private async Task<IReadOnlyList<int>> ResolveSeasonNumbersAsync(int showTmdbId, IReadOnlyList<int> serializdSeasonIds)

@@ -89,6 +89,10 @@ public class SerializdSyncRunner
                 {
                     await SyncOneAsync(user, account, source, cancellationToken).ConfigureAwait(false);
                 }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError("Serializd catch-up failed for {Username} as {Email}: {Message}",
@@ -136,6 +140,10 @@ public class SerializdSyncRunner
                 try
                 {
                     await SyncOneAsync(user, account, source, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -356,6 +364,11 @@ public class SerializdSyncRunner
 
                 // Be polite during a large first-time backfill.
                 await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Shutdown, not a failure of this episode: record nothing.
+                throw;
             }
             catch (Exception ex)
             {

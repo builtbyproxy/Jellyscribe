@@ -291,6 +291,53 @@ public class SerializdApiClientTests
         Assert.Empty(whole.SeasonNumbers);                          // no seasonIds → whole show
     }
 
+    [Theory]
+    [InlineData("error")]
+    [InlineData("empty")]
+    [InlineData("noitems")]
+    public async Task GetWatchlist_LaterPageCannotBeRead_Throws(string failure)
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            if (path.Contains("/watchlistpage_v2/1"))
+                return Json(HttpStatusCode.OK, "{\"totalPages\":2,\"items\":[{\"showId\":206828,\"seasonIds\":[]}]}");
+            if (path.Contains("/watchlistpage_v2/2"))
+                return failure switch
+                {
+                    "error" => Json(HttpStatusCode.BadGateway, "{}"),
+                    "empty" => Json(HttpStatusCode.OK, "{\"totalPages\":2,\"items\":[]}"),
+                    _ => Json(HttpStatusCode.OK, "{\"totalPages\":2}"),
+                };
+            return Json(HttpStatusCode.OK, "{\"seasons\":[]}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        // A short list would make the watchlist sync remove every show on page two.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetWatchlistAsync());
+    }
+
+    [Fact]
+    public async Task GetWatchlist_EmptyWatchlist_ReturnsEmpty()
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.OK, "{\"totalPages\":0,\"items\":[]}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        Assert.Empty(await client.GetWatchlistAsync());
+    }
+
     [Fact]
     public async Task ExpiredToken_ReAuthenticatesAndRetries()
     {
