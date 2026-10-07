@@ -119,6 +119,68 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
             Content = new StringContent("{\"results\":[{\"id\":" + seerrId + ",\"jellyfinUserId\":\"" + jellyfinIdHex + "\"}]}"),
         };
 
+    // ----- Gate (one watchlist run at a time) -----
+
+    [Fact]
+    public async Task TryRunForUserAsync_GateAlreadyHeld_ReturnsFalseWithoutFetching()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId);
+        var service = Substitute.For<ISerializdService>();
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        await SerializdWatchlistSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        try
+        {
+            var ok = await _runner.TryRunForUserAsync(userId, CancellationToken.None);
+
+            Assert.False(ok);
+            await service.DidNotReceive().GetWatchlistAsync();
+        }
+        finally
+        {
+            SerializdWatchlistSyncGate.Instance.Release();
+        }
+    }
+
+    [Fact]
+    public async Task RunForAllAsync_GateAlreadyHeld_SkipsWithoutFetching()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId);
+        var service = Substitute.For<ISerializdService>();
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        await SerializdWatchlistSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        try
+        {
+            await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+
+            await service.DidNotReceive().GetWatchlistAsync();
+        }
+        finally
+        {
+            SerializdWatchlistSyncGate.Instance.Release();
+        }
+    }
+
+    [Fact]
+    public async Task TryRunForUserAsync_ReleasesGateAfterRun()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId);
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry>());
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        Assert.True(await _runner.TryRunForUserAsync(userId, CancellationToken.None));
+        Assert.False(SerializdWatchlistSyncGate.IsRunning);
+    }
+
     // ----- Seerr auto-request -----
 
     [Fact]

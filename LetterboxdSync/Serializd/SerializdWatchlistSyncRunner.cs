@@ -55,6 +55,24 @@ public class SerializdWatchlistSyncRunner
 
     public async Task RunForAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
+        if (!await SerializdWatchlistSyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("Serializd watchlist sync already running, skipping scheduled run");
+            return;
+        }
+
+        try
+        {
+            await RunForAllCoreAsync(progress, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            SerializdWatchlistSyncGate.Instance.Release();
+        }
+    }
+
+    private async Task RunForAllCoreAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    {
         var pairs = _userManager.GetUsers()
             .SelectMany(u => Config.GetEnabledSerializdAccountsForUser(u.Id.ToString("N"))
                 .Where(a => a.SyncWatchlist)
@@ -96,7 +114,29 @@ public class SerializdWatchlistSyncRunner
         }
     }
 
+    /// <summary>
+    /// Runs the watchlist sync for one Jellyfin user. Returns false when another watchlist run
+    /// holds the gate, the user is unknown, or none of their accounts has watchlist sync on.
+    /// </summary>
     public async Task<bool> TryRunForUserAsync(string userJellyfinId, CancellationToken cancellationToken)
+    {
+        if (!await SerializdWatchlistSyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("Serializd watchlist sync already running, refusing user-triggered start for {UserId}", userJellyfinId);
+            return false;
+        }
+
+        try
+        {
+            return await TryRunForUserCoreAsync(userJellyfinId, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            SerializdWatchlistSyncGate.Instance.Release();
+        }
+    }
+
+    private async Task<bool> TryRunForUserCoreAsync(string userJellyfinId, CancellationToken cancellationToken)
     {
         var user = _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userJellyfinId);
         if (user == null) return false;

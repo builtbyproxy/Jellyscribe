@@ -366,16 +366,22 @@ public class SerializdController : JellyfinUserApiController
     /// <summary>
     /// Mirrors the calling user's Serializd watchlist into the Jellyfin collection + playlist,
     /// on demand (the TV counterpart to the Letterboxd "Sync Watchlist Now"). 202 + background;
-    /// 400 if no Serializd account has watchlist sync enabled.
+    /// 400 if no Serializd account has watchlist sync enabled; 409 while a watchlist run is going.
     /// </summary>
     [HttpPost("SyncWatchlistNow")]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public ActionResult SyncWatchlistNow()
     {
         var userId = GetCurrentUserId();
         if (string.IsNullOrEmpty(userId))
             return BadRequest(new { error = "Could not determine user" });
+
+        // Best-effort early answer for the dashboard; the runner's own gate is what actually
+        // stops two requests that both get past this check from running in parallel.
+        if (SerializdWatchlistSyncGate.IsRunning)
+            return Conflict(new { error = "A Serializd watchlist sync is already running" });
 
         var enabled = Plugin.Instance!.Configuration.GetEnabledSerializdAccountsForUser(userId);
         if (!enabled.Any(a => a.SyncWatchlist))

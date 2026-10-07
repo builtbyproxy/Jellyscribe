@@ -641,6 +641,26 @@ public class SerializdControllerTests : IDisposable
     }
 
     [Fact]
+    public void SyncWatchlistNow_WatchlistRunInProgress_ReturnsConflict()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).SyncWatchlist = true;
+        Authenticate(idHex);
+        SerializdWatchlistSyncGate.Instance.Wait();
+        try
+        {
+            var result = _controller.SyncWatchlistNow();
+
+            Assert.IsType<ConflictObjectResult>(result);
+            Assert.Null(_controller.LastBackgroundSync);
+        }
+        finally
+        {
+            SerializdWatchlistSyncGate.Instance.Release();
+        }
+    }
+
+    [Fact]
     public void SyncWatchlistNow_NoAccountHasWatchlistSyncEnabled_ReturnsBadRequest()
     {
         // Enabled account exists, but SyncWatchlist is off (the default).
