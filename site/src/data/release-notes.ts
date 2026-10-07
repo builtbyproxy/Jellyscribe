@@ -10,6 +10,31 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.9',
+    headline: 'The settings pages never lose or duplicate an account',
+    summary:
+      'The Jellyscribe dashboards now keep your accounts safe when something goes wrong. If your accounts or activity can\'t be loaded, the page says so and offers Retry instead of showing an empty list or zeros, so a save can no longer wipe your linked diaries. A failed or repeated Save never adds an account twice, and Remove now asks you to confirm in the page and only removes the account once the server has. Every save, sync, login check and review now tells you when it fails and why, rather than hanging on "Saving…" or claiming everything was up to date, and a sync whose progress can\'t be read stops with a clear message. A review with only a star rating now sets your Letterboxd rating instead of always failing. A review that lands on some of your accounts says which ones it missed. Review is no longer offered on rows that can\'t be reviewed. The rewatch date defaults to your own local date, and selecting text in a modal no longer closes it. On the admin dashboard, saving settings no longer undoes account changes your users made in the meantime, Sync all now also runs the TV sync for every user, and the overview is labelled as your own activity. Opening Jellyscribe from the sidebar while the admin settings page is still loaded now works. Thanks to Wouter Stulp, whose fixes for showing load and save failures and for reporting the Integrations save result are included.',
+    highlights: {
+      improvements: [
+        'Remove asks you to confirm in the page, and only removes the account once the server has (both dashboards).',
+        'A review with only a star rating sets your Letterboxd rating, and a review that reaches some of your accounts names the ones it missed.',
+        'On the admin dashboard, Sync all now also runs the TV sync for every user, and the overview is labelled as your own activity.',
+      ],
+      fixes: [
+        'A failed account or activity load shows an error with Retry instead of an empty list or zeros, so a save can no longer overwrite your accounts (thanks to Wouter Stulp).',
+        'A failed or repeated Save never adds an account twice, and every save shows the server\'s reason when it fails (thanks to Wouter Stulp).',
+        'The Integrations Save reports Saved or the reason it failed (thanks to Wouter Stulp).',
+        'Admin saves no longer undo account changes users made while the dashboard was open.',
+        'Sync now reports why a sync could not start, and stops with a clear message when its progress can\'t be read.',
+        'Login checks and reviews no longer hang on Verifying or Posting when the server can\'t be reached, and Post review can\'t be pressed twice.',
+        'Review is no longer offered on rows that can\'t be reviewed.',
+        'The rewatch date defaults to your local date.',
+        'Selecting text in a dialog no longer closes it.',
+        'Opening Jellyscribe from the sidebar works while the admin settings page is still loaded.',
+      ],
+    },
+  },
+  {
     version: '2.10.8',
     headline: 'Faster, steadier syncs on big libraries',
     summary:
