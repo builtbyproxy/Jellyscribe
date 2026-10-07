@@ -584,6 +584,30 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
         Assert.Contains(events, e => e.Status == SyncStatus.Skipped && e.FilmTitle.Contains("paused", StringComparison.Ordinal));
     }
 
+    // A few items Serializd rejects on their own (a 400) are not an outage: the rest still sync.
+    [Fact]
+    public async Task Run_ItemsRejectedOnTheirOwn_AtTheHeadOfTheQueue_DoNotStopTheAccount()
+    {
+        SerializdSyncRunner.FailurePause = TimeSpan.Zero;
+        var (user, _) = AddUserWithAccount();
+        var episodes = new Episode[2 * SerializdSyncRunner.MaxConsecutiveFailures];
+        for (var i = 0; i < episodes.Length; i++)
+            episodes[i] = MakeEpisode(i + 1, 1);
+        LibraryHas(episodes);
+        _userDataManager.GetUserData(user, Arg.Any<Episode>()).Returns(MakeUserData(DateTime.UtcNow.AddHours(-1)));
+        var service = FakeService(out var logged);
+        var calls = 0;
+        service.LogEpisodesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>())
+            .Returns(_ => ++calls <= SerializdSyncRunner.MaxConsecutiveFailures + 1
+                ? Task.FromException(new SerializdRequestException(System.Net.HttpStatusCode.BadRequest, "Serializd /episode/log failed (400): bad season"))
+                : Task.CompletedTask);
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        Assert.Equal(episodes.Length, calls);
+        Assert.Equal(episodes.Length, logged.Count);
+    }
+
     [Fact]
     public async Task Run_ASuccessBetweenFailures_ResetsTheCount()
     {

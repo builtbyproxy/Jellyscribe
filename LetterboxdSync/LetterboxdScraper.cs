@@ -26,6 +26,8 @@ public class LetterboxdScraper
 
     // tmdbId -> film, shared across instances so later runs and other accounts skip the two
     // throttled requests. Never shared with LetterboxdApiClient: FilmId here is the numeric id.
+    // Kept for the process lifetime: it grows with the library at most, and a film Letterboxd
+    // renames keeps its old slug until a restart.
     private static readonly ConcurrentDictionary<int, FilmResult> FilmCache = new();
 
     /// <summary>

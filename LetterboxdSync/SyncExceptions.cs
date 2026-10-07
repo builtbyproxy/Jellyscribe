@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 namespace LetterboxdSync;
 
@@ -63,6 +64,17 @@ public sealed class LetterboxdApiAuthException : Exception
         or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden;
 }
 
+/// <summary>Serializd answered a request with an error status (after the client's own retries).</summary>
+public sealed class SerializdRequestException : Exception
+{
+    public SerializdRequestException(System.Net.HttpStatusCode statusCode, string message) : base(message)
+    {
+        StatusCode = statusCode;
+    }
+
+    public System.Net.HttpStatusCode StatusCode { get; }
+}
+
 public static class SyncErrors
 {
     /// <summary>
@@ -76,4 +88,22 @@ public static class SyncErrors
         System.Net.Http.HttpRequestException h => h.StatusCode == System.Net.HttpStatusCode.Forbidden,
         _ => false,
     };
+
+    /// <summary>
+    /// True when a Serializd failure says the service is down or refusing the account (no
+    /// connection, a timeout, 5xx, 429, 401, 403), rather than something about one item (a 400, a
+    /// season it does not have). Only these count toward stopping an account's catch-up, so a few
+    /// bad items at the head of the queue never starve the rest.
+    /// </summary>
+    public static bool IsServiceFailure(Exception ex) => ex switch
+    {
+        SerializdRequestException r => IsServiceStatus(r.StatusCode),
+        System.Net.Http.HttpRequestException h => h.StatusCode is not { } status || IsServiceStatus(status),
+        TaskCanceledException or TimeoutException => true,
+        _ => false,
+    };
+
+    private static bool IsServiceStatus(System.Net.HttpStatusCode status)
+        => (int)status >= 500 || status is System.Net.HttpStatusCode.TooManyRequests
+            or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden;
 }

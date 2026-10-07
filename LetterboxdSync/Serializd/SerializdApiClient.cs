@@ -150,7 +150,7 @@ public class SerializdApiClient : ISerializdService
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Serializd login failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(err, 200)}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd login failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(err, 200)}");
         }
 
         var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -194,7 +194,7 @@ public class SerializdApiClient : ISerializdService
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Serializd get-show {showTmdbId} failed ({(int)resp.StatusCode}): {err}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd get-show {showTmdbId} failed ({(int)resp.StatusCode}): {err}");
         }
 
         var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -253,7 +253,7 @@ public class SerializdApiClient : ISerializdService
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Serializd /show/reviews/add failed ({(int)resp.StatusCode}): {err}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd /show/reviews/add failed ({(int)resp.StatusCode}): {err}");
         }
     }
 
@@ -271,7 +271,7 @@ public class SerializdApiClient : ISerializdService
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Serializd {path} failed ({(int)resp.StatusCode}): {err}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd {path} failed ({(int)resp.StatusCode}): {err}");
         }
     }
 
@@ -479,7 +479,7 @@ public class SerializdApiClient : ISerializdService
             "Serializd review POST show {Show} (is_log={IsLog}, rating={Rating}, textLen={Len}) → HTTP {Status}",
             showTmdbId, hasText, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode);
         if (!resp.IsSuccessStatusCode)
-            throw new Exception($"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
     }
 
     public async Task CreateEpisodeReviewAsync(int showTmdbId, int seasonNumber, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler)
@@ -516,7 +516,7 @@ public class SerializdApiClient : ISerializdService
             "Serializd episode review POST show {Show} S{Season}E{Episode} (is_log={IsLog}, rating={Rating}, textLen={Len}) → HTTP {Status}",
             showTmdbId, seasonNumber, episodeNumber, hasText, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode);
         if (!resp.IsSuccessStatusCode)
-            throw new Exception($"Serializd episode review ({showTmdbId} S{seasonNumber}E{episodeNumber}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd episode review ({showTmdbId} S{seasonNumber}E{episodeNumber}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
     }
 
     public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
@@ -545,7 +545,7 @@ public class SerializdApiClient : ISerializdService
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Serializd show-meta ({showTmdbId}) failed ({(int)resp.StatusCode}): {err}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd show-meta ({showTmdbId}) failed ({(int)resp.StatusCode}): {err}");
         }
     }
 

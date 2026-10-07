@@ -86,7 +86,7 @@ public class SerializdApiClientTests
             Json(HttpStatusCode.Unauthorized, "{\"message\":\"Incorrect password.\"}"));
 
         using var client = new SerializdApiClient(Log, handler);
-        var ex = await Assert.ThrowsAsync<Exception>(() => client.AuthenticateAsync("me@example.com", "wrong"));
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() => client.AuthenticateAsync("me@example.com", "wrong"));
         Assert.Contains("401", ex.Message);
     }
 
@@ -461,7 +461,7 @@ public class SerializdApiClientTests
 
         // 500s exhaust the built-in retry (fast: SerializdApiConstants backoff is short in tests
         // only in that it's bounded, not mocked away), then the failure surfaces as an exception.
-        var ex = await Assert.ThrowsAsync<Exception>(() => client.ResolveSeasonIdAsync(1396, 1));
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() => client.ResolveSeasonIdAsync(1396, 1));
         Assert.Contains("get-show", ex.Message);
     }
 
@@ -478,7 +478,7 @@ public class SerializdApiClientTests
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
 
-        var ex = await Assert.ThrowsAsync<Exception>(() =>
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() =>
             client.CreateEpisodeLogAsync(1396, 3572, 1, DateTime.UtcNow, rating: null, isRewatch: false));
         Assert.Contains("/show/reviews/add", ex.Message);
     }
@@ -496,7 +496,7 @@ public class SerializdApiClientTests
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
 
-        var ex = await Assert.ThrowsAsync<Exception>(() => client.LogEpisodesAsync(1396, 3572, new[] { 1 }));
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() => client.LogEpisodesAsync(1396, 3572, new[] { 1 }));
         Assert.Contains("/episode_log/add", ex.Message);
     }
 
@@ -513,7 +513,7 @@ public class SerializdApiClientTests
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
 
-        var ex = await Assert.ThrowsAsync<Exception>(() => client.SetShowMetaAsync(1396, rating: 5, like: false));
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() => client.SetShowMetaAsync(1396, rating: 5, like: false));
         Assert.Contains("show-meta", ex.Message);
     }
 
@@ -574,7 +574,7 @@ public class SerializdApiClientTests
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
 
-        var ex = await Assert.ThrowsAsync<Exception>(() =>
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() =>
             client.CreateShowReviewAsync(1396, rating: 5, reviewText: null, containsSpoiler: false));
         Assert.Contains("Serializd review", ex.Message);
     }

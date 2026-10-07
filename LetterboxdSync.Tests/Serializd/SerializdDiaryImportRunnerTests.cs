@@ -169,7 +169,7 @@ public class SerializdDiaryImportRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task Run_SerializdGateHeld_SkipsWithoutAuthenticating()
+    public async Task Run_SerializdGateHeld_WaitsForItBeforeAuthenticating()
     {
         AddUserWithImportAccount();
         var factoryCalled = false;
@@ -180,16 +180,20 @@ public class SerializdDiaryImportRunnerTests : IDisposable
         };
 
         await SerializdSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        Task import;
         try
         {
-            await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+            import = _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+            Assert.False(import.IsCompleted);
+            Assert.False(factoryCalled, "an import must not hit Serializd while a sync holds the gate");
         }
         finally
         {
             SerializdSyncGate.Instance.Release();
         }
 
-        Assert.False(factoryCalled, "an import must not hit Serializd while a sync holds the gate");
+        await import;
+        Assert.True(factoryCalled);
         Assert.False(SerializdSyncGate.IsRunning);
     }
 

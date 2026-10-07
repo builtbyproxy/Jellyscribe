@@ -178,15 +178,19 @@ public class SyncReliabilityTests : IDisposable
     public async Task FilmsWithoutATmdbId_AreRecordedOnce_NotOnEveryRun()
     {
         var user = MakeUser();
-        Setup(user, MakeMovie(null, "Home Movie"), MakeMovie(null, "Concert"), MakeMovie(4001, "Arrival"));
+        // More of them than the per-film compaction cap, across a restart (which compacts).
+        var homeMovies = Enumerable.Range(1, SyncHistory.MaxPrunableEventsPerFilm + 3)
+            .Select(i => MakeMovie(null, "Home Movie " + i)).ToArray();
+        Setup(user, homeMovies.Append(MakeMovie(4001, "Arrival")).ToArray());
         Service();
 
         await RunAsync(user);
         await RunAsync(user);
+        SyncHistory.ResetForTesting();
         await RunAsync(user);
 
-        var skips = SyncHistory.GetRecent(50, "demo-user").Where(e => e.Error == SyncHistory.NoTmdbIdError).ToList();
-        Assert.Equal(2, skips.Count);
-        Assert.Equal(new[] { "Concert", "Home Movie" }, skips.Select(e => e.FilmTitle).OrderBy(t => t));
+        var skips = SyncHistory.GetRecent(100, "demo-user").Where(e => e.Error == SyncHistory.NoTmdbIdError).ToList();
+        Assert.Equal(homeMovies.Length, skips.Count);
+        Assert.Equal(homeMovies.Select(m => m.Name).OrderBy(t => t), skips.Select(e => e.FilmTitle).OrderBy(t => t));
     }
 }

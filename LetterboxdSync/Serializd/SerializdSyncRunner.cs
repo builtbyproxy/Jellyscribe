@@ -310,12 +310,13 @@ public class SerializdSyncRunner
             return target;
         }
 
-        // Counts failed calls in a row across both phases; any success resets it.
+        // Counts service failures in a row across both phases (see SyncErrors.IsServiceFailure);
+        // any success resets it, and a failure about one item neither counts nor resets.
         var failuresInARow = 0;
         var stopped = false;
-        async Task<bool> FailedAsync()
+        async Task<bool> FailedAsync(Exception ex)
         {
-            if (++failuresInARow >= MaxConsecutiveFailures)
+            if (SyncErrors.IsServiceFailure(ex) && ++failuresInARow >= MaxConsecutiveFailures)
             {
                 _logger.LogWarning(
                     "Serializd catch-up: {Count} calls in a row failed for {Username} as {Email}; stopping this account until the next run",
@@ -326,7 +327,7 @@ public class SerializdSyncRunner
                     Username = user.Username ?? string.Empty,
                     Timestamp = DateTime.UtcNow,
                     Status = SyncStatus.Skipped,
-                    Error = $"Serializd failed {failuresInARow} times in a row; the rest waits for the next sync",
+                    Error = $"Serializd failed {failuresInARow} times in a row (down or refusing the account); the rest waits for the next sync",
                     Source = source,
                 });
                 return true;
@@ -370,7 +371,7 @@ public class SerializdSyncRunner
             {
                 _logger.LogError("Serializd catch-up: failed marking watched TMDb {Show} S{Season} for {Username}: {Message}",
                     show, season, user.Username, ex.Message);
-                stopped = await FailedAsync().ConfigureAwait(false);
+                stopped = await FailedAsync(ex).ConfigureAwait(false);
                 if (stopped)
                     break;
             }
@@ -439,7 +440,7 @@ public class SerializdSyncRunner
                     break;
                 }
 
-                stopped = await FailedAsync().ConfigureAwait(false);
+                stopped = await FailedAsync(ex).ConfigureAwait(false);
                 if (stopped)
                     break;
             }

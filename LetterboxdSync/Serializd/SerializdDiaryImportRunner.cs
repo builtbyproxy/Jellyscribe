@@ -52,11 +52,12 @@ public class SerializdDiaryImportRunner
     public async Task RunForAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         // Shares the export runner's gate so an import never logs in to Serializd while a
-        // catch-up is mid-run against the same accounts.
+        // catch-up is mid-run against the same accounts. It waits rather than skips, so a long
+        // catch-up never costs the night's import.
         if (!await SerializdSyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
         {
-            _logger.LogWarning("Serializd sync already running, skipping diary import");
-            return;
+            _logger.LogInformation("A Serializd sync is running; the diary import starts when it finishes");
+            await SerializdSyncGate.Instance.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         try
