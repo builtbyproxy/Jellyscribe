@@ -26,6 +26,7 @@ namespace LetterboxdSync.Serializd;
 public class SerializdApiClient : ISerializdService
 {
     private readonly HttpClient _http;
+    private readonly bool _ownsHttp;
     private readonly ILogger _logger;
     private string _email = string.Empty;
     private string _password = string.Empty;
@@ -59,15 +60,35 @@ public class SerializdApiClient : ISerializdService
     private const int MaxSendAttempts = 4; // initial try + 3 backoff retries
     private static readonly SemaphoreSlim RequestGate = new(MaxConcurrentRequests, MaxConcurrentRequests);
 
+    // One process-wide client: a client per sync opened a fresh connection pool (and TLS
+    // handshake) every time. The bounded connection lifetime keeps DNS changes on Render
+    // visible. Only default headers live here; the bearer token goes on each request.
+    private static readonly HttpClient SharedHttp = WithDefaultHeaders(new HttpClient(new SocketsHttpHandler
+    {
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    }));
+
+    // Serializd's Render host cold-starts after idling, and a request that hangs on it is
+    // abandoned after this rather than HttpClient's default 100s, then retried with backoff.
+    internal static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(60);
+
     public SerializdApiClient(ILogger logger, HttpMessageHandler? handler = null)
     {
         _logger = logger;
-        _http = handler != null ? new HttpClient(handler) : new HttpClient();
-        _http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd(SerializdApiConstants.UserAgent);
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("Origin", SerializdApiConstants.FrontPageUrl);
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("Referer", SerializdApiConstants.FrontPageUrl);
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Requested-With", SerializdApiConstants.AppId);
+        _ownsHttp = handler != null;
+        _http = handler != null ? WithDefaultHeaders(new HttpClient(handler)) : SharedHttp;
+    }
+
+    internal HttpClient HttpForTesting => _http;
+
+    private static HttpClient WithDefaultHeaders(HttpClient http)
+    {
+        http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        http.DefaultRequestHeaders.UserAgent.ParseAdd(SerializdApiConstants.UserAgent);
+        http.DefaultRequestHeaders.TryAddWithoutValidation("Origin", SerializdApiConstants.FrontPageUrl);
+        http.DefaultRequestHeaders.TryAddWithoutValidation("Referer", SerializdApiConstants.FrontPageUrl);
+        http.DefaultRequestHeaders.TryAddWithoutValidation("X-Requested-With", SerializdApiConstants.AppId);
+        return http;
     }
 
     /// <summary>Test hook: drop cached tokens + season maps so tests don't leak state into each other.</summary>
@@ -528,15 +549,29 @@ public class SerializdApiClient : ISerializdService
 
         // Cap concurrency: the gate wraps only the raw send (never a delay or the recursive
         // retry), so a slow endpoint can't hold a slot and the 401/login recursion can't deadlock.
-        HttpResponseMessage response;
+        // A Render cold start surfaces as a refused/reset connection or a timeout rather than
+        // a status code, so those are retried like a transient 5xx (response stays null).
+        HttpResponseMessage? response = null;
+        var failure = string.Empty;
+        using var timeout = new CancellationTokenSource(RequestTimeout);
         await RequestGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            response = await _http.SendAsync(request).ConfigureAwait(false);
+            response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsColdStartFailure(ex, timeout) && attempt + 1 < MaxSendAttempts)
+        {
+            failure = ex.GetType().Name;
         }
         finally
         {
             RequestGate.Release();
+        }
+
+        if (response == null)
+        {
+            await BackoffAsync(path, failure, attempt).ConfigureAwait(false);
+            return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1).ConfigureAwait(false);
         }
 
         if (response.StatusCode == (HttpStatusCode)429 && !isRetry)
@@ -555,10 +590,7 @@ public class SerializdApiClient : ISerializdService
         if ((code == 500 || code == 502 || code == 503 || code == 504) && attempt + 1 < MaxSendAttempts)
         {
             response.Dispose();
-            var delayMs = (int)(Math.Pow(2, attempt) * 500) + Random.Shared.Next(0, 400); // ~0.5s, 1s, 2s (+jitter)
-            _logger.LogWarning("Serializd {Path} returned {Code}; backing off {Ms}ms then retry {Next}/{Max}",
-                path, code, delayMs, attempt + 2, MaxSendAttempts);
-            await Task.Delay(delayMs).ConfigureAwait(false);
+            await BackoffAsync(path, code.ToString(CultureInfo.InvariantCulture), attempt).ConfigureAwait(false);
             return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1).ConfigureAwait(false);
         }
 
@@ -577,9 +609,24 @@ public class SerializdApiClient : ISerializdService
         return response;
     }
 
+    // Only our own timeout counts: a TaskCanceledException from anywhere else is a real
+    // cancellation and must propagate.
+    private static bool IsColdStartFailure(Exception ex, CancellationTokenSource timeout)
+        => ex is HttpRequestException
+           || (ex is TaskCanceledException && (timeout.IsCancellationRequested || ex.InnerException is TimeoutException));
+
+    private async Task BackoffAsync(string path, string reason, int attempt)
+    {
+        var delayMs = (int)(Math.Pow(2, attempt) * 500) + Random.Shared.Next(0, 400); // ~0.5s, 1s, 2s (+jitter)
+        _logger.LogWarning("Serializd {Path} failed ({Reason}); backing off {Ms}ms then retry {Next}/{Max}",
+            path, reason, delayMs, attempt + 2, MaxSendAttempts);
+        await Task.Delay(delayMs).ConfigureAwait(false);
+    }
+
     public void Dispose()
     {
-        _http.Dispose();
+        if (_ownsHttp)
+            _http.Dispose();
         GC.SuppressFinalize(this);
     }
 

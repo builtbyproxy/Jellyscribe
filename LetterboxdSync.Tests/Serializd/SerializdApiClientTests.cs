@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using LetterboxdSync.Serializd;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -841,4 +842,114 @@ public class SerializdApiClientTests
 
         Assert.Equal(2, attempts);
     }
+
+    // Render cold starts: no status code, just a failed connection or a hung request.
+
+    [Fact]
+    public async Task ConnectionFailure_RetriesThenSucceeds()
+    {
+        int attempts = 0;
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            attempts++;
+            if (attempts < 2)
+                throw new HttpRequestException("Connection refused");
+            return Json(HttpStatusCode.OK, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await client.SetShowMetaAsync(1396, rating: 5, like: false);
+
+        Assert.Equal(2, attempts);
+    }
+
+    [Fact]
+    public async Task ConnectionFailure_ExhaustsRetriesThenThrows()
+    {
+        int attempts = 0;
+        var handler = new ApiMockHandler(_ =>
+        {
+            attempts++;
+            throw new HttpRequestException("Connection refused");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await Assert.ThrowsAsync<HttpRequestException>(() => client.AuthenticateAsync("me@example.com", "pw"));
+
+        Assert.Equal(4, attempts); // initial try + 3 backoff retries
+    }
+
+    [Fact]
+    public async Task HungRequest_TimesOutAndRetries()
+    {
+        var original = SerializdApiClient.RequestTimeout;
+        SerializdApiClient.RequestTimeout = TimeSpan.FromMilliseconds(100);
+        try
+        {
+            int attempts = 0;
+            var handler = new AsyncApiMockHandler(async (req, ct) =>
+            {
+                if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                    return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+                if (++attempts == 1)
+                    await Task.Delay(Timeout.Infinite, ct);
+                return Json(HttpStatusCode.OK, "{}");
+            });
+
+            using var client = new SerializdApiClient(Log, handler);
+            await client.AuthenticateAsync("me@example.com", "pw");
+            await client.SetShowMetaAsync(1396, rating: 5, like: false);
+
+            Assert.Equal(2, attempts);
+        }
+        finally
+        {
+            SerializdApiClient.RequestTimeout = original;
+        }
+    }
+
+    [Fact]
+    public async Task CancellationThatIsNotOurTimeout_IsNotRetried()
+    {
+        int attempts = 0;
+        var handler = new ApiMockHandler(_ =>
+        {
+            attempts++;
+            throw new TaskCanceledException();
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await Assert.ThrowsAsync<TaskCanceledException>(() => client.AuthenticateAsync("me@example.com", "pw"));
+
+        Assert.Equal(1, attempts);
+    }
+
+    [Fact]
+    public void ProductionClients_ShareOneHttpClient_AndDisposeLeavesItUsable()
+    {
+        var first = new SerializdApiClient(Log);
+        var shared = first.HttpForTesting;
+        first.Dispose();
+
+        using var second = new SerializdApiClient(Log);
+
+        Assert.Same(shared, second.HttpForTesting);
+        shared.CancelPendingRequests(); // throws ObjectDisposedException if Dispose closed it
+    }
+}
+
+internal class AsyncApiMockHandler : HttpMessageHandler
+{
+    private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _handler;
+
+    public AsyncApiMockHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+    {
+        _handler = handler;
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        => _handler(request, cancellationToken);
 }
