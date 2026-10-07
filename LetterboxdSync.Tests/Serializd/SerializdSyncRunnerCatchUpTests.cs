@@ -28,6 +28,7 @@ namespace LetterboxdSync.Tests.Serializd;
 public class SerializdSyncRunnerCatchUpTests : IDisposable
 {
     private const int ShowTmdbId = 1396;
+    private static readonly TimeSpan DefaultFailurePause = SerializdSyncRunner.FailurePause;
 
     private readonly string _tempDir;
     private readonly IUserManager _userManager;
@@ -68,6 +69,7 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
 
     public void Dispose()
     {
+        SerializdSyncRunner.FailurePause = DefaultFailurePause;
         SerializdServiceFactory.OverrideForTesting = null;
         SerializdSyncRunner.SeriesTmdbIdReader = SerializdSyncRunner.ReadSeriesTmdbId;
         SerializdSeasonFallback.SeasonLengthsReader = SerializdSeasonFallback.ReadSeasonLengths;
@@ -554,5 +556,53 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
 
         Assert.Equal(new[] { (ShowTmdbId, 502, 5) }, logged);
         await service.Received(1).LogEpisodesAsync(ShowTmdbId, 502, Arg.Is<IReadOnlyList<int>>(l => l.Count == 1 && l[0] == 5));
+    }
+
+    // When Serializd is down, the catch-up stops the account after a few failures in a row
+    // instead of trying (and retrying) every remaining episode.
+    [Fact]
+    public async Task Run_SerializdFailingEveryCall_StopsTheAccountAfterAFewInARow()
+    {
+        SerializdSyncRunner.FailurePause = TimeSpan.Zero;
+        var (user, _) = AddUserWithAccount();
+        var episodes = new Episode[12];
+        for (var i = 0; i < episodes.Length; i++)
+            episodes[i] = MakeEpisode(i + 1, 1);
+        LibraryHas(episodes);
+        _userDataManager.GetUserData(user, Arg.Any<Episode>()).Returns(MakeUserData(DateTime.UtcNow.AddHours(-1)));
+        var service = FakeService(out _);
+        service.LogEpisodesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>())
+            .Returns(Task.FromException(new System.Net.Http.HttpRequestException("Serializd returned 503")));
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        await service.Received(SerializdSyncRunner.MaxConsecutiveFailures)
+            .LogEpisodesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>());
+        await service.DidNotReceive().CreateEpisodeLogAsync(
+            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
+        var (events, _) = SerializdActivity.GetPage(0, 50);
+        Assert.Contains(events, e => e.Status == SyncStatus.Skipped && e.FilmTitle.Contains("paused", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Run_ASuccessBetweenFailures_ResetsTheCount()
+    {
+        SerializdSyncRunner.FailurePause = TimeSpan.Zero;
+        var (user, _) = AddUserWithAccount();
+        var episodes = new Episode[2 * SerializdSyncRunner.MaxConsecutiveFailures];
+        for (var i = 0; i < episodes.Length; i++)
+            episodes[i] = MakeEpisode(i + 1, 1);
+        LibraryHas(episodes);
+        _userDataManager.GetUserData(user, Arg.Any<Episode>()).Returns(MakeUserData(DateTime.UtcNow.AddHours(-1)));
+        var service = FakeService(out _);
+        var calls = 0;
+        service.LogEpisodesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>())
+            .Returns(_ => ++calls % 2 == 0
+                ? Task.CompletedTask
+                : Task.FromException(new System.Net.Http.HttpRequestException("Serializd returned 503")));
+
+        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
+
+        Assert.Equal(episodes.Length, calls);
     }
 }

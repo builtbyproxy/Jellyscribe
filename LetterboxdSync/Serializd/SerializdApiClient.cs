@@ -67,6 +67,8 @@ public class SerializdApiClient : ISerializdService
     private static readonly HttpClient SharedHttp = WithDefaultHeaders(new HttpClient(new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        // Shared by every account: a cookie one response set must never ride on another's request.
+        UseCookies = false,
     }));
 
     // Serializd's Render host cold-starts after idling, and a request that hangs on it is
@@ -559,21 +561,24 @@ public class SerializdApiClient : ISerializdService
         // Cap concurrency: the gate wraps only the raw send (never a delay or the recursive
         // retry), so a slow endpoint can't hold a slot and the 401/login recursion can't deadlock.
         // A Render cold start surfaces as a refused/reset connection or a timeout rather than
-        // a status code, so those are retried like a transient 5xx (response stays null).
+        // a status code, so those are retried like a transient 5xx (response stays null). The
+        // timeout starts once a slot is free, so waiting behind other requests never eats it.
         HttpResponseMessage? response = null;
         var failure = string.Empty;
-        using var timeout = new CancellationTokenSource(RequestTimeout);
         await RequestGate.WaitAsync().ConfigureAwait(false);
+        CancellationTokenSource? timeout = null;
         try
         {
+            timeout = new CancellationTokenSource(RequestTimeout);
             response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
         }
-        catch (Exception ex) when (IsColdStartFailure(ex, timeout) && attempt + 1 < MaxSendAttempts)
+        catch (Exception ex) when (IsRetryableSendFailure(method, ex, timeout!) && attempt + 1 < MaxSendAttempts)
         {
             failure = ex.GetType().Name;
         }
         finally
         {
+            timeout?.Dispose();
             RequestGate.Release();
         }
 
@@ -618,11 +623,30 @@ public class SerializdApiClient : ISerializdService
         return response;
     }
 
-    // Only our own timeout counts: a TaskCanceledException from anywhere else is a real
-    // cancellation and must propagate.
-    private static bool IsColdStartFailure(Exception ex, CancellationTokenSource timeout)
+    /// <summary>
+    /// Whether a send that got no response may be tried again. A read (GET) may always be: a
+    /// cold start shows up as a refused or reset connection, or our own timeout. A write may only
+    /// be retried when the connection was never made, because after a timeout or a reset the
+    /// server may already have applied it, and a second POST would log the episode twice. Only
+    /// our own timeout counts: a TaskCanceledException from anywhere else is a real cancellation
+    /// and must propagate.
+    /// </summary>
+    internal static bool IsRetryableSendFailure(HttpMethod method, Exception ex, CancellationTokenSource timeout)
+    {
+        if (method == HttpMethod.Get || method == HttpMethod.Head)
+            return ex is HttpRequestException
+                || (ex is TaskCanceledException && (timeout.IsCancellationRequested || ex.InnerException is TimeoutException));
+
+        return IsConnectFailure(ex);
+    }
+
+    // The request never left this machine: no name, no connection, or no TLS session.
+    private static bool IsConnectFailure(Exception ex)
         => ex is HttpRequestException
-           || (ex is TaskCanceledException && (timeout.IsCancellationRequested || ex.InnerException is TimeoutException));
+        {
+            HttpRequestError: HttpRequestError.NameResolutionError
+            or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError
+        };
 
     private async Task BackoffAsync(string path, string reason, int attempt)
     {

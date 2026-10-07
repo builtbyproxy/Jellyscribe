@@ -54,6 +54,8 @@ public class LetterboxdApiClient : ILetterboxdService
     private static readonly HttpClient SharedHttp = WithDefaultHeaders(new HttpClient(new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        // Shared by every account: a cookie one response set must never ride on another's request.
+        UseCookies = false,
     }));
 
     private readonly bool _ownsHttp;

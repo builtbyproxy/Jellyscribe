@@ -882,18 +882,27 @@ public class SerializdApiClientTests
     }
 
     // Render cold starts: no status code, just a failed connection or a hung request.
+    // SocketsHttpHandler reports a refused connection as HttpRequestError.ConnectionError, and a
+    // connection dropped after the request went out as ResponseEnded (or Unknown).
+
+    private static HttpRequestException Refused()
+        => new(HttpRequestError.ConnectionError, "Connection refused (api.serializd.example:443)");
+
+    private static HttpRequestException ResetAfterSend()
+        => new(HttpRequestError.ResponseEnded, "The response ended prematurely.");
+
+    private static ApiMockHandler LoginThen(Func<HttpRequestMessage, HttpResponseMessage> rest)
+        => new(req => req.RequestUri!.AbsolutePath.EndsWith("/login")
+            ? Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}")
+            : rest(req));
 
     [Fact]
-    public async Task ConnectionFailure_RetriesThenSucceeds()
+    public async Task Write_ConnectionRefused_RetriesThenSucceeds()
     {
         int attempts = 0;
-        var handler = new ApiMockHandler(req =>
+        var handler = LoginThen(_ =>
         {
-            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
-                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
-            attempts++;
-            if (attempts < 2)
-                throw new HttpRequestException("Connection refused");
+            if (++attempts < 2) throw Refused();
             return Json(HttpStatusCode.OK, "{}");
         });
 
@@ -905,13 +914,13 @@ public class SerializdApiClientTests
     }
 
     [Fact]
-    public async Task ConnectionFailure_ExhaustsRetriesThenThrows()
+    public async Task ConnectionRefused_ExhaustsRetriesThenThrows()
     {
         int attempts = 0;
         var handler = new ApiMockHandler(_ =>
         {
             attempts++;
-            throw new HttpRequestException("Connection refused");
+            throw Refused();
         });
 
         using var client = new SerializdApiClient(Log, handler);
@@ -920,28 +929,94 @@ public class SerializdApiClientTests
         Assert.Equal(4, attempts); // initial try + 3 backoff retries
     }
 
+    // A dropped connection after the POST went out may mean Serializd already logged it, so a
+    // retry would log the episode twice.
     [Fact]
-    public async Task HungRequest_TimesOutAndRetries()
+    public async Task Write_ResetAfterSend_IsNotRetried()
+    {
+        int posts = 0;
+        var handler = LoginThen(_ =>
+        {
+            posts++;
+            throw ResetAfterSend();
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => client.CreateEpisodeLogAsync(1396, 3572, 1, DateTime.UtcNow, rating: null, isRewatch: false));
+
+        Assert.Equal(1, posts);
+    }
+
+    [Fact]
+    public async Task Write_Timeout_IsNotRetried()
     {
         var original = SerializdApiClient.RequestTimeout;
         SerializdApiClient.RequestTimeout = TimeSpan.FromMilliseconds(100);
         try
         {
-            int attempts = 0;
+            int posts = 0;
             var handler = new AsyncApiMockHandler(async (req, ct) =>
             {
                 if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
                     return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
-                if (++attempts == 1)
-                    await Task.Delay(Timeout.Infinite, ct);
+                posts++;
+                await Task.Delay(Timeout.Infinite, ct);
                 return Json(HttpStatusCode.OK, "{}");
             });
 
             using var client = new SerializdApiClient(Log, handler);
             await client.AuthenticateAsync("me@example.com", "pw");
-            await client.SetShowMetaAsync(1396, rating: 5, like: false);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SetShowMetaAsync(1396, rating: 5, like: false));
 
-            Assert.Equal(2, attempts);
+            Assert.Equal(1, posts);
+        }
+        finally
+        {
+            SerializdApiClient.RequestTimeout = original;
+        }
+    }
+
+    [Fact]
+    public async Task Read_ResetConnection_IsRetried()
+    {
+        int reads = 0;
+        var handler = LoginThen(_ =>
+        {
+            if (++reads < 2) throw ResetAfterSend();
+            return Json(HttpStatusCode.OK, ShowJson);
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        Assert.Equal(3572, await client.ResolveSeasonIdAsync(1396, 1));
+        Assert.Equal(2, reads);
+    }
+
+    [Fact]
+    public async Task Read_HungRequest_TimesOutAndRetries()
+    {
+        var original = SerializdApiClient.RequestTimeout;
+        SerializdApiClient.RequestTimeout = TimeSpan.FromMilliseconds(100);
+        try
+        {
+            int reads = 0;
+            var handler = new AsyncApiMockHandler(async (req, ct) =>
+            {
+                if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                    return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+                if (++reads == 1)
+                    await Task.Delay(Timeout.Infinite, ct);
+                return Json(HttpStatusCode.OK, ShowJson);
+            });
+
+            using var client = new SerializdApiClient(Log, handler);
+            await client.AuthenticateAsync("me@example.com", "pw");
+
+            Assert.Equal(3572, await client.ResolveSeasonIdAsync(1396, 1));
+            Assert.Equal(2, reads);
         }
         finally
         {

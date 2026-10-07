@@ -47,6 +47,16 @@ public class SerializdSyncRunner
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
 
     /// <summary>
+    /// After this many Serializd calls in a row fail for one account, the rest of that account's
+    /// catch-up waits for the next run: Serializd is down or refusing the account, and trying
+    /// every remaining episode would only hammer it.
+    /// </summary>
+    internal const int MaxConsecutiveFailures = 5;
+
+    /// <summary>Pause after a failed call, so a struggling Serializd gets room. A test hook replaces it.</summary>
+    internal static TimeSpan FailurePause { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
     /// Reads the parent series' TMDb id from an episode. Overridable so the runner's tests
     /// can supply ids without wiring Jellyfin's library-parent graph. Production reads the
     /// resolved Series entity (populated at runtime).
@@ -300,6 +310,32 @@ public class SerializdSyncRunner
             return target;
         }
 
+        // Counts failed calls in a row across both phases; any success resets it.
+        var failuresInARow = 0;
+        var stopped = false;
+        async Task<bool> FailedAsync()
+        {
+            if (++failuresInARow >= MaxConsecutiveFailures)
+            {
+                _logger.LogWarning(
+                    "Serializd catch-up: {Count} calls in a row failed for {Username} as {Email}; stopping this account until the next run",
+                    failuresInARow, user.Username, account.Email);
+                SerializdActivity.Record(new SyncEvent
+                {
+                    FilmTitle = $"Account {account.Email} paused",
+                    Username = user.Username ?? string.Empty,
+                    Timestamp = DateTime.UtcNow,
+                    Status = SyncStatus.Skipped,
+                    Error = $"Serializd failed {failuresInARow} times in a row; the rest waits for the next sync",
+                    Source = source,
+                });
+                return true;
+            }
+
+            await Task.Delay(FailurePause, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+
         // 1. Watched-status marking, batched per (show, season).
         foreach (var ((show, season), epNums) in needsWatched)
         {
@@ -324,13 +360,24 @@ public class SerializdSyncRunner
                     .ConfigureAwait(false);
                 foreach (var n in fitting)
                     SerializdSyncHistory.Record(userId, account.Email, show, season, n);
+                failuresInARow = 0;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 _logger.LogError("Serializd catch-up: failed marking watched TMDb {Show} S{Season} for {Username}: {Message}",
                     show, season, user.Username, ex.Message);
+                stopped = await FailedAsync().ConfigureAwait(false);
+                if (stopped)
+                    break;
             }
         }
+
+        if (stopped)
+            return;
 
         // 2. Dated Diary logs, one per episode, backdated to the real watch date.
         SyncProgress.SetPhase(SyncProgress.TrackSerializd, "Logging episodes to Serializd");
@@ -350,6 +397,7 @@ public class SerializdSyncRunner
                     .ConfigureAwait(false);
                 SerializdSyncHistory.Record(userId, account.Email, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
                 logged++;
+                failuresInARow = 0;
 
                 SerializdActivity.Record(new SyncEvent
                 {
@@ -390,12 +438,19 @@ public class SerializdSyncRunner
                     _logger.LogWarning("Serializd catch-up: stopping on first failure for {Username} (StopOnFailure)", user.Username);
                     break;
                 }
+
+                stopped = await FailedAsync().ConfigureAwait(false);
+                if (stopped)
+                    break;
             }
         }
 
         if (logged > 0)
             _logger.LogInformation("Serializd catch-up: created {Count} dated diary logs for {Username} as {Email}",
                 logged, user.Username, account.Email);
+
+        if (stopped)
+            return;
 
         // 3. Show-level rating + favorite (like) sync, one entry per rated/favorited series
         //    among the shows we're tracking. is_log:false so it doesn't clutter the Diary.

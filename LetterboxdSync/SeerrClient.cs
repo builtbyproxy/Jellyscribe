@@ -22,6 +22,9 @@ public class SeerrClient : IDisposable
     private static readonly HttpClient SharedHttp = WithDefaultHeaders(new HttpClient(new SocketsHttpHandler
     {
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+        // Shared by every Seerr configuration: a cookie one response set must never ride on
+        // another's request.
+        UseCookies = false,
     }));
 
     private readonly HttpClient _http;
