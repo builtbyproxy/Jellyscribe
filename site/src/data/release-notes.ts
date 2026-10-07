@@ -10,6 +10,24 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.5',
+    headline: 'Separate Serializd watchlist collections, and Seerr requests made as each person',
+    summary:
+      'Serializd watchlist collections are now kept separately for each person. Before, everyone who turned on Serializd watchlist sync shared one collection called "Serializd Watchlist", so each person\'s sync removed the other\'s shows. A custom name could also point the sync at any collection on the server, including one an admin curates. Each linked account now gets its own collection, named "Serializd Watchlist (your Jellyfin username)" by default, and Jellyscribe only ever changes the collection it made for that account. On upgrade, if only one account was syncing into the old shared collection, it carries on using it. Otherwise the old collection is left exactly as it is and each account gets a fresh one, so you can delete the old one once you no longer need it. Collections are visible to everyone who can see the shows in them. Custom names for watchlist collections and playlists can now be set only by an admin, from the plugin\'s settings page. Seerr requests are now made as each person\'s own Seerr account, so Seerr applies their own permissions. Admins, note one change: if you have turned off "Auto-approve requests created by Jellyscribe", requests from people without Auto-Approve in Seerr now wait in Seerr\'s approval queue, where before they were approved as the admin. With the switch on, which is the default, requests still go straight through. Thanks to Wouter Stulp, who spotted the Seerr approval problem in his fork.',
+    highlights: {
+      improvements: [
+        'Each linked Serializd account now gets its own watchlist collection, named after its Jellyfin user by default.',
+        'Only admins can now set custom names for watchlist collections and playlists, from the plugin\'s settings page.',
+      ],
+      fixes: [
+        'Two people with Serializd watchlist sync no longer share one collection and remove each other\'s shows.',
+        'A custom watchlist name can no longer make the sync rewrite a collection someone else curates.',
+        'Seerr requests are made as each person\'s own Seerr account, so Seerr applies their own approval rights and quota (spotted by Wouter Stulp).',
+        'Admins: with "Auto-approve requests created by Jellyscribe" turned off, requests from people without Auto-Approve in Seerr now wait for approval instead of being approved as the admin.',
+      ],
+    },
+  },
+  {
     version: '2.10.4',
     headline: 'Tighter security for servers with several Jellyfin users',
     summary:
