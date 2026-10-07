@@ -25,9 +25,20 @@
                     --ws-film: #e8b84b; --ws-tv: #90a6ee; --ws-primary: #e8b84b;
                     --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8; --ws-requested: #a78bfa;
                     --ws-film-soft: rgba(232,184,75,.13); --ws-tv-soft: rgba(144,166,238,.14); --ws-primary-soft: rgba(232,184,75,.16);
-                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55);
+                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55); --ws-focus: #e8b84b;
                     --ws-mono: 'WS Mono', ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
                     --ws-r: 12px; color: var(--ws-text); font-family: 'WS Sans', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; background: var(--ws-bg);
+                }
+                /* Light palette, used when Jellyfin's own theme is light (see applyTheme). Every text colour
+                   here reaches 4.5:1 on the white and pale grey surfaces. */
+                #letterboxdUserPage.ws-light {
+                    --ws-bg: #f4f6f8; --ws-surface: #ffffff; --ws-surface-2: #f0f2f5; --ws-raise: #e9ecf0;
+                    --ws-border: rgba(16,22,30,.10); --ws-border-strong: rgba(16,22,30,.20);
+                    --ws-text: #131922; --ws-muted: #5a6572; --ws-faint: #646e7b;
+                    --ws-film: #855e00; --ws-tv: #3d53bd; --ws-info: #2a5bd6; --ws-warn: #94590a; --ws-crit: #b03b1c; --ws-ok: #187457; --ws-requested: #6a40d0;
+                    --ws-film-soft: rgba(184,130,20,.14); --ws-tv-soft: rgba(70,90,200,.14); --ws-primary-soft: rgba(184,130,20,.14);
+                    --ws-focus: #855e00;
+                    --ws-shadow: 0 10px 30px -18px rgba(16,22,30,.30);
                 }
                 #letterboxdUserPage .content-primary, #letterboxdUserPage div[data-role="content"] { padding: 0 !important; margin: 0 !important; max-width: none !important; }
                 #letterboxdUserPage .ws { display: grid; grid-template-columns: 240px minmax(0,1fr); min-height: 100vh; background: var(--ws-bg); }
@@ -37,7 +48,7 @@
                 #letterboxdUserPage .ws-back:hover { background: var(--ws-surface-2); color: var(--ws-text); }
                 #letterboxdUserPage .ws-back svg { width: 15px; height: 15px; flex: none; }
                 #letterboxdUserPage .ws-brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
-                #letterboxdUserPage .ws-glyph { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: linear-gradient(150deg, var(--ws-film), var(--ws-tv)); }
+                #letterboxdUserPage .ws-glyph { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: linear-gradient(150deg, #e8b84b, #90a6ee); }
                 #letterboxdUserPage .ws-brand b { font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
                 #letterboxdUserPage .ws-brand small { display: block; font-size: 11px; color: var(--ws-faint); margin-top: -1px; }
                 #letterboxdUserPage .ws-nav { display: flex; flex-direction: column; gap: 2px; }
@@ -196,7 +207,6 @@
                 #letterboxdUserPage .ws-spin { width: 14px; height: 14px; flex: none; border: 2px solid var(--ws-border-strong); border-top-color: var(--ws-primary); border-radius: 50%; animation: wsSpin .8s linear infinite; }
                 #letterboxdUserPage .ws-spin.done { animation: none; border: 0; color: var(--ws-ok); }
                 @keyframes wsSpin { to { transform: rotate(360deg); } }
-                #letterboxdUserPage .ws-btn:disabled { opacity: .55; cursor: default; }
                 </style>
 
                 <div class="ws">
@@ -333,11 +343,34 @@
                                 if (!/width\s*=\s*device-width/i.test(vp.getAttribute('content') || '')) vp.setAttribute('content', 'width=device-width, initial-scale=1');
                             } catch (e) {}
                         },
+                        /* Follow Jellyfin's theme rather than the OS: the light palette when the nearest painted
+                           background behind this page (Jellyfin's theme colours its page) is light. Outside
+                           Jellyfin's web client nothing behind it is painted, so the OS setting decides there,
+                           and the browser's default body margin is dropped (that document is this page alone). */
+                        applyTheme: function () {
+                            var light = null;
+                            for (var el = root.parentElement; el && light === null; el = el.parentElement) {
+                                var c = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(el).backgroundColor || '');
+                                if (c && (c[4] === undefined || parseFloat(c[4]) >= 0.5)) light = 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3] > 140;
+                            }
+                            if (light === null) {
+                                light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+                                if (root.parentElement === document.body) document.body.style.margin = '0';
+                            }
+                            root.classList.toggle('ws-light', light);
+                        },
                         init: function () {
                             var self = this;
                             // Removed before it finished starting (the in-app page was left): stop retrying.
                             if (!root || !root.isConnected) return;
                             self.ensureViewport();
+                            if (!self.themed) {
+                                self.themed = true;
+                                self.applyTheme();
+                                // Again once Jellyfin's theme stylesheet has surely loaded, and on every return to the page.
+                                setTimeout(function () { if (root.isConnected) self.applyTheme(); }, 1000);
+                                root.addEventListener('viewshow', function () { self.applyTheme(); });
+                            }
                             if (!self.resolveAuth()) { setTimeout(function () { self.init(); }, 400); return; }
                             self.wire();
                             self.loadOverview();

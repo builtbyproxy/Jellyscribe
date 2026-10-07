@@ -24,12 +24,23 @@
                     --ws-border: rgba(255,255,255,.085); --ws-border-strong: rgba(255,255,255,.16);
                     --ws-text: #edeff5; --ws-muted: #9aa1b5; --ws-faint: #8b93a5;
                     --ws-film: #e8b84b; --ws-tv: #90a6ee; --ws-primary: #e8b84b;
-                    --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8;
+                    --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8; --ws-requested: #a78bfa;
                     --ws-film-soft: rgba(232,184,75,.13); --ws-tv-soft: rgba(144,166,238,.14); --ws-primary-soft: rgba(232,184,75,.16);
-                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55);
+                    --ws-shadow: 0 8px 30px -14px rgba(0,0,0,.55); --ws-focus: #e8b84b;
                     --ws-mono: 'WS Mono', ui-monospace,"SF Mono","Cascadia Code",Menlo,monospace;
                     --ws-r: 12px;
                     color: var(--ws-text); font-family: 'WS Sans', system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; background: var(--ws-bg);
+                }
+                /* Light palette, used when Jellyfin's own theme is light (see applyTheme). Every text colour
+                   here reaches 4.5:1 on the white and pale grey surfaces. */
+                #letterboxdSyncConfigPage.ws-light {
+                    --ws-bg: #f4f6f8; --ws-surface: #ffffff; --ws-surface-2: #f0f2f5; --ws-raise: #e9ecf0;
+                    --ws-border: rgba(16,22,30,.10); --ws-border-strong: rgba(16,22,30,.20);
+                    --ws-text: #131922; --ws-muted: #5a6572; --ws-faint: #646e7b;
+                    --ws-film: #855e00; --ws-tv: #3d53bd; --ws-info: #2a5bd6; --ws-warn: #94590a; --ws-crit: #b03b1c; --ws-ok: #187457; --ws-requested: #6a40d0;
+                    --ws-film-soft: rgba(184,130,20,.14); --ws-tv-soft: rgba(70,90,200,.14); --ws-primary-soft: rgba(184,130,20,.14);
+                    --ws-focus: #855e00;
+                    --ws-shadow: 0 10px 30px -18px rgba(16,22,30,.30);
                 }
                 /* Break out of Jellyfin's padded content column so the app fills the screen. */
                 #letterboxdSyncConfigPage .content-primary,
@@ -40,7 +51,7 @@
                 #letterboxdSyncConfigPage .ws-rail-inner { display: flex; flex-direction: column; gap: 18px; }
                 #letterboxdSyncConfigPage .ws-brand { display: flex; align-items: center; gap: 10px; padding: 2px 6px; }
                 #letterboxdSyncConfigPage .ws-glyph { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none;
-                    background: linear-gradient(150deg, var(--ws-film), var(--ws-tv)); }
+                    background: linear-gradient(150deg, #e8b84b, #90a6ee); }
                 #letterboxdSyncConfigPage .ws-brand b { font-size: 15px; font-weight: 650; letter-spacing: -.02em; }
                 #letterboxdSyncConfigPage .ws-brand small { display: block; font-size: 11px; color: var(--ws-faint); margin-top: -1px; }
                 #letterboxdSyncConfigPage .ws-nav { display: flex; flex-direction: column; gap: 2px; }
@@ -72,7 +83,7 @@
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Success"] { border-color: var(--ws-ok); background: rgba(53,194,129,.14); box-shadow: inset 0 0 0 1px var(--ws-ok); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Rewatch"] { border-color: var(--ws-info); background: rgba(71,180,242,.14); box-shadow: inset 0 0 0 1px var(--ws-info); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Reviewed"], #letterboxdSyncConfigPage .ws-chip.on[data-s="Rated"] { border-color: var(--ws-warn); background: rgba(245,166,35,.14); box-shadow: inset 0 0 0 1px var(--ws-warn); }
-                #letterboxdSyncConfigPage .ws-chip.on[data-s="Requested"] { border-color: #a78bfa; background: rgba(167,139,250,.14); box-shadow: inset 0 0 0 1px #a78bfa; }
+                #letterboxdSyncConfigPage .ws-chip.on[data-s="Requested"] { border-color: var(--ws-requested); background: rgba(167,139,250,.14); box-shadow: inset 0 0 0 1px var(--ws-requested); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Skipped"] { border-color: var(--ws-faint); background: var(--ws-raise); box-shadow: inset 0 0 0 1px var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-chip.on[data-s="Failed"] { border-color: var(--ws-crit); background: rgba(242,88,94,.14); box-shadow: inset 0 0 0 1px var(--ws-crit); }
                 #letterboxdSyncConfigPage .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
@@ -106,7 +117,7 @@
                 #letterboxdSyncConfigPage .ws-info-i { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid currentColor; font-size: 9px; font-style: italic; line-height: 1; opacity: .8; }
                 #letterboxdSyncConfigPage .ws-pill.Skipped { color: var(--ws-muted); background: var(--ws-surface-2); }
                 #letterboxdSyncConfigPage .ws-pill.Failed { color: var(--ws-crit); background: rgba(242,88,94,.14); }
-                #letterboxdSyncConfigPage .ws-pill.Requested { color: #a78bfa; background: rgba(167,139,250,.14); }
+                #letterboxdSyncConfigPage .ws-pill.Requested { color: var(--ws-requested); background: rgba(167,139,250,.14); }
                 #letterboxdSyncConfigPage .ws-when { font-family: var(--ws-mono); font-size: 12px; color: var(--ws-muted); white-space: nowrap; }
                 #letterboxdSyncConfigPage .ws-src { color: var(--ws-faint); font-size: 12px; }
                 #letterboxdSyncConfigPage .ws-review-btn { border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-family: inherit; font-size: 11.5px; padding: 4px 10px; border-radius: 7px; cursor: pointer; }
@@ -213,7 +224,6 @@
                 #letterboxdSyncConfigPage .ws-spin { width: 14px; height: 14px; flex: none; border: 2px solid var(--ws-border-strong); border-top-color: var(--ws-primary); border-radius: 50%; animation: wsSpin .8s linear infinite; }
                 #letterboxdSyncConfigPage .ws-spin.done { animation: none; border: 0; color: var(--ws-ok); }
                 @keyframes wsSpin { to { transform: rotate(360deg); } }
-                #letterboxdSyncConfigPage .ws-btn:disabled { opacity: .55; cursor: default; }
                 </style>
 
                 <div class="ws">
@@ -397,6 +407,9 @@
 
                 <script type="text/javascript">
                 (function () {
+                    // This page's own root: the script sits inside it.
+                    var me = document.currentScript;
+                    var root = (me && me.closest('#letterboxdSyncConfigPage')) || document.getElementById('letterboxdSyncConfigPage');
                     var WS = {
                         PluginId: 'c7a3e1b9-5d42-4f8a-9c06-2b7d8e4f1a35',
                         ovFilter: 'all',
@@ -415,9 +428,29 @@
                                 if (!/width\s*=\s*device-width/i.test(vp.getAttribute('content') || '')) vp.setAttribute('content', 'width=device-width, initial-scale=1');
                             } catch (e) {}
                         },
+                        /* Follow Jellyfin's theme rather than the OS: the light palette when the nearest painted
+                           background behind this page (Jellyfin's theme colours its page) is light. Outside
+                           Jellyfin's web client nothing behind it is painted, so the OS setting decides there,
+                           and the browser's default body margin is dropped (that document is this page alone). */
+                        applyTheme: function () {
+                            var light = null;
+                            for (var el = root.parentElement; el && light === null; el = el.parentElement) {
+                                var c = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(el).backgroundColor || '');
+                                if (c && (c[4] === undefined || parseFloat(c[4]) >= 0.5)) light = 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3] > 140;
+                            }
+                            if (light === null) {
+                                light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+                                if (root.parentElement === document.body) document.body.style.margin = '0';
+                            }
+                            root.classList.toggle('ws-light', light);
+                        },
                         init: function () {
                             var self = this;
                             self.ensureViewport();
+                            self.applyTheme();
+                            // Again once Jellyfin's theme stylesheet has surely loaded, and on every return to the page.
+                            setTimeout(function () { self.applyTheme(); }, 1000);
+                            root.addEventListener('viewshow', function () { self.applyTheme(); });
                             self.wireNav();
                             self.wireButtons();
                             self.loadOverview();
