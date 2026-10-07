@@ -9,7 +9,8 @@ namespace LetterboxdSync.Tests;
 
 /// <summary>
 /// GET /Progress returns one process-wide snapshot that every signed-in user can read, so the
-/// phase text a runner sets must never carry a Jellyfin or Letterboxd/Serializd username.
+/// phase and task text a runner sets must never carry a Jellyfin or Letterboxd/Serializd
+/// username, an email, or a film/episode title.
 /// This scans every <c>SyncProgress.Start</c>/<c>SetPhase</c> call in the plugin source, so a
 /// new runner that interpolates a name into its phase fails here rather than in production.
 /// </summary>
@@ -19,15 +20,17 @@ public class SyncProgressPrivacyTests
         @"SyncProgress\.(?:Start|SetPhase)\((?<args>[^;]*)\);",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
+    // Any reference to a user, account or item name in the arguments, whether interpolated or
+    // concatenated. Film and episode titles count too: they say what someone is watching.
     private static readonly Regex NameReference = new(
-        @"\{[^}]*(?:Username|\.Name\b|DisplayName)[^}]*\}",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        @"(?:Username|DisplayName|Email|\.Name\b|Title\b|\btitle\b)",
+        RegexOptions.Compiled);
 
     private static string PluginSourceDir([CallerFilePath] string thisFile = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "LetterboxdSync"));
 
     [Fact]
-    public void NoProgressPhaseInterpolatesAUsername()
+    public void NoProgressCallNamesAUserOrTitle()
     {
         var dir = PluginSourceDir();
         Assert.True(Directory.Exists(dir), $"plugin source not found at {dir}");

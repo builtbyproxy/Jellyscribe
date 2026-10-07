@@ -48,7 +48,7 @@ public class ControllerAuthorizationTests
         var actions = new List<ActionInfo>();
         foreach (var controller in controllers)
         {
-            var classAuth = controller.GetCustomAttributes<AuthorizeAttribute>(inherit: true).ToList();
+            var classAuth = controller.GetCustomAttributes(inherit: true).OfType<IAuthorizeData>().ToList();
             var classAnon = controller.IsDefined(typeof(AllowAnonymousAttribute), inherit: true);
 
             // MVC treats every public instance method declared on a controller as an action
@@ -57,13 +57,13 @@ public class ControllerAuthorizationTests
                 .Where(m => !m.IsSpecialName && !m.IsDefined(typeof(NonActionAttribute)));
             foreach (var m in methods)
             {
-                var methodAuth = m.GetCustomAttributes<AuthorizeAttribute>(inherit: true).ToList();
+                var methodAuth = m.GetCustomAttributes(inherit: true).OfType<IAuthorizeData>().ToList();
                 var auth = classAuth.Concat(methodAuth).ToList();
                 actions.Add(new ActionInfo(
                     $"{controller.Name}.{m.Name}",
                     Anonymous: classAnon || m.IsDefined(typeof(AllowAnonymousAttribute), inherit: true),
                     Authorized: auth.Count > 0,
-                    AdminOnly: auth.Any(a => a.Policy == AdminPolicy),
+                    AdminOnly: auth.Any(a => a.Policy == AdminPolicy || (a.Roles?.Contains("Administrator") ?? false)),
                     Routed: m.GetCustomAttributes<HttpMethodAttribute>(inherit: true).Any()));
             }
         }
