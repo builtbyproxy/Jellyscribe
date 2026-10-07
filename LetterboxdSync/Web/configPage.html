@@ -316,7 +316,7 @@
 
                         <!-- INTEGRATIONS -->
                         <section class="ws-view" data-sec="settings">
-                            <div class="ws-head"><div><h1>Integrations</h1><p>Server-wide connections shared by both diaries.</p></div><button type="button" class="ws-btn primary" id="saveIntegrationsBtn">Save</button></div>
+                            <div class="ws-head"><div><h1>Integrations</h1><p>Server-wide connections shared by both diaries.</p></div><div style="display:flex;gap:10px;align-items:center;"><span id="integrationsStatus" style="font-size:12.5px;"></span><button type="button" class="ws-btn primary" id="saveIntegrationsBtn">Save</button></div></div>
                             <div class="ws-panel" style="padding:18px;margin-bottom:14px;">
                                 <div class="ws-sect-title" style="margin-top:0;"><h2>Seerr</h2><span class="rule"></span></div>
                                 <p class="ws-muted" style="font-size:12.5px;margin-top:0;">Auto-request titles missing from the library (films and TV shows).</p>
@@ -472,10 +472,10 @@
                             if (err.json) return err.json().then(function (d) { return (d && d.error) || err.statusText || ('HTTP ' + err.status); }, function () { return err.statusText || ('HTTP ' + err.status); });
                             return Promise.resolve(err.message || String(err));
                         },
-                        saveFailed: function (err) {
+                        saveFailed: function (err, statusId) {
                             var self = this;
                             Promise.resolve(self.errText(err)).then(function (msg) {
-                                document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed: ' + self.escAttr(msg) + '</span>';
+                                document.getElementById(statusId || 'mStatus').innerHTML = '<span class="ws-red">Save failed: ' + self.escAttr(msg) + '</span>';
                             });
                         },
 
@@ -1106,6 +1106,11 @@
                         /* ===== Integrations & logs ===== */
                         saveIntegrations: function () {
                             var self = this, g = function (id) { return document.getElementById(id); };
+                            var btn = g('saveIntegrationsBtn'), st = g('integrationsStatus');
+                            btn.disabled = true;
+                            st.textContent = 'Saving…';
+                            // saveConfig edits a copy, so a failed save leaves the loaded config (Seerr fields and
+                            // the telemetry switch) as it was and a later account save cannot send the unsaved values.
                             self.saveConfig(function (c) {
                                 c.JellyseerrUrl = g('jellyseerrUrl').value.trim() || null;
                                 // Blank keeps the saved key (the server never sends it back); typing replaces it.
@@ -1113,7 +1118,14 @@
                                 c.ClearJellyseerrApiKey = !c.JellyseerrApiKey && g('jellyseerrApiKeyClear').checked;
                                 c.AutoApproveJellyseerrRequests = g('autoApproveJellyseerr').checked;
                                 c.Telemetry = Object.assign({}, c.Telemetry, { Enabled: g('telemetryEnabled').checked });
-                            }).then(function () { Dashboard.processPluginConfigurationUpdateResult(); }, function () { g('jellyseerrTestStatus').innerHTML = '<span class="ws-red">Save failed.</span>'; });
+                            }).then(function () {
+                                btn.disabled = false;
+                                st.innerHTML = '<span class="ws-green">Saved</span>';
+                                Dashboard.processPluginConfigurationUpdateResult();
+                            }, function (err) {
+                                btn.disabled = false;
+                                self.saveFailed(err, 'integrationsStatus');
+                            });
                         },
                         testJellyseerr: function () {
                             var url = document.getElementById('jellyseerrUrl').value.trim(), key = document.getElementById('jellyseerrApiKey').value.trim();
