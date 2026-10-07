@@ -10,6 +10,29 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.11.0',
+    headline: 'See exactly what telemetry and log bundles send',
+    summary:
+      'You can now see exactly what Jellyscribe would send before anything leaves your server. In the admin settings, Integrations has a Preview of the anonymous telemetry ping, the exact JSON, with Copy and "Copy + regenerate ID" for bug reports, and a Regenerate ID button that gives your server a fresh anonymous identity whenever you like. The admin Overview asks once whether you would like to turn telemetry on, and never again after you answer. "Send to developer" on the Logs tab now has a Preview of the full bundle, your note included, and its confirmation lists everything the bundle holds. Email addresses no longer appear in Jellyscribe\'s logs or in a bundle: Serializd accounts are named by a short tag, and any address in older log lines is masked. A successful review\'s reply is no longer written to the log, and replies that older versions logged are cut from what you can send. The telemetry description is also more precise: usage counts are rough buckets, error counts are exact per week, and an extra ping goes out at most once a day when a new kind of error starts.',
+    highlights: {
+      new: [
+        'Preview the exact anonymous telemetry ping from Integrations, with Copy and Copy + regenerate ID for bug reports.',
+        'Regenerate ID gives your server a fresh anonymous telemetry identity whenever you like.',
+        'Send to developer has a Preview of the full log bundle, your note included, before anything is uploaded.',
+        'A one-time question on the admin Overview about turning on anonymous telemetry, which never returns once answered.',
+      ],
+      improvements: [
+        'The Send to developer confirmation lists everything a bundle holds, including that log lines name films, shows and usernames.',
+        'The telemetry description says exactly what is sent: bucketed usage counts, exact weekly error counts, and an extra ping at most once a day when a new kind of error starts.',
+      ],
+      fixes: [
+        'Email addresses no longer appear in Jellyscribe\'s logs or in a log bundle; Serializd accounts are named by a short tag.',
+        'A successful review\'s reply, which can repeat the review, is no longer written to the log, and replies older versions logged are cut from what you can send.',
+        'A log bundle preview now matches what is sent byte for byte, even when telemetry has never been on.',
+      ],
+    },
+  },
+  {
     version: '2.10.10',
     headline: 'Settings pages that work by keyboard, on phones and in both themes',
     summary:
