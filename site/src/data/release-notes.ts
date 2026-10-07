@@ -10,6 +10,30 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.8',
+    headline: 'Faster, steadier syncs on big libraries',
+    summary:
+      'Syncs get faster and calmer on big libraries, building on work by Wouter Stulp, whose changes to scheduling, caching, connection reuse and history upkeep are included here. The scheduled tasks now run at fixed, staggered times overnight (Letterboxd from 3:00, Serializd from 4:00, telemetry at 5:00) instead of a day after each restart, so if you kept the default schedule your syncs move to these times, and a server that is off overnight still syncs at least every two days. Sync history no longer grows forever: old skipped and failed entries are trimmed without forgetting anything the sync relies on, and history files are rewritten safely so a crash can no longer truncate them. Films and shows are looked up once instead of on every run, and the review window and watchlists no longer scan the whole library. On accounts that use the Letterboxd website, real-time and rating sync reuse the signed-in session instead of logging in again for every film. When Cloudflare blocks the website, a run pauses that account after a few films instead of spending a minute on each one; a struggling Serializd is given room, a catch-up stops after a few failures in a row, and Serializd writes are never retried in a way that could log an episode twice. An account paused by repeated login failures now tries one login a day for a week, so a Letterboxd outage clears on its own, while a rejected password still waits for you to re-save it. Films without a TMDb id are noted once instead of on every run, the diary imports wait for a running sync instead of competing with it, and Jellyfin no longer waits on large history files at startup.',
+    highlights: {
+      improvements: [
+        'Scheduled tasks run at fixed, staggered times overnight; if you kept the default schedule, your syncs move to these times, with a two-day fallback for servers that are off at night (thanks to Wouter Stulp)',
+        'Sync history stays small: old skipped and failed entries are trimmed without forgetting anything the sync relies on (thanks to Wouter Stulp)',
+        'Films, seasons and library items are looked up once instead of on every run (thanks to Wouter Stulp)',
+        'Connections to Letterboxd, Serializd and Seerr are reused across syncs (thanks to Wouter Stulp)',
+        'Real-time and rating sync on the Letterboxd website reuse the signed-in session instead of logging in each time',
+        'Jellyfin starts faster with a large sync history',
+        'Films without a TMDb id are noted once instead of on every run',
+      ],
+      fixes: [
+        'History and cache files are rewritten safely, so a crash can no longer truncate them (thanks to Wouter Stulp)',
+        'A Cloudflare block pauses that account\'s run after a few films instead of costing a minute per film',
+        'A Serializd catch-up stops after repeated failures and never retries a write that might already have been saved',
+        'An account paused by login failures tries one login a day for a week, so an outage clears on its own',
+        'The Letterboxd and Serializd diary imports wait for a running sync instead of competing with it',
+      ],
+    },
+  },
+  {
     version: '2.10.7',
     headline: 'Every account synced on the right day, once',
     summary:
