@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Http;
@@ -40,8 +41,7 @@ public abstract class JellyfinUserApiController : ControllerBase
     protected ObjectResult TooManyLoginChecks(TimeSpan retryAfter)
     {
         var seconds = (int)Math.Ceiling(retryAfter.TotalSeconds);
-        if (HttpContext != null)
-            Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Response.Headers.RetryAfter = seconds.ToString(CultureInfo.InvariantCulture);
         return StatusCode(StatusCodes.Status429TooManyRequests, new
         {
             error = LoginCheckLimiter.RefusalMessage(retryAfter),

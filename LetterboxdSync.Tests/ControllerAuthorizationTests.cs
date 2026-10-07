@@ -51,10 +51,15 @@ public class ControllerAuthorizationTests
             var classAuth = controller.GetCustomAttributes(inherit: true).OfType<IAuthorizeData>().ToList();
             var classAnon = controller.IsDefined(typeof(AllowAnonymousAttribute), inherit: true);
 
-            // MVC treats every public instance method declared on a controller as an action
-            // unless it is marked [NonAction], so walk all of them, not only the routed ones.
-            var methods = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                .Where(m => !m.IsSpecialName && !m.IsDefined(typeof(NonActionAttribute)));
+            // MVC treats every public instance method on a controller as an action unless it is
+            // marked [NonAction], including ones inherited from a plugin base class such as
+            // JellyfinUserApiController, so walk all of them, not only the routed ones. Methods
+            // from ControllerBase itself and object are framework plumbing, not actions.
+            var methods = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .Where(m => m.DeclaringType != null
+                            && m.DeclaringType.Assembly == typeof(Plugin).Assembly
+                            && !m.IsSpecialName
+                            && !m.IsDefined(typeof(NonActionAttribute)));
             foreach (var m in methods)
             {
                 var methodAuth = m.GetCustomAttributes(inherit: true).OfType<IAuthorizeData>().ToList();

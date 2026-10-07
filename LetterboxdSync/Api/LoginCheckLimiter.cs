@@ -14,8 +14,13 @@ namespace LetterboxdSync.Api;
 /// confirming several working accounts never runs out. One instance per remote service, since
 /// a block on one does not affect the other. Nothing is persisted; a restart clears it.
 /// </para>
+/// <para>
+/// It is a mitigation, not a lock: the server-wide cap means a few users failing at once can
+/// make everyone wait out the window, which is the price of keeping the server's IP off the
+/// remote service's block list.
+/// </para>
 /// </summary>
-public sealed class LoginCheckLimiter
+internal sealed class LoginCheckLimiter
 {
     /// <summary>How far back a check counts.</summary>
     public static readonly TimeSpan Window = TimeSpan.FromMinutes(10);

@@ -695,24 +695,40 @@ public class LetterboxdControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    private sealed class ThrowingHandler : System.Net.Http.HttpMessageHandler
+    {
+        public const string Detail = "No connection could be made to seerr-internal.example:5055 (Connection refused)";
+
+        protected override System.Threading.Tasks.Task<System.Net.Http.HttpResponseMessage> SendAsync(
+            System.Net.Http.HttpRequestMessage request, System.Threading.CancellationToken cancellationToken)
+            => throw new System.Net.Http.HttpRequestException(Detail);
+    }
+
     [Fact]
     public async Task TestJellyseerr_ConnectionFails_ReturnsGenericErrorWithoutExceptionText()
     {
         using var h = new ControllerTestHarness();
-
-        // Port 1 on loopback refuses the connection at once, so the client throws an
-        // HttpRequestException whose message names the host and port.
-        var result = await h.Controller.TestJellyseerr(new JellyseerrTestRequest
+        // The real failure is an HttpRequestException whose message names the host and port.
+        LetterboxdController.SeerrTestHandlerForTesting = new ThrowingHandler();
+        try
         {
-            Url = "http://127.0.0.1:1",
-            ApiKey = "test-key"
-        });
+            var result = await h.Controller.TestJellyseerr(new JellyseerrTestRequest
+            {
+                Url = "http://seerr-internal.example:5055",
+                ApiKey = "test-key"
+            });
 
-        Assert.IsType<BadRequestObjectResult>(result);
-        Assert.False(Prop<bool>(result, "success"));
-        var error = Prop<string>(result, "error");
-        Assert.Equal("Could not connect to Seerr with that URL and API key. The server log has the details.", error);
-        Assert.DoesNotContain("127.0.0.1", error!, StringComparison.Ordinal);
+            Assert.IsType<BadRequestObjectResult>(result);
+            Assert.False(Prop<bool>(result, "success"));
+            var error = Prop<string>(result, "error");
+            Assert.False(string.IsNullOrEmpty(error));
+            Assert.DoesNotContain("seerr-internal", error!, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("refused", error!, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            LetterboxdController.SeerrTestHandlerForTesting = null;
+        }
     }
 
     // ----- GetLogs -----

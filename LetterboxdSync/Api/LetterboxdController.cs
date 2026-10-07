@@ -478,6 +478,9 @@ public class LetterboxdController : JellyfinUserApiController
         return Ok(new { success = true, count = mine.Count });
     }
 
+    /// <summary>Test-only transport for <see cref="TestJellyseerr"/>. Production never assigns it.</summary>
+    internal static System.Net.Http.HttpMessageHandler? SeerrTestHandlerForTesting;
+
     /// <summary>
     /// Checks the Seerr URL and API key from the admin settings form. Admin-only, because it
     /// makes the server GET any URL; failures return a fixed message so the response never
@@ -494,7 +497,7 @@ public class LetterboxdController : JellyfinUserApiController
 
         try
         {
-            using var client = new SeerrClient(request.Url!, request.ApiKey!, _logger);
+            using var client = new SeerrClient(request.Url!, request.ApiKey!, _logger, SeerrTestHandlerForTesting);
             var userId = await client.GetJellyseerrUserIdAsync(GetCurrentUserId() ?? string.Empty)
                 .ConfigureAwait(false);
             return Ok(new
