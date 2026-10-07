@@ -81,8 +81,9 @@ public class ScheduledTaskTests : IDisposable
 
         var triggers = task.GetDefaultTriggers().ToList();
 
-        Assert.Single(triggers);
+        Assert.Equal(2, triggers.Count);
         Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
+        Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[1].Type);
     }
 
     [Fact]
@@ -124,8 +125,9 @@ public class ScheduledTaskTests : IDisposable
 
         var triggers = task.GetDefaultTriggers().ToList();
 
-        Assert.Single(triggers);
+        Assert.Equal(2, triggers.Count);
         Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
+        Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[1].Type);
     }
 
     [Fact]
@@ -164,8 +166,9 @@ public class ScheduledTaskTests : IDisposable
 
         var triggers = task.GetDefaultTriggers().ToList();
 
-        Assert.Single(triggers);
+        Assert.Equal(2, triggers.Count);
         Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
+        Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[1].Type);
     }
 
     [Fact]
@@ -203,13 +206,19 @@ public class ScheduledTaskTests : IDisposable
                 new TimeSpan(4, 20, 0)),
             (new SerializdDiaryImportTask(new SerializdDiaryImportRunner(NullLoggerFactory.Instance, lm, um, udm)),
                 new TimeSpan(4, 40, 0)),
+            (new TelemetryTask(lm, Substitute.For<MediaBrowser.Controller.IServerApplicationHost>(), NullLoggerFactory.Instance), new TimeSpan(5, 0, 0)),
         };
 
         foreach (var (task, timeOfDay) in expected)
         {
-            var trigger = Assert.Single(task.GetDefaultTriggers());
-            Assert.Equal(TaskTriggerInfoType.DailyTrigger, trigger.Type);
-            Assert.Equal(timeOfDay.Ticks, trigger.TimeOfDayTicks);
+            var triggers = task.GetDefaultTriggers().ToList();
+            Assert.Equal(2, triggers.Count);
+            Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
+            Assert.Equal(timeOfDay.Ticks, triggers[0].TimeOfDayTicks);
+            // A machine that is off at that hour never fires the daily trigger; the interval
+            // trigger runs the task once it has gone two days without running.
+            Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[1].Type);
+            Assert.Equal(TimeSpan.FromDays(2).Ticks, triggers[1].IntervalTicks);
         }
     }
 }

@@ -24,12 +24,5 @@ public class SerializdWatchlistSyncTask : IScheduledTask
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, cancellationToken);
 
-    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => new[]
-    {
-        new TaskTriggerInfo
-        {
-            Type = TaskTriggerInfoType.DailyTrigger,
-            TimeOfDayTicks = new TimeSpan(4, 20, 0).Ticks,
-        },
-    };
+    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => TaskSchedule.Daily(TaskSchedule.SerializdWatchlist);
 }

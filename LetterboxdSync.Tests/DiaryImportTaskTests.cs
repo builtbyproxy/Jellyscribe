@@ -430,7 +430,7 @@ public class DiaryImportTaskTests : IDisposable
     {
         var triggers = _task.GetDefaultTriggers().ToList();
 
-        Assert.Single(triggers);
+        Assert.Equal(2, triggers.Count);
         Assert.Equal(MediaBrowser.Model.Tasks.TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
         Assert.Equal(new TimeSpan(3, 40, 0).Ticks, triggers[0].TimeOfDayTicks);
     }

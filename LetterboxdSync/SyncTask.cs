@@ -23,12 +23,5 @@ public class SyncTask : IScheduledTask
     public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
         => _runner.RunForAllAsync(progress, "scheduled", cancellationToken);
 
-    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => new[]
-    {
-        new TaskTriggerInfo
-        {
-            Type = TaskTriggerInfoType.DailyTrigger,
-            TimeOfDayTicks = new TimeSpan(3, 0, 0).Ticks
-        }
-    };
+    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => TaskSchedule.Daily(TaskSchedule.LetterboxdDiarySync);
 }

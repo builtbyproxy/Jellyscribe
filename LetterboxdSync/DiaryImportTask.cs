@@ -269,12 +269,5 @@ public class DiaryImportTask : IScheduledTask
         progress.Report(100);
     }
 
-    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => new[]
-    {
-        new TaskTriggerInfo
-        {
-            Type = TaskTriggerInfoType.DailyTrigger,
-            TimeOfDayTicks = new TimeSpan(3, 40, 0).Ticks
-        }
-    };
+    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => TaskSchedule.Daily(TaskSchedule.LetterboxdDiaryImport);
 }

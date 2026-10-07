@@ -57,12 +57,5 @@ public class TelemetryTask : IScheduledTask
         }
     }
 
-    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => new[]
-    {
-        new TaskTriggerInfo
-        {
-            Type = TaskTriggerInfoType.IntervalTrigger,
-            IntervalTicks = TimeSpan.FromDays(1).Ticks
-        }
-    };
+    public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => TaskSchedule.Daily(TaskSchedule.Telemetry);
 }
