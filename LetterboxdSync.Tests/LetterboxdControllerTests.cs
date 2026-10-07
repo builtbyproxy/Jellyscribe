@@ -191,13 +191,24 @@ public class LetterboxdControllerTests
     }
 
     [Fact]
-    public void GetHistory_CapsCountAt200()
+    public void GetHistory_CapsCountAt250()
     {
         using var h = ResolvedUserHarness();
 
         var result = h.Controller.GetHistory(count: 9999);
 
-        Assert.Equal(200, Prop<int>(result, "count"));
+        Assert.Equal(250, Prop<int>(result, "count"));
+    }
+
+    [Fact]
+    public void GetHistory_ThePageSizeTheDashboardsAskFor_IsServedInFull()
+    {
+        using var h = ResolvedUserHarness();
+
+        // userPage.html and configPage.html both request 250 rows a page.
+        var result = h.Controller.GetHistory(count: 250);
+
+        Assert.Equal(250, Prop<int>(result, "count"));
     }
 
     [Fact]
