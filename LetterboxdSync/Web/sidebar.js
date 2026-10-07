@@ -15,6 +15,7 @@
     var PAGE_ID = "jellyscribe-app-page";
     var SLOT_CLASS = "jellyscribe-app-content";
     var DASHBOARD_ID = "letterboxdUserPage";
+    var ADMIN_DASHBOARD_ID = "letterboxdSyncConfigPage";
     var state = { visible: false, previous: null, watcher: null, mounting: 0, previousTitle: "", tabs: null };
 
     // Any server base URL (e.g. /jellyfin) in front of /web/. Only a plain path prefix is accepted,
@@ -95,10 +96,14 @@
     }
 
     // A dashboard already in the document outside our page (a configuration-page view Jellyfin is
-    // caching): mounting a second copy would make its element lookups resolve to the wrong one.
+    // caching): the user dashboard, or the admin settings page, which uses the same element ids.
+    // Mounting beside either would leave two copies of every id in the document, so open the
+    // configuration page instead, the way the link worked before the in-app page.
     function dashboardElsewhere() {
-        var existing = document.getElementById(DASHBOARD_ID);
-        return !!existing && !existing.closest("#" + PAGE_ID);
+        return [DASHBOARD_ID, ADMIN_DASHBOARD_ID].some(function (id) {
+            var existing = document.getElementById(id);
+            return !!existing && !existing.closest("#" + PAGE_ID);
+        });
     }
 
     function dashboardUrl() {
