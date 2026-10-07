@@ -10,6 +10,25 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.10.4',
+    headline: 'Tighter security for servers with several Jellyfin users',
+    summary:
+      'Jellyscribe is now safer on servers shared by several people. Only administrators can run the Seerr connection test, and a failed test no longer reports details about what lives at the address entered. The sync progress shown on the dashboard no longer names whose sync is running. The activity and stats views refuse to answer when the server cannot tell who is asking, where before they returned everyone\'s history. Login checks for Letterboxd and Serializd are now rate-limited per user and across the server, so nobody can use the server to test passwords and get its address blocked; the dashboard says how long to wait. "Sync watchlist now" for Serializd can no longer start several overlapping runs. Two old account endpoints that nothing used any more were removed, one of which returned a stored password. The Seerr URL field now shows a generic example address. Thanks to Wouter Stulp, whose fork fixed the Seerr test, progress and history issues first.',
+    highlights: {
+      improvements: [
+        'Login checks for Letterboxd and Serializd are rate-limited per user and server-wide, and the dashboard says how long to wait.',
+        'The Seerr URL field shows a generic example address.',
+      ],
+      fixes: [
+        'Only administrators can run the Seerr connection test, and a failure no longer echoes details about the address tried (thanks to Wouter Stulp).',
+        'Sync progress no longer shows other people\'s Jellyfin or Letterboxd names (thanks to Wouter Stulp).',
+        'Activity and stats refuse to answer when the caller cannot be identified, instead of returning everyone\'s history (thanks to Wouter Stulp).',
+        'Serializd "Sync watchlist now" runs one at a time and says when a run is already going.',
+        'Removed two unused account endpoints, one of which returned the stored password.',
+      ],
+    },
+  },
+  {
     version: '2.10.3',
     headline: 'Security fixes for servers with more than one Jellyfin user',
     summary:
