@@ -82,8 +82,7 @@ public class ScheduledTaskTests : IDisposable
         var triggers = task.GetDefaultTriggers().ToList();
 
         Assert.Single(triggers);
-        Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[0].Type);
-        Assert.Equal(TimeSpan.FromDays(1).Ticks, triggers[0].IntervalTicks);
+        Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public class ScheduledTaskTests : IDisposable
         var triggers = task.GetDefaultTriggers().ToList();
 
         Assert.Single(triggers);
-        Assert.Equal(TimeSpan.FromDays(1).Ticks, triggers[0].IntervalTicks);
+        Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
     }
 
     [Fact]
@@ -166,8 +165,7 @@ public class ScheduledTaskTests : IDisposable
         var triggers = task.GetDefaultTriggers().ToList();
 
         Assert.Single(triggers);
-        Assert.Equal(TaskTriggerInfoType.IntervalTrigger, triggers[0].Type);
-        Assert.Equal(TimeSpan.FromDays(1).Ticks, triggers[0].IntervalTicks);
+        Assert.Equal(TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
     }
 
     [Fact]
@@ -181,5 +179,37 @@ public class ScheduledTaskTests : IDisposable
 
         await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
         // No exception = pass; runner exited cleanly with no users to process.
+    }
+
+    // A DailyTrigger fires at a fixed time of day; an IntervalTrigger restarts its clock on
+    // every Jellyfin restart and fired all seven tasks together. Staggered so the Letterboxd
+    // and Serializd families don't hit their origins in the same minute.
+    [Fact]
+    public void AllSyncTasks_AreStaggeredDailyTriggers()
+    {
+        var um = Substitute.For<IUserManager>();
+        var lm = Substitute.For<ILibraryManager>();
+        var udm = Substitute.For<IUserDataManager>();
+        var pm = Substitute.For<IPlaylistManager>();
+        var cm = Substitute.For<MediaBrowser.Controller.Collections.ICollectionManager>();
+
+        var expected = new (IScheduledTask Task, TimeSpan TimeOfDay)[]
+        {
+            (new SyncTask(MakeSyncRunner(um, lm, udm)), new TimeSpan(3, 0, 0)),
+            (new WatchlistSyncTask(MakeWatchlistRunner(um, lm, pm)), new TimeSpan(3, 20, 0)),
+            (new DiaryImportTask(um, NullLoggerFactory.Instance, lm, udm), new TimeSpan(3, 40, 0)),
+            (new SerializdSyncTask(MakeSerializdSyncRunner(um, lm, udm)), new TimeSpan(4, 0, 0)),
+            (new SerializdWatchlistSyncTask(new SerializdWatchlistSyncRunner(NullLoggerFactory.Instance, lm, um, cm, pm)),
+                new TimeSpan(4, 20, 0)),
+            (new SerializdDiaryImportTask(new SerializdDiaryImportRunner(NullLoggerFactory.Instance, lm, um, udm)),
+                new TimeSpan(4, 40, 0)),
+        };
+
+        foreach (var (task, timeOfDay) in expected)
+        {
+            var trigger = Assert.Single(task.GetDefaultTriggers());
+            Assert.Equal(TaskTriggerInfoType.DailyTrigger, trigger.Type);
+            Assert.Equal(timeOfDay.Ticks, trigger.TimeOfDayTicks);
+        }
     }
 }

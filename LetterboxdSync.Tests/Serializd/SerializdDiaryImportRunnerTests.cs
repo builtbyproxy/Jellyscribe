@@ -169,6 +169,31 @@ public class SerializdDiaryImportRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_SerializdGateHeld_SkipsWithoutAuthenticating()
+    {
+        AddUserWithImportAccount();
+        var factoryCalled = false;
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) =>
+        {
+            factoryCalled = true;
+            return Task.FromResult(Substitute.For<ISerializdService>());
+        };
+
+        await SerializdSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        try
+        {
+            await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+        }
+        finally
+        {
+            SerializdSyncGate.Instance.Release();
+        }
+
+        Assert.False(factoryCalled, "an import must not hit Serializd while a sync holds the gate");
+        Assert.False(SerializdSyncGate.IsRunning);
+    }
+
+    [Fact]
     public async Task Run_ImportDisabledOnAccount_NeverAuthenticates()
     {
         AddUserWithImportAccount(importEnabled: false);

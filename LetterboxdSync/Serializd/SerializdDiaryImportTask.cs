@@ -28,8 +28,8 @@ public class SerializdDiaryImportTask : IScheduledTask
     {
         new TaskTriggerInfo
         {
-            Type = TaskTriggerInfoType.IntervalTrigger,
-            IntervalTicks = TimeSpan.FromDays(1).Ticks,
+            Type = TaskTriggerInfoType.DailyTrigger,
+            TimeOfDayTicks = new TimeSpan(4, 40, 0).Ticks,
         },
     };
 }

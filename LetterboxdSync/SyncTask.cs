@@ -27,8 +27,8 @@ public class SyncTask : IScheduledTask
     {
         new TaskTriggerInfo
         {
-            Type = TaskTriggerInfoType.IntervalTrigger,
-            IntervalTicks = System.TimeSpan.FromDays(1).Ticks
+            Type = TaskTriggerInfoType.DailyTrigger,
+            TimeOfDayTicks = new TimeSpan(3, 0, 0).Ticks
         }
     };
 }

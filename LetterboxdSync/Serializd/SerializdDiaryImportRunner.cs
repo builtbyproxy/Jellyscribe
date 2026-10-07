@@ -51,34 +51,49 @@ public class SerializdDiaryImportRunner
 
     public async Task RunForAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var pairs = _userManager.GetUsers()
-            .SelectMany(u => Config.GetEnabledSerializdAccountsForUser(u.Id.ToString("N"))
-                .Where(a => a.EnableDiaryImport)
-                .Select(a => (User: u, Account: a)))
-            .ToList();
-
-        var processed = 0;
-        foreach (var (user, account) in pairs)
+        // Shares the export runner's gate so an import never logs in to Serializd while a
+        // catch-up is mid-run against the same accounts.
+        if (!await SerializdSyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                await ImportOneAsync(user, account, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Serializd diary import failed for {Username} as {Email}: {Message}",
-                    user.Username, account.Email, ex.Message);
-                // No SyncEvent is recorded on this path; hook telemetry directly.
-                TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
-            }
-
-            processed++;
-            if (pairs.Count > 0)
-                progress.Report((double)processed / pairs.Count * 100);
+            _logger.LogWarning("Serializd sync already running, skipping diary import");
+            return;
         }
 
-        progress.Report(100);
+        try
+        {
+            var pairs = _userManager.GetUsers()
+                .SelectMany(u => Config.GetEnabledSerializdAccountsForUser(u.Id.ToString("N"))
+                    .Where(a => a.EnableDiaryImport)
+                    .Select(a => (User: u, Account: a)))
+                .ToList();
+
+            var processed = 0;
+            foreach (var (user, account) in pairs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    await ImportOneAsync(user, account, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Serializd diary import failed for {Username} as {Email}: {Message}",
+                        user.Username, account.Email, ex.Message);
+                    // No SyncEvent is recorded on this path; hook telemetry directly.
+                    TelemetryService.RecordError(TelemetryService.Classify(ex.Message));
+                }
+
+                processed++;
+                if (pairs.Count > 0)
+                    progress.Report((double)processed / pairs.Count * 100);
+            }
+
+            progress.Report(100);
+        }
+        finally
+        {
+            SerializdSyncGate.Instance.Release();
+        }
     }
 
     private async Task ImportOneAsync(User user, SerializdAccount account, CancellationToken cancellationToken)

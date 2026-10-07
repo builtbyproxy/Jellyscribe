@@ -426,12 +426,13 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
-    public void GetDefaultTriggers_ReturnsDailyInterval()
+    public void GetDefaultTriggers_ReturnsDailyTrigger()
     {
         var triggers = _task.GetDefaultTriggers().ToList();
 
         Assert.Single(triggers);
-        Assert.Equal(TimeSpan.FromDays(1).Ticks, triggers[0].IntervalTicks);
+        Assert.Equal(MediaBrowser.Model.Tasks.TaskTriggerInfoType.DailyTrigger, triggers[0].Type);
+        Assert.Equal(new TimeSpan(3, 40, 0).Ticks, triggers[0].TimeOfDayTicks);
     }
 
     [Fact]
