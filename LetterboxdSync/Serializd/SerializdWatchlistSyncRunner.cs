@@ -53,11 +53,18 @@ public class SerializdWatchlistSyncRunner
 
     private static PluginConfiguration Config => Plugin.Instance!.Configuration;
 
+    /// <summary>How long a scheduled run waits for a manual run to finish. Tests shorten it.</summary>
+    internal static TimeSpan ScheduledGateWait { get; set; } = TimeSpan.FromMinutes(15);
+
     public async Task RunForAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        if (!await SerializdWatchlistSyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        // A user's "Sync watchlist now" may hold the gate; it covers only that user, so the
+        // scheduled run waits for it (bounded) instead of skipping everyone else until the
+        // next trigger.
+        if (!await SerializdWatchlistSyncGate.Instance.WaitAsync(ScheduledGateWait, cancellationToken).ConfigureAwait(false))
         {
-            _logger.LogWarning("Serializd watchlist sync already running, skipping scheduled run");
+            _logger.LogWarning("Serializd watchlist sync still running after {Minutes} minutes, skipping scheduled run",
+                ScheduledGateWait.TotalMinutes);
             return;
         }
 

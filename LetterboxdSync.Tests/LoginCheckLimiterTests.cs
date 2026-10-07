@@ -42,7 +42,7 @@ public class LoginCheckLimiterTests
     }
 
     [Fact]
-    public void Refund_GivesTheCheckBack()
+    public void Refund_GivesTheFailedCheckBack()
     {
         var limiter = NewLimiter();
         for (var i = 0; i < LoginCheckLimiter.PerUserLimit * 3; i++)
@@ -50,6 +50,21 @@ public class LoginCheckLimiterTests
             Assert.True(limiter.TryAcquire("alex", out var stamp, out _));
             limiter.Refund("alex", stamp);
         }
+    }
+
+    [Fact]
+    public void SuccessfulChecks_StillHitTheLooserTotalCap()
+    {
+        var limiter = NewLimiter();
+        for (var i = 0; i < LoginCheckLimiter.PerUserTotalLimit; i++)
+        {
+            Assert.True(limiter.TryAcquire("alex", out var stamp, out _));
+            limiter.Refund("alex", stamp);
+        }
+
+        Assert.False(limiter.TryAcquire("alex", out _, out var retryAfter));
+        Assert.Equal(LoginCheckLimiter.Window, retryAfter);
+        Assert.True(limiter.TryAcquire("sam", out _, out _));
     }
 
     [Fact]

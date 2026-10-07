@@ -145,7 +145,7 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     }
 
     [Fact]
-    public async Task RunForAllAsync_GateAlreadyHeld_SkipsWithoutFetching()
+    public async Task RunForAllAsync_GateHeldPastTheWait_SkipsWithoutFetching()
     {
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
@@ -154,6 +154,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
         SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
 
         await SerializdWatchlistSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        var previousWait = SerializdWatchlistSyncRunner.ScheduledGateWait;
+        SerializdWatchlistSyncRunner.ScheduledGateWait = TimeSpan.FromMilliseconds(50);
         try
         {
             await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
@@ -162,8 +164,32 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
         }
         finally
         {
+            SerializdWatchlistSyncRunner.ScheduledGateWait = previousWait;
             SerializdWatchlistSyncGate.Instance.Release();
         }
+    }
+
+    [Fact]
+    public async Task RunForAllAsync_WaitsForAManualRunToFinish_ThenRuns()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId);
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry>());
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        await SerializdWatchlistSyncGate.Instance.WaitAsync(0, CancellationToken.None);
+        var run = _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+        await Task.Delay(50);
+        Assert.False(run.IsCompleted);
+
+        SerializdWatchlistSyncGate.Instance.Release();
+        await run;
+
+        await service.Received().GetWatchlistAsync();
+        Assert.False(SerializdWatchlistSyncGate.IsRunning);
     }
 
     [Fact]

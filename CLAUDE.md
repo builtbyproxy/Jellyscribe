@@ -52,6 +52,7 @@ Deploy a build to a Jellyfin server: `JELLYSCRIBE_DEPLOY_TARGET=user@host ./depl
 
 - `Plugin.cs` + `ServiceRegistrator.cs` register services and config.
 - `Api/LetterboxdController.cs` and `Api/SidebarController.cs` expose REST endpoints consumed by the config dashboard. `LetterboxdController` also serves the read-only `ItemRating` endpoint the review modal uses to pre-fill its stars from the caller's stored Jellyfin rating.
+- `Api/LoginCheckLimiter.cs` rate-limits both Verify (login check) endpoints in memory: 5 failed checks per Jellyfin user, 20 checks of any outcome per user, and 20 failed checks server-wide, per service per 10 minutes, answering 429. `ControllerAuthorizationTests` pins which actions are anonymous and which are admin-only, so a new action has to be added there on purpose.
 - `Api/LibrariesController.cs` lists the film, TV, and mixed libraries the caller can access, for the per-account "Excluded libraries" checklist on both settings pages (Jellyfin's own `/Library/VirtualFolders` is admin-only).
 - `Web/*.html` and `Web/*.js` are embedded resources (see `LetterboxdSync.csproj`) served as the plugin's config pages.
 - `SidebarScriptStartupFilter.cs` injects the sidebar link without any other plugin (kill switch: `PluginConfiguration.DisableSidebarScriptMiddleware`, XML only). `SidebarInjection.cs` also registers the same injection with the File Transformation plugin when it is installed.

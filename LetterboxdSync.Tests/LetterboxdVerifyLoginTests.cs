@@ -138,7 +138,18 @@ public class LetterboxdVerifyLoginTests : IDisposable
         Logins();
         using var h = new ControllerTestHarness(UserId);
 
-        for (var i = 0; i < LoginCheckLimiter.PerUserLimit * 2; i++)
+        for (var i = 0; i < LoginCheckLimiter.PerUserLimit * 3; i++)
+            Assert.IsType<OkObjectResult>(await h.Controller.VerifyLogin(
+                new LetterboxdVerifyRequest { LetterboxdUsername = "account" + i, LetterboxdPassword = "pw" }));
+    }
+
+    [Fact]
+    public async Task WebsiteFallbackSuccesses_AreRefundedToo()
+    {
+        Logins(api: new Exception("api refused"));
+        using var h = new ControllerTestHarness(UserId);
+
+        for (var i = 0; i < LoginCheckLimiter.PerUserLimit * 3; i++)
             Assert.IsType<OkObjectResult>(await h.Controller.VerifyLogin(
                 new LetterboxdVerifyRequest { LetterboxdUsername = "account" + i, LetterboxdPassword = "pw" }));
     }

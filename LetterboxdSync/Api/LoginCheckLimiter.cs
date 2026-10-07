@@ -9,10 +9,12 @@ namespace LetterboxdSync.Api;
 /// signed-in Jellyfin user could use the server to test stolen passwords, and the remote
 /// service would block the server's IP for every account in the household.
 /// <para>
-/// A check is counted when it starts (so a burst of parallel requests cannot slip past) and
-/// refunded when the login succeeds, so the budget is effectively failed checks: a user
-/// confirming several working accounts never runs out. One instance per remote service, since
-/// a block on one does not affect the other. Nothing is persisted; a restart clears it.
+/// A check is counted when it starts (so a burst of parallel requests cannot slip past). A
+/// check whose login succeeds is refunded from the failed-check budget, so a user confirming
+/// several working accounts is not locked out, but every check still counts toward a looser
+/// per-user cap, so a loop of valid logins cannot hammer the remote service either. One
+/// instance per remote service, since a block on one does not affect the other. Nothing is
+/// persisted; a restart clears it.
 /// </para>
 /// <para>
 /// It is a mitigation, not a lock: the server-wide cap means a few users failing at once can
@@ -28,6 +30,9 @@ internal sealed class LoginCheckLimiter
     /// <summary>Failed checks one Jellyfin user may make per window.</summary>
     public const int PerUserLimit = 5;
 
+    /// <summary>Checks of any outcome one Jellyfin user may make per window.</summary>
+    public const int PerUserTotalLimit = 20;
+
     /// <summary>Failed checks the whole server may make per window, across all users.</summary>
     public const int GlobalLimit = 20;
 
@@ -38,14 +43,20 @@ internal sealed class LoginCheckLimiter
     /// <summary>Test-only clock. Production never assigns it.</summary>
     internal Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
 
+    private sealed class UserBucket
+    {
+        public readonly List<DateTime> Failed = new();
+        public readonly List<DateTime> All = new();
+    }
+
     private readonly object _lock = new();
-    private readonly Dictionary<string, List<DateTime>> _perUser = new(StringComparer.Ordinal);
-    private readonly List<DateTime> _global = new();
+    private readonly Dictionary<string, UserBucket> _perUser = new(StringComparer.Ordinal);
+    private readonly List<DateTime> _globalFailed = new();
 
     /// <summary>
     /// Counts one check for <paramref name="userKey"/> (the Jellyfin user id; empty when it
     /// cannot be resolved, which then shares one bucket). Returns false, with how long until a
-    /// slot frees up, when either the user's or the server's budget is spent.
+    /// slot frees up, when the user's or the server's budget is spent.
     /// </summary>
     public bool TryAcquire(string userKey, out DateTime stamp, out TimeSpan retryAfter)
     {
@@ -53,19 +64,19 @@ internal sealed class LoginCheckLimiter
         {
             var now = UtcNow();
             var cutoff = now - Window;
-            Prune(_global, cutoff);
+            Prune(_globalFailed, cutoff);
             PruneUsers(cutoff);
 
             _perUser.TryGetValue(userKey, out var mine);
-            var userFull = mine != null && mine.Count >= PerUserLimit;
-            var globalFull = _global.Count >= GlobalLimit;
-            if (userFull || globalFull)
+
+            // A slot frees when the oldest entry in a full list leaves the window. With more
+            // than one list full, the latest of those is when a retry can actually succeed.
+            var freesAt = DateTime.MinValue;
+            if (mine != null && mine.Failed.Count >= PerUserLimit) freesAt = Later(freesAt, mine.Failed[0] + Window);
+            if (mine != null && mine.All.Count >= PerUserTotalLimit) freesAt = Later(freesAt, mine.All[0] + Window);
+            if (_globalFailed.Count >= GlobalLimit) freesAt = Later(freesAt, _globalFailed[0] + Window);
+            if (freesAt != DateTime.MinValue)
             {
-                // A slot frees when the oldest check in a full bucket leaves the window. When
-                // both are full, the later of the two is when a retry can actually succeed.
-                var freesAt = DateTime.MinValue;
-                if (userFull) freesAt = mine![0] + Window;
-                if (globalFull && _global[0] + Window > freesAt) freesAt = _global[0] + Window;
                 stamp = default;
                 retryAfter = freesAt - now;
                 return false;
@@ -73,30 +84,31 @@ internal sealed class LoginCheckLimiter
 
             if (mine == null)
             {
-                mine = new List<DateTime>();
+                mine = new UserBucket();
                 _perUser[userKey] = mine;
             }
 
-            mine.Add(now);
-            _global.Add(now);
+            mine.Failed.Add(now);
+            mine.All.Add(now);
+            _globalFailed.Add(now);
             stamp = now;
             retryAfter = TimeSpan.Zero;
             return true;
         }
     }
 
-    /// <summary>Gives back a check that succeeded, so working logins never use up the budget.</summary>
+    /// <summary>
+    /// Gives back a check whose login succeeded, so working logins never use up the
+    /// failed-check budgets. It still counts toward <see cref="PerUserTotalLimit"/>.
+    /// </summary>
     public void Refund(string userKey, DateTime stamp)
     {
         lock (_lock)
         {
             if (_perUser.TryGetValue(userKey, out var mine))
-            {
-                mine.Remove(stamp);
-                if (mine.Count == 0) _perUser.Remove(userKey);
-            }
+                mine.Failed.Remove(stamp);
 
-            _global.Remove(stamp);
+            _globalFailed.Remove(stamp);
         }
     }
 
@@ -112,18 +124,21 @@ internal sealed class LoginCheckLimiter
         lock (_lock)
         {
             _perUser.Clear();
-            _global.Clear();
+            _globalFailed.Clear();
             UtcNow = () => DateTime.UtcNow;
         }
     }
 
+    private static DateTime Later(DateTime a, DateTime b) => a > b ? a : b;
+
     private void PruneUsers(DateTime cutoff)
     {
         List<string>? empty = null;
-        foreach (var (key, list) in _perUser)
+        foreach (var (key, bucket) in _perUser)
         {
-            Prune(list, cutoff);
-            if (list.Count == 0) (empty ??= new List<string>()).Add(key);
+            Prune(bucket.Failed, cutoff);
+            Prune(bucket.All, cutoff);
+            if (bucket.All.Count == 0) (empty ??= new List<string>()).Add(key);
         }
 
         if (empty != null)
