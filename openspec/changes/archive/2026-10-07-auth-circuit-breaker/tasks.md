@@ -17,9 +17,9 @@
 - [x] 3.1 `LetterboxdController`: `Reset` on `PUT Account` and `PUT Accounts` when credentials are persisted; `GET Accounts` gains `authPaused`/`authPausedSince`
 - [x] 3.2 Controller tests: re-save resets an open breaker; accounts payload carries paused fields
 - [x] 3.3 Paused badge in `configPage.html` + `userPage.html` account rows
-- [ ] 3.4 Manual verification on live Jellyfin: force-open a breaker (bad password), observe skip + activity entry, re-save credentials, observe recovery
+- [ ] 3.4 NOT DONE at archive (2026-10-07): no live run is on record. Manual verification on live Jellyfin: force-open a breaker (bad password), observe skip + activity entry, re-save credentials, observe recovery. Covered in tests by `AuthBreakerRunnerTests`, `AuthBreakerPlaybackTests` and `AuthBreakerControllerTests`; no follow-up issue filed yet
 
 ## 4. Release plumbing
 
 - [x] 4.1 Bump `AssemblyVersion`/`FileVersion` (minor) in `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`
-- [ ] 4.2 PR with `feat:` title, `## Release notes` paragraph, `site/src/data/release-notes.ts` entry; reference issue #103
+- [x] 4.2 PR with `feat:` title, `## Release notes` paragraph, `site/src/data/release-notes.ts` entry; reference issue #103 (2026-07-31: #105 merged with a `feat:` title, a `## Release notes` section, "Closes #103" and the 2.3.0 `release-notes.ts` entry; shipped as v2.3.0)
