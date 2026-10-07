@@ -122,7 +122,7 @@ public class SyncCorrectnessTests : IDisposable
     private Task<bool> RunAsync(User user, CancellationToken ct = default)
         => _runner.TryRunForUserAsync(user.Id.ToString("N"), "scheduled", new Progress<double>(), ct);
 
-    // ----- COR-1: history is per Letterboxd account -----
+    // ----- History is per Letterboxd account -----
 
     [Fact]
     public async Task SecondAccount_StillGetsFilmTheFirstAccountAlreadyLogged()
@@ -179,7 +179,7 @@ public class SyncCorrectnessTests : IDisposable
         Assert.Null(SyncHistory.GetLastStatusForFilm(events, "u", 3, "lb-b"));
     }
 
-    // ----- COR-2: one viewing date, the server's local day -----
+    // ----- One viewing date: the server's local day -----
 
     [Fact]
     public void ToLocalViewingDate_UsesServerZoneNotUtcDay()
@@ -241,7 +241,7 @@ public class SyncCorrectnessTests : IDisposable
         await MarkedAny(service, 0);
     }
 
-    // ----- REL-1: a film already on the diary is settled -----
+    // ----- A film already on the diary is settled -----
 
     [Fact]
     public async Task FilmAlreadyOnDiary_IsNotCheckedAgainNextRun()
@@ -266,7 +266,7 @@ public class SyncCorrectnessTests : IDisposable
         await service.DidNotReceive().LookupFilmByTmdbIdAsync(Arg.Any<int>());
     }
 
-    // ----- REL-2: only deterministic failures lead to giving up -----
+    // ----- Giving up on a film needs failures that are not an outage -----
 
     [Fact]
     public async Task TransientFailuresOnEveryRun_NeverAbandonTheFilm()
@@ -399,7 +399,7 @@ public class SyncCorrectnessTests : IDisposable
         Assert.Equal(1, SyncHistory.GetFailureStreak(reset, "u", 1).Permanent);
     }
 
-    // ----- REL-6: an unanswered diary check never posts -----
+    // ----- An unanswered diary check never posts -----
 
     [Fact]
     public async Task FailedDiaryCheck_RecordsRetryableFailure_AndDoesNotPost()
@@ -466,7 +466,7 @@ public class SyncCorrectnessTests : IDisposable
         Assert.Equal("lb-user", row.Account);
     }
 
-    // ----- COR-6: real-time backstop and per-film lock -----
+    // ----- Real-time backstop and per-film lock -----
 
     [Fact]
     public async Task RealTime_LocalHistoryBackstop_SuppressesSecondSameDayEntry()
@@ -523,7 +523,7 @@ public class SyncCorrectnessTests : IDisposable
         Assert.Equal(0, FilmSyncLock.ActiveCount);
     }
 
-    // ----- REL-17: cancellation records nothing -----
+    // ----- Cancellation records nothing -----
 
     [Fact]
     public async Task CancelledRun_RecordsNoFailure()
@@ -546,7 +546,7 @@ public class SyncCorrectnessTests : IDisposable
         Assert.DoesNotContain(SyncHistory.GetRecent(10, "lachlan"), e => e.Status == SyncStatus.Failed);
     }
 
-    // ----- COR-9: scheduled sync marks rewatches -----
+    // ----- Scheduled sync marks rewatches -----
 
     [Fact]
     public async Task ScheduledSync_MarksRewatchFromDiaryLastDate()

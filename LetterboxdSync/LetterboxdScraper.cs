@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,9 @@ public class LetterboxdScraper
 {
     private readonly LetterboxdHttpClient _http;
     private readonly ILogger _logger;
+
+    private static readonly Regex TitleRegex =
+        new(@"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
 
     public LetterboxdScraper(LetterboxdHttpClient http, ILogger logger)
     {
@@ -172,18 +176,11 @@ public class LetterboxdScraper
     private static InvalidOperationException WatchlistIncomplete(string username, int count, string reason)
         => new($"Could not read the whole Letterboxd watchlist for {username}: after {count} films Letterboxd returned {reason}. Nothing was changed this run.");
 
-    // Matches the challenge page's <title> or the managed-challenge script path, never body text
-    // (a review or a film title reading "just a moment" must not stop a sync) and never the
-    // /cdn-cgi/challenge-platform/scripts/jsd/ snippet Cloudflare also adds to ordinary pages.
-    private static readonly System.Text.RegularExpressions.Regex TitleRegex =
-        new(@"<title[^>]*>(.*?)</title>", System.Text.RegularExpressions.RegexOptions.IgnoreCase
-            | System.Text.RegularExpressions.RegexOptions.Singleline
-            | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-
+    // Matches only the challenge page's <title>, never body text (a review or a film title
+    // reading "just a moment" must not stop a sync) and never Cloudflare's script snippets, which
+    // it also injects into ordinary pages.
     internal static bool IsCloudflareChallenge(string html)
     {
-        if (html.Contains("/cdn-cgi/challenge-platform/h/", StringComparison.OrdinalIgnoreCase))
-            return true;
         var title = TitleRegex.Match(html);
         if (!title.Success) return false;
         var text = title.Groups[1].Value;
