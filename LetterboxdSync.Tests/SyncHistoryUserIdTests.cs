@@ -46,16 +46,16 @@ public class SyncHistoryUserIdTests : IDisposable
 
     private static SyncEvent Event(string username, int tmdbId = 1, string? userId = null,
         SyncStatus status = SyncStatus.Success, DateTime? viewingDate = null) => new()
-    {
-        FilmTitle = $"Film {tmdbId}",
-        TmdbId = tmdbId,
-        Username = username,
-        UserId = userId,
-        Timestamp = DateTime.UtcNow,
-        ViewingDate = viewingDate,
-        Status = status,
-        Source = "test",
-    };
+        {
+            FilmTitle = $"Film {tmdbId}",
+            TmdbId = tmdbId,
+            Username = username,
+            UserId = userId,
+            Timestamp = DateTime.UtcNow,
+            ViewingDate = viewingDate,
+            Status = status,
+            Source = "test",
+        };
 
     [Fact]
     public void Record_StampsTheUserIdOfTheCurrentUsername()
@@ -164,10 +164,32 @@ public class SyncHistoryUserIdTests : IDisposable
         var userManager = Substitute.For<IUserManager>();
         userManager.GetUserByName("alice").Returns(user);
         var service = new UserIdentityService(userManager, NullLogger<UserIdentityService>.Instance);
+        UserIdentityService.ResetForTesting();
 
         await service.StartAsync(CancellationToken.None);
+        await service.Stamping!;
 
         Assert.Equal(user.Id.ToString("N"), SyncHistory.ResolveUserId("alice"));
         Assert.Null(SyncHistory.ResolveUserId("nobody"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UserIdentityService_StampsInTheBackground_AndOnlyOnce()
+    {
+        File.WriteAllLines(SyncHistory.DataPathOverride!, new[] { JsonSerializer.Serialize(Event("alice")) });
+        var user = new User("alice", "test-provider-id", "test-reset-id");
+        var userManager = Substitute.For<IUserManager>();
+        userManager.GetUserByName("alice").Returns(user);
+        UserIdentityService.ResetForTesting();
+        var first = new UserIdentityService(userManager, NullLogger<UserIdentityService>.Instance);
+        var second = new UserIdentityService(userManager, NullLogger<UserIdentityService>.Instance);
+
+        await first.StartAsync(CancellationToken.None);
+        await second.StartAsync(CancellationToken.None);
+        await first.Stamping!;
+
+        Assert.Null(second.Stamping);
+        var stored = JsonSerializer.Deserialize<SyncEvent>(File.ReadAllLines(SyncHistory.DataPathOverride!).Single());
+        Assert.Equal(user.Id.ToString("N"), stored!.UserId);
     }
 }
