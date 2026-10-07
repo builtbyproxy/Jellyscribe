@@ -346,16 +346,20 @@
                                 if (!/width\s*=\s*device-width/i.test(vp.getAttribute('content') || '')) vp.setAttribute('content', 'width=device-width, initial-scale=1');
                             } catch (e) {}
                         },
-                        /* Follow Jellyfin's theme rather than the OS: the light palette when the nearest painted
-                           background behind this page (Jellyfin's theme colours its page) is light. Outside
-                           Jellyfin's web client nothing behind it is painted, so the OS setting decides there,
-                           and the browser's default body margin is dropped (that document is this page alone). */
+                        /* Follow Jellyfin's theme rather than the OS: the light palette when the background Jellyfin's
+                           theme paints is light. The theme paints its .backgroundContainer (10.11 keeps a fixed dark
+                           colour on the document itself until the app has loaded), else the nearest painted element
+                           behind this page (Jellyfin 12's dashboard paints the document). Outside Jellyfin's web
+                           client nothing is painted, so the OS setting decides there, and the browser's default body
+                           margin is dropped (that document is this page alone). */
                         applyTheme: function () {
-                            var light = null;
-                            for (var el = root.parentElement; el && light === null; el = el.parentElement) {
+                            var light = null, behind = [document.querySelector('.backgroundContainer')];
+                            for (var el = root.parentElement; el; el = el.parentElement) behind.push(el);
+                            behind.forEach(function (el) {
+                                if (!el || light !== null) return;
                                 var c = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/.exec(getComputedStyle(el).backgroundColor || '');
                                 if (c && (c[4] === undefined || parseFloat(c[4]) >= 0.5)) light = 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3] > 140;
-                            }
+                            });
                             if (light === null) {
                                 light = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
                                 if (root.parentElement === document.body) document.body.style.margin = '0';
@@ -370,8 +374,8 @@
                             if (!self.themed) {
                                 self.themed = true;
                                 self.applyTheme();
-                                // Again once Jellyfin's theme stylesheet has surely loaded, and on every return to the page.
-                                setTimeout(function () { if (root.isConnected) self.applyTheme(); }, 1000);
+                                // Again once Jellyfin's theme stylesheet has loaded (a cold start loads it late), and on every return to the page.
+                                [1000, 4000].forEach(function (ms) { setTimeout(function () { if (root.isConnected) self.applyTheme(); }, ms); });
                                 root.addEventListener('viewshow', function () { self.applyTheme(); });
                             }
                             if (!self.resolveAuth()) { setTimeout(function () { self.init(); }, 400); return; }
