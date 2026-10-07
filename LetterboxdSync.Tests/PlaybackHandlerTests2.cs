@@ -236,14 +236,21 @@ public class PlaybackHandlerEarlyExitTests : IDisposable
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
             throw new Exception("auth failed");
 
-        // Handler swallows the exception (catch wraps the per-user block); test
-        // asserts that no exception escapes and we don't crash the event handler.
+        // Handler swallows the exception (no throw escapes the event handler) and
+        // records the failure so the dashboard and the catch-up queue can see it.
         await _handler.HandlePlaybackStoppedAsync(new PlaybackStopEventArgs
         {
             Item = movie,
             PlayedToCompletion = true,
             Users = new List<User> { user }
         });
+
+        var recorded = SyncHistory.GetRecent(count: 10, username: "lachlan");
+        var failed = Assert.Single(recorded);
+        Assert.Equal(SyncStatus.Failed, failed.Status);
+        Assert.Equal(1233413, failed.TmdbId);
+        Assert.Equal("playback", failed.Source);
+        Assert.Contains("auth failed", failed.Error);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -46,6 +47,14 @@ public class ScheduledTaskTests : IDisposable
     public void Dispose()
     {
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
+    }
+
+    // Progress<T> posts to the sync context asynchronously; this records inline so
+    // the assertions see every report before ExecuteAsync returns.
+    private sealed class RecordingProgress : IProgress<double>
+    {
+        public List<double> Values { get; } = new();
+        public void Report(double value) => Values.Add(value);
     }
 
     private LetterboxdSyncRunner MakeSyncRunner(IUserManager um, ILibraryManager lm, IUserDataManager udm)
@@ -97,8 +106,12 @@ public class ScheduledTaskTests : IDisposable
         var udm = Substitute.For<IUserDataManager>();
         var task = new SyncTask(MakeSyncRunner(um, lm, udm));
 
-        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
-        // No exception = pass; runner exited cleanly with no users to process.
+        var progress = new RecordingProgress();
+        await task.ExecuteAsync(progress, CancellationToken.None);
+
+        // The task really ran the runner: it enumerated users and finished the run.
+        um.Received(1).GetUsers();
+        Assert.Equal(new[] { 100d }, progress.Values);
     }
 
     [Fact]
@@ -139,7 +152,11 @@ public class ScheduledTaskTests : IDisposable
         var pm = Substitute.For<IPlaylistManager>();
         var task = new WatchlistSyncTask(MakeWatchlistRunner(um, lm, pm));
 
-        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+        var progress = new RecordingProgress();
+        await task.ExecuteAsync(progress, CancellationToken.None);
+
+        um.Received(1).GetUsers();
+        Assert.Equal(new[] { 100d }, progress.Values);
     }
 
     [Fact]
@@ -180,8 +197,12 @@ public class ScheduledTaskTests : IDisposable
         var udm = Substitute.For<IUserDataManager>();
         var task = new SerializdSyncTask(MakeSerializdSyncRunner(um, lm, udm));
 
-        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
-        // No exception = pass; runner exited cleanly with no users to process.
+        var progress = new RecordingProgress();
+        await task.ExecuteAsync(progress, CancellationToken.None);
+
+        // The task really ran the runner: it enumerated users and finished the run.
+        um.Received(1).GetUsers();
+        Assert.Equal(new[] { 100d }, progress.Values);
     }
 
     // A DailyTrigger fires at a fixed time of day; an IntervalTrigger restarts its clock on
