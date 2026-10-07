@@ -91,6 +91,10 @@ internal sealed class ControllerTestHarness : IDisposable
         var playlistManager = Substitute.For<IPlaylistManager>();
         WatchlistRunner = new WatchlistSyncRunner(loggerFactory, LibraryManager, UserManager, playlistManager);
 
+        // The login-check limit is process-wide; start every test with a full budget.
+        LoginCheckLimiter.Letterboxd.ResetForTesting();
+        LoginCheckLimiter.Serializd.ResetForTesting();
+
         Controller = new LetterboxdController(
             NullLoggerFactory.Instance.CreateLogger<LetterboxdController>(),
             UserManager,

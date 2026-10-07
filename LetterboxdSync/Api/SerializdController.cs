@@ -292,15 +292,24 @@ public class SerializdController : JellyfinUserApiController
 
     /// <summary>
     /// Verifies a Serializd email/password by logging in. Returns the account username on
-    /// success (200) or a 400 with an error message on failure. Persists nothing.
+    /// success (200) or a 400 with an error message on failure. Persists nothing. Failed checks
+    /// are rate-limited per user and server-wide (<see cref="LoginCheckLimiter"/>), answering 429.
     /// </summary>
     [HttpPost("Verify")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult> Verify([FromBody] VerifyRequest request)
     {
         if (string.IsNullOrWhiteSpace(request?.Email) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { error = "Email and password are required." });
+
+        var limiterKey = GetCurrentUserId() ?? string.Empty;
+        if (!LoginCheckLimiter.Serializd.TryAcquire(limiterKey, out var stamp, out var retryAfter))
+        {
+            _logger.LogWarning("Serializd login check refused for {UserId}: rate limit reached", limiterKey);
+            return TooManyLoginChecks(retryAfter);
+        }
 
         try
         {
@@ -315,6 +324,7 @@ public class SerializdController : JellyfinUserApiController
                 username = await client.VerifyLoginAsync(request.Email, request.Password).ConfigureAwait(false);
             }
 
+            LoginCheckLimiter.Serializd.Refund(limiterKey, stamp);
             return Ok(new { ok = true, username });
         }
         catch (Exception ex)

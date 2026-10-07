@@ -60,6 +60,7 @@ public class SerializdControllerTests : IDisposable
             Substitute.For<IUserManager>(), Substitute.For<ICollectionManager>(), Substitute.For<IPlaylistManager>());
 
         _controller = new SerializdController(new NullLogger<SerializdController>(), runner, watchlistRunner, _userManager);
+        LoginCheckLimiter.Serializd.ResetForTesting();
     }
 
     public void Dispose()
@@ -119,6 +120,7 @@ public class SerializdControllerTests : IDisposable
     [Fact]
     public async Task Verify_GoodLogin_ReturnsOkWithUsername()
     {
+        Authenticate("aabbccddeeff00112233445566778899");
         SerializdController.VerifyOverrideForTesting = (_, _, _) => Task.FromResult<string?>("8bitproxy");
 
         var result = await _controller.Verify(
@@ -129,8 +131,34 @@ public class SerializdControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Verify_RepeatedFailures_AreRefusedWith429()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+        var attempts = 0;
+        SerializdController.VerifyOverrideForTesting = (_, _, _) =>
+        {
+            attempts++;
+            throw new Exception("Serializd login failed (401): Incorrect password.");
+        };
+
+        for (var i = 0; i < LoginCheckLimiter.PerUserLimit; i++)
+            Assert.IsType<BadRequestObjectResult>(await _controller.Verify(
+                new SerializdController.VerifyRequest { Email = "me@example.com", Password = "wrong" + i }));
+
+        var refused = await _controller.Verify(
+            new SerializdController.VerifyRequest { Email = "me@example.com", Password = "wrong-again" });
+
+        var obj = Assert.IsAssignableFrom<ObjectResult>(refused);
+        Assert.Equal(StatusCodes.Status429TooManyRequests, obj.StatusCode);
+        Assert.StartsWith("Too many login checks", Prop<string>(refused, "error"));
+        Assert.Equal(LoginCheckLimiter.PerUserLimit, attempts);
+    }
+
+    [Fact]
     public async Task Verify_BadLogin_ReturnsBadRequest()
     {
+        Authenticate("aabbccddeeff00112233445566778899");
         SerializdController.VerifyOverrideForTesting = (_, _, _) =>
             throw new Exception("Serializd login failed (401): Incorrect password.");
 

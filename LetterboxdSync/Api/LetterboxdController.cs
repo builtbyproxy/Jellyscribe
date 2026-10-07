@@ -280,11 +280,13 @@ public class LetterboxdController : JellyfinUserApiController
     /// <summary>
     /// Checks Letterboxd credentials the way sync will use them: the official API first, then the
     /// website login (with the optional raw cookies and user agent). Reports which one worked, or
-    /// both reasons. Saves nothing and does not touch the auth breaker.
+    /// both reasons. Saves nothing and does not touch the auth breaker. Failed checks are
+    /// rate-limited per user and server-wide (<see cref="LoginCheckLimiter"/>), answering 429.
     /// </summary>
     [HttpPost("Verify")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult> VerifyLogin([FromBody] LetterboxdVerifyRequest request)
     {
         var username = request?.LetterboxdUsername?.Trim();
@@ -294,6 +296,13 @@ public class LetterboxdController : JellyfinUserApiController
         var emailError = EmailAsUsernameError(username);
         if (emailError != null)
             return BadRequest(new { error = emailError });
+
+        var limiterKey = GetCurrentUserId() ?? string.Empty;
+        if (!LoginCheckLimiter.Letterboxd.TryAcquire(limiterKey, out var stamp, out var retryAfter))
+        {
+            _logger.LogWarning("Letterboxd login check refused for {UserId}: rate limit reached", limiterKey);
+            return TooManyLoginChecks(retryAfter);
+        }
 
         string apiError;
         try
@@ -308,6 +317,7 @@ public class LetterboxdController : JellyfinUserApiController
                 await api.AuthenticateAsync(username, request.LetterboxdPassword).ConfigureAwait(false);
             }
 
+            LoginCheckLimiter.Letterboxd.Refund(limiterKey, stamp);
             return Ok(new { ok = true, via = "api" });
         }
         catch (Exception ex)
@@ -327,6 +337,7 @@ public class LetterboxdController : JellyfinUserApiController
                 await website.AuthenticateAsync(username, request.LetterboxdPassword, request.RawCookies).ConfigureAwait(false);
             }
 
+            LoginCheckLimiter.Letterboxd.Refund(limiterKey, stamp);
             return Ok(new { ok = true, via = "website", apiError });
         }
         catch (Exception ex)

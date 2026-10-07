@@ -901,6 +901,7 @@
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
                             d = d || {};
+                            if (!ok && d.retryAfterSeconds) return '<span class="ws-red">' + esc(d.error) + '</span>';
                             if (ok && d.via === 'api') return '<span class="ws-green">Login OK (official API).</span>';
                             if (ok) return '<span class="ws-green">Login OK via the website login.</span> <span class="ws-muted">The official API refused it: ' + esc(d.apiError) + '</span>';
                             var parts = [];
@@ -925,7 +926,10 @@
                             st.innerHTML = '<span class="ws-muted">Verifying…</span>';
                             ApiClient.ajax({ url: ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify'), type: 'POST', contentType: 'application/json', data: JSON.stringify({ email: email, password: pw }) })
                                 .then(function (r) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.escAttr(d.username) + ')' : '') + '.</span>'; }); },
-                                    function () { st.innerHTML = '<span class="ws-red">Login failed. Check email and password.</span>'; });
+                                    function (r) {
+                                        if (r && r.status === 429 && r.json) r.json().then(function (d) { st.innerHTML = '<span class="ws-red">' + self.escAttr(d.error) + '</span>'; }, function () { st.innerHTML = '<span class="ws-red">Too many login checks. Try again later.</span>'; });
+                                        else st.innerHTML = '<span class="ws-red">Login failed. Check email and password.</span>';
+                                    });
                         },
 
                         /* ===== Review ===== */

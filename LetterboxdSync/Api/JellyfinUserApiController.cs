@@ -1,5 +1,7 @@
+using System;
 using System.Linq;
 using MediaBrowser.Controller.Library;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LetterboxdSync.Api;
@@ -29,5 +31,21 @@ public abstract class JellyfinUserApiController : ControllerBase
         var userId = GetCurrentUserId();
         if (string.IsNullOrEmpty(userId)) return null;
         return _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId)?.Username;
+    }
+
+    /// <summary>
+    /// 429 for a login check refused by <see cref="LoginCheckLimiter"/>, with a Retry-After
+    /// header and an <c>error</c> the dashboards show as it is.
+    /// </summary>
+    protected ObjectResult TooManyLoginChecks(TimeSpan retryAfter)
+    {
+        var seconds = (int)Math.Ceiling(retryAfter.TotalSeconds);
+        if (HttpContext != null)
+            Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return StatusCode(StatusCodes.Status429TooManyRequests, new
+        {
+            error = LoginCheckLimiter.RefusalMessage(retryAfter),
+            retryAfterSeconds = seconds
+        });
     }
 }
