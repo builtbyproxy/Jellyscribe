@@ -281,7 +281,7 @@
                 <dialog class="ws-modal-ov" id="acctModal" aria-labelledby="acctModalTitle"><div class="ws-modal">
                     <button type="button" class="ws-modal-x" aria-label="Close">&times;</button>
                     <h3 id="acctModalTitle">Link a diary</h3>
-                    <div class="ws-row"><label class="ws-field" for="mSvc">Service</label><select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
+                    <div class="ws-row"><label class="ws-field" for="mSvc">Service</label><select class="ws-input" id="mSvc"><option value="serializd">Serializd: TV</option><option value="letterboxd">Letterboxd: Film</option></select></div>
                     <div class="ws-row"><label class="ws-field" id="mUserLabel" for="mUsername">Email or username</label><input type="text" class="ws-input" id="mUsername" autocomplete="off" /></div>
                     <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="new-password" /></div>
                     <!-- NOTE: these ids deliberately avoid the word "cookie". Privacy and
@@ -857,7 +857,7 @@
                                 .concat([['Sync ratings to Letterboxd', 'chkRatings', a.syncRatings !== false, 'Rate in Jellyfin after watching → your Letterboxd film rating.']])
                                 .concat([['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
-                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist. Everyone who can see those shows can see the collection.' : 'playlist.')],
+                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, this.watchDesc(svc)],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.autoRequestWatchlist, 'Missing from the library → request via Seerr.'],
                                 ['Backfill Seerr requests', 'chkBackfill', !!a.backfillAvailableRequests, 'Also attribute a Seerr request for already-available titles.'],
                                 ['Mirror watchlist to Seerr', 'chkMirror', !!a.mirrorJellyseerrWatchlist, 'Push this watchlist into your Seerr watchlist (primary account only).'],
@@ -867,7 +867,9 @@
                             return rows.map(function (r) { return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>'; }).join('') +
                                 '<div class="ws-row" id="dateDaysRow" style="display:' + (a.enableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field" for="chkDateDays">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.dateFilterDays || 7) + '" /></div>';
                         },
-                        onSvcChange: function () { var svc = byId('mSvc').value; byId('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; byId('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; byId('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; var ratingsBox = byId('chkRatings'); if (ratingsBox) ratingsBox.closest('label').style.display = svc === 'letterboxd' ? '' : 'none'; var uname = byId('mUsername').value.trim(); byId('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : '')); },
+                        // The one toggle whose wording depends on the service; onSvcChange keeps it in step.
+                        watchDesc: function (svc) { return 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist. Everyone who can see those shows can see the collection.' : 'playlist.'); },
+                        onSvcChange: function () { var svc = byId('mSvc').value; var watchBox = byId('chkWatch'), watchDesc = watchBox && watchBox.closest('label').querySelector('.desc'); if (watchDesc) watchDesc.textContent = this.watchDesc(svc); byId('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; byId('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; byId('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; var ratingsBox = byId('chkRatings'); if (ratingsBox) ratingsBox.closest('label').style.display = svc === 'letterboxd' ? '' : 'none'; var uname = byId('mUsername').value.trim(); byId('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : '')); },
                         fillSecret: function (id, saved, keepText, emptyText) {
                             var el = byId(id), clearRow = byId(id + 'ClearRow');
                             el.value = '';

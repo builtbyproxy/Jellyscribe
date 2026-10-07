@@ -385,7 +385,7 @@
                     <button type="button" class="ws-modal-x" aria-label="Close">&times;</button>
                     <h3 id="acctModalTitle">Link a diary</h3>
                     <div class="ws-row"><label class="ws-field" for="mSvc">Service</label>
-                        <select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
+                        <select class="ws-input" id="mSvc"><option value="serializd">Serializd: TV</option><option value="letterboxd">Letterboxd: Film</option></select></div>
                     <div class="ws-row"><label class="ws-field" for="mUser">Jellyfin user</label><select class="ws-input" id="mUser"></select></div>
                     <div class="ws-row"><label class="ws-field" id="mUserLabel" for="mUsername">Email or username</label><input type="text" class="ws-input" id="mUsername" autocomplete="off" /></div>
                     <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="new-password" /></div>
@@ -1140,7 +1140,7 @@
                             ].concat([['Sync ratings to Letterboxd', 'chkRatings', a.SyncRatings !== false, 'Rate in Jellyfin after watching → the Letterboxd film rating.']]).concat([
                                 ['Only sync recently played', 'chkDate', !!a.EnableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.IsPrimary, 'Wins on tie-breaks when a user has several.'],
-                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.SyncWatchlist : !!a.EnableWatchlistSync, svc === 'serializd' ? 'Watchlist → Jellyfin collection + playlist. The collection is visible to everyone who can see those shows.' : 'Watchlist → Jellyfin playlist.'],
+                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.SyncWatchlist : !!a.EnableWatchlistSync, this.watchDesc(svc)],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.AutoRequestWatchlist, 'Watchlisted but missing from the library → request via Seerr.'],
                                 ['Backfill Seerr requests', 'chkBackfill', !!a.BackfillAvailableRequests, 'Also attribute a Seerr request for already-available titles (requester trail).'],
                                 ['Mirror watchlist to Seerr', 'chkMirror', !!a.MirrorJellyseerrWatchlist, 'Push this watchlist into the Seerr user\'s own watchlist (primary account only).'],
@@ -1167,8 +1167,14 @@
                                 return '<label><input type="checkbox" class="mLibChk" data-id="' + self.escAttr(l.id) + '"' + (excluded.indexOf(l.id) >= 0 ? ' checked' : '') + ' /><span>' + self.escAttr(l.name) + '<span class="desc">' + ({ movies: 'Films', tvshows: 'TV', mixed: 'Mixed' }[l.collectionType] || 'Mixed') + '</span></span></label>';
                             }).join('');
                         },
+                        // The one toggle whose wording depends on the service; onSvcChange keeps it in step.
+                        watchDesc: function (svc) {
+                            return svc === 'serializd' ? 'Watchlist → Jellyfin collection + playlist. The collection is visible to everyone who can see those shows.' : 'Watchlist → Jellyfin playlist.';
+                        },
                         onSvcChange: function () {
                             var svc = document.getElementById('mSvc').value;
+                            var watchBox = document.getElementById('chkWatch'), watchDesc = watchBox && watchBox.closest('label').querySelector('.desc');
+                            if (watchDesc) watchDesc.textContent = this.watchDesc(svc);
                             document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username';
                             document.getElementById('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
                             document.getElementById('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
