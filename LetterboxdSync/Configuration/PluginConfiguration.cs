@@ -51,7 +51,8 @@ public class PluginConfiguration : BasePluginConfiguration
     /// that user's own permissions: a user without "Auto-Approve" gets a PENDING request, which
     /// Seerr never hands to Radarr/Sonarr until someone approves it (the symptom of issue #110).
     /// With this on, the plugin follows a PENDING request with POST /api/v1/request/{id}/approve
-    /// using the admin API key, and also approves that user's earlier pending watchlist requests.
+    /// using the admin API key; the Letterboxd watchlist sync also approves that user's earlier
+    /// pending requests for films on the watchlist (SeerrClient.ApprovePendingForUserAsync).
     /// </para>
     /// <para>
     /// Defaults to true: enabling per-account auto-request already expresses "go and fetch these".

@@ -277,6 +277,53 @@ public class SerializdWatchlistCollectionTests : IDisposable
     }
 
     [Fact]
+    public async Task AdminRenamesOntoANameInUse_GetsAUniqueName()
+    {
+        var curated = _collections.Add("Staff Picks", Guid.NewGuid());
+        AddSeries(1);
+        AddUser("alice", "alice@example.com", new[] { 1 });
+        await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+        var mine = CollectionNamed("Serializd Watchlist (alice)");
+
+        Plugin.Instance!.Configuration.SerializdAccounts[0].WatchlistName = "Staff Picks";
+        await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Equal("Staff Picks 2", mine.Name);
+        Assert.Equal("Staff Picks", curated.Name);
+    }
+
+    [Fact]
+    public async Task Upgrade_OldSharedCollectionAlreadyTrackedByAnotherAccount_IsNotAdopted()
+    {
+        var legacy = _collections.Add("Serializd Watchlist", Guid.NewGuid());
+        AddSeries(1);
+        var bob = AddUser("bob", "bob@example.com", Array.Empty<int>(), watchlistName: "Bob's Shows");
+        SerializdCollectionStore.Set(bob.Id.ToString("N"), "bob@example.com", legacy.Id, "Bob's Shows");
+        Plugin.Instance!.Configuration.SerializdAccounts[0].SyncWatchlist = false;
+        AddUser("alice", "alice@example.com", new[] { 1 });
+
+        await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Equal("Serializd Watchlist", legacy.Name);
+        Assert.Single(_collections.All, b => b.Name == "Serializd Watchlist (alice)");
+    }
+
+    [Fact]
+    public async Task UnreadableRecord_SkipsTheCollectionRatherThanGuessing()
+    {
+        _collections.Add("Serializd Watchlist", Guid.NewGuid());
+        AddSeries(1);
+        AddUser("alice", "alice@example.com", new[] { 1 });
+        File.WriteAllText(Path.Combine(_tempDir, "serializd-watchlist-collections.json"), "{ not json");
+
+        await _runner.RunForAllAsync(new Progress<double>(), CancellationToken.None);
+
+        Assert.Single(_collections.All);
+        await _collections.Manager.DidNotReceive().AddToCollectionAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<Guid>>());
+        await _collections.Manager.DidNotReceive().CreateCollectionAsync(Arg.Any<CollectionCreationOptions>());
+    }
+
+    [Fact]
     public void UniqueName_SkipsNamesInUse_CaseInsensitively()
     {
         var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "staff picks", "Staff Picks 2" };

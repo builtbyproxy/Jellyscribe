@@ -592,7 +592,7 @@
                                 .concat([['Sync ratings to Letterboxd', 'chkRatings', a.syncRatings !== false, 'Rate in Jellyfin after watching → your Letterboxd film rating.']])
                                 .concat([['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
                                 ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
-                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist.' : 'playlist.')],
+                                ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist. Everyone who can see those shows can see the collection.' : 'playlist.')],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.autoRequestWatchlist, 'Missing from the library → request via Seerr.'],
                                 ['Backfill Seerr requests', 'chkBackfill', !!a.backfillAvailableRequests, 'Also attribute a Seerr request for already-available titles.'],
                                 ['Mirror watchlist to Seerr', 'chkMirror', !!a.mirrorJellyseerrWatchlist, 'Push this watchlist into your Seerr watchlist (primary account only).'],

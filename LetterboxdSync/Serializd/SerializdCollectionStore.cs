@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -45,12 +47,17 @@ internal static class SerializdCollectionStore
 
             var configFile = Plugin.Instance?.ConfigurationFilePath;
             var dir = string.IsNullOrEmpty(configFile) ? null : Path.GetDirectoryName(configFile);
-            return string.IsNullOrEmpty(dir) ? FileName : Path.Combine(dir, FileName);
+            if (string.IsNullOrEmpty(dir))
+                throw new InvalidOperationException("The plugin configurations directory is not known yet");
+            return Path.Combine(dir, FileName);
         }
     }
 
+    // The email is hashed so this file does not become a second plaintext copy of who owns which
+    // Serializd account; the key only has to be stable, never read back.
     private static string Key(string userJellyfinId, string email)
-        => $"{userJellyfinId}|{email.Trim().ToLowerInvariant()}";
+        => userJellyfinId + "|" + Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(email.Trim().ToLowerInvariant())));
 
     // Read on every call: the file is tiny and touched once per account per sync, and a cache
     // would need invalidating whenever Plugin.Instance (and so the path) changes. An unreadable

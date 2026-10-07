@@ -544,7 +544,11 @@ public class SerializdWatchlistSyncRunner
         }
 
         if (collection != null && tracked != null && !string.Equals(tracked.Name, configuredName, StringComparison.Ordinal))
-            await RenameCollectionAsync(user, account, collection, configuredName).ConfigureAwait(false);
+        {
+            var others = AllCollections().Where(b => b.Id != collection.Id).Select(b => b.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            await RenameCollectionAsync(user, account, collection, UniqueName(configuredName, others), configuredName).ConfigureAwait(false);
+        }
 
         var createName = configuredName;
         if (collection == null)
@@ -605,14 +609,14 @@ public class SerializdWatchlistSyncRunner
     }
 
     /// <summary>Applies an admin's changed collection name; a rename made in Jellyfin itself is otherwise left alone.</summary>
-    private async Task RenameCollectionAsync(User user, SerializdAccount account, BoxSet collection, string name)
+    private async Task RenameCollectionAsync(User user, SerializdAccount account, BoxSet collection, string name, string configuredName)
     {
         try
         {
             collection.Name = name;
             await _libraryManager.UpdateItemAsync(collection, collection.GetParent(), ItemUpdateType.MetadataEdit, CancellationToken.None)
                 .ConfigureAwait(false);
-            SaveTracked(user, account, collection.Id, name);
+            SaveTracked(user, account, collection.Id, configuredName);
         }
         catch (Exception ex)
         {
