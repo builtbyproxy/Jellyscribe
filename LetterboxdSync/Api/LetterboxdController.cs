@@ -594,7 +594,12 @@ public class LetterboxdController : JellyfinUserApiController
         }
     }
 
+    /// <summary>
+    /// Checks the Seerr URL and API key from the admin settings form. Admin-only: it makes the
+    /// server GET any URL and echoes the error back.
+    /// </summary>
     [HttpPost("TestJellyseerr")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult> TestJellyseerr([FromBody] JellyseerrTestRequest request)

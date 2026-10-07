@@ -10,6 +10,7 @@ using LetterboxdSync.Configuration;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Model.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NSubstitute;
 using Xunit;
@@ -784,6 +785,15 @@ public class LetterboxdControllerTests
     }
 
     // ----- TestJellyseerr -----
+
+    [Fact]
+    public void TestJellyseerr_RequiresElevation()
+    {
+        var method = typeof(LetterboxdController).GetMethod(nameof(LetterboxdController.TestJellyseerr));
+        var attr = method!.GetCustomAttribute<AuthorizeAttribute>();
+
+        Assert.Equal("RequiresElevation", attr?.Policy);
+    }
 
     [Fact]
     public async Task TestJellyseerr_NotConfigured_ReturnsBadRequest()
