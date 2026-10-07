@@ -871,7 +871,10 @@
                             self.pollProgress();
                         },
                         pollProgress: function () {
-                            var self = this, w = self.watcher; w.ticks++;
+                            var self = this, w = self.watcher;
+                            // Jellyfin drops this page from its cache when it is no longer needed; stop polling then.
+                            if (!root.isConnected) { clearInterval(w.timer); w.timer = null; return; }
+                            w.ticks++;
                             self.getProgress().then(function (p) {
                                 if (!w.timer) return; // finished while this poll was in flight
                                 // A failed poll counts too: after several in a row, stop and say so rather than spin forever.
@@ -902,7 +905,7 @@
                             document.getElementById('jwTitle').textContent = completed ? 'Done' : (unknown ? 'Progress unavailable' : 'Nothing to sync');
                             document.getElementById('jwPhase').textContent = completed ? 'Sync complete' : (unknown ? 'Couldn\'t read the sync\'s progress. It may still be running: check Recent activity in a minute.' : 'Everything was already up to date');
                             self.setSyncBusy(false);
-                            setTimeout(function () { document.getElementById('jobWatcher').style.display = 'none'; self.loadOverview(); }, completed ? 2600 : (unknown ? 8000 : 1600));
+                            setTimeout(function () { if (!root.isConnected) return; document.getElementById('jobWatcher').style.display = 'none'; self.loadOverview(); }, completed ? 2600 : (unknown ? 8000 : 1600));
                         },
 
                         /* ===== Accounts ===== */
