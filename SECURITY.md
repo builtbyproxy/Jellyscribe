@@ -13,7 +13,7 @@ Every merge to `main` ships a release, so only the **latest release** receives s
 
 Please **do not open a public issue** for security problems.
 
-Report privately via [GitHub's private vulnerability reporting](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/security/advisories/new) (Security tab → "Report a vulnerability").
+Report privately via [GitHub's private vulnerability reporting](https://github.com/builtbyproxy/Jellyscribe/security/advisories/new) (Security tab → "Report a vulnerability").
 
 You can expect an acknowledgement within a few days. Because the release pipeline ships on every merge, confirmed fixes typically go out quickly.
 

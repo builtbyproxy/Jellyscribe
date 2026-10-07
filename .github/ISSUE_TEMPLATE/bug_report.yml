@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for taking the time to file a report. The more of the fields below you fill in, the faster this can be diagnosed. Most sync issues come down to your version, which sync path you're on, and what the logs say.
 
-        Before submitting, please skim the [Cloudflare troubleshooting](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd#cloudflare-issues) section. A large share of "films won't sync" reports turn out to be an expired or mismatched `cf_clearance` cookie.
+        Before submitting, please skim the [Cloudflare troubleshooting](https://github.com/builtbyproxy/Jellyscribe#cloudflare-issues) section. A large share of "films won't sync" reports turn out to be an expired or mismatched `cf_clearance` cookie.
 
   - type: checkboxes
     id: preflight

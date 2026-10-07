@@ -25,7 +25,7 @@ type ManifestEntry = {
 
 const manifestEntries = manifest[0].versions as ManifestEntry[];
 
-const repoUrl = 'https://github.com/builtbyproxy/jellyfin-plugin-letterboxd';
+const repoUrl = 'https://github.com/builtbyproxy/Jellyscribe';
 
 function semverKey(v: string): number {
   const [maj, min, patch] = v.split('.').map((n) => parseInt(n, 10) || 0);

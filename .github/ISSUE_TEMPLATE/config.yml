@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Cloudflare or "films won't sync" troubleshooting
-    url: https://github.com/builtbyproxy/jellyfin-plugin-letterboxd#cloudflare-issues
+    url: https://github.com/builtbyproxy/Jellyscribe#cloudflare-issues
     about: Most sync and lookup failures are an expired or mismatched cf_clearance cookie. Try this first.
   - name: How telemetry and log bundles work
-    url: https://github.com/builtbyproxy/jellyfin-plugin-letterboxd#telemetry
+    url: https://github.com/builtbyproxy/Jellyscribe#telemetry
     about: What anonymous telemetry collects, and how the "Send logs to developer" bundle works.
