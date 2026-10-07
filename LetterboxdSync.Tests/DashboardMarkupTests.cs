@@ -172,7 +172,14 @@ public class DashboardMarkupTests
         Assert.Contains("all = this.visibleEvents().filter(", page, StringComparison.Ordinal);
         Assert.Contains("if (self.seen[k]) return false;", page, StringComparison.Ordinal);
 
-        // The group header of a binge is a button that says whether it is open.
+        // The group header of a binge is a button that says whether it is open, and every value it
+        // shows (show name, first and last episode) goes through the page's escaper.
+        var at = page.IndexOf("groupHtml: function", StringComparison.Ordinal);
+        Assert.True(at >= 0, "no groupHtml");
+        var groupHtml = page.Substring(at, page.IndexOf("\n                        },", at, StringComparison.Ordinal) - at);
+        Assert.Matches(@"self\.esc(Attr)?\(u\.show\)", groupHtml);
+        Assert.Matches(@"self\.esc(Attr)?\(episodeOf\(oldest\)\).*self\.esc(Attr)?\(episodeOf\(newest\)\)", groupHtml);
+        Assert.DoesNotMatch(@"[^(]u\.show\b(?!\))", groupHtml.Replace("show: ", ""));
         Assert.Contains("class=\"ws-grp-btn ws-tc\" data-grp=\"' + id + '\" aria-expanded=\"false\"", page, StringComparison.Ordinal);
     }
 

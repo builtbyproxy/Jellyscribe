@@ -547,7 +547,7 @@
                         },
                         // Offset paging: an event logged between two loads shifts the older ones down, so the
                         // next page starts with rows already shown. Keep one copy of each.
-                        eventKey: function (e) { return [e._svc, e.Timestamp, e.FilmTitle, e.Status, e.Source, e.Account || '', e.TmdbId].join('|'); },
+                        eventKey: function (e) { return [e._svc, e.Timestamp, e.UserId || e.Username || '', e.Account || '', e.FilmTitle, e.Status, e.Source, e.TmdbId].join('|'); },
                         addEvents: function (events) {
                             var self = this, fresh = events.filter(function (e) {
                                 var k = self.eventKey(e);
