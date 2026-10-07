@@ -877,41 +877,49 @@ public class LetterboxdController : JellyfinUserApiController
     /// rating writeback and the ItemRating read path so the two cannot drift.
     /// </summary>
     private BaseItem? FindMovieByTmdbId(User user, int tmdbId)
-    {
-        return _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.Movie },
-            IsVirtualItem = false,
-            Recursive = true
-        }).FirstOrDefault(m => m.GetProviderId(MediaBrowser.Model.Entities.MetadataProvider.Tmdb) == tmdbId.ToString());
-    }
+        => FindByTmdbId(user, BaseItemKind.Movie, tmdbId).FirstOrDefault();
 
     private BaseItem? FindSeriesByTmdbId(User user, int tmdbId)
-    {
-        return _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { BaseItemKind.Series },
-            IsVirtualItem = false,
-            Recursive = true
-        }).FirstOrDefault(s => s.GetProviderId(MediaBrowser.Model.Entities.MetadataProvider.Tmdb) == tmdbId.ToString());
-    }
+        => FindByTmdbId(user, BaseItemKind.Series, tmdbId).FirstOrDefault();
 
     /// <summary>
     /// Resolve an episode by series TMDb id + season/episode number. The series
-    /// TMDb id lives on the parent Series entity; SeriesTmdbIdReader is the one
-    /// place that knows that, shared with Serializd sync.
+    /// TMDb id lives on the parent Series entity, so the series is resolved first
+    /// and its episodes are then queried by number.
     /// </summary>
     private BaseItem? FindEpisodeByTmdbId(User user, int seriesTmdbId, int seasonNumber, int episodeNumber)
     {
+        var seriesIds = FindByTmdbId(user, BaseItemKind.Series, seriesTmdbId).Select(s => s.Id).ToArray();
+        if (seriesIds.Length == 0)
+            return null;
+
         return _libraryManager.GetItemList(new InternalItemsQuery(user)
         {
             IncludeItemTypes = new[] { BaseItemKind.Episode },
             IsVirtualItem = false,
-            Recursive = true
+            Recursive = true,
+            AncestorIds = seriesIds,
+            ParentIndexNumber = seasonNumber,
+            IndexNumber = episodeNumber
         }).OfType<MediaBrowser.Controller.Entities.TV.Episode>()
-          .FirstOrDefault(ep => Serializd.SerializdSyncRunner.SeriesTmdbIdReader(ep) == seriesTmdbId
-              && ep.ParentIndexNumber == seasonNumber
-              && ep.IndexNumber == episodeNumber);
+          .FirstOrDefault(ep => ep.ParentIndexNumber == seasonNumber && ep.IndexNumber == episodeNumber);
+    }
+
+    /// <summary>
+    /// Library items of one kind carrying the given TMDb id, filtered in the database
+    /// instead of loading the whole library. The id is re-checked in memory, so a query
+    /// that ever came back looser could not resolve (and write a rating to) the wrong item.
+    /// </summary>
+    private IEnumerable<BaseItem> FindByTmdbId(User user, BaseItemKind kind, int tmdbId)
+    {
+        var id = tmdbId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return _libraryManager.GetItemList(new InternalItemsQuery(user)
+        {
+            IncludeItemTypes = new[] { kind },
+            IsVirtualItem = false,
+            Recursive = true,
+            HasAnyProviderId = new Dictionary<string, string> { [MediaBrowser.Model.Entities.MetadataProvider.Tmdb.ToString()] = id }
+        }).Where(item => item.GetProviderId(MediaBrowser.Model.Entities.MetadataProvider.Tmdb) == id);
     }
 
     /// <summary>

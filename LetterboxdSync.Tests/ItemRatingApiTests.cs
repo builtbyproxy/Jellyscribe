@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
+using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
-using LetterboxdSync.Serializd;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
@@ -18,16 +18,8 @@ namespace LetterboxdSync.Tests;
 /// the modal never breaks on the lookup; only a missing user identity is an error.
 /// </summary>
 [Collection("Plugin")]
-public class ItemRatingApiTests : System.IDisposable
+public class ItemRatingApiTests
 {
-
-    public void Dispose()
-    {
-        // The episode tests override the shared series-TMDb reader; restore the
-        // production default so an override can't leak into other test classes.
-        SerializdSyncRunner.SeriesTmdbIdReader = SerializdSyncRunner.ReadSeriesTmdbId;
-    }
-
     private static (double? Rating, double? Stars) ReadPayload(ActionResult result)
     {
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -56,7 +48,7 @@ public class ItemRatingApiTests : System.IDisposable
         var (h, user) = MakeHarness();
         using var _ = h;
         var movie = MakeMovie(603);
-        AddItem(h, movie);
+        SetLibrary(h, movie);
         h.UserDataManager.GetUserData(user, movie).Returns(new UserItemData { Key = "k", Rating = 7 });
 
         var (rating, stars) = ReadPayload(h.Controller.GetItemRating(tmdbId: 603));
@@ -71,7 +63,7 @@ public class ItemRatingApiTests : System.IDisposable
         var (h, user) = MakeHarness();
         using var _ = h;
         var movie = MakeMovie(603);
-        AddItem(h, movie);
+        SetLibrary(h, movie);
         h.UserDataManager.GetUserData(user, movie).Returns(new UserItemData { Key = "k" });
 
         var (rating, stars) = ReadPayload(h.Controller.GetItemRating(tmdbId: 603));
@@ -100,7 +92,7 @@ public class ItemRatingApiTests : System.IDisposable
     {
         var (h, _) = MakeHarness();
         using var __ = h;
-        AddItem(h, MakeMovie(603));
+        SetLibrary(h, MakeMovie(603));
 
         var (rating, stars) = ReadPayload(h.Controller.GetItemRating(tmdbId: 550));
 
@@ -114,8 +106,7 @@ public class ItemRatingApiTests : System.IDisposable
         var (h, user) = MakeHarness();
         using var _ = h;
         var episode = new Episode { Name = "Ozymandias", ParentIndexNumber = 5, IndexNumber = 14, Id = System.Guid.NewGuid() };
-        AddItem(h, episode);
-        SerializdSyncRunner.SeriesTmdbIdReader = _ => 1396;
+        SetLibrary(h, MakeSeries(1396), episode);
         h.UserDataManager.GetUserData(user, episode).Returns(new UserItemData { Key = "k", Rating = 8 });
 
         var (rating, stars) = ReadPayload(
@@ -131,7 +122,7 @@ public class ItemRatingApiTests : System.IDisposable
         var (h, user) = MakeHarness();
         using var _ = h;
         var series = MakeSeries(1396);
-        AddItem(h, series);
+        SetLibrary(h, series);
         h.UserDataManager.GetUserData(user, series).Returns(new UserItemData { Key = "k", Rating = 9 });
 
         var (rating, stars) = ReadPayload(h.Controller.GetItemRating(tmdbId: 1396, isShow: true));
@@ -147,9 +138,7 @@ public class ItemRatingApiTests : System.IDisposable
         using var _ = h;
         var series = MakeSeries(1396);
         var episode = new Episode { Name = "Pilot", ParentIndexNumber = 1, IndexNumber = 1, Id = System.Guid.NewGuid() };
-        AddItem(h, series);
-        AddItem(h, episode);
-        SerializdSyncRunner.SeriesTmdbIdReader = _ => 1396;
+        SetLibrary(h, series, episode);
         h.UserDataManager.GetUserData(user, series).Returns(new UserItemData { Key = "k", Rating = 9 });
 
         var (rating, stars) = ReadPayload(
@@ -157,6 +146,56 @@ public class ItemRatingApiTests : System.IDisposable
 
         Assert.Null(rating);
         Assert.Null(stars);
+    }
+
+    [Fact]
+    public void MovieLookup_FiltersByTmdbIdInTheQuery_ForTheCallingUser()
+    {
+        var (h, user) = MakeHarness();
+        using var _ = h;
+        var queries = CaptureQueries(h);
+
+        h.Controller.GetItemRating(tmdbId: 603);
+
+        var query = Assert.Single(queries);
+        Assert.Same(user, query.User);
+        Assert.Equal(new[] { BaseItemKind.Movie }, query.IncludeItemTypes);
+        Assert.Equal("603", query.HasAnyProviderId?[MetadataProvider.Tmdb.ToString()]);
+    }
+
+    [Fact]
+    public void EpisodeLookup_ResolvesSeriesByTmdbId_ThenQueriesItsEpisodesByNumber()
+    {
+        var (h, user) = MakeHarness();
+        using var _ = h;
+        var series = MakeSeries(1396);
+        SetLibrary(h, series);
+        var queries = CaptureQueries(h);
+
+        h.Controller.GetItemRating(tmdbId: 1396, isShow: true, seasonNumber: 5, episodeNumber: 14);
+
+        Assert.Equal(2, queries.Count);
+        Assert.Equal(new[] { BaseItemKind.Series }, queries[0].IncludeItemTypes);
+        Assert.Equal("1396", queries[0].HasAnyProviderId?[MetadataProvider.Tmdb.ToString()]);
+        Assert.Same(user, queries[1].User);
+        Assert.Equal(new[] { BaseItemKind.Episode }, queries[1].IncludeItemTypes);
+        Assert.Equal(new[] { series.Id }, queries[1].AncestorIds);
+        Assert.Equal(5, queries[1].ParentIndexNumber);
+        Assert.Equal(14, queries[1].IndexNumber);
+    }
+
+    [Fact]
+    public void EpisodeLookup_SeriesNotInLibrary_SkipsTheEpisodeQuery()
+    {
+        var (h, _) = MakeHarness();
+        using var __ = h;
+        var queries = CaptureQueries(h);
+
+        var (rating, _) = ReadPayload(
+            h.Controller.GetItemRating(tmdbId: 1396, isShow: true, seasonNumber: 5, episodeNumber: 14));
+
+        Assert.Null(rating);
+        Assert.Equal(new[] { BaseItemKind.Series }, Assert.Single(queries).IncludeItemTypes);
     }
 
     [Fact]
@@ -183,17 +222,19 @@ public class ItemRatingApiTests : System.IDisposable
         return series;
     }
 
-    /// <summary>
-    /// Appends an arbitrary BaseItem to the harness's mocked library list.
-    /// (ControllerTestHarness.AddMovie substitutes Movie and stubs GetProviderId,
-    /// which NSubstitute can't intercept; real entities avoid that.)
-    /// </summary>
-    private static void AddItem(ControllerTestHarness h, BaseItem item)
+    private static List<InternalItemsQuery> CaptureQueries(ControllerTestHarness h)
     {
-        var existing = System.Linq.Enumerable.ToList(
-            System.Linq.Enumerable.Cast<BaseItem>(
-                h.LibraryManager.GetItemList(Arg.Any<InternalItemsQuery>())));
-        existing.Add(item);
-        h.LibraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(existing);
+        var queries = new List<InternalItemsQuery>();
+        h.LibraryManager.When(m => m.GetItemList(Arg.Any<InternalItemsQuery>()))
+            .Do(call => queries.Add(call.Arg<InternalItemsQuery>()));
+        return queries;
     }
+
+    /// <summary>
+    /// Sets the harness's mocked library list. (ControllerTestHarness.AddMovie substitutes
+    /// Movie and stubs GetProviderId, which NSubstitute can't intercept; real entities avoid
+    /// that.) All items go in one call: re-reading the stub to append keeps only the last item.
+    /// </summary>
+    private static void SetLibrary(ControllerTestHarness h, params BaseItem[] items)
+        => h.LibraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>(items));
 }
