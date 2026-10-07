@@ -184,6 +184,31 @@ public class RatingSyncHandlerTests : IDisposable
         Assert.Equal(1, _handler.PendingCount);
     }
 
+    [Fact]
+    public void ImportSave_WithTheSameValue_KeepsTheUsersQueuedPush()
+    {
+        AddAccount();
+        _handler.MarkBaselineReady();
+        Save(8);
+        Save(8, UserDataSaveReason.Import);
+        Assert.True(_handler.TryGetPending(_user.Id, _movie.Id, out var pending));
+        Assert.Equal(8, pending.Rating);
+    }
+
+    [Fact]
+    public void ImportSave_ThatClearsTheRating_ClearsTheBaseline()
+    {
+        AddAccount();
+        _handler.MarkBaselineReady();
+        Save(8, UserDataSaveReason.Import);
+        Save(null, UserDataSaveReason.Import);
+        Assert.Equal(0, _handler.PendingCount);
+
+        // With no baseline, rating the film again is a change.
+        Save(8);
+        Assert.Equal(1, _handler.PendingCount);
+    }
+
     [Theory]
     [InlineData(UserDataSaveReason.UpdateUserData)]
     [InlineData(UserDataSaveReason.UpdateUserRating)]

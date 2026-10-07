@@ -104,7 +104,9 @@ public class LetterboxdScraper
     {
         var tmdbIds = new List<int>();
         var page = 1;
-        const int maxPages = 50;
+        // Only a guard against a site that loops: a cap a real watchlist can reach would now stop
+        // the sync instead of quietly trimming the list, so it sits far above any real one.
+        const int maxPages = 400;
 
         while (true)
         {
@@ -162,9 +164,23 @@ public class LetterboxdScraper
     private static InvalidOperationException WatchlistIncomplete(string username, int count, string reason)
         => new($"Could not read the whole Letterboxd watchlist for {username}: after {count} films Letterboxd returned {reason}. Nothing was changed this run.");
 
-    private static bool IsCloudflareChallenge(string html)
-        => html.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)
-            || html.Contains("Attention Required", StringComparison.OrdinalIgnoreCase);
+    // Matches the challenge page's <title> or Cloudflare's challenge script path, never body
+    // text: a review or a film title reading "just a moment" must not stop a sync.
+    private static readonly System.Text.RegularExpressions.Regex TitleRegex =
+        new(@"<title[^>]*>(.*?)</title>", System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            | System.Text.RegularExpressions.RegexOptions.Singleline
+            | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+    internal static bool IsCloudflareChallenge(string html)
+    {
+        if (html.Contains("/cdn-cgi/challenge-platform/", StringComparison.OrdinalIgnoreCase))
+            return true;
+        var title = TitleRegex.Match(html);
+        if (!title.Success) return false;
+        var text = title.Groups[1].Value;
+        return text.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)
+            || text.Contains("Attention Required", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     /// Scrape all films a user has logged on Letterboxd and return their TMDb IDs.

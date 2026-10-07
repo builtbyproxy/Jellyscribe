@@ -439,11 +439,9 @@ public static class SyncHistory
     }
 
     /// <summary>
-    /// ViewingDate of the most recent Success or Rewatch entry for this user/film, or null
-    /// if there isn't one. Used as a local-history backstop against duplicates that can
-    /// otherwise be created when Letterboxd's own duplicate-check call fails (Cloudflare
-    /// 403 returns null lastDate, which the original IsDuplicate check then treats as
-    /// "not a duplicate").
+    /// ViewingDate of the most recent Success or Rewatch entry for this user/account/film, or
+    /// null if there isn't one. Used as a local-history backstop against duplicates when
+    /// Letterboxd's diary does not yet show an entry that was just written.
     /// </summary>
     public static DateTime? GetLastSuccessfulSyncDate(string username, int tmdbId, string? account = null)
     {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -47,8 +48,18 @@ public class ScrapingLetterboxdService : ILetterboxdService
     }
 
     public Task<DiaryInfo> GetDiaryInfoAsync(string filmIdOrSlug, string username)
-        => _scraper.GetDiaryInfoAsync(
-            _slugByFilmId.TryGetValue(filmIdOrSlug, out var slug) ? slug : filmIdOrSlug, username);
+    {
+        if (_slugByFilmId.TryGetValue(filmIdOrSlug, out var slug))
+            return _scraper.GetDiaryInfoAsync(slug, username);
+
+        // A numeric id this instance never returned has no slug to look up, and its diary URL
+        // would 404, which reads as "never logged". Refuse rather than risk a duplicate.
+        if (filmIdOrSlug.Length > 0 && filmIdOrSlug.All(char.IsAsciiDigit))
+            throw new DiaryCheckFailedException(
+                $"Could not check the Letterboxd diary: film id {filmIdOrSlug} was not looked up by this session");
+
+        return _scraper.GetDiaryInfoAsync(filmIdOrSlug, username);
+    }
 
     public Task MarkAsWatchedAsync(string filmSlug, string filmId, DateTime? date, bool liked,
         string? productionId = null, bool rewatch = false, double? rating = null)

@@ -96,6 +96,23 @@ public class WatchlistSyncRunnerTests : IDisposable
         });
     }
 
+    [Fact]
+    public async Task PartialWatchlistRead_LeavesThePlaylistUntouched()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { MakeMovie(1233413) });
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetWatchlistTmdbIdsAsync(Arg.Any<string>()).Returns(Task.FromException<List<int>>(
+            new InvalidOperationException("Could not read the whole Letterboxd watchlist for lb-user: after 28 films Letterboxd returned status 429 on page 2. Nothing was changed this run.")));
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        await _runner.TryRunForUserAsync(userId, "manual", new Progress<double>(), CancellationToken.None);
+
+        Assert.Empty(_playlistManager.ReceivedCalls());
+    }
+
     // ----- Pre-flight gates -----
 
     [Fact]

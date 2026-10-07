@@ -100,7 +100,7 @@ public class ScraperAsyncMethodsTests : IDisposable
         var handler = new MockHandler((request, _) =>
             new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent("<html><body>Just a moment...</body></html>")
+                Content = new StringContent("<html><head><title>Just a moment...</title></head><body></body></html>")
             });
 
         var (http, scraper) = handler.CreateClients(TestLogger);

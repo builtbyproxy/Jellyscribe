@@ -272,8 +272,14 @@ public class SerializdApiClient : ISerializdService
 
             var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+            var hasItems = doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array;
+            var declaredPages = TryGetInt(doc.RootElement, "totalPages", out var dp) ? dp : (int?)null;
+            if (!hasItems)
+            {
+                // A first page with no items list and no pages to follow is an empty watchlist.
+                if (page == 1 && (declaredPages ?? 0) == 0) break;
                 throw WatchlistIncomplete(entries.Count, $"a page {page} with no list of items");
+            }
 
             if (items.GetArrayLength() == 0)
             {
@@ -306,7 +312,8 @@ public class SerializdApiClient : ISerializdService
         return entries;
     }
 
-    private const int MaxWatchlistPages = 100;
+    // Only a guard against an API that loops; the read normally stops at totalPages.
+    private const int MaxWatchlistPages = 1000;
 
     // The watchlist sync reconciles the Jellyfin collection, playlist and Seerr watchlist to this
     // list, so a partial read must throw (leaving all of them as they were) rather than return a

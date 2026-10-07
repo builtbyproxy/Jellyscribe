@@ -316,8 +316,9 @@ public class SyncCorrectnessTests : IDisposable
         var b = MakeMovie(222, "B");
         Library(user, (a, DateTime.UtcNow.AddHours(-1)), (b, DateTime.UtcNow.AddHours(-1)));
         var service = Service();
-        service.LookupFilmByTmdbIdAsync(Arg.Any<int>())
-            .Returns(ci => Task.FromException<FilmResult>(new FilmNotFoundException(ci.Arg<int>(), "not found on Letterboxd")));
+        // Letterboxd is erroring; one film also came back "not found" during it.
+        service.LookupFilmByTmdbIdAsync(111).ThrowsAsync(new FilmNotFoundException(111, "not found on Letterboxd"));
+        service.LookupFilmByTmdbIdAsync(222).ThrowsAsync(new Exception("Response status code does not indicate success: 503"));
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
 
         await RunAsync(user);
@@ -328,6 +329,28 @@ public class SyncCorrectnessTests : IDisposable
         SyncHistory.ResetForTesting();
         Assert.Equal(0, SyncHistory.GetConsecutiveFailureCount("lachlan", 111, "lb-user"));
         Assert.Equal(2, SyncHistory.GetRecent(10, "lachlan").Count(e => e.Status == SyncStatus.Failed));
+    }
+
+    [Fact]
+    public async Task OnlyUnfindableFilmsLeft_AreAbandonedAfterTheThreshold()
+    {
+        // The steady state once everything findable has synced: every run tries only films
+        // Letterboxd does not have. That is not an outage, so they must still be given up on.
+        var user = MakeUser();
+        AddAccount(user, "lb-user");
+        var a = MakeMovie(111, "A");
+        var b = MakeMovie(222, "B");
+        Library(user, (a, DateTime.UtcNow.AddHours(-1)), (b, DateTime.UtcNow.AddHours(-1)));
+        var service = Service();
+        service.LookupFilmByTmdbIdAsync(Arg.Any<int>())
+            .Returns(ci => Task.FromException<FilmResult>(new FilmNotFoundException(ci.Arg<int>(), "not found on Letterboxd")));
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        for (var run = 0; run < LetterboxdSyncRunner.MaxConsecutiveSyncFailures + 1; run++)
+            await RunAsync(user);
+
+        await service.Received(LetterboxdSyncRunner.MaxConsecutiveSyncFailures).LookupFilmByTmdbIdAsync(111);
+        await service.Received(LetterboxdSyncRunner.MaxConsecutiveSyncFailures).LookupFilmByTmdbIdAsync(222);
     }
 
     // ----- REL-6: an unanswered diary check never posts -----
@@ -372,6 +395,29 @@ public class SyncCorrectnessTests : IDisposable
 
         await MarkedAny(service, 0);
         Assert.Equal(SyncStatus.Failed, Assert.Single(SyncHistory.GetRecent(10, "lachlan")).Status);
+    }
+
+    [Fact]
+    public async Task RealTime_NotFoundFilm_IsRecordedAsPermanent()
+    {
+        var user = MakeUser();
+        AddAccount(user, "lb-user");
+        var movie = MakeMovie();
+        var service = Service();
+        service.LookupFilmByTmdbIdAsync(Arg.Any<int>())
+            .ThrowsAsync(new FilmNotFoundException(FilmTmdb, "Film with TMDb ID 1233413 not found on Letterboxd"));
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        await _handler.HandlePlaybackStoppedAsync(new PlaybackStopEventArgs
+        {
+            Item = movie,
+            PlayedToCompletion = true,
+            Users = new List<User> { user }
+        });
+
+        var row = Assert.Single(SyncHistory.GetRecent(10, "lachlan"));
+        Assert.True(row.PermanentFailure);
+        Assert.Equal("lb-user", row.Account);
     }
 
     // ----- COR-6: real-time backstop and per-film lock -----

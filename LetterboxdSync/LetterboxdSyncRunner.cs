@@ -56,8 +56,11 @@ public class LetterboxdSyncRunner
     internal const int MaxConsecutiveSyncFailures = 3;
 
     /// <summary>
-    /// A run in which at least this many films were tried and every one failed is treated as an
-    /// account or service outage: none of its failures count toward abandonment.
+    /// A run in which at least this many films were tried, every one failed, and at least one
+    /// failure was transient (a block, an error status) is treated as an account or service
+    /// outage: none of its failures count toward abandonment. A run whose films all failed only
+    /// with "not found" is not an outage; it is the usual state once everything findable has
+    /// synced, and those films must still reach the abandonment threshold.
     /// </summary>
     internal const int OutageMinAttempts = 2;
 
@@ -517,10 +520,10 @@ public class LetterboxdSyncRunner
             }
         }
 
-        // Every film tried failed: Letterboxd (or this account) was having a bad run, which says
-        // nothing about the films themselves, so none of these failures may count toward
-        // abandoning a film.
-        if (attempted >= OutageMinAttempts && failed == attempted)
+        // Every film tried failed and Letterboxd was erroring: a bad run for the service or this
+        // account says nothing about the films, so none of these failures may count toward
+        // abandoning a film, including any "not found" answers given during it.
+        if (attempted >= OutageMinAttempts && failed == attempted && failures.Any(f => !f.PermanentFailure))
         {
             _logger.LogWarning("Every one of the {Count} films tried for {Username} as {LbUser} failed; treating the run as an outage, so none of them counts toward giving up on a film",
                 attempted, user.Username, lbAccount);

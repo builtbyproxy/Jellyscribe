@@ -202,14 +202,18 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
         // The plugin's own writes (diary import, the review modal) are never pushed, but they do
         // become the new baseline. Otherwise the next favorite toggle on the film would see the
         // imported rating as a change and push it to every linked account, overwriting a rating
-        // another account set on Letterboxd itself.
+        // another account set on Letterboxd itself. Any other writer that saves with Import (an
+        // importing plugin, say) is treated the same way. A rating still waiting to be pushed is
+        // dropped only when the import replaced it with a different value; an import that saves
+        // the same value leaves the user's own change queued.
         if (e.SaveReason == UserDataSaveReason.Import)
         {
             if (current is double imported)
                 _known[key] = imported;
             else
                 _known.TryRemove(key, out _);
-            _pending.TryRemove(key, out _);
+            if (_pending.TryGetValue(key, out var queued) && queued.Rating != current)
+                _pending.TryRemove(key, out _);
             return;
         }
         var known = _known.TryGetValue(key, out var stored);

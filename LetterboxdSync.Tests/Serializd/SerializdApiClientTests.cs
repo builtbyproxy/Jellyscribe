@@ -321,6 +321,24 @@ public class SerializdApiClientTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetWatchlistAsync());
     }
 
+    [Theory]
+    [InlineData("{\"totalPages\":0}")]
+    [InlineData("{}")]
+    public async Task GetWatchlist_EmptyFirstPageWithoutItems_ReturnsEmpty(string body)
+    {
+        var handler = new ApiMockHandler(req =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"8bitproxy\",\"token\":\"t\"}");
+            return Json(HttpStatusCode.OK, body);
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+
+        Assert.Empty(await client.GetWatchlistAsync());
+    }
+
     [Fact]
     public async Task GetWatchlist_EmptyWatchlist_ReturnsEmpty()
     {

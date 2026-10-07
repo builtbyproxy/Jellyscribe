@@ -297,6 +297,16 @@ public class ScraperTests
         await Assert.ThrowsAsync<DiaryCheckFailedException>(() => scraper.GetDiaryInfoAsync("test-film", "testuser"));
     }
 
+    [Theory]
+    [InlineData("<html><head><title>Just a moment...</title></head></html>", true)]
+    [InlineData("<html><head><title>Attention Required! | Cloudflare</title></head></html>", true)]
+    [InlineData("<html><script src=\"/cdn-cgi/challenge-platform/h/b/orchestrate\"></script></html>", true)]
+    [InlineData("<html><head><title>Diary</title></head><body><p>Just a moment of silence, attention required.</p></body></html>", false)]
+    public void IsCloudflareChallenge_LooksAtTheChallengeMarkersNotPageText(string html, bool expected)
+    {
+        Assert.Equal(expected, LetterboxdScraper.IsCloudflareChallenge(html));
+    }
+
     [Fact]
     public async Task ScrapingService_DiaryCheck_UsesTheSlugForTheFilmIdItReturned()
     {
@@ -329,6 +339,15 @@ public class ScraperTests
         // Callers pass back FilmId (the numeric id here); the diary page lives at the slug.
         Assert.Equal("945898", film.FilmId);
         Assert.Equal(new[] { "/testuser/film/dune-part-two/diary/" }, diaryPaths);
+    }
+
+    [Fact]
+    public async Task ScrapingService_DiaryCheck_RefusesANumericIdItNeverLookedUp()
+    {
+        var handler = new ScraperMockHandler((_, _) => new HttpResponseMessage(HttpStatusCode.NotFound));
+        using var service = new ScrapingLetterboxdService(TestLogger, handler);
+
+        await Assert.ThrowsAsync<DiaryCheckFailedException>(() => service.GetDiaryInfoAsync("945898", "testuser"));
     }
 
     internal class ScraperMockHandler : HttpMessageHandler
