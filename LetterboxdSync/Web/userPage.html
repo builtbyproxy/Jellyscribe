@@ -127,6 +127,7 @@
                 #letterboxdUserPage .ws-acct .u { font-family: var(--ws-mono); font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 #letterboxdUserPage .ws-acct .svc { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 #letterboxdUserPage .ws-acct .svc.film { color: var(--ws-film); } #letterboxdUserPage .ws-acct .svc.tv { color: var(--ws-tv); }
+                #letterboxdUserPage .ws-saved { margin-left: 6px; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ws-ok); background: rgba(53,194,129,.14); padding: 2px 6px; border-radius: 5px; }
                 #letterboxdUserPage .ws-prim { flex: none; margin-left: auto; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ws-warn); background: rgba(245,166,35,.14); padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
                 #letterboxdUserPage .ws-featchips { display: flex; flex-wrap: wrap; gap: 5px; }
                 #letterboxdUserPage .ws-feat { font-size: 11px; padding: 3px 8px; border-radius: 6px; background: var(--ws-surface-2); color: var(--ws-muted); border: 1px solid var(--ws-border); }
@@ -271,7 +272,7 @@
                     <h3 id="acctModalTitle">Link a diary</h3>
                     <div class="ws-row"><label class="ws-field">Service</label><select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
                     <div class="ws-row"><label class="ws-field" id="mUserLabel">Email or username</label><input type="text" class="ws-input" id="mUsername" /></div>
-                    <div class="ws-row"><label class="ws-field">Password</label><input type="password" class="ws-input" id="mPassword" /></div>
+                    <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="new-password" /></div>
                     <!-- NOTE: these ids deliberately avoid the word "cookie". Privacy and
                          anti-annoyance filter lists (Ghostery, uBlock annoyance lists, AdGuard,
                          Brave shields) carry generic cosmetic rules like [id*="cookie" i] to kill
@@ -281,7 +282,7 @@
                          2FA-blocked users at, and they have no way to tell it is their extension.
                          Reported in issue #112. Keep the visible label as "Raw cookies"; only the
                          attributes need to stay boring. -->
-                    <div class="ws-row" id="mAuthBlobRow" style="display:none;"><label class="ws-field">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span></label><input type="text" class="ws-input" id="mAuthBlob" placeholder="From a signed-in browser (incl. cf_clearance)" /></div>
+                    <div class="ws-row" id="mAuthBlobRow" style="display:none;"><label class="ws-field" for="mAuthBlob">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span><span class="ws-saved" id="mAuthBlobSaved" hidden>Saved</span></label><input type="text" class="ws-input" id="mAuthBlob" autocomplete="off" placeholder="From a signed-in browser (incl. cf_clearance)" /><label class="ws-muted" id="mAuthBlobClearRow" style="display:none;gap:7px;align-items:center;margin-top:6px;font-size:12.5px;"><input type="checkbox" id="mAuthBlobClear" /> Remove saved cookies</label></div>
                     <div class="ws-row" id="mUserAgentRow" style="display:none;"><label class="ws-field">User-Agent <span class="ws-muted" style="text-transform:none;">(optional)</span></label><input type="text" class="ws-input" id="mUserAgent" placeholder="Mozilla/5.0 …" /></div>
                     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;"><button type="button" class="ws-btn" id="mVerifyBtn">Verify login</button><span id="mVerifyStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
                     <div class="ws-checks" id="mChecks"></div>
@@ -579,7 +580,7 @@
                             var self = this, uname = svc === 'serializd' ? (a.email || '?') : (a.letterboxdUsername || '?');
                             var feats = svc === 'serializd'
                                 ? [['Favourites', a.syncFavorites], ['Watchlist', a.syncWatchlist], ['Seerr', a.autoRequestWatchlist], ['Import', a.enableDiaryImport]]
-                                : [['Favourites', a.syncFavorites], ['Watchlist', a.enableWatchlistSync], ['Seerr', a.autoRequestWatchlist], ['Cookies', !!a.rawCookies]];
+                                : [['Favourites', a.syncFavorites], ['Watchlist', a.enableWatchlistSync], ['Seerr', a.autoRequestWatchlist], ['Cookies', !!a.hasCookies]];
                             var chips = feats.map(function (f) { return self.feat(f[0], f[1]); }).join('');
                             return '<div class="ws-acct ' + (svc === 'serializd' ? 'tv' : 'film') + '"><div class="top"><span class="ws-badge ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'TV' : 'MV') + '</span><div style="min-width:0;"><div class="u" title="' + self.esc(uname) + '">' + self.esc(uname) + '</div><div class="svc ' + (svc === 'serializd' ? 'tv' : 'film') + '">' + (svc === 'serializd' ? 'Serializd · TV' : 'Letterboxd · Film') + '</div></div>' + (a.isPrimary ? '<span class="ws-prim">Primary</span>' : '') + '</div><div class="ws-featchips">' + chips + '</div><div class="foot"><span class="st">' + (a.authPaused ? '<span class="ws-red" title="Letterboxd login has been failing since ' + self.esc(a.authPausedSince ? String(a.authPausedSince).slice(0, 10) : '?') + '. Re-save this account\'s credentials to resume syncing.">Login failing · sync paused</span>' : (a.enabled !== false ? '<span class="ws-green">Enabled</span>' : '<span class="ws-muted">Paused</span>')) + '</span><button type="button" class="ws-linkbtn" onclick="WSU.openAccount({svc:\'' + svc + '\',i:' + i + '})">Edit ›</button></div></div>';
                         },
@@ -603,6 +604,12 @@
                                 '<div class="ws-row" id="dateDaysRow" style="display:' + (a.enableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.dateFilterDays || 7) + '" /></div>';
                         },
                         onSvcChange: function () { var svc = document.getElementById('mSvc').value; document.getElementById('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username'; document.getElementById('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; document.getElementById('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none'; var ratingsBox = document.getElementById('chkRatings'); if (ratingsBox) ratingsBox.closest('label').style.display = svc === 'letterboxd' ? '' : 'none'; var uname = document.getElementById('mUsername').value.trim(); document.getElementById('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : '')); },
+                        fillSecret: function (id, saved, keepText, emptyText) {
+                            var el = document.getElementById(id);
+                            el.value = '';
+                            el.placeholder = saved ? keepText : emptyText;
+                            document.getElementById(id + 'Saved').hidden = !saved;
+                        },
                         openAccount: function (ref) {
                             var self = this, svc = ref ? ref.svc : 'serializd', a = null;
                             if (ref) a = (svc === 'serializd' ? self.sz : self.lb)[ref.i];
@@ -610,8 +617,11 @@
                             document.getElementById('acctModalTitle').textContent = a ? 'Edit account' : 'Link a diary';
                             document.getElementById('mSvc').value = svc; document.getElementById('mSvc').disabled = !!a;
                             document.getElementById('mUsername').value = a ? (svc === 'serializd' ? a.email : a.letterboxdUsername) : '';
-                            document.getElementById('mPassword').value = a ? (svc === 'serializd' ? (a.password || '') : (a.letterboxdPassword || '')) : '';
-                            document.getElementById('mAuthBlob').value = (a && a.rawCookies) || '';
+                            // Saved secrets never come back from the server (only has* flags): blank keeps them, typing replaces them.
+                            self.fillSecret('mPassword', !!(a && a.hasPassword), 'Leave blank to keep the saved password', '');
+                            self.fillSecret('mAuthBlob', !!(a && a.hasCookies), 'Leave blank to keep the saved cookies', 'From a signed-in browser (incl. cf_clearance)');
+                            document.getElementById('mAuthBlobClear').checked = false;
+                            document.getElementById('mAuthBlobClearRow').style.display = a && a.hasCookies ? 'flex' : 'none';
                             document.getElementById('mUserAgent').value = (a && a.userAgent) || '';
                             document.getElementById('mWatchName').value = (a && (svc === 'serializd' ? a.watchlistName : a.playlistName)) || '';
                             document.getElementById('mWatchNameRow').style.display = self.canSetWatchlistName ? '' : 'none';
@@ -626,7 +636,7 @@
                         },
                         collectModal: function () {
                             var g = function (id) { return document.getElementById(id); };
-                            return { svc: g('mSvc').value, username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mAuthBlob').value,
+                            return { svc: g('mSvc').value, username: g('mUsername').value.trim(), password: g('mPassword').value, cookies: g('mAuthBlob').value, clearCookies: g('mAuthBlobClear').checked,
                                 userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
                                 enabled: g('chkEnabled').checked, fav: g('chkFav').checked, ratings: g('chkRatings') ? g('chkRatings').checked : true, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
                                 primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,
@@ -641,24 +651,27 @@
                             var orig = self.editing ? (m.svc === 'serializd' ? self.sz : self.lb)[self.editing.i] : null;
                             var excludedLibs = self.mergeExcluded((orig && orig.excludedLibraryIds) || [], m.libs);
                             if (m.svc === 'serializd') {
-                                var item = { email: m.username, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
+                                // original* names the login this edit started from, so its saved password follows a changed email.
+                                var item = { email: m.username, originalEmail: orig ? orig.email : null, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) self.sz[self.editing.i] = item; else self.sz.push(item);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function (r) { self.afterSave(r); });
                             } else {
-                                var itemL = { letterboxdUsername: m.username, letterboxdPassword: m.password, rawCookies: m.cookies || null, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
+                                var itemL = { letterboxdUsername: m.username, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null, letterboxdPassword: m.password, rawCookies: m.cookies || null, clearRawCookies: !m.cookies && m.clearCookies, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) self.lb[self.editing.i] = itemL; else self.lb.push(itemL);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function (r) { self.afterSave(r); });
                             }
                         },
                         afterSave: function (r) {
                             var self = this;
-                            if (r.ok) { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); document.getElementById('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>'; }
-                            else { r.json().then(function (d) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">' + self.esc(d.error || 'Save failed') + '</span>'; }); }
+                            // Reload either way: the list must match what the server stored, and must not keep a typed secret.
+                            self.loadAccounts();
+                            if (r.ok) { document.getElementById('acctModal').classList.remove('show'); document.getElementById('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>'; }
+                            else { r.json().then(function (d) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">' + self.esc(d.error || 'Save failed') + '</span>'; }, function () { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed</span>'; }); }
                         },
                         deleteAccount: function () {
                             var self = this; if (!self.editing) return;
-                            if (self.editing.svc === 'serializd') { self.sz.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); }); }
-                            else { self.lb.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.renderAccounts(); }); }
+                            if (self.editing.svc === 'serializd') { self.sz.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.loadAccounts(); }); }
+                            else { self.lb.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.loadAccounts(); }); }
                         },
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
@@ -674,18 +687,21 @@
                         },
                         verifyAccount: function () {
                             var self = this, svc = document.getElementById('mSvc').value, st = document.getElementById('mVerifyStatus');
+                            // A blank password checks the saved one: the server looks it up for the account being
+                            // edited (by the login it started from), so it never comes back to the browser.
+                            var orig = self.editing ? (self.editing.svc === 'serializd' ? self.sz : self.lb)[self.editing.i] : null;
                             if (svc === 'letterboxd') {
                                 var lbUser = document.getElementById('mUsername').value.trim(), lbPw = document.getElementById('mPassword').value;
-                                if (!lbUser || !lbPw) { st.innerHTML = '<span class="ws-red">Username and password required.</span>'; return; }
+                                if (!lbUser || (!lbPw && !(orig && orig.hasPassword))) { st.innerHTML = '<span class="ws-red">Username and password required.</span>'; return; }
                                 st.innerHTML = '<span class="ws-muted">Verifying… (can take a few seconds)</span>';
-                                self.post('Jellyfin.Plugin.LetterboxdSync/Verify', { letterboxdUsername: lbUser, letterboxdPassword: lbPw, rawCookies: document.getElementById('mAuthBlob').value || null, userAgent: document.getElementById('mUserAgent').value.trim() || null })
+                                self.post('Jellyfin.Plugin.LetterboxdSync/Verify', { letterboxdUsername: lbUser, letterboxdPassword: lbPw || null, rawCookies: document.getElementById('mAuthBlob').value || null, clearRawCookies: document.getElementById('mAuthBlobClear').checked, userAgent: document.getElementById('mUserAgent').value.trim() || null, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null })
                                     .then(function (r) { r.json().then(function (d) { st.innerHTML = self.verifyMessage(r.ok, d); }, function () { st.innerHTML = self.verifyMessage(r.ok, null); }); });
                                 return;
                             }
                             var email = document.getElementById('mUsername').value.trim(), pw = document.getElementById('mPassword').value;
-                            if (!email || !pw) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
+                            if (!email || (!pw && !(orig && orig.hasPassword))) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
                             st.innerHTML = '<span class="ws-muted">Verifying…</span>';
-                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.esc(d.username) + ')' : '') + '.</span>'; }); } else if (r.status === 429) { r.json().then(function (d) { st.innerHTML = '<span class="ws-red">' + self.esc(d.error) + '</span>'; }, function () { st.innerHTML = '<span class="ws-red">Too many login checks. Try again later.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
+                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw || null, originalEmail: orig ? orig.email : null }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.esc(d.username) + ')' : '') + '.</span>'; }); } else if (r.status === 429) { r.json().then(function (d) { st.innerHTML = '<span class="ws-red">' + self.esc(d.error) + '</span>'; }, function () { st.innerHTML = '<span class="ws-red">Too many login checks. Try again later.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
                         },
 
                         /* Paint the star widget to a 0.5-step value (null/0 clears). Single
