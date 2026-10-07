@@ -17,7 +17,13 @@
   "triggers": {
     "crons": ["13 3 * * *"]
   },
+  // Workers Logs stays OFF. Its invocation logs record request metadata for
+  // every call, which would put caller IPs from every public manifest poll and
+  // download into Cloudflare's log store, and the README promises IPs are only
+  // used transiently. The setting is Worker-wide (no per-route sampling), so it
+  // cannot be kept for POST routes alone. To debug, use `npx wrangler tail`
+  // (live, not persisted) rather than turning this back on.
   "observability": {
-    "enabled": true
+    "enabled": false
   }
 }

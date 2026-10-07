@@ -6,6 +6,8 @@
 //  - error_transition: per-instance daily cap, 204 on cap hit (plugin never retries)
 //  - global + per-IP requests-per-minute caps bound abuse from minted UUIDs
 
+import { bundleCapExceeded, parseDownloadPath, utcDayStart } from "./dl";
+
 export interface Env {
   DB: D1Database;
   INGEST_KEY: string;
@@ -90,6 +92,27 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
   if (typeof p.instance_id !== "string" || !UUID_RE.test(p.instance_id)) return bad(400, "invalid instance_id");
   if (!Array.isArray(p.log_lines)) return bad(400, "missing log_lines");
 
+  const logLines = JSON.stringify((p.log_lines as unknown[]).slice(0, 5000).map((l) => String(l).slice(0, 2000)));
+  const telemetry = p.telemetry != null ? JSON.stringify(p.telemetry) : null;
+  const note = typeof p.note === "string" ? p.note.slice(0, 2000) : null;
+  const collector = p.collector != null ? JSON.stringify(p.collector) : null;
+
+  // Durable daily cap (the per-minute limiter above is per-isolate memory only).
+  // Counted from what is already stored today, so it holds across isolates; two
+  // uploads racing the last slot can overshoot by one bundle, which is fine.
+  const enc = new TextEncoder();
+  const incomingBytes = [logLines, telemetry, note, collector]
+    .reduce((n, v) => n + (v ? enc.encode(v).length : 0), 0);
+  const usage = await env.DB.prepare(
+    `SELECT COUNT(*) AS n,
+            COALESCE(SUM(LENGTH(CAST(log_lines AS BLOB)) + COALESCE(LENGTH(CAST(telemetry AS BLOB)), 0)
+                       + COALESCE(LENGTH(CAST(note AS BLOB)), 0) + COALESCE(LENGTH(CAST(collector AS BLOB)), 0)), 0) AS bytes
+     FROM log_bundles WHERE received_at >= ?1`,
+  ).bind(utcDayStart(new Date())).first<{ n: number; bytes: number }>();
+  if (bundleCapExceeded(usage?.n ?? 0, usage?.bytes ?? 0, incomingBytes)) {
+    return bad(429, "daily bundle limit reached, try again tomorrow");
+  }
+
   // Find a free ref code (collision is astronomically unlikely; check anyway).
   // Re-check after each regenerate so we never fall through to a colliding INSERT.
   let code = "";
@@ -100,11 +123,6 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
     if (!hit) { allocated = true; break; }
   }
   if (!allocated) return bad(503, "could not allocate ref code, retry");
-
-  const logLines = JSON.stringify((p.log_lines as unknown[]).slice(0, 5000).map((l) => String(l).slice(0, 2000)));
-  const telemetry = p.telemetry != null ? JSON.stringify(p.telemetry) : null;
-  const note = typeof p.note === "string" ? p.note.slice(0, 2000) : null;
-  const collector = p.collector != null ? JSON.stringify(p.collector) : null;
 
   await env.DB.prepare(
     `INSERT INTO log_bundles (ref_code, received_at, instance_id, plugin_version, jellyfin_version, telemetry, note, collector, log_lines)
@@ -129,14 +147,13 @@ async function handleLogs(req: Request, env: Env): Promise<Response> {
 
 // ---- Install-count telemetry (GET paths; NOT opt-in, see schema.sql) --------
 // Where the GitHub manifest and release assets live. The download redirect is
-// rebuilt by prefixing GH_RELEASE_BASE onto the validated path, so it can only
-// ever point back into this one repo's releases (no open-redirect).
+// rebuilt from a tag and asset name that parseDownloadPath (./dl.ts) has matched
+// exactly, on the raw undecoded path, so it can only ever point at one release
+// asset of this repo (no open redirect).
 const RAW_MANIFEST_URL =
   "https://raw.githubusercontent.com/builtbyproxy/Jellyscribe/main/manifest.json";
 const GH_RELEASE_BASE =
   "https://github.com/builtbyproxy/Jellyscribe/releases/download/";
-// Release paths only ever contain tag/file segments like "v1.18.4/jellyfin-plugin-letterboxd-v1.18.4.zip".
-const SAFE_DL_PATH = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/;
 
 async function sha256hex(s: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -144,7 +161,9 @@ async function sha256hex(s: string): Promise<string> {
 }
 
 // Record one unique-install hit. instance identity = SHA-256(ip:week:salt), so
-// the raw IP never lands in storage and hashes can't be linked across weeks.
+// the raw IP never lands in storage and outsiders cannot link hashes across
+// weeks. The salt is fixed, though: whoever holds it could recompute hashes for
+// candidate IPs (IPv4 is small enough to enumerate) and so link a known IP's rows.
 async function recordInstallHit(env: Env, ip: string, kind: "manifest" | "download", version: string): Promise<void> {
   if (!env.HASH_SALT) return; // fail-open: counting is best-effort, never blocks serving
   const week = weekOfUtc(new Date());
@@ -185,11 +204,10 @@ async function handleGet(req: Request, env: Env, ctx: ExecutionContext, url: URL
   }
 
   if (path.startsWith("/dl/")) {
-    const rel = decodeURIComponent(path.slice("/dl/".length));
-    if (!SAFE_DL_PATH.test(rel)) return bad(400, "bad download path");
-    const version = rel.split("/")[0]; // the release tag, e.g. "v1.18.4"
-    if (count) ctx.waitUntil(recordInstallHit(env, ip, "download", version));
-    return Response.redirect(GH_RELEASE_BASE + rel, 302);
+    const target = parseDownloadPath(path.slice("/dl/".length));
+    if (!target) return bad(400, "bad download path");
+    if (count) ctx.waitUntil(recordInstallHit(env, ip, "download", target.tag));
+    return Response.redirect(`${GH_RELEASE_BASE}${target.tag}/${target.asset}`, 302);
   }
 
   return bad(404, "not found");

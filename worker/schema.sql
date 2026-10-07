@@ -57,8 +57,10 @@ CREATE INDEX IF NOT EXISTS log_bundles_instance ON log_bundles (instance_id);
 -- on the Worker) and the release-asset download (Option B, GET /dl/<tag>/... which
 -- 302s to GitHub). A unique install is approximated by a SHA-256 of
 -- (ip : week : HASH_SALT): weekly-rotating so the same install dedupes WITHIN a
--- week (giving a WAU-style headcount) but cannot be linked ACROSS weeks. The raw
--- IP is never stored. IP-based identity is coarse (NAT undercounts, dynamic IPs
+-- week (giving a WAU-style headcount), and someone reading the table without the
+-- salt cannot link rows ACROSS weeks. The salt is fixed, so whoever holds it can
+-- hash candidate IPs and link a known IP's rows; it is a secret, not a guarantee.
+-- The raw IP is never stored. IP-based identity is coarse (NAT undercounts, dynamic IPs
 -- overcount), so read these as order-of-magnitude active-install figures, not an
 -- exact roster, the opt-in pings.instance_id remains the only exact per-install id.
 -- version is '' for manifest polls, the release tag (e.g. v1.18.4) for downloads.
