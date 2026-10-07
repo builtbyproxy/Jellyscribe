@@ -47,16 +47,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     /// Approve the requests this plugin creates in Seerr, so they actually reach Radarr/Sonarr.
     /// <para>
-    /// Seerr decides auto-approval from the permissions of the user a request is attributed to,
-    /// not from the API key used to create it. A request attributed to a Seerr user without
-    /// "Auto-Approve" is therefore created as PENDING and never handed to Radarr, even though the
-    /// API key belongs to an admin. That is issue #110: requests show up in Seerr but nothing
-    /// downloads. With this on, the plugin follows a PENDING request with
-    /// POST /api/v1/request/{id}/approve using the admin API key.
+    /// The plugin creates each request as the Seerr user it is for (X-API-User), so Seerr applies
+    /// that user's own permissions: a user without "Auto-Approve" gets a PENDING request, which
+    /// Seerr never hands to Radarr/Sonarr until someone approves it (the symptom of issue #110).
+    /// With this on, the plugin follows a PENDING request with POST /api/v1/request/{id}/approve
+    /// using the admin API key, and also approves that user's earlier pending watchlist requests.
     /// </para>
     /// <para>
     /// Defaults to true: enabling per-account auto-request already expresses "go and fetch these".
-    /// Turn it off to keep plugin-created requests in Seerr's manual approval queue.
+    /// Turn it off and requests wait in Seerr's approval queue unless the requesting Seerr user
+    /// has Auto-Approve there.
     /// </para>
     /// </summary>
     public bool AutoApproveJellyseerrRequests { get; set; } = true;

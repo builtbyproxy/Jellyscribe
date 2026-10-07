@@ -42,162 +42,155 @@ public class SeerrClientTests
         Assert.True(posted, "request endpoint should have been called");
     }
 
-    /// <summary>
-    /// Regression test for #110. A 2xx from POST /api/v1/request only means Seerr stored the
-    /// request; Seerr hands it to Radarr only once it is APPROVED, and it decides auto-approval
-    /// from the permissions of the user the request is attributed to, not from the admin API key
-    /// used to create it. So requests for users without Auto-Approve came back PENDING and never
-    /// downloaded. The client now follows up with the approve endpoint.
-    /// </summary>
+    // ----- Request creation: who Seerr treats as the requester -----
+    // FakeSeerr below models Seerr's real rules (seerr-team/seerr, server/middleware/auth.ts and
+    // server/entity/MediaRequest.ts): an API-key call acts as user 1 (the owner admin) unless
+    // X-API-User names someone else; a body userId from a caller without Manage Users and Manage
+    // Requests is refused with 403; and a new request is APPROVED only when the ACTING user holds
+    // Auto-Approve (or the media type's flag) or Manage Requests, otherwise PENDING.
+
+    private const int SeerrAdmin = 2;
+    private const int SeerrManageUsers = 8;
+    private const int SeerrManageRequests = 16;
+    private const int SeerrRequest = 32;
+    private const int SeerrAutoApprove = 128;
+
     [Fact]
-    public async Task RequestMovieAsync_PendingRequest_IsApproved()
+    public async Task RequestMovieAsync_ActsAsTheRequesterAndLeavesUserIdOutOfTheBody()
     {
-        string? approvedPath = null;
-        var handler = new SeerrHandler(req =>
-        {
-            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
-                return JsonResponse("{\"id\":100}");
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = SeerrRequest;
 
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
-                return new HttpResponseMessage(HttpStatusCode.Created)
-                {
-                    Content = new StringContent("{\"id\":42,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
-                };
-
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/approve"))
-            {
-                approvedPath = req.RequestUri.AbsolutePath;
-                return JsonResponse("{\"id\":42,\"status\":2}");
-            }
-
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
-
-        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, seerr, autoApprove: false);
         var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
-        Assert.Equal("/api/v1/request/42/approve", approvedPath);
-    }
-
-    /// <summary>An already-approved request (status 2) needs no follow-up call.</summary>
-    [Fact]
-    public async Task RequestMovieAsync_AlreadyApproved_DoesNotCallApprove()
-    {
-        var approveCalls = 0;
-        var handler = new SeerrHandler(req =>
-        {
-            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
-                return JsonResponse("{\"id\":100}");
-
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
-                return new HttpResponseMessage(HttpStatusCode.Created)
-                {
-                    Content = new StringContent("{\"id\":42,\"status\":2}", System.Text.Encoding.UTF8, "application/json")
-                };
-
-            if (req.RequestUri!.AbsolutePath.EndsWith("/approve")) approveCalls++;
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
-
-        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
-        var (result, _) = await client.RequestMovieAsync(100, 7);
-
-        Assert.Equal(SeerrClient.RequestResult.Requested, result);
-        Assert.Equal(0, approveCalls);
+        var post = Assert.Single(seerr.RequestPosts);
+        Assert.Equal("7", post.ApiUser);
+        Assert.DoesNotContain("userId", post.Body, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// With auto-approve switched off the request is deliberately left in Seerr's moderation
-    /// queue, but the log must say why nothing will download.
+    /// The finding this pins: with the admin switch off, a Seerr user who needs approval must not
+    /// get an approved request just because the plugin holds the admin API key. Before requests
+    /// were made as the requester, Seerr saw the admin as the acting user and approved on creation.
     /// </summary>
     [Fact]
-    public async Task RequestMovieAsync_AutoApproveDisabled_LeavesPendingAndWarns()
+    public async Task RequestMovieAsync_UserWithoutAutoApprove_SwitchOff_StaysPendingAndWarns()
     {
-        var approveCalls = 0;
-        var handler = new SeerrHandler(req =>
-        {
-            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
-                return JsonResponse("{\"id\":100}");
-
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
-                return new HttpResponseMessage(HttpStatusCode.Created)
-                {
-                    Content = new StringContent("{\"id\":42,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
-                };
-
-            if (req.RequestUri!.AbsolutePath.EndsWith("/approve")) approveCalls++;
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = SeerrRequest;
 
         var logs = new ListLogger();
-        using var client = new SeerrClient(BaseUrl, ApiKey, logs, handler, autoApprove: false);
+        using var client = new SeerrClient(BaseUrl, ApiKey, logs, seerr, autoApprove: false);
         var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
-        Assert.Equal(0, approveCalls);
+        var created = Assert.Single(seerr.Created);
+        Assert.Equal(7, created.RequestedBy);
+        Assert.Equal(1, created.Status); // PENDING
+        Assert.Equal(0, seerr.ApproveCalls);
         Assert.Contains(logs.Entries, e => e.Level == LogLevel.Warning
             && e.Message.Contains("PENDING", StringComparison.Ordinal)
             && e.Message.Contains("Radarr", StringComparison.Ordinal));
+    }
+
+    /// <summary>A Seerr user with Auto-Approve is approved by Seerr itself, so no follow-up is needed.</summary>
+    [Fact]
+    public async Task RequestMovieAsync_UserWithAutoApprove_SwitchOff_ApprovedBySeerr()
+    {
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = SeerrRequest | SeerrAutoApprove;
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, seerr, autoApprove: false);
+        await client.RequestMovieAsync(100, 7);
+
+        var created = Assert.Single(seerr.Created);
+        Assert.Equal(2, created.Status); // APPROVED
+        Assert.Equal(0, seerr.ApproveCalls);
+    }
+
+    /// <summary>
+    /// Issue #110 guard: with the admin switch on (the default), a request that Seerr leaves
+    /// PENDING for a user without Auto-Approve is approved with the admin key, so it reaches
+    /// Radarr. The approve call must act as the admin, not as the requester, who cannot approve.
+    /// </summary>
+    [Fact]
+    public async Task RequestMovieAsync_UserWithoutAutoApprove_SwitchOn_ApprovedWithTheAdminKey()
+    {
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = SeerrRequest;
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, seerr);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        var created = Assert.Single(seerr.Created);
+        Assert.Equal(2, created.Status);
+        Assert.Equal(1, seerr.ApproveCalls);
     }
 
     /// <summary>A failed approve must not turn a created request into a reported failure.</summary>
     [Fact]
     public async Task RequestMovieAsync_ApproveFails_StillReportsRequested()
     {
-        var handler = new SeerrHandler(req =>
-        {
-            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/movie/100"))
-                return JsonResponse("{\"id\":100}");
-
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
-                return new HttpResponseMessage(HttpStatusCode.Created)
-                {
-                    Content = new StringContent("{\"id\":42,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
-                };
-
-            return new HttpResponseMessage(HttpStatusCode.Forbidden);
-        });
+        var seerr = new FakeSeerr { ApproveFails = true };
+        seerr.Users[7] = SeerrRequest;
 
         var logs = new ListLogger();
-        using var client = new SeerrClient(BaseUrl, ApiKey, logs, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, logs, seerr);
         var (result, _) = await client.RequestMovieAsync(100, 7);
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal(1, Assert.Single(seerr.Created).Status);
         Assert.Contains(logs.Entries, e => e.Level == LogLevel.Warning
             && e.Message.Contains("Could not approve", StringComparison.Ordinal));
     }
 
-    /// <summary>The TV path is gated the same way, so it gets the same follow-up.</summary>
+    /// <summary>A requester without request permission in Seerr is refused, and that is a failure.</summary>
     [Fact]
-    public async Task RequestSeriesAsync_PendingRequest_IsApproved()
+    public async Task RequestMovieAsync_UserWithoutRequestPermission_IsRefusedAsFailed()
     {
-        string? approvedPath = null;
-        var handler = new SeerrHandler(req =>
-        {
-            if (req.Method == HttpMethod.Get && req.RequestUri!.AbsolutePath.Contains("/api/v1/tv/"))
-                return JsonResponse("{\"id\":200,\"name\":\"Show\"}");
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = 0;
 
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/api/v1/request"))
-                return new HttpResponseMessage(HttpStatusCode.Created)
-                {
-                    Content = new StringContent("{\"id\":77,\"status\":1}", System.Text.Encoding.UTF8, "application/json")
-                };
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, seerr);
+        var (result, _) = await client.RequestMovieAsync(100, 7);
 
-            if (req.Method == HttpMethod.Post && req.RequestUri!.AbsolutePath.EndsWith("/approve"))
-            {
-                approvedPath = req.RequestUri.AbsolutePath;
-                return JsonResponse("{\"id\":77,\"status\":2}");
-            }
+        Assert.Equal(SeerrClient.RequestResult.Failed, result);
+        Assert.Empty(seerr.Created);
+    }
 
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
-        });
+    /// <summary>The TV path creates requests the same way, as the requester.</summary>
+    [Fact]
+    public async Task RequestSeriesAsync_UserWithoutAutoApprove_SwitchOff_StaysPending()
+    {
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = SeerrRequest;
 
-        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, seerr, autoApprove: false);
         var (result, _) = await client.RequestSeriesAsync(200, 7, new[] { 1 });
 
         Assert.Equal(SeerrClient.RequestResult.Requested, result);
-        Assert.Equal("/api/v1/request/77/approve", approvedPath);
+        var post = Assert.Single(seerr.RequestPosts);
+        Assert.Equal("7", post.ApiUser);
+        Assert.DoesNotContain("userId", post.Body, StringComparison.Ordinal);
+        Assert.Equal(1, Assert.Single(seerr.Created).Status);
+        Assert.Equal(0, seerr.ApproveCalls);
+    }
+
+    [Fact]
+    public async Task RequestSeriesAsync_UserWithoutAutoApprove_SwitchOn_ApprovedWithTheAdminKey()
+    {
+        var seerr = new FakeSeerr();
+        seerr.Users[7] = SeerrRequest;
+
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, seerr);
+        var (result, _) = await client.RequestSeriesAsync(200, 7, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.Requested, result);
+        Assert.Equal(2, Assert.Single(seerr.Created).Status);
+        Assert.Equal(1, seerr.ApproveCalls);
     }
 
     /// <summary>
@@ -973,6 +966,98 @@ public class SeerrClientTests
             HttpStatusCode.InternalServerError, new[] { 1 });
 
         Assert.Equal(SeerrClient.RequestResult.Failed, result);
+    }
+
+    /// <summary>
+    /// A small model of Seerr's request endpoints, following seerr-team/seerr:
+    /// server/middleware/auth.ts (an API-key call acts as user 1, or as the X-API-User id),
+    /// server/entity/MediaRequest.ts (a body userId needs Manage Users and Manage Requests; the
+    /// requester needs request permission; a new request is APPROVED only when the ACTING user
+    /// holds Auto-Approve, the media type's Auto-Approve or Manage Requests) and
+    /// server/routes/request.ts (approve needs Manage Requests; permission errors are 403).
+    /// Admin (2) passes every check, as Seerr's hasPermission does. The movie and TV lookups
+    /// answer with no media info, so every title is new.
+    /// </summary>
+    private sealed class FakeSeerr : HttpMessageHandler
+    {
+        private const int AdminBit = 2;
+        private const int AutoApproveMovieBit = 256;
+        private const int AutoApproveTvBit = 512;
+        private const int RequestMovieBit = 262144;
+        private const int RequestTvBit = 524288;
+
+        public Dictionary<int, int> Users { get; } = new() { [1] = AdminBit };
+        public List<(string? ApiUser, string Body)> RequestPosts { get; } = new();
+        public List<(int Id, int RequestedBy, int Status)> Created { get; } = new();
+        public int ApproveCalls { get; private set; }
+        public bool ApproveFails { get; set; }
+
+        private bool Has(int userId, params int[] any)
+        {
+            var value = Users.TryGetValue(userId, out var v) ? v : 0;
+            if ((value & AdminBit) != 0) return true;
+            foreach (var p in any)
+                if ((value & p) != 0) return true;
+            return false;
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            var apiUser = request.Headers.TryGetValues("X-API-User", out var v) ? string.Join(",", v) : null;
+            var acting = apiUser == null ? 1 : int.Parse(apiUser, System.Globalization.CultureInfo.InvariantCulture);
+
+            if (request.Method == HttpMethod.Get && (path.Contains("/api/v1/movie/") || path.Contains("/api/v1/tv/")))
+                return JsonResponse("{\"id\":1}");
+
+            if (request.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+            {
+                var body = await request.Content!.ReadAsStringAsync(cancellationToken);
+                RequestPosts.Add((apiUser, body));
+                using var doc = System.Text.Json.JsonDocument.Parse(body);
+                var isTv = doc.RootElement.GetProperty("mediaType").GetString() == "tv";
+
+                var requester = acting;
+                if (doc.RootElement.TryGetProperty("userId", out var uid))
+                {
+                    if (!(Has(acting, SeerrManageUsers) && Has(acting, SeerrManageRequests)))
+                        return Forbidden("You do not have permission to modify the request user.");
+                    requester = uid.GetInt32();
+                }
+
+                if (!Has(requester, SeerrRequest, isTv ? RequestTvBit : RequestMovieBit))
+                    return Forbidden("You do not have permission to make requests.");
+
+                var approved = Has(acting, SeerrAutoApprove, isTv ? AutoApproveTvBit : AutoApproveMovieBit, SeerrManageRequests);
+                var id = 40 + Created.Count;
+                var status = approved ? 2 : 1;
+                Created.Add((id, requester, status));
+                return new HttpResponseMessage(HttpStatusCode.Created)
+                {
+                    Content = new StringContent("{\"id\":" + id + ",\"status\":" + status + "}", System.Text.Encoding.UTF8, "application/json")
+                };
+            }
+
+            if (request.Method == HttpMethod.Post && path.EndsWith("/approve"))
+            {
+                ApproveCalls++;
+                if (ApproveFails || !Has(acting, SeerrManageRequests))
+                    return Forbidden("You do not have permission to access this endpoint");
+                var id = int.Parse(path.Split('/')[^2], System.Globalization.CultureInfo.InvariantCulture);
+                var i = Created.FindIndex(c => c.Id == id);
+                if (i < 0) return new HttpResponseMessage(HttpStatusCode.NotFound);
+                Created[i] = (id, Created[i].RequestedBy, 2);
+                return JsonResponse("{\"id\":" + id + ",\"status\":2}");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        }
+
+        private static HttpResponseMessage Forbidden(string message)
+            => new(HttpStatusCode.Forbidden)
+            {
+                Content = new StringContent("{\"message\":\"" + message + "\"}", System.Text.Encoding.UTF8, "application/json")
+            };
     }
 
     private class SeerrHandler : HttpMessageHandler
