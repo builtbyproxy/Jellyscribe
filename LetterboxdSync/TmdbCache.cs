@@ -87,7 +87,11 @@ public static class TmdbCache
                 Directory.CreateDirectory(dir);
 
             var json = JsonSerializer.Serialize(_cache, new JsonSerializerOptions { WriteIndented = false });
-            File.WriteAllText(path, json);
+            // Write beside the file and swap it in, so a crash mid-write can't leave invalid JSON
+            // (which Load would treat as an empty cache).
+            var tmp = path + ".tmp";
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, path, overwrite: true);
         }
         catch (Exception ex)
         {

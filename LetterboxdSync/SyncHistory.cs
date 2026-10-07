@@ -297,6 +297,7 @@ public static class SyncHistory
             var jsonlPath = DataPath;
             if (File.Exists(jsonlPath))
             {
+                var unreadable = 0;
                 foreach (var line in File.ReadLines(jsonlPath))
                 {
                     if (string.IsNullOrWhiteSpace(line)) continue;
@@ -305,8 +306,14 @@ public static class SyncHistory
                         var evt = JsonSerializer.Deserialize<SyncEvent>(line);
                         if (evt != null) _events!.Add(evt);
                     }
-                    catch { }
+                    catch
+                    {
+                        unreadable++;
+                    }
                 }
+
+                if (unreadable > 0)
+                    _logger?.LogWarning("Skipped {Count} unreadable lines in sync history {Path}", unreadable, jsonlPath);
                 return true;
             }
 
@@ -339,11 +346,17 @@ public static class SyncHistory
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            using var writer = new StreamWriter(path, append: false);
-            foreach (var evt in _events!)
+            // Write beside the file and swap it in, so a crash mid-write can't truncate the history.
+            var tmp = path + ".tmp";
+            using (var writer = new StreamWriter(tmp, append: false))
             {
-                writer.WriteLine(JsonSerializer.Serialize(evt));
+                foreach (var evt in _events!)
+                {
+                    writer.WriteLine(JsonSerializer.Serialize(evt));
+                }
             }
+
+            File.Move(tmp, path, overwrite: true);
         }
         catch (Exception ex)
         {

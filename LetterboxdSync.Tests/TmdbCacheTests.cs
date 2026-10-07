@@ -143,4 +143,19 @@ public class TmdbCacheTests : IDisposable
 
         Assert.Equal(872585, TmdbCache.Get("oppenheimer"));
     }
+
+    // A crash mid-save must leave the old file: Load treats unparsable JSON as an empty cache.
+    // The held handle keeps the old content only if the save renamed a new file over it.
+    [Fact]
+    public void Set_ReplacesTheFileInsteadOfRewritingItInPlace()
+    {
+        File.WriteAllText(_cachePath, "{\"dune\":438631}");
+        using var original = new FileStream(_cachePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+
+        TmdbCache.Set("arrival", 329865);
+
+        Assert.Equal("{\"dune\":438631}", new StreamReader(original).ReadToEnd());
+        Assert.Contains("arrival", File.ReadAllText(_cachePath));
+        Assert.False(File.Exists(_cachePath + ".tmp"));
+    }
 }

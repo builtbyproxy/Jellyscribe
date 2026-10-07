@@ -6,6 +6,7 @@ using Xunit;
 
 namespace LetterboxdSync.Tests.Serializd;
 
+[Collection("Plugin")]
 public class SerializdActivityTests : IDisposable
 {
     private readonly string _file;
