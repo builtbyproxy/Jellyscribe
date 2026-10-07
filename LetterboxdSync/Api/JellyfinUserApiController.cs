@@ -36,13 +36,16 @@ public abstract class JellyfinUserApiController : ControllerBase
             ? requestedUserId.Replace("-", string.Empty)
             : GetCurrentUserId();
 
-    /// <summary>The calling Jellyfin user's username, resolved via IUserManager, or null.</summary>
-    protected string? GetJellyfinUsername()
+    /// <summary>The calling Jellyfin user, resolved via IUserManager, or null.</summary>
+    protected Jellyfin.Database.Implementations.Entities.User? GetCurrentUser()
     {
         var userId = GetCurrentUserId();
         if (string.IsNullOrEmpty(userId)) return null;
-        return _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId)?.Username;
+        return _userManager.GetUsers().FirstOrDefault(u => u.Id.ToString("N") == userId);
     }
+
+    /// <summary>The calling Jellyfin user's username, resolved via IUserManager, or null.</summary>
+    protected string? GetJellyfinUsername() => GetCurrentUser()?.Username;
 
     /// <summary>
     /// True when the caller is a Jellyfin administrator. Jellyfin's authentication handler gives

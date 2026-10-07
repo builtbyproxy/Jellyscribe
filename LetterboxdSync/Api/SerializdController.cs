@@ -1,10 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
 using LetterboxdSync.Configuration;
+using Jellyfin.Data.Enums;
 using LetterboxdSync.Serializd;
+using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,6 +31,7 @@ public class SerializdController : JellyfinUserApiController
     private readonly ILogger<SerializdController> _logger;
     private readonly SerializdSyncRunner _syncRunner;
     private readonly SerializdWatchlistSyncRunner _watchlistRunner;
+    private readonly ILibraryManager _libraryManager;
 
     /// <summary>
     /// Test-only override for the login check. When non-null, <see cref="Verify"/> calls this
@@ -42,12 +47,13 @@ public class SerializdController : JellyfinUserApiController
     internal Task? LastBackgroundSync { get; private set; }
 
     public SerializdController(ILogger<SerializdController> logger, SerializdSyncRunner syncRunner,
-        SerializdWatchlistSyncRunner watchlistRunner, MediaBrowser.Controller.Library.IUserManager userManager)
+        SerializdWatchlistSyncRunner watchlistRunner, IUserManager userManager, ILibraryManager libraryManager)
         : base(userManager)
     {
         _logger = logger;
         _syncRunner = syncRunner;
         _watchlistRunner = watchlistRunner;
+        _libraryManager = libraryManager;
     }
 
     public class AccountItem
@@ -271,20 +277,35 @@ public class SerializdController : JellyfinUserApiController
         if (accounts.Count == 0)
             return BadRequest(new { error = "No enabled Serializd account for your user" });
 
+        var isEpisode = request.SeasonNumber is > 0 && request.EpisodeNumber is > 0;
+        // Read from the library only if Serializd lists fewer seasons than Jellyfin, and once
+        // for all accounts.
+        var seasonLengths = new Lazy<IReadOnlyDictionary<int, int>>(
+            () => SerializdSeasonFallback.SeasonLengthsReader(FindSeries(request.TmdbId)));
+
         var posted = 0;
+        var unmatched = 0;
         foreach (var account in accounts)
         {
             try
             {
                 using var service = await SerializdServiceFactory
                     .CreateAuthenticatedAsync(account.Email, account.Password, _logger).ConfigureAwait(false);
-                if (request.SeasonNumber is int season && season > 0 && request.EpisodeNumber is int episode && episode > 0)
-                    await service.CreateEpisodeReviewAsync(request.TmdbId, season, episode, request.Rating, request.ReviewText, request.ContainsSpoilers)
-                        .ConfigureAwait(false);
-                else
+                if (!isEpisode)
+                {
                     await service.CreateShowReviewAsync(request.TmdbId, request.Rating, request.ReviewText, request.ContainsSpoilers)
                         .ConfigureAwait(false);
-                posted++;
+                    posted++;
+                }
+                else if (await PostEpisodeReviewAsync(service, request, request.SeasonNumber!.Value, request.EpisodeNumber!.Value,
+                    seasonLengths).ConfigureAwait(false))
+                {
+                    posted++;
+                }
+                else
+                {
+                    unmatched++;
+                }
             }
             catch (Exception ex)
             {
@@ -294,7 +315,12 @@ public class SerializdController : JellyfinUserApiController
         }
 
         if (posted == 0)
-            return BadRequest(new { error = "Could not post the review" });
+            return BadRequest(new
+            {
+                error = unmatched > 0
+                    ? $"Serializd has no episode matching S{request.SeasonNumber}E{request.EpisodeNumber} of this show"
+                    : "Could not post the review"
+            });
 
         // Show it in the activity feed. Source="review" so SerializdActivity.GetStats excludes it
         // from the episode-log counts (a review isn't an episode watched).
@@ -312,6 +338,42 @@ public class SerializdController : JellyfinUserApiController
         });
 
         return Ok(new { posted });
+    }
+
+    /// <summary>
+    /// Posts an episode review where an episode log of the same episode would go: Serializd's own
+    /// season, or for a show Serializd lists as a single season, season 1 at the episode's
+    /// absolute number. False (nothing posted) when Serializd has no such season, or the episode
+    /// would land past the end of Serializd's season 1.
+    /// </summary>
+    private async Task<bool> PostEpisodeReviewAsync(ISerializdService service, ReviewRequest request, int season, int episode,
+        Lazy<IReadOnlyDictionary<int, int>> seasonLengths)
+    {
+        var target = await SerializdSeasonFallback
+            .ResolveAsync(service, request.TmdbId, season, () => seasonLengths.Value).ConfigureAwait(false);
+        if (target?.EpisodeFor(episode) is not int serializdEpisode)
+        {
+            _logger.LogWarning("Serializd has no episode matching S{Season}E{Episode} of TMDb show {TmdbId}, review not posted",
+                season, episode, request.TmdbId);
+            return false;
+        }
+
+        if (target.EpisodeOffset > 0)
+            _logger.LogInformation("Serializd lists TMDb show {TmdbId} as a single season; posting the S{Season}E{Episode} review on S1E{Absolute}",
+                request.TmdbId, season, episode, serializdEpisode);
+
+        await service.CreateEpisodeReviewAsync(request.TmdbId, target.SeasonId, serializdEpisode,
+            request.Rating, request.ReviewText, request.ContainsSpoilers).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>The caller's copy of the series, for its season lengths; null when it is not in their library.</summary>
+    private Series? FindSeries(int tmdbId)
+    {
+        var user = GetCurrentUser();
+        return user == null
+            ? null
+            : TmdbLibraryLookup.FindByTmdbId(_libraryManager, user, BaseItemKind.Series, tmdbId).OfType<Series>().FirstOrDefault();
     }
 
     /// <summary>

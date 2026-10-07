@@ -1007,22 +1007,8 @@ public class LetterboxdController : JellyfinUserApiController
               && ep.ParentIndexNumber == seasonNumber && ep.IndexNumber == episodeNumber);
     }
 
-    /// <summary>
-    /// Library items of one kind carrying the given TMDb id, filtered in the database
-    /// instead of loading the whole library. The id is re-checked in memory, so a query
-    /// that ever came back looser could not resolve (and write a rating to) the wrong item.
-    /// </summary>
     private IEnumerable<BaseItem> FindByTmdbId(User user, BaseItemKind kind, int tmdbId)
-    {
-        var id = tmdbId.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        return _libraryManager.GetItemList(new InternalItemsQuery(user)
-        {
-            IncludeItemTypes = new[] { kind },
-            IsVirtualItem = false,
-            Recursive = true,
-            HasAnyProviderId = new Dictionary<string, string> { [MediaBrowser.Model.Entities.MetadataProvider.Tmdb.ToString()] = id }
-        }).Where(item => item.GetProviderId(MediaBrowser.Model.Entities.MetadataProvider.Tmdb) == id);
-    }
+        => TmdbLibraryLookup.FindByTmdbId(_libraryManager, user, kind, tmdbId);
 
     /// <summary>
     /// Mirror the dashboard review's star rating into Jellyfin's UserItemData.Rating

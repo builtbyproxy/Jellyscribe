@@ -484,19 +484,15 @@ public class SerializdApiClient : ISerializdService
             throw new SerializdRequestException(resp.StatusCode, $"Serializd review ({showTmdbId}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
     }
 
-    public async Task CreateEpisodeReviewAsync(int showTmdbId, int seasonNumber, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler)
+    public async Task CreateEpisodeReviewAsync(int showTmdbId, int seasonId, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler)
     {
-        var seasonId = await ResolveSeasonIdAsync(showTmdbId, seasonNumber).ConfigureAwait(false);
-        if (seasonId == null)
-            throw new Exception($"Serializd episode review: no season {seasonNumber} found for show {showTmdbId}");
-
         // Same rule as the show review: review_text only persists on a log (is_log:true). Attaching
         // season_id + episode_number scopes it to the episode instead of the whole show.
         var hasText = !string.IsNullOrWhiteSpace(reviewText);
         var payload = new Dictionary<string, object?>
         {
             ["show_id"] = showTmdbId,
-            ["season_id"] = seasonId.Value,
+            ["season_id"] = seasonId,
             ["episode_number"] = episodeNumber,
             ["review_text"] = reviewText ?? string.Empty,
             ["contains_spoiler"] = containsSpoiler,
@@ -515,10 +511,10 @@ public class SerializdApiClient : ISerializdService
         // Never log the response body: /show/reviews/add echoes the submitted review_text back
         // in the created review object, so logging it would leak a user's private review draft.
         _logger.LogInformation(
-            "Serializd episode review POST show {Show} S{Season}E{Episode} (is_log={IsLog}, rating={Rating}, textLen={Len}) → HTTP {Status}",
-            showTmdbId, seasonNumber, episodeNumber, hasText, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode);
+            "Serializd episode review POST show {Show} season id {SeasonId} episode {Episode} (is_log={IsLog}, rating={Rating}, textLen={Len}) → HTTP {Status}",
+            showTmdbId, seasonId, episodeNumber, hasText, payload["rating"], (reviewText ?? string.Empty).Length, (int)resp.StatusCode);
         if (!resp.IsSuccessStatusCode)
-            throw new SerializdRequestException(resp.StatusCode, $"Serializd episode review ({showTmdbId} S{seasonNumber}E{episodeNumber}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
+            throw new SerializdRequestException(resp.StatusCode, $"Serializd episode review ({showTmdbId} season id {seasonId} episode {episodeNumber}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
     }
 
     public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like, CancellationToken cancellationToken = default)

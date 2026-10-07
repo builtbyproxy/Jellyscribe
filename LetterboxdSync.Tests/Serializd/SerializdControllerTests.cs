@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -8,8 +9,11 @@ using LetterboxdSync.Configuration;
 using LetterboxdSync.Serializd;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller.Collections;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
+using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Serialization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -31,6 +35,7 @@ public class SerializdControllerTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly IUserManager _userManager;
+    private readonly ILibraryManager _libraryManager = Substitute.For<ILibraryManager>();
     private readonly SerializdController _controller;
 
     public SerializdControllerTests()
@@ -59,7 +64,7 @@ public class SerializdControllerTests : IDisposable
         var watchlistRunner = new SerializdWatchlistSyncRunner(new LoggerFactory(), Substitute.For<ILibraryManager>(),
             Substitute.For<IUserManager>(), Substitute.For<ICollectionManager>(), Substitute.For<IPlaylistManager>());
 
-        _controller = new SerializdController(new NullLogger<SerializdController>(), runner, watchlistRunner, _userManager);
+        _controller = new SerializdController(new NullLogger<SerializdController>(), runner, watchlistRunner, _userManager, _libraryManager);
         LoginCheckLimiter.Serializd.ResetForTesting();
     }
 
@@ -67,6 +72,7 @@ public class SerializdControllerTests : IDisposable
     {
         SerializdController.VerifyOverrideForTesting = null;
         SerializdServiceFactory.OverrideForTesting = null;
+        SerializdSeasonFallback.SeasonLengthsReader = SerializdSeasonFallback.ReadSeasonLengths;
         SerializdActivity.DataPathOverride = null;
         SerializdActivity.ResetForTesting();
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
@@ -279,6 +285,7 @@ public class SerializdControllerTests : IDisposable
         var (_, idHex) = AddUserWithAccount();
         Authenticate(idHex);
         var service = Substitute.For<ISerializdService>();
+        service.ResolveSeasonIdAsync(1396, 2).Returns(Task.FromResult<int?>(3573));
         SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
 
         var result = await _controller.PostReview(new SerializdController.ReviewRequest
@@ -290,9 +297,83 @@ public class SerializdControllerTests : IDisposable
         });
 
         Assert.IsType<OkObjectResult>(result);
-        await service.Received(1).CreateEpisodeReviewAsync(1396, 2, 5, 7, null, false);
+        // Serializd's own season id for season 2, the episode number unchanged.
+        await service.Received(1).CreateEpisodeReviewAsync(1396, 3573, 5, 7, null, false);
         await service.DidNotReceive().CreateShowReviewAsync(
             Arg.Any<int>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<bool>());
+    }
+
+    /// <summary>A Serializd show listing one season: only season 1 resolves, with this many episodes.</summary>
+    private static ISerializdService SingleSeasonShow(int showTmdbId, int seasonOneId, int seasonOneEpisodes)
+    {
+        var service = Substitute.For<ISerializdService>();
+        service.ResolveSeasonIdAsync(showTmdbId, Arg.Any<int>()).Returns(Task.FromResult<int?>(null));
+        service.ResolveSeasonIdAsync(showTmdbId, 1).Returns(Task.FromResult<int?>(seasonOneId));
+        service.GetSeasonEpisodeCountAsync(showTmdbId, 1).Returns(Task.FromResult<int?>(seasonOneEpisodes));
+        return service;
+    }
+
+    /// <summary>The caller's library holds the series, so its season lengths can be read.</summary>
+    private Series SeriesInLibrary(int tmdbId)
+    {
+        var series = new Series { Name = "Show", Id = Guid.NewGuid() };
+        series.SetProviderId(MetadataProvider.Tmdb, tmdbId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem> { series });
+        return series;
+    }
+
+    [Fact]
+    public async Task PostReview_EpisodeOfAShowSerializdListsAsOneSeason_PostsOnSeasonOneAtTheAbsoluteNumber()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+        var series = SeriesInLibrary(220542);
+        Series? readFor = null;
+        SerializdSeasonFallback.SeasonLengthsReader = s =>
+        {
+            readFor = s;
+            return new Dictionary<int, int> { [1] = 10, [2] = 10 };
+        };
+        var service = SingleSeasonShow(220542, seasonOneId: 9001, seasonOneEpisodes: 20);
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        var result = await _controller.PostReview(new SerializdController.ReviewRequest
+        {
+            TmdbId = 220542,
+            ReviewText = "great episode",
+            SeasonNumber = 2,
+            EpisodeNumber = 3,
+        });
+
+        Assert.IsType<OkObjectResult>(result);
+        Assert.Same(series, readFor);
+        await service.Received(1).CreateEpisodeReviewAsync(220542, 9001, 13, null, "great episode", false);
+    }
+
+    [Fact]
+    public async Task PostReview_EpisodePastTheEndOfSerializdsSingleSeason_IsRefused()
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex);
+        SeriesInLibrary(220542);
+        SerializdSeasonFallback.SeasonLengthsReader = _ => new Dictionary<int, int> { [1] = 10, [2] = 10 };
+        // Serializd's season 1 has 12 episodes: S2E3 would be S1E13, past its end.
+        var service = SingleSeasonShow(220542, seasonOneId: 9001, seasonOneEpisodes: 12);
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+
+        var result = await _controller.PostReview(new SerializdController.ReviewRequest
+        {
+            TmdbId = 220542,
+            Rating = 8,
+            SeasonNumber = 2,
+            EpisodeNumber = 3,
+        });
+
+        var bad = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Contains("no episode matching S2E3", System.Text.Json.JsonSerializer.Serialize(bad.Value));
+        await service.DidNotReceive().CreateEpisodeReviewAsync(
+            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<bool>());
+        Assert.Equal(0, SerializdActivity.GetPage(0, 10).Total);
     }
 
     [Fact]

@@ -131,7 +131,7 @@ public class WriteOnlySecretsTests : IDisposable
                 Substitute.For<IUserManager>(), Substitute.For<IUserDataManager>()),
             new SerializdWatchlistSyncRunner(NullLoggerFactory.Instance, Substitute.For<ILibraryManager>(),
                 Substitute.For<IUserManager>(), Substitute.For<ICollectionManager>(), Substitute.For<IPlaylistManager>()),
-            Substitute.For<IUserManager>());
+            Substitute.For<IUserManager>(), Substitute.For<ILibraryManager>());
         SignIn(controller, userId, admin);
         return controller;
     }

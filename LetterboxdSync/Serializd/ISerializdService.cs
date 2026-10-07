@@ -69,11 +69,12 @@ public interface ISerializdService : IDisposable
     Task CreateShowReviewAsync(int showTmdbId, int? rating, string? reviewText, bool containsSpoiler);
 
     /// <summary>
-    /// Writes a review against a specific episode (resolves the Serializd season id from the season
-    /// number). Used when a review is filed from an episode row, so it attaches to that episode
-    /// rather than the whole show.
+    /// Writes a review against a specific episode, so it attaches to that episode rather than the
+    /// whole show. <paramref name="seasonId"/> and <paramref name="episodeNumber"/> are Serializd's,
+    /// resolved through <see cref="SerializdSeasonFallback"/> like an episode log, so a show
+    /// Serializd lists as one season gets the absolute episode number.
     /// </summary>
-    Task CreateEpisodeReviewAsync(int showTmdbId, int seasonNumber, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler);
+    Task CreateEpisodeReviewAsync(int showTmdbId, int seasonId, int episodeNumber, int? rating, string? reviewText, bool containsSpoiler);
 
     /// <summary>Reads the authenticated user's Serializd diary as episode-level entries (for import to Jellyfin).</summary>
     Task<List<SerializdDiaryEpisode>> GetDiaryEpisodesAsync(CancellationToken cancellationToken = default);

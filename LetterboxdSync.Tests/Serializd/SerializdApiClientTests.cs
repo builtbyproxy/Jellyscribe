@@ -597,48 +597,33 @@ public class SerializdApiClientTests
     }
 
     [Fact]
-    public async Task CreateEpisodeReview_ResolvesSeasonId_PostsScopedPayload()
+    public async Task CreateEpisodeReview_PostsTheResolvedSeasonId_WithoutReadingTheShowAgain()
     {
         string body = string.Empty;
+        var showReads = 0;
         var handler = new ApiMockHandler(req =>
         {
             var path = req.RequestUri!.AbsolutePath;
             if (path.EndsWith("/login"))
                 return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
             if (path.Contains("/show/1396"))
+            {
+                showReads++;
                 return Json(HttpStatusCode.OK, ShowJson);
+            }
             body = ReadBody(req);
             return Json(HttpStatusCode.OK, "{\"id\":1}");
         });
 
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
-        await client.CreateEpisodeReviewAsync(1396, seasonNumber: 1, episodeNumber: 4, rating: 9, reviewText: "good ep", containsSpoiler: false);
+        // The caller resolves the target (SerializdSeasonFallback), so the client posts it as is.
+        await client.CreateEpisodeReviewAsync(1396, seasonId: 3572, episodeNumber: 4, rating: 9, reviewText: "good ep", containsSpoiler: false);
 
         Assert.Contains("\"season_id\":3572", body);
         Assert.Contains("\"episode_number\":4", body);
         Assert.Contains("\"is_log\":true", body);
-    }
-
-    [Fact]
-    public async Task CreateEpisodeReview_UnknownSeason_Throws()
-    {
-        var handler = new ApiMockHandler(req =>
-        {
-            var path = req.RequestUri!.AbsolutePath;
-            if (path.EndsWith("/login"))
-                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
-            if (path.Contains("/show/1396"))
-                return Json(HttpStatusCode.OK, ShowJson);
-            return Json(HttpStatusCode.OK, "{}");
-        });
-
-        using var client = new SerializdApiClient(Log, handler);
-        await client.AuthenticateAsync("me@example.com", "pw");
-
-        var ex = await Assert.ThrowsAsync<Exception>(() =>
-            client.CreateEpisodeReviewAsync(1396, seasonNumber: 99, episodeNumber: 1, rating: 5, reviewText: null, containsSpoiler: false));
-        Assert.Contains("no season", ex.Message);
+        Assert.Equal(0, showReads);
     }
 
     // ----- Diary -----
