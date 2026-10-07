@@ -390,6 +390,9 @@
                             document.querySelectorAll('.ws-modal-x').forEach(function (x) { x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); }); });
                             // Once per document: the in-app page re-runs this script on every visit.
                             if (!window.__jellyscribeEscapeHandler) { window.__jellyscribeEscapeHandler = true; document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); }); }
+                            document.getElementById('letterboxdUserPage').addEventListener('click', function (e) {
+                                var r = e.target.closest('[data-retry]'); if (r) self[r.getAttribute('data-retry')]();
+                            });
                             document.getElementById('historyBody').addEventListener('click', function (e) {
                                 var b = e.target.closest('.ws-review-btn'); if (!b) return;
                                 self.openReview(b.getAttribute('data-svc'), parseInt(b.getAttribute('data-tmdb'), 10) || 0, b.getAttribute('data-title'),
@@ -406,7 +409,7 @@
 
                         loadOverview: function () {
                             var self = this, LB = 'Jellyfin.Plugin.LetterboxdSync', SZ = 'Jellyfin.Plugin.LetterboxdSync/Serializd';
-                            Promise.all([self.get(LB + '/Stats'), self.get(SZ + '/Stats'), self.get(LB + '/History?count=250&offset=0'), self.get(SZ + '/History?count=250&offset=0')].map(function (p) { return p.then(function (r) { return r.json(); }).catch(function () { return {}; }); }))
+                            Promise.all([self.get(LB + '/Stats'), self.get(SZ + '/Stats'), self.get(LB + '/History?count=250&offset=0'), self.get(SZ + '/History?count=250&offset=0')].map(function (p) { return p.then(self.json); }))
                                 .then(function (res) {
                                     var fs = res[0] || {}, ts = res[1] || {};
                                     document.getElementById('statFilm').textContent = fs.total || 0;
@@ -422,7 +425,32 @@
                                     self.merged = fe.concat(te).sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
                                     self.renderOverview();
                                     self.renderSparks();
+                                }).catch(function () {
+                                    document.getElementById('historyBody').innerHTML = self.errorRow('your activity', 'loadOverview');
+                                    document.getElementById('historyPagination').style.display = 'none';
                                 });
+                        },
+                        json: function (r) { if (!r.ok) throw r; return r.json(); },
+                        errorHtml: function (what, retry) {
+                            return '<span class="ws-red">Couldn\'t load ' + what + '.</span> <button type="button" class="ws-btn" data-retry="' + retry + '">Retry</button>';
+                        },
+                        errorRow: function (what, retry) {
+                            return '<tr><td colspan="5" style="padding:2em;text-align:center;">' + this.errorHtml(what, retry) + '</td></tr>';
+                        },
+                        errText: function (err) {
+                            if (!err) return Promise.resolve('unknown error');
+                            if (err.json) return err.json().then(function (d) { return (d && d.error) || err.statusText || ('HTTP ' + err.status); }, function () { return err.statusText || ('HTTP ' + err.status); });
+                            return Promise.resolve(err.message || String(err));
+                        },
+                        saveFailed: function (err) {
+                            var self = this;
+                            self.errText(err).then(function (msg) {
+                                document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed: ' + self.esc(msg) + '</span>';
+                            });
+                        },
+                        setModalBusy: function (busy) {
+                            document.getElementById('mSaveBtn').disabled = busy;
+                            document.getElementById('mDeleteBtn').disabled = busy;
                         },
                         renderSparks: function () {
                             var self = this, days = 14, now = Date.now(), dayMs = 86400000;
@@ -457,7 +485,7 @@
                         renderOverview: function () {
                             var self = this, f = this.ovFilter;
                             var all = this.merged.filter(function (e) { return (f === 'all' || e._svc === f) && self.matchesStatus(e); });
-                            if (!all.length) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">No activity yet. Link an account and start watching.</td></tr>'; document.getElementById('historyPagination').style.display = 'none'; return; }
+                            if (!all.length) { document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">' + (this.merged.length ? 'No items match these filters.' : 'No activity yet. Link an account and start watching.') + '</td></tr>'; document.getElementById('historyPagination').style.display = 'none'; return; }
                             var ps = this.ovPageSize || 40, total = all.length, pages = Math.max(1, Math.ceil(total / ps));
                             if ((this.ovPage || 0) >= pages) this.ovPage = pages - 1;
                             var start = (this.ovPage || 0) * ps;
@@ -558,14 +586,16 @@
                         /* ===== Accounts ===== */
                         loadAccounts: function () {
                             var self = this;
-                            Promise.all([self.get('Jellyfin.Plugin.LetterboxdSync/Accounts').then(function (r) { return r.json(); }).catch(function () { return { accounts: [] }; }),
-                                self.get('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts').then(function (r) { return r.json(); }).catch(function () { return { accounts: [] }; })])
+                            Promise.all([self.get('Jellyfin.Plugin.LetterboxdSync/Accounts').then(self.json),
+                                self.get('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts').then(self.json)])
                                 .then(function (res) {
                                     self.lb = (res[0] && res[0].accounts) || []; self.sz = (res[1] && res[1].accounts) || [];
                                     // Watchlist collections and playlists are named by an admin; the server keeps the stored name for anyone else.
                                     self.canSetWatchlistName = !!((res[0] && res[0].canSetWatchlistName) || (res[1] && res[1].canSetWatchlistName));
                                     self.renderAccounts();
-                                });
+                                })
+                                // Never render the add card on a failed load: saving from an empty list would overwrite the stored accounts.
+                                .catch(function () { document.getElementById('acctGrid').innerHTML = '<div class="ws-panel" style="padding:2em;text-align:center;">' + self.errorHtml('your accounts', 'loadAccounts') + '</div>'; });
                         },
                         feat: function (l, on) { return '<span class="ws-feat ' + (on ? 'on' : '') + '">' + l + '</span>'; },
                         renderAccounts: function () {
@@ -649,29 +679,36 @@
                             if (m.svc === 'letterboxd' && m.username.indexOf('@') >= 0) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Letterboxd no longer accepts an email address to sign in. Use your Letterboxd username, the name in letterboxd.com/&lt;username&gt;/.</span>'; return; }
                             document.getElementById('mStatus').textContent = 'Saving…';
                             var orig = self.editing ? (m.svc === 'serializd' ? self.sz : self.lb)[self.editing.i] : null;
+                            var prevLb = self.lb.slice(), prevSz = self.sz.slice();
+                            self.setModalBusy(true);
                             var excludedLibs = self.mergeExcluded((orig && orig.excludedLibraryIds) || [], m.libs);
                             if (m.svc === 'serializd') {
                                 // original* names the login this edit started from, so its saved password follows a changed email.
                                 var item = { email: m.username, originalEmail: orig ? orig.email : null, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) self.sz[self.editing.i] = item; else self.sz.push(item);
-                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function (r) { self.afterSave(r); });
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.sz = prevSz; self.afterSave(err); });
                             } else {
                                 var itemL = { letterboxdUsername: m.username, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null, letterboxdPassword: m.password, rawCookies: m.cookies || null, clearRawCookies: !m.cookies && m.clearCookies, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) self.lb[self.editing.i] = itemL; else self.lb.push(itemL);
-                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function (r) { self.afterSave(r); });
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.lb = prevLb; self.afterSave(err); });
                             }
                         },
-                        afterSave: function (r) {
+                        afterSave: function (err) {
                             var self = this;
-                            // Reload either way: the list must match what the server stored, and must not keep a typed secret.
+                            self.setModalBusy(false);
+                            if (err) { self.saveFailed(err); return; }
+                            // Reload after a save: the list must match what the server stored, and must not keep a typed secret.
                             self.loadAccounts();
-                            if (r.ok) { document.getElementById('acctModal').classList.remove('show'); document.getElementById('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>'; }
-                            else { r.json().then(function (d) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">' + self.esc(d.error || 'Save failed') + '</span>'; }, function () { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed</span>'; }); }
+                            document.getElementById('acctModal').classList.remove('show'); document.getElementById('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>';
                         },
                         deleteAccount: function () {
                             var self = this; if (!self.editing) return;
-                            if (self.editing.svc === 'serializd') { self.sz.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.loadAccounts(); }); }
-                            else { self.lb.splice(self.editing.i, 1); self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(function () { document.getElementById('acctModal').classList.remove('show'); self.loadAccounts(); }); }
+                            var tv = self.editing.svc === 'serializd', prev = (tv ? self.sz : self.lb).slice();
+                            (tv ? self.sz : self.lb).splice(self.editing.i, 1);
+                            document.getElementById('mStatus').textContent = 'Removing…';
+                            self.setModalBusy(true);
+                            self.put(tv ? 'Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts' : 'Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: tv ? self.sz : self.lb })
+                                .then(self.json).then(function () { self.afterSave(); }, function (err) { if (tv) self.sz = prev; else self.lb = prev; self.afterSave(err); });
                         },
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };

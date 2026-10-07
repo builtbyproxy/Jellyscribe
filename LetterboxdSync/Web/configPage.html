@@ -427,6 +427,11 @@
                             self.ensureViewport();
                             self.wireNav();
                             self.wireButtons();
+                            self.loadOverview();
+                            self.loadConfig();
+                        },
+                        loadConfig: function () {
+                            var self = this;
                             ApiClient.getUsers().then(function (u) { self.users = u; return ApiClient.getPluginConfiguration(self.PluginId); })
                                 .then(function (c) {
                                     self.config = c;
@@ -441,7 +446,6 @@
                                         self.breakers = map;
                                         self.renderAccounts();
                                     }).catch(function () { });
-                                    self.loadOverview();
                                     // Libraries for the per-account exclusion list. Fail-soft: null means
                                     // "unknown", and saving then keeps each account's stored list untouched.
                                     ApiClient.getJSON(ApiClient.getUrl('Jellyfin.Plugin.LetterboxdSync/Libraries')).then(function (d) {
@@ -453,7 +457,26 @@
                                     // because pending requests never reach Radarr/Sonarr.
                                     document.getElementById('autoApproveJellyseerr').checked = c.AutoApproveJellyseerrRequests !== false;
                                     document.getElementById('telemetryEnabled').checked = !!(c.Telemetry && c.Telemetry.Enabled);
+                                }).catch(function () {
+                                    document.getElementById('acctGroups').innerHTML = '<div class="ws-panel" style="padding:2em;text-align:center;">' + self.errorHtml('accounts', 'loadConfig') + '</div>';
                                 });
+                        },
+                        errorHtml: function (what, retry) {
+                            return '<span class="ws-red">Couldn\'t load ' + what + '.</span> <button type="button" class="ws-btn" data-retry="' + retry + '">Retry</button>';
+                        },
+                        errorRow: function (what, retry) {
+                            return '<tr><td colspan="5" style="padding:2em;text-align:center;">' + this.errorHtml(what, retry) + '</td></tr>';
+                        },
+                        errText: function (err) {
+                            if (!err) return 'unknown error';
+                            if (err.json) return err.json().then(function (d) { return (d && d.error) || err.statusText || ('HTTP ' + err.status); }, function () { return err.statusText || ('HTTP ' + err.status); });
+                            return Promise.resolve(err.message || String(err));
+                        },
+                        saveFailed: function (err) {
+                            var self = this;
+                            Promise.resolve(self.errText(err)).then(function (msg) {
+                                document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed: ' + self.escAttr(msg) + '</span>';
+                            });
                         },
 
                         /* Saved secrets never come back from the server (only Has* flags), so a secret
@@ -556,6 +579,9 @@
                                         b.getAttribute('data-slug'), b.getAttribute('data-season'), b.getAttribute('data-episode'));
                                 });
                             });
+                            document.getElementById('letterboxdSyncConfigPage').addEventListener('click', function (e) {
+                                var r = e.target.closest('[data-retry]'); if (r) self[r.getAttribute('data-retry')]();
+                            });
                             document.getElementById('acctGroups').addEventListener('click', function (e) {
                                 var add = e.target.closest('[data-add-for]');
                                 if (add) { self.openAccount(null, add.getAttribute('data-add-for')); return; }
@@ -598,7 +624,10 @@
                                 self.merged = fe.concat(te).sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); });
                                 self.renderOverview();
                                 self.renderSparks();
-                            }).catch(function () {});
+                            }).catch(function () {
+                                document.getElementById('historyBody').innerHTML = self.errorRow('activity', 'loadOverview');
+                                document.getElementById('historyPagination').style.display = 'none';
+                            });
                         },
                         renderSparks: function () {
                             var self = this, days = 14, now = Date.now(), dayMs = 86400000;
@@ -627,7 +656,8 @@
                             var ps = this.ovPageSize || 40, total = all.length, pages = Math.max(1, Math.ceil(total / ps));
                             if ((this.ovPage || 0) >= pages) this.ovPage = pages - 1;
                             var start = (this.ovPage || 0) * ps;
-                            document.getElementById('historyBody').innerHTML = this.rowsHtml(all.slice(start, start + ps), null);
+                            var empty = this.merged.length ? 'No items match these filters.' : null;
+                            document.getElementById('historyBody').innerHTML = this.rowsHtml(all.slice(start, start + ps), null, empty);
                             var pag = document.getElementById('historyPagination');
                             if (total > ps) {
                                 pag.style.display = 'flex';
@@ -646,7 +676,10 @@
                                     var pg = document.getElementById('actPagination');
                                     pg.style.display = self.actTotal > self.pageSize ? 'flex' : 'none';
                                     document.getElementById('actPageInfo').textContent = (self.actOffset + 1) + '–' + Math.min(self.actOffset + self.pageSize, self.actTotal) + ' of ' + self.actTotal;
-                                }).catch(function () {});
+                                }).catch(function () {
+                                    document.getElementById('actBody').innerHTML = self.errorRow('the activity log', 'loadActivity');
+                                    document.getElementById('actPagination').style.display = 'none';
+                                });
                         },
                         statusOf: function (e) {
                             if (e.Source === 'review') return 'Reviewed';
@@ -665,8 +698,8 @@
                             if (!reason) return '<span class="ws-pill ' + status + '">' + status + '</span>';
                             return '<span class="ws-pill ' + status + ' has-reason" title="' + this.escAttr(reason) + '">' + status + ' <span class="ws-info-i">i</span></span>';
                         },
-                        rowsHtml: function (events, src) {
-                            if (!events.length) return '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">No activity yet. Run a sync to get started.</td></tr>';
+                        rowsHtml: function (events, src, emptyMsg) {
+                            if (!events.length) return '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">' + (emptyMsg || 'No activity yet. Run a sync to get started.') + '</td></tr>';
                             var self = this;
                             return events.map(function (e) {
                                 var source = e._svc || src;
@@ -911,19 +944,34 @@
                             }
                             var key = m.svc === 'serializd' ? 'SerializdAccounts' : 'Accounts';
                             document.getElementById('mStatus').textContent = 'Saving…';
+                            self.setModalBusy(true);
                             self.saveConfig(function (c) {
                                 c[key] = (c[key] || []).filter(function (x) { return x !== orig; }).concat([item]);
                             }).then(function () {
+                                self.setModalBusy(false);
                                 document.getElementById('acctModal').classList.remove('show');
                                 Dashboard.processPluginConfigurationUpdateResult();
-                            }, function () { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed.</span>'; });
+                            }, function (err) {
+                                self.setModalBusy(false);
+                                self.saveFailed(err);
+                            });
+                        },
+                        setModalBusy: function (busy) {
+                            document.getElementById('mSaveBtn').disabled = busy;
+                            document.getElementById('mDeleteBtn').disabled = busy;
                         },
                         deleteAccount: function () {
                             var self = this, orig = self.editing.original; if (!orig) return;
                             var key = self.editing.svc === 'serializd' ? 'SerializdAccounts' : 'Accounts';
+                            document.getElementById('mStatus').textContent = 'Removing…';
+                            self.setModalBusy(true);
                             self.saveConfig(function (c) { c[key] = (c[key] || []).filter(function (x) { return x !== orig; }); }).then(function () {
+                                self.setModalBusy(false);
                                 document.getElementById('acctModal').classList.remove('show');
-                            }, function () { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Remove failed.</span>'; });
+                            }, function (err) {
+                                self.setModalBusy(false);
+                                self.saveFailed(err);
+                            });
                         },
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
