@@ -35,16 +35,10 @@ internal static class SerializdCollectionStore
         [JsonIgnore] public Guid CollectionId => Guid.TryParse(Id, out var g) ? g : Guid.Empty;
     }
 
-    /// <summary>Test-only hook for the file location. Production uses the plugin configurations dir.</summary>
-    internal static string? DataPathOverride { get; set; }
-
     private static string DataPath
     {
         get
         {
-            if (!string.IsNullOrEmpty(DataPathOverride))
-                return DataPathOverride!;
-
             var configFile = Plugin.Instance?.ConfigurationFilePath;
             var dir = string.IsNullOrEmpty(configFile) ? null : Path.GetDirectoryName(configFile);
             if (string.IsNullOrEmpty(dir))
@@ -53,8 +47,9 @@ internal static class SerializdCollectionStore
         }
     }
 
-    // The email is hashed so this file does not become a second plaintext copy of who owns which
-    // Serializd account; the key only has to be stable, never read back.
+    // The key only has to be stable and is never read back, so it holds a hash of the email
+    // rather than the address itself. This is tidiness, not secrecy: the email is in the plugin
+    // config in the clear, and an unsalted hash of a known address is easy to match.
     private static string Key(string userJellyfinId, string email)
         => userJellyfinId + "|" + Convert.ToHexString(
             SHA256.HashData(Encoding.UTF8.GetBytes(email.Trim().ToLowerInvariant())));

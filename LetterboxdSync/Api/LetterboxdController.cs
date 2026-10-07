@@ -392,7 +392,7 @@ public class LetterboxdController : JellyfinUserApiController
             })
             .ToList();
 
-        // Naming is admin-only, matching the Serializd collection name it shares a field with.
+        // Naming is admin-only (see PutAccounts); the page hides the field for everyone else.
         return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator() });
     }
 
@@ -456,7 +456,9 @@ public class LetterboxdController : JellyfinUserApiController
                 SkipPreviouslySynced = req.SkipPreviouslySynced,
                 StopOnFailure = req.StopOnFailure,
                 IsPrimary = req.IsPrimary,
-                // Admin-only, like the Serializd watchlist name; anyone else keeps the stored value.
+                // Admin-only, like the Serializd watchlist name: the playlist is found by name among the
+                // playlists this user can see, which can include ones shared with them, so a chosen
+                // name could aim the sync at someone else's playlist. Anyone else keeps the stored value.
                 PlaylistName = canName
                     ? (string.IsNullOrWhiteSpace(req.PlaylistName) ? null : req.PlaylistName.Trim())
                     : stored?.PlaylistName,

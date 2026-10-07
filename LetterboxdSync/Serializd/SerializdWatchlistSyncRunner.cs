@@ -237,7 +237,7 @@ public class SerializdWatchlistSyncRunner
         // resolved to a desired show/episode" (a real state, safe to reconcile away).
         var sourceWasEmpty = entries.Count == 0;
 
-        await ReconcileCollectionAsync(user, account, desiredShows, sourceWasEmpty).ConfigureAwait(false);
+        await ReconcileCollectionAsync(user, account, desiredShows, sourceWasEmpty, cancellationToken).ConfigureAwait(false);
         await ReconcilePlaylistAsync(user, desiredEpisodes, account.GetWatchlistName(), sourceWasEmpty).ConfigureAwait(false);
 
         await SeerrIntegrationAsync(account, entries, seriesByTmdb, user, cancellationToken).ConfigureAwait(false);
@@ -507,7 +507,8 @@ public class SerializdWatchlistSyncRunner
     /// collection uses: Jellyfin derives a collection's folder, and so its item id, from the name,
     /// so creating a same-named one would land in the existing collection.
     /// </summary>
-    private async Task ReconcileCollectionAsync(User user, SerializdAccount account, HashSet<Guid> desired, bool sourceWasEmpty)
+    private async Task ReconcileCollectionAsync(User user, SerializdAccount account, HashSet<Guid> desired, bool sourceWasEmpty,
+        CancellationToken cancellationToken)
     {
         var userId = user.Id.ToString("N");
         var configuredName = account.GetWatchlistCollectionName(user.Username);
@@ -535,19 +536,20 @@ public class SerializdWatchlistSyncRunner
         }
         else
         {
+            // An adopted collection keeps its name: recording the configured name as applied means
+            // only a later change to the setting renames it.
             collection = AdoptLegacyCollection(user, account);
             if (collection != null)
-            {
-                tracked = new SerializdCollectionStore.Entry { Id = collection.Id.ToString("N"), Name = configuredName };
                 SaveTracked(user, account, collection.Id, configuredName);
-            }
         }
 
+        // The resolved name changed since it was last applied: the admin changed the setting, or
+        // the Jellyfin username in the default name changed. A rename made in Jellyfin is kept.
         if (collection != null && tracked != null && !string.Equals(tracked.Name, configuredName, StringComparison.Ordinal))
         {
             var others = AllCollections().Where(b => b.Id != collection.Id).Select(b => b.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            await RenameCollectionAsync(user, account, collection, UniqueName(configuredName, others), configuredName).ConfigureAwait(false);
+            await RenameCollectionAsync(user, account, collection, UniqueName(configuredName, others), configuredName, cancellationToken).ConfigureAwait(false);
         }
 
         var createName = configuredName;
@@ -581,8 +583,8 @@ public class SerializdWatchlistSyncRunner
     /// default name wrote to the single collection named "Serializd Watchlist". That collection is
     /// adopted only when it provably belonged to this account alone: this account uses the
     /// default name (a custom name could have been pointed at any collection, so it proves
-    /// nothing), it is the only account with watchlist sync on the default name (so no one else's
-    /// shows are in it), exactly one collection has that name, and no account tracks it already.
+    /// nothing), it is the only account with watchlist sync on the default name, enabled or not,
+    /// since a disabled account may have synced into it earlier (so no one else's shows are in it), exactly one collection has that name, and no account tracks it already.
     /// Otherwise the old collection is left untouched and the caller creates a new one.
     /// </summary>
     private BoxSet? AdoptLegacyCollection(User user, SerializdAccount account)
@@ -603,22 +605,23 @@ public class SerializdWatchlistSyncRunner
         if (SerializdCollectionStore.IsTrackedByAnotherAccount(legacy[0].Id, user.Id.ToString("N"), account.Email))
             return null;
 
-        _logger.LogInformation("Serializd watchlist: keeping the existing '{Name}' collection as {Username}'s, the only account that synced into it",
+        _logger.LogInformation("Serializd watchlist: keeping the existing '{Name}' collection as {Username}'s, the only account that could have synced into it",
             legacy[0].Name, user.Username);
         return legacy[0];
     }
 
     /// <summary>Applies an admin's changed collection name; a rename made in Jellyfin itself is otherwise left alone.</summary>
-    private async Task RenameCollectionAsync(User user, SerializdAccount account, BoxSet collection, string name, string configuredName)
+    private async Task RenameCollectionAsync(User user, SerializdAccount account, BoxSet collection, string name, string configuredName,
+        CancellationToken cancellationToken)
     {
         try
         {
             collection.Name = name;
-            await _libraryManager.UpdateItemAsync(collection, collection.GetParent(), ItemUpdateType.MetadataEdit, CancellationToken.None)
+            await _libraryManager.UpdateItemAsync(collection, collection.GetParent(), ItemUpdateType.MetadataEdit, cancellationToken)
                 .ConfigureAwait(false);
             SaveTracked(user, account, collection.Id, configuredName);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning("Could not rename the Serializd watchlist collection for {Username} to '{Name}': {Message}",
                 user.Username, name, ex.Message);

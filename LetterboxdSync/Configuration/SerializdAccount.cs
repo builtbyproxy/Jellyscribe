@@ -84,8 +84,8 @@ public class SerializdAccount
     /// Optional override for the watchlist collection + playlist name, settable by admins only
     /// (the per-user endpoint keeps the stored value). When null/blank the playlist is
     /// "Serializd Watchlist" and the collection "Serializd Watchlist (Jellyfin username)". The
-    /// name is applied when the plugin creates the collection or when this setting changes; the
-    /// collection itself is tracked by id. Mirrors <see cref="Account.PlaylistName"/>.
+    /// name is applied when the plugin creates the collection and whenever the resolved name
+    /// changes (this setting, or the username in the default); the collection is tracked by id. Mirrors <see cref="Account.PlaylistName"/>.
     /// </summary>
     public string? WatchlistName { get; set; }
 
