@@ -152,4 +152,23 @@ public class DashboardMarkupTests
         Assert.DoesNotContain("current-password", page, StringComparison.Ordinal);
         Assert.Contains(root + " :focus-visible { outline: 2px solid var(--ws-focus);", page, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AdminPage_OffersThePromisedTelemetryAndLogBundlePreviews()
+    {
+        // README, the telemetry and log-bundle specs, and the bug report form all send admins to these.
+        var page = Read("configPage.html");
+        foreach (var id in new[] { "telemetryPreviewBtn", "telemetryRegenBtn", "telemetryRegenYes", "telemetryCopyBtn",
+                     "telemetryCopyRegenBtn", "sendLogsPreview", "telemetryNotice", "telemetryNoticeEnable", "telemetryNoticeDismiss" })
+            Assert.Contains($"id=\"{id}\"", page, StringComparison.Ordinal);
+        Assert.Contains("<dialog class=\"ws-modal-ov\" id=\"telemetryModal\" aria-labelledby=\"telemetryModalTitle\">", page, StringComparison.Ordinal);
+        Assert.Contains("<dialog class=\"ws-modal-ov\" id=\"logsPreviewModal\" aria-labelledby=\"logsPreviewTitle\">", page, StringComparison.Ordinal);
+        foreach (var endpoint in new[] { "Telemetry/Preview'", "Telemetry/PreviewLogs'", "Telemetry/RegenerateId'" })
+            Assert.Contains(endpoint, page, StringComparison.Ordinal);
+        // The notice is answered through the stored flag, and opens hidden until the config says to show it.
+        Assert.Contains("BannerDismissed", page, StringComparison.Ordinal);
+        Assert.Matches("id=\"telemetryNotice\"[^>]* hidden>", page);
+        // The consent text no longer promises what the payload does not keep.
+        Assert.DoesNotContain("exact numbers", page, StringComparison.Ordinal);
+    }
 }

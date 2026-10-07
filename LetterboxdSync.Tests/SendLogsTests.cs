@@ -148,6 +148,24 @@ public class SendLogsTests : IDisposable
     }
 
     [Fact]
+    public async Task PreviewWithTheTypedNote_IsByteForByteWhatTheSendUploads()
+    {
+        // Telemetry has never been on here, so the bundle carries a one-off id: the preview
+        // must show the same one the send then uploads.
+        Assert.True(string.IsNullOrEmpty(_h.Config.Telemetry.InstanceId));
+        var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");
+        System.IO.File.WriteAllText(logFile,
+            "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.Foo: a diagnostic line\n");
+
+        var preview = Assert.IsType<ContentResult>(_h.Controller.PreviewLogs("sync stops at film 3")).Content!;
+        await _h.Controller.SendLogs(new SendLogsRequest { Note = "sync stops at film 3" });
+
+        var (_, sent) = Assert.Single(_sent);
+        Assert.Equal(preview, sent);
+        Assert.Contains("sync stops at film 3", preview);
+    }
+
+    [Fact]
     public async Task SendLogs_Success_ReturnsRefCode()
     {
         var result = await _h.Controller.SendLogs(new SendLogsRequest { Note = "diary broke" });

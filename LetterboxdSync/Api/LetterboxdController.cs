@@ -868,15 +868,16 @@ public class LetterboxdController : JellyfinUserApiController
 
     /// <summary>
     /// Returns the EXACT bundle that "Send logs to developer" would upload, without
-    /// sending it. Backs the consent modal's "Preview exactly what's sent" so the user
-    /// sees the real log lines and telemetry snapshot, not just the anonymous part.
+    /// sending it, including the note the admin has typed so far. Backs the Logs tab's
+    /// Preview so the user sees the real log lines and telemetry snapshot, not just the
+    /// anonymous part.
     /// </summary>
     [HttpGet("Telemetry/PreviewLogs")]
     [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult PreviewLogs()
+    public ActionResult PreviewLogs([FromQuery] string? note = null)
     {
-        return Content(BuildLogBundleJson(null).Json, "application/json");
+        return Content(BuildLogBundleJson(string.IsNullOrEmpty(note) ? null : note).Json, "application/json");
     }
 
     /// <summary>
