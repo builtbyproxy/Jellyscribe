@@ -484,12 +484,11 @@ public class LetterboxdScraper
     private async Task<int?> ResolveTmdbIdFromSlugAsync(string slug, CancellationToken cancellationToken, bool throwOnHttpError = false)
     {
         // Check cache first, avoids HTTP request for previously resolved slugs
-        var cached = TmdbCache.Get(slug);
-        if (cached.HasValue)
+        if (TmdbCache.TryGet(slug, out var cached))
         {
             SyncProgress.IncrementCacheHit(SyncProgress.TrackLetterboxd);
             SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
-            return cached.Value == TmdbCache.NotAFilm ? null : cached.Value;
+            return cached;
         }
 
         SyncProgress.IncrementNewLookup(SyncProgress.TrackLetterboxd);
@@ -526,7 +525,8 @@ public class LetterboxdScraper
     /// and TV separately, so the same number can be an unrelated movie (tv/198102 is Hijack,
     /// movie/198102 Cutie Honey Flash). The API path skips TV links the same way. The entry is
     /// TV when the body's <c>data-tmdb-type</c> says so or, without that attribute, when the TMDb
-    /// button links to a themoviedb.org /tv/ page; a page with neither counts as a film.
+    /// button links to a themoviedb.org /tv/ page; a page with neither counts as a film. Only the
+    /// button counts: a review or list on the page can link anywhere on themoviedb.org.
     /// </summary>
     internal static (int? MovieId, bool NotAMovie) ReadTmdbEntry(string filmHtml)
     {
@@ -537,7 +537,7 @@ public class LetterboxdScraper
         var type = body?.GetAttributeValue("data-tmdb-type", string.Empty) ?? string.Empty;
         var notAMovie = type.Length > 0
             ? !type.Equals("movie", StringComparison.OrdinalIgnoreCase)
-            : (doc.DocumentNode.SelectSingleNode("//a[contains(@href, 'themoviedb.org/')]")
+            : (doc.DocumentNode.SelectSingleNode("//a[@data-track-action='TMDB']")
                 ?.GetAttributeValue("href", string.Empty) ?? string.Empty)
                 .Contains("themoviedb.org/tv/", StringComparison.OrdinalIgnoreCase);
         if (notAMovie)

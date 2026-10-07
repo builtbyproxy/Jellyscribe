@@ -600,8 +600,9 @@ public class SerializdApiClient : ISerializdService
             var wait = RetryAfterLimit.Wait(response.Headers.RetryAfter);
             if (wait == null)
             {
-                _logger.LogWarning("Serializd rate limited {Path} for longer than {Max}s, not retrying",
-                    path, RetryAfterLimit.Max.TotalSeconds);
+                // No path: some carry the member's username.
+                _logger.LogWarning("Serializd rate limited for longer than {Max}s, not retrying",
+                    RetryAfterLimit.Max.TotalSeconds);
                 return response;
             }
 

@@ -325,7 +325,7 @@ public class SerializdControllerTests : IDisposable
     [Fact]
     public async Task PostReview_EpisodeOfAShowSerializdListsAsOneSeason_PostsOnSeasonOneAtTheAbsoluteNumber()
     {
-        var (_, idHex) = AddUserWithAccount();
+        var (caller, idHex) = AddUserWithAccount();
         Authenticate(idHex);
         var series = SeriesInLibrary(220542);
         Series? readFor = null;
@@ -347,6 +347,8 @@ public class SerializdControllerTests : IDisposable
 
         Assert.IsType<OkObjectResult>(result);
         Assert.Same(series, readFor);
+        // The series is looked up in the caller's own library, never another user's.
+        _libraryManager.Received().GetItemList(Arg.Is<InternalItemsQuery>(q => q.User != null && q.User.Id == caller.Id));
         await service.Received(1).CreateEpisodeReviewAsync(220542, 9001, 13, null, "great episode", false);
     }
 

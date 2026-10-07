@@ -82,10 +82,17 @@ public class ScraperTests
     public void ReadTmdbEntry_WithoutTheTypeAttribute_FallsBackToTheTmdbLink()
     {
         Assert.Equal((null, true), LetterboxdScraper.ReadTmdbEntry(
-            "<html><body data-tmdb-id=\"198102\"><a href=\"https://www.themoviedb.org/tv/198102/\">TMDB</a></body></html>"));
+            "<html><body data-tmdb-id=\"198102\"><a href=\"https://www.themoviedb.org/tv/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>"));
         Assert.Equal((198102, false), LetterboxdScraper.ReadTmdbEntry(
-            "<html><body data-tmdb-id=\"198102\"><a href=\"https://www.themoviedb.org/movie/198102/\">TMDB</a></body></html>"));
+            "<html><body data-tmdb-id=\"198102\"><a href=\"https://www.themoviedb.org/movie/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>"));
     }
+
+    [Fact]
+    public void ReadTmdbEntry_ATvLinkInAReview_DoesNotMakeTheFilmTv()
+        => Assert.Equal((198102, false), LetterboxdScraper.ReadTmdbEntry(
+            "<html><body data-tmdb-id=\"198102\">" +
+            "<div class=\"review\"><a href=\"https://www.themoviedb.org/tv/1399/\">a show I liked</a></div>" +
+            "<a href=\"https://www.themoviedb.org/movie/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>"));
 
     [Fact]
     public void ReadTmdbEntry_OlderMarkupWithNeither_StillCountsAsAFilm()

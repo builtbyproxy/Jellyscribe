@@ -14,7 +14,8 @@ public static class TmdbCache
 {
     /// <summary>
     /// Stored for a slug whose Letterboxd page is a TV entry, so it is not fetched again.
-    /// TMDb ids start at 1, so it never collides with a real one.
+    /// TMDb ids start at 1, so it never collides with a real one. <see cref="Get"/> never
+    /// returns it; <see cref="TryGet"/> reports it as a known slug with no movie id.
     /// </summary>
     public const int NotAFilm = 0;
 
@@ -98,12 +99,21 @@ public static class TmdbCache
         }
     }
 
+    /// <summary>The cached TMDb movie id for a slug, or null when it is unknown or not a film.</summary>
     public static int? Get(string slug)
+        => TryGet(slug, out var tmdbId) ? tmdbId : null;
+
+    /// <summary>
+    /// True when the slug has been resolved before. <paramref name="tmdbId"/> is its TMDb movie
+    /// id, or null when the slug was found to be a TV entry.
+    /// </summary>
+    public static bool TryGet(string slug, out int? tmdbId)
     {
         lock (_lock)
         {
-            var cache = Load();
-            return cache.TryGetValue(slug, out var tmdbId) ? tmdbId : null;
+            var known = Load().TryGetValue(slug, out var stored);
+            tmdbId = known && stored != NotAFilm ? stored : null;
+            return known;
         }
     }
 
