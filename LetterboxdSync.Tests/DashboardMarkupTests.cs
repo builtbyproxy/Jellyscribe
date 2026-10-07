@@ -153,6 +153,45 @@ public class DashboardMarkupTests
         Assert.Contains(root + " :focus-visible { outline: 2px solid var(--ws-focus);", page, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [MemberData(nameof(Pages))]
+    public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file, string root)
+    {
+        _ = root;
+        var page = Read(file);
+        Assert.Contains("id=\"historySearch\" placeholder=\"Search titles\" aria-label=\"Search activity by title\"", page, StringComparison.Ordinal);
+        Assert.Contains("<button type=\"button\" class=\"ws-btn\" id=\"historyMore\">Load older history</button>", page, StringComparison.Ordinal);
+
+        // GET History serves at most 200 Letterboxd events a page; asking for more silently got 200
+        // and the list stopped there. Each page asks for what the server gives, then pages by offset.
+        Assert.Matches(@"histChunk: 200,", page);
+        Assert.DoesNotMatch(@"History[^\n]*count(=|: )250", page);
+        Assert.Matches(@"offset(: |=' \+ )h\.loaded", page);
+        // The merged list stops at the oldest loaded event of a service with more to load, and an event
+        // that a later page repeats is shown once.
+        Assert.Contains("all = this.visibleEvents().filter(", page, StringComparison.Ordinal);
+        Assert.Contains("if (self.seen[k]) return false;", page, StringComparison.Ordinal);
+
+        // The group header of a binge is a button that says whether it is open.
+        Assert.Contains("class=\"ws-grp-btn ws-tc\" data-grp=\"' + id + '\" aria-expanded=\"false\"", page, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [MemberData(nameof(Pages))]
+    public void AccountDialog_NamesTheServicesPlainly_AndRewordsTheWatchlistToggleWhenTheServiceChanges(string file, string root)
+    {
+        _ = root;
+        var page = Read(file);
+        Assert.Contains("<option value=\"serializd\">Serializd: TV</option><option value=\"letterboxd\">Letterboxd: Film</option>", page, StringComparison.Ordinal);
+        // A new account opens as Serializd; switching it to Letterboxd must reword the watchlist toggle too.
+        var at = page.IndexOf("onSvcChange: function", StringComparison.Ordinal);
+        Assert.True(at >= 0, "no onSvcChange");
+        var end = new[] { "fillSecret: function", "openAccount: function" }
+            .Select(n => page.IndexOf(n, at, StringComparison.Ordinal)).Where(i => i > at).Min();
+        Assert.Contains("watchDesc.textContent = this.watchDesc(svc)", page.Substring(at, end - at), StringComparison.Ordinal);
+        Assert.Matches(@"'chkWatch', svc === 'serializd' \? !!a\.\w+ : !!a\.\w+, this\.watchDesc\(svc\)\]", page);
+    }
+
     [Fact]
     public void AdminPage_OffersThePromisedTelemetryAndLogBundlePreviews()
     {
