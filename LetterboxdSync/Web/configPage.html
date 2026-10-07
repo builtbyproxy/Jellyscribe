@@ -357,8 +357,8 @@
                     <div class="ws-row"><label class="ws-field" for="mSvc">Service</label>
                         <select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
                     <div class="ws-row"><label class="ws-field" for="mUser">Jellyfin user</label><select class="ws-input" id="mUser"></select></div>
-                    <div class="ws-row"><label class="ws-field" id="mUserLabel" for="mUsername">Email or username</label><input type="text" class="ws-input" id="mUsername" autocomplete="username" /></div>
-                    <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="current-password" /></div>
+                    <div class="ws-row"><label class="ws-field" id="mUserLabel" for="mUsername">Email or username</label><input type="text" class="ws-input" id="mUsername" autocomplete="off" /></div>
+                    <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="new-password" /></div>
                     <!-- NOTE: these ids deliberately avoid the word "cookie". Privacy and
                          anti-annoyance filter lists (Ghostery, uBlock annoyance lists, AdGuard,
                          Brave shields) carry generic cosmetic rules like [id*="cookie" i] to kill
@@ -635,7 +635,11 @@
                                 var ov = document.getElementById(id), pressedBackdrop = false;
                                 ov.addEventListener('pointerdown', function (e) { pressedBackdrop = e.target === ov; });
                                 ov.addEventListener('click', function (e) { if (e.target === ov && pressedBackdrop) self.closeModal(id); pressedBackdrop = false; });
-                                ov.addEventListener('close', function () { self.restoreFocus(id); });
+                                ov.addEventListener('close', function () {
+                                    // A closed account dialog keeps no typed password or cookies in the page.
+                                    if (id === 'acctModal') { root.querySelector('#mPassword').value = ''; root.querySelector('#mAuthBlob').value = ''; }
+                                    self.restoreFocus(id);
+                                });
                             });
                             root.querySelectorAll('.ws-modal-x').forEach(function (x) {
                                 x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) self.closeModal(ov.id); });
@@ -1026,7 +1030,6 @@
                             document.getElementById('chkDate').addEventListener('change', function () { document.getElementById('dateDaysRow').style.display = this.checked ? 'block' : 'none'; });
                             self.onSvcChange();
                             self.openModal('acctModal');
-                            self.dropAutofill(document.getElementById('mUsername').value);
                         },
                         collectModal: function () {
                             var g = function (id) { return document.getElementById(id); };
@@ -1147,14 +1150,6 @@
                             var to = this.returnFocus[id];
                             this.returnFocus[id] = null;
                             if (to && to.isConnected && typeof to.focus === 'function') to.focus();
-                        },
-                        /* The browser may fill its saved Jellyfin login into these fields. A saved diary password
-                           is never shown here, so a password the browser filled in by itself is cleared, and the
-                           login it put beside it is put back. */
-                        dropAutofill: function (login) {
-                            var pw = document.getElementById('mPassword'), user = document.getElementById('mUsername');
-                            var filled = function (el) { try { return el.matches(':autofill'); } catch (e) { try { return el.matches(':-webkit-autofill'); } catch (e2) { return false; } } };
-                            [100, 600].forEach(function (ms) { setTimeout(function () { if (filled(pw)) { pw.value = ''; user.value = login; } }, ms); });
                         },
 
                         /* ===== Review ===== */

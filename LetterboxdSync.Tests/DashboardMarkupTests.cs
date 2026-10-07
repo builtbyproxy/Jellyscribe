@@ -140,9 +140,11 @@ public class DashboardMarkupTests
         Assert.NotEmpty(fieldLabels);
         Assert.All(fieldLabels, l => Assert.Contains(" for=\"", l, StringComparison.Ordinal));
 
-        // Password managers see a login form; the saved password is still never filled in (write-only).
-        Assert.Contains("id=\"mUsername\" autocomplete=\"username\"", page, StringComparison.Ordinal);
-        Assert.Contains("id=\"mPassword\" autocomplete=\"current-password\"", page, StringComparison.Ordinal);
+        // The diary login sits on Jellyfin's own origin, where the browser keeps the Jellyfin login: it must
+        // never be offered or filled here, or the Jellyfin password would be sent to the diary.
+        Assert.Contains("id=\"mUsername\" autocomplete=\"off\"", page, StringComparison.Ordinal);
+        Assert.Contains("id=\"mPassword\" autocomplete=\"new-password\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("current-password", page, StringComparison.Ordinal);
         Assert.Contains(root + " :focus-visible { outline: 2px solid var(--ws-focus);", page, StringComparison.Ordinal);
     }
 }
