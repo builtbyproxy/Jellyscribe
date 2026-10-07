@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -132,7 +133,8 @@ public class PlaybackHandler : IHostedService, IDisposable
                         Timestamp = DateTime.UtcNow,
                         Status = SyncStatus.Skipped,
                         Error = $"Sync paused for {account.LetterboxdUsername}: login failing; re-save credentials to resume",
-                        Source = "playback"
+                        Source = "playback",
+                        Account = account.LetterboxdUsername
                     });
                     continue;
                 }
@@ -164,7 +166,8 @@ public class PlaybackHandler : IHostedService, IDisposable
                         // Sanitized: auth error messages can echo response-body fragments,
                         // and sync history renders in the dashboard.
                         Error = AuthBreaker.Sanitize(ex.Message),
-                        Source = "playback"
+                        Source = "playback",
+                        Account = account.LetterboxdUsername
                     });
                     if (AuthBreaker.RecordFailure(breakerUserId, account.LetterboxdUsername, ex.Message))
                         await AuthBreaker.NotifyOpenedAsync(_activityManager, user.Id, account.LetterboxdUsername, _logger).ConfigureAwait(false);
@@ -176,52 +179,7 @@ public class PlaybackHandler : IHostedService, IDisposable
                 try
                 {
                     using var service = authedService;
-
-                    var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
-                    var viewingDate = DateTime.Now.Date;
-
-                    var diaryInfo = await service.GetDiaryInfoAsync(film.FilmId, account.LetterboxdUsername).ConfigureAwait(false);
-
-                    if (Helpers.IsDuplicate(diaryInfo.LastDate, viewingDate))
-                    {
-                        _logger.LogInformation("{Title} already logged on Letterboxd ({LbUser}) for {Date}, skipping",
-                            e.Item.Name, account.LetterboxdUsername, viewingDate.ToString("yyyy-MM-dd"));
-                        SyncHistory.Record(new SyncEvent
-                        {
-                            FilmTitle = e.Item.Name,
-                            FilmSlug = film.Slug,
-                            TmdbId = tmdbId,
-                            Username = user.Username,
-                            Timestamp = DateTime.UtcNow,
-                            ViewingDate = viewingDate,
-                            Status = SyncStatus.Skipped,
-                            Source = "playback"
-                        });
-                        continue;
-                    }
-
-                    bool isRewatch = Helpers.IsRewatch(diaryInfo.LastDate, viewingDate);
-                    var userData = _userDataManager.GetUserData(user, e.Item!);
-                    bool liked = account.SyncFavorites && (userData?.IsFavorite ?? false);
-                    double? lbRating = Helpers.MapRating(userData?.Rating);
-
-                    await service.MarkAsWatchedAsync(film.Slug, film.FilmId, DateTime.Now, liked,
-                        film.ProductionId, isRewatch, lbRating).ConfigureAwait(false);
-
-                    var action = isRewatch ? "Logged rewatch of" : "Logged";
-                    _logger.LogInformation("{Action} {Title} to Letterboxd diary for {Username} as {LbUser}",
-                        action, e.Item.Name, user.Username, account.LetterboxdUsername);
-                    SyncHistory.Record(new SyncEvent
-                    {
-                        FilmTitle = e.Item.Name,
-                        FilmSlug = film.Slug,
-                        TmdbId = tmdbId,
-                        Username = user.Username,
-                        Timestamp = DateTime.UtcNow,
-                        ViewingDate = viewingDate,
-                        Status = isRewatch ? SyncStatus.Rewatch : SyncStatus.Success,
-                        Source = "playback"
-                    });
+                    await SyncFilmAsync(service, user, account, e.Item, tmdbId).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
@@ -232,14 +190,104 @@ public class PlaybackHandler : IHostedService, IDisposable
                         FilmTitle = e.Item.Name,
                         TmdbId = tmdbId,
                         Username = user.Username,
+                        Account = account.LetterboxdUsername,
                         Timestamp = DateTime.UtcNow,
                         Status = SyncStatus.Failed,
                         Error = ex.Message,
-                        Source = "playback"
+                        Source = "playback",
+                        PermanentFailure = ex is FilmNotFoundException
                     });
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Logs one finished film to one account, under the same per-film lock and the same duplicate
+    /// rules as the scheduled sync: the viewing date is today in the server's time zone (the day
+    /// the scheduled sync derives from LastPlayedDate), an entry already on the diary for that day
+    /// is a skip, and a recent sync in local history suppresses a second entry even when the diary
+    /// does not show it yet.
+    /// </summary>
+    private async Task SyncFilmAsync(ILetterboxdService service, Jellyfin.Database.Implementations.Entities.User user,
+        Account account, MediaBrowser.Controller.Entities.BaseItem item, int tmdbId)
+    {
+        var lbAccount = account.LetterboxdUsername;
+        var username = user.Username ?? string.Empty;
+        using var filmLock = await FilmSyncLock.AcquireAsync(user.Id.ToString("N"), lbAccount, tmdbId).ConfigureAwait(false);
+
+        var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
+        var viewingDate = Helpers.ToLocalViewingDate(DateTime.UtcNow);
+        var viewingDateStr = viewingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+        // Throws when the check fails; the caller records a retryable failure instead of posting.
+        var diaryInfo = await service.GetDiaryInfoAsync(film.FilmId, lbAccount).ConfigureAwait(false);
+
+        if (Helpers.IsDuplicate(diaryInfo.LastDate, viewingDate))
+        {
+            _logger.LogInformation("{Title} already logged on Letterboxd ({LbUser}) for {Date}, skipping",
+                item.Name, lbAccount, viewingDateStr);
+            SyncHistory.Record(new SyncEvent
+            {
+                FilmTitle = item.Name,
+                FilmSlug = film.Slug,
+                TmdbId = tmdbId,
+                Username = username,
+                Account = lbAccount,
+                Timestamp = DateTime.UtcNow,
+                ViewingDate = viewingDate,
+                Status = SyncStatus.Skipped,
+                Error = SyncHistory.AlreadyOnDiaryError,
+                Source = "playback"
+            });
+            return;
+        }
+
+        var localLastSync = SyncHistory.GetLastSuccessfulSyncDate(username, tmdbId, lbAccount);
+        if (localLastSync.HasValue && !Helpers.IsRewatch(localLastSync, viewingDate))
+        {
+            var lastSyncStr = localLastSync.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            _logger.LogInformation("{Title}: local history shows a sync to {LbUser} on {Date}, suppressing potential duplicate",
+                item.Name, lbAccount, lastSyncStr);
+            SyncHistory.Record(new SyncEvent
+            {
+                FilmTitle = item.Name,
+                FilmSlug = film.Slug,
+                TmdbId = tmdbId,
+                Username = username,
+                Account = lbAccount,
+                Timestamp = DateTime.UtcNow,
+                ViewingDate = viewingDate,
+                Status = SyncStatus.Skipped,
+                Error = $"{SyncHistory.BackstopErrorPrefix}{lastSyncStr}, suppressing potential duplicate",
+                Source = "playback"
+            });
+            return;
+        }
+
+        bool isRewatch = Helpers.IsRewatch(diaryInfo.LastDate, viewingDate);
+        var userData = _userDataManager.GetUserData(user, item);
+        bool liked = account.SyncFavorites && (userData?.IsFavorite ?? false);
+        double? lbRating = Helpers.MapRating(userData?.Rating);
+
+        await service.MarkAsWatchedAsync(film.Slug, film.FilmId, viewingDate, liked,
+            film.ProductionId, isRewatch, lbRating).ConfigureAwait(false);
+
+        var action = isRewatch ? "Logged rewatch of" : "Logged";
+        _logger.LogInformation("{Action} {Title} to Letterboxd diary for {Username} as {LbUser}",
+            action, item.Name, username, lbAccount);
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = item.Name,
+            FilmSlug = film.Slug,
+            TmdbId = tmdbId,
+            Username = username,
+            Account = lbAccount,
+            Timestamp = DateTime.UtcNow,
+            ViewingDate = viewingDate,
+            Status = isRewatch ? SyncStatus.Rewatch : SyncStatus.Success,
+            Source = "playback"
+        });
     }
 
     // internal so tests can drive the episode path directly, same as HandlePlaybackStoppedAsync.

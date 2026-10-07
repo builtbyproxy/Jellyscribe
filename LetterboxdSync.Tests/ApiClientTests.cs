@@ -342,7 +342,7 @@ public class ApiClientFilmLookupTests
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
-        var ex = await Assert.ThrowsAsync<Exception>(() => client.LookupFilmByTmdbIdAsync(99999999));
+        var ex = await Assert.ThrowsAsync<FilmNotFoundException>(() => client.LookupFilmByTmdbIdAsync(99999999));
         Assert.Contains("not found", ex.Message);
     }
 }
@@ -350,6 +350,40 @@ public class ApiClientFilmLookupTests
 public class ApiClientDiaryTests
 {
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
+
+    [Theory]
+    [InlineData("th-TH")]  // Buddhist calendar: 2026 is 2569
+    [InlineData("fa-IR")]  // Persian calendar
+    public async Task MarkAsWatchedAsync_NonGregorianServerCulture_SendsGregorianDate(string culture)
+    {
+        string? capturedBody = null;
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: (request) =>
+        {
+            if (request.Method == HttpMethod.Post &&
+                request.RequestUri?.AbsolutePath.EndsWith("/log-entries") == true)
+            {
+                capturedBody = request.Content?.ReadAsStringAsync().Result;
+                return new HttpResponseMessage(HttpStatusCode.Created);
+            }
+            return null;
+        });
+
+        var previous = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(culture);
+            using var client = new LetterboxdApiClient(TestLogger, handler);
+            await client.AuthenticateAsync("user", "pass");
+            await client.MarkAsWatchedAsync("fight-club", "2a9q", new DateTime(2026, 10, 6), liked: false);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = previous;
+        }
+
+        using var doc = JsonDocument.Parse(capturedBody!);
+        Assert.Equal("2026-10-06", doc.RootElement.GetProperty("diaryDetails").GetProperty("diaryDate").GetString());
+    }
 
     [Fact]
     public async Task MarkAsWatchedAsync_SendsCorrectBody()

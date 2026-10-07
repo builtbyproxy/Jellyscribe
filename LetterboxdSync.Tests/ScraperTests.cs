@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -68,7 +69,7 @@ public class ScraperTests
         var (http, scraper) = handler.CreateClients(TestLogger);
         using var _ = http;
 
-        await Assert.ThrowsAsync<Exception>(() => scraper.LookupFilmByTmdbIdAsync(99999));
+        await Assert.ThrowsAsync<FilmNotFoundException>(() => scraper.LookupFilmByTmdbIdAsync(99999));
     }
 
     [Fact]
@@ -268,6 +269,66 @@ public class ScraperTests
 
         Assert.Null(info.LastDate);
         Assert.False(info.HasAnyEntry);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task GetDiaryInfo_ErrorStatus_ThrowsInsteadOfReportingNoEntries(HttpStatusCode status)
+    {
+        var handler = new ScraperMockHandler((_, _) => new HttpResponseMessage(status));
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        await Assert.ThrowsAsync<DiaryCheckFailedException>(() => scraper.GetDiaryInfoAsync("test-film", "testuser"));
+    }
+
+    [Fact]
+    public async Task GetDiaryInfo_CloudflareChallenge_Throws()
+    {
+        var handler = new ScraperMockHandler((_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html><title>Just a moment...</title></html>")
+        });
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        await Assert.ThrowsAsync<DiaryCheckFailedException>(() => scraper.GetDiaryInfoAsync("test-film", "testuser"));
+    }
+
+    [Fact]
+    public async Task ScrapingService_DiaryCheck_UsesTheSlugForTheFilmIdItReturned()
+    {
+        var diaryPaths = new List<string>();
+        var handler = new ScraperMockHandler((request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path.StartsWith("/tmdb/693134"))
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<html><head><link rel=\"canonical\" href=\"https://letterboxd.com/film/dune-part-two/\" /></head></html>")
+                };
+            if (path == "/film/dune-part-two/")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<div data-film-slug=\"dune-part-two\" data-film-id=\"945898\"></div>")
+                };
+            if (path.EndsWith("/diary/"))
+            {
+                lock (diaryPaths) diaryPaths.Add(path);
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        using var service = new ScrapingLetterboxdService(TestLogger, handler);
+
+        var film = await service.LookupFilmByTmdbIdAsync(693134);
+        await service.GetDiaryInfoAsync(film.FilmId, "testuser");
+
+        // Callers pass back FilmId (the numeric id here); the diary page lives at the slug.
+        Assert.Equal("945898", film.FilmId);
+        Assert.Equal(new[] { "/testuser/film/dune-part-two/diary/" }, diaryPaths);
     }
 
     internal class ScraperMockHandler : HttpMessageHandler

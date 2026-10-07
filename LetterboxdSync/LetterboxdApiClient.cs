@@ -93,7 +93,7 @@ public class LetterboxdApiClient : ILetterboxdService
         var items = doc.RootElement.GetProperty("items");
 
         if (items.GetArrayLength() == 0)
-            throw new Exception($"Film with TMDb ID {tmdbId} not found on Letterboxd");
+            throw new FilmNotFoundException(tmdbId, $"Film with TMDb ID {tmdbId} not found on Letterboxd");
 
         var film = items[0];
         var lid = film.GetProperty("id").GetString()!;
@@ -111,8 +111,11 @@ public class LetterboxdApiClient : ILetterboxdService
             queryParams: $"member={Uri.EscapeDataString(_memberId)}&film={Uri.EscapeDataString(filmIdOrSlug)}&perPage=1&sort=WhenAdded",
             authenticated: true).ConfigureAwait(false);
 
+        // A failed check is not "no entries": reading it that way logs the film again, a
+        // duplicate whenever it was already on the diary. The caller records a retryable failure.
         if (!response.IsSuccessStatusCode)
-            return new DiaryInfo(null, false);
+            throw new DiaryCheckFailedException(
+                $"Could not check the Letterboxd diary: returned {(int)response.StatusCode}");
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
@@ -144,7 +147,7 @@ public class LetterboxdApiClient : ILetterboxdService
             ["filmId"] = filmId,
             ["diaryDetails"] = new Dictionary<string, object>
             {
-                ["diaryDate"] = viewingDate.ToString("yyyy-MM-dd"),
+                ["diaryDate"] = viewingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 ["rewatch"] = rewatch
             },
             ["like"] = liked,
@@ -190,7 +193,7 @@ public class LetterboxdApiClient : ILetterboxdService
             ["filmId"] = filmId,
             ["diaryDetails"] = new Dictionary<string, object>
             {
-                ["diaryDate"] = date ?? DateTime.Now.ToString("yyyy-MM-dd"),
+                ["diaryDate"] = date ?? DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                 ["rewatch"] = isRewatch
             },
             ["like"] = false,

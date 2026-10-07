@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using LetterboxdSync;
 using Xunit;
 
@@ -52,6 +53,8 @@ public class RatedHistoryTests
             Evt(SyncStatus.Failed, 10),
             Evt(SyncStatus.Rated, 1)
         };
+        foreach (var e in events.Where(e => e.Status == SyncStatus.Failed))
+            e.PermanentFailure = true;
         Assert.Equal(2, SyncHistory.GetConsecutiveFailureCount(events, User, Film));
     }
 

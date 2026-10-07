@@ -710,7 +710,8 @@ public class LetterboxdSyncRunnerTests : IDisposable
                 TmdbId = 1233413,
                 Username = "lachlan",
                 Timestamp = DateTime.UtcNow.AddMinutes(-i),
-                Status = SyncStatus.Failed
+                Status = SyncStatus.Failed,
+                PermanentFailure = true
             });
 
         var factoryHit = false;
@@ -748,7 +749,8 @@ public class LetterboxdSyncRunnerTests : IDisposable
                 TmdbId = 1233413,
                 Username = "lachlan",
                 Timestamp = DateTime.UtcNow.AddMinutes(-i),
-                Status = SyncStatus.Failed
+                Status = SyncStatus.Failed,
+                PermanentFailure = true
             });
 
         var factoryHit = false;

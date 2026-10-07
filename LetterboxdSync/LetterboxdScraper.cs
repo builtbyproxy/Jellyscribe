@@ -41,7 +41,7 @@ public class LetterboxdScraper
                 "See README \"Cloudflare issues\" for what to try.");
 
         if (res.StatusCode == HttpStatusCode.NotFound)
-            throw new Exception($"Film with TMDb ID {tmdbId} not found on Letterboxd.");
+            throw new FilmNotFoundException(tmdbId, $"Film with TMDb ID {tmdbId} not found on Letterboxd.");
 
         res.EnsureSuccessStatusCode();
 
@@ -70,10 +70,21 @@ public class LetterboxdScraper
         _http.SetNavHeaders(req.Headers, "same-origin");
         using var res = await _http.Http.SendAsync(req).ConfigureAwait(false);
 
-        if (!res.IsSuccessStatusCode)
+        // 404 is Letterboxd's answer for a member with no diary entry for the film. Any other
+        // error, or a Cloudflare challenge page, means the check did not happen: reading that as
+        // "not logged" would post a duplicate of a film already on the diary.
+        if (res.StatusCode == HttpStatusCode.NotFound)
             return new DiaryInfo(null, false);
 
+        if (!res.IsSuccessStatusCode)
+            throw new DiaryCheckFailedException(
+                $"Could not check the Letterboxd diary for {filmSlug}: returned {(int)res.StatusCode}");
+
         var html = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
+        if (IsCloudflareChallenge(html))
+            throw new DiaryCheckFailedException(
+                $"Could not check the Letterboxd diary for {filmSlug}: Cloudflare challenge");
+
         var dates = Helpers.ParseDiaryDates(html);
 
         return new DiaryInfo(
@@ -82,14 +93,24 @@ public class LetterboxdScraper
         );
     }
 
+    /// <summary>
+    /// Reads every page of the member's watchlist. Any early stop (an error status, a Cloudflare
+    /// challenge, an empty page after a page that linked to it, a film page that would not load,
+    /// or the page cap) throws instead of returning what was read so far: the caller reconciles
+    /// the playlist and the Seerr watchlist to this list, so a short list would remove films the
+    /// member still has watchlisted. The API path's reader behaves the same way.
+    /// </summary>
     public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username)
     {
         var tmdbIds = new List<int>();
         var page = 1;
         const int maxPages = 50;
 
-        while (page <= maxPages)
+        while (true)
         {
+            if (page > maxPages)
+                throw WatchlistIncomplete(username, tmdbIds.Count, $"more than {maxPages} pages");
+
             await Task.Delay(2000 + Random.Shared.Next(2000)).ConfigureAwait(false);
 
             using var req = new HttpRequestMessage(HttpMethod.Get, $"/{username}/watchlist/page/{page}/");
@@ -97,35 +118,32 @@ public class LetterboxdScraper
             using var res = await _http.Http.SendAsync(req).ConfigureAwait(false);
 
             if (!res.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("Watchlist page {Page} for {Username} returned {Status}. Returning {Count} films found so far.",
-                    page, username, (int)res.StatusCode, tmdbIds.Count);
-                break;
-            }
+                throw WatchlistIncomplete(username, tmdbIds.Count, $"status {(int)res.StatusCode} on page {page}");
 
             var html = await res.Content.ReadAsStringAsync().ConfigureAwait(false);
 
-            if (html.Contains("Just a moment", StringComparison.OrdinalIgnoreCase) ||
-                html.Contains("Attention Required", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogWarning("Cloudflare challenge detected on watchlist page {Page} for {Username}. " +
-                    "Returning {Count} films found so far. Try providing raw cookies with cf_clearance.",
-                    page, username, tmdbIds.Count);
-                break;
-            }
+            if (IsCloudflareChallenge(html))
+                throw WatchlistIncomplete(username, tmdbIds.Count,
+                    $"a Cloudflare challenge on page {page} (try providing raw cookies with cf_clearance)");
 
             var doc = new HtmlDocument();
             doc.LoadHtml(html);
 
             var posters = doc.DocumentNode.SelectNodes("//div[@data-component-class='LazyPoster']");
-            if (posters == null || posters.Count == 0) break;
+            if (posters == null || posters.Count == 0)
+            {
+                // An empty first page is an empty watchlist. An empty later page means the
+                // previous page linked to a page that has nothing on it.
+                if (page == 1) break;
+                throw WatchlistIncomplete(username, tmdbIds.Count, $"an empty page {page}");
+            }
 
             foreach (var poster in posters)
             {
                 var slug = poster.GetAttributeValue("data-item-slug", string.Empty);
                 if (string.IsNullOrEmpty(slug)) continue;
 
-                var tmdbId = await ResolveTmdbIdFromSlugAsync(slug).ConfigureAwait(false);
+                var tmdbId = await ResolveTmdbIdFromSlugAsync(slug, throwOnHttpError: true).ConfigureAwait(false);
                 if (tmdbId.HasValue)
                 {
                     tmdbIds.Add(tmdbId.Value);
@@ -140,6 +158,13 @@ public class LetterboxdScraper
 
         return tmdbIds;
     }
+
+    private static InvalidOperationException WatchlistIncomplete(string username, int count, string reason)
+        => new($"Could not read the whole Letterboxd watchlist for {username}: after {count} films Letterboxd returned {reason}. Nothing was changed this run.");
+
+    private static bool IsCloudflareChallenge(string html)
+        => html.Contains("Just a moment", StringComparison.OrdinalIgnoreCase)
+            || html.Contains("Attention Required", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Scrape all films a user has logged on Letterboxd and return their TMDb IDs.
@@ -395,7 +420,10 @@ public class LetterboxdScraper
         return segments[1];
     }
 
-    private async Task<int?> ResolveTmdbIdFromSlugAsync(string slug)
+    /// <param name="throwOnHttpError">True for the watchlist read, where silently dropping a
+    /// film whose page failed to load would remove it from the playlist. A 404 (the film is gone
+    /// from Letterboxd) is still a plain null.</param>
+    private async Task<int?> ResolveTmdbIdFromSlugAsync(string slug, bool throwOnHttpError = false)
     {
         // Check cache first, avoids HTTP request for previously resolved slugs
         var cached = TmdbCache.Get(slug);
@@ -413,7 +441,13 @@ public class LetterboxdScraper
         using var filmReq = new HttpRequestMessage(HttpMethod.Get, $"/film/{slug}/");
         _http.SetNavHeaders(filmReq.Headers);
         using var filmRes = await _http.Http.SendAsync(filmReq).ConfigureAwait(false);
-        if (!filmRes.IsSuccessStatusCode) return null;
+        if (!filmRes.IsSuccessStatusCode)
+        {
+            if (throwOnHttpError && filmRes.StatusCode != HttpStatusCode.NotFound)
+                throw new InvalidOperationException(
+                    $"Could not read the whole Letterboxd watchlist: the page for {slug} returned {(int)filmRes.StatusCode}. Nothing was changed this run.");
+            return null;
+        }
 
         var filmHtml = await filmRes.Content.ReadAsStringAsync().ConfigureAwait(false);
         var filmDoc = new HtmlDocument();

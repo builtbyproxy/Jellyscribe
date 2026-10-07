@@ -19,14 +19,15 @@ public class SyncHistoryLookupTests
     private static readonly DateTime ViewedYesterday = new DateTime(2026, 4, 29);
 
     private static SyncEvent Event(string username, int tmdbId, DateTime viewingDate, SyncStatus status,
-        DateTime? recordedAt = null)
+        DateTime? recordedAt = null, bool permanent = false)
         => new()
         {
             Username = username,
             TmdbId = tmdbId,
             ViewingDate = viewingDate,
             Status = status,
-            Timestamp = recordedAt ?? DateTime.UtcNow
+            Timestamp = recordedAt ?? DateTime.UtcNow,
+            PermanentFailure = permanent
         };
 
     [Fact]
@@ -241,9 +242,9 @@ public class SyncHistoryLookupTests
     {
         var events = new List<SyncEvent>
         {
-            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 1)),
-            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 2)),
-            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 3)),
+            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 1), permanent: true),
+            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 2), permanent: true),
+            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 3), permanent: true),
         };
 
         Assert.Equal(3, SyncHistory.GetConsecutiveFailureCount(events, User, FilmA));
@@ -271,10 +272,10 @@ public class SyncHistoryLookupTests
         // post-success failures count toward abandoning the film.
         var events = new List<SyncEvent>
         {
-            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 1)),
+            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 1), permanent: true),
             Event(User, FilmA, ViewedToday, SyncStatus.Success, recordedAt: new DateTime(2026, 4, 2)),
-            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 3)),
-            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 4)),
+            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 3), permanent: true),
+            Event(User, FilmA, ViewedToday, SyncStatus.Failed, recordedAt: new DateTime(2026, 4, 4), permanent: true),
         };
 
         Assert.Equal(2, SyncHistory.GetConsecutiveFailureCount(events, User, FilmA));

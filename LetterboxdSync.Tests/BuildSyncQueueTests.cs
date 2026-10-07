@@ -64,10 +64,10 @@ public class BuildSyncQueueTests
     }
 
     [Fact]
-    public void PreviouslySkippedFilmsAlsoPrioritised()
+    public void PreviouslySkippedFilmsAreNotPrioritised()
     {
-        // Skipped (e.g. from a transient duplicate-check error) is also an unfinished attempt
-        // that deserves priority on the next run.
+        // A skip is settled or deliberate (already on the diary, no TMDb id, account paused);
+        // only a failure jumps the queue, or every run would spend its budget re-checking them.
         var candidates = new[]
         {
             (Item: "fresh", TmdbId: (int?)100, ViewingDate: Today),
@@ -77,8 +77,8 @@ public class BuildSyncQueueTests
         var (queue, _) = Run(candidates,
             lastStatus: (_, tid) => tid == 200 ? SyncStatus.Skipped : null);
 
-        Assert.Equal("previouslySkipped", queue[0]);
-        Assert.Equal("fresh", queue[1]);
+        Assert.Equal("fresh", queue[0]);
+        Assert.Equal("previouslySkipped", queue[1]);
     }
 
     [Fact]

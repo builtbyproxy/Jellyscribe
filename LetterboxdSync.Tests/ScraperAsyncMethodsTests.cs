@@ -95,7 +95,7 @@ public class ScraperAsyncMethodsTests : IDisposable
     }
 
     [Fact]
-    public async Task GetWatchlistTmdbIdsAsync_CloudflareChallenge_StopsCleanly()
+    public async Task GetWatchlistTmdbIdsAsync_CloudflareChallenge_Throws()
     {
         var handler = new MockHandler((request, _) =>
             new HttpResponseMessage(HttpStatusCode.OK)
@@ -106,27 +106,71 @@ public class ScraperAsyncMethodsTests : IDisposable
         var (http, scraper) = handler.CreateClients(TestLogger);
         using var _ = http;
 
-        var ids = await scraper.GetWatchlistTmdbIdsAsync("blocked");
-
-        // The challenge detection path returns whatever was found before (zero),
-        // logs a warning, and exits the loop without crashing.
-        Assert.Empty(ids);
+        // A challenge page is a short read, not an empty watchlist: returning what was found so
+        // far would let the reconcile remove every film from the playlist.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => scraper.GetWatchlistTmdbIdsAsync("blocked"));
+        Assert.Contains("Cloudflare", ex.Message);
     }
 
     [Fact]
-    public async Task GetWatchlistTmdbIdsAsync_NonSuccessStatus_ReturnsPartial()
+    public async Task GetWatchlistTmdbIdsAsync_LaterPageFails_ThrowsRatherThanReturningTheFirstPage()
     {
-        // Simulate a 503 on the first page; the scraper should log and exit
-        // the loop, returning whatever it had collected so far (zero here).
+        TmdbCache.Set("dune-part-two", 693134);
+        var handler = new MockHandler((request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path == "/8bitproxy/watchlist/page/1/")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "<html><body>" +
+                        "<div data-component-class='LazyPoster' data-item-slug='dune-part-two'></div>" +
+                        "<ul><li><a href='/8bitproxy/watchlist/page/2/'>2</a></li></ul>" +
+                        "</body></html>")
+                };
+            return new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        });
+
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        // Returning page one alone would make the reconcile drop everything on page two.
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => scraper.GetWatchlistTmdbIdsAsync("8bitproxy"));
+        Assert.Contains("page 2", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_FilmPageFails_Throws()
+    {
+        var handler = new MockHandler((request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path == "/8bitproxy/watchlist/page/1/")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "<div data-component-class='LazyPoster' data-item-slug='uncached-film'></div>")
+                };
+            return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
+        });
+
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scraper.GetWatchlistTmdbIdsAsync("8bitproxy"));
+    }
+
+    [Fact]
+    public async Task GetWatchlistTmdbIdsAsync_NonSuccessStatus_Throws()
+    {
+        // A 503 on the first page must not read as an empty watchlist.
         var handler = new MockHandler((request, _) =>
             new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 
         var (http, scraper) = handler.CreateClients(TestLogger);
         using var _ = http;
 
-        var ids = await scraper.GetWatchlistTmdbIdsAsync("blocked");
-
-        Assert.Empty(ids);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scraper.GetWatchlistTmdbIdsAsync("blocked"));
     }
 
     [Fact]

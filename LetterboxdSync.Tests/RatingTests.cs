@@ -22,7 +22,9 @@ public class RatingTests
     }
 
     [Theory]
-    [InlineData(8.5, 4.0)]
+    [InlineData(8.5, 4.5)]
+    [InlineData(4.5, 2.5)]
+    [InlineData(2.5, 1.5)]
     [InlineData(7.3, 3.5)]
     [InlineData(6.8, 3.5)]
     [InlineData(5.5, 3.0)]
