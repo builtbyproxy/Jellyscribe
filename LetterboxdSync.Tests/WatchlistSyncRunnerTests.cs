@@ -191,6 +191,49 @@ public class WatchlistSyncRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task TryRunForUserAsync_ProgressPhases_NeverNameTheUser()
+    {
+        // GET /Progress is one process-wide snapshot that every signed-in user can read, so
+        // the phase text must not say whose sync is running.
+        var (user, userId) = MakeUser("phase-privacy-user");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId);
+
+        var phases = new List<string>();
+        void Capture()
+        {
+            var snapshot = SyncProgress.GetSnapshot();
+            phases.Add((string)snapshot.GetType().GetProperty("phase")!.GetValue(snapshot)!);
+        }
+
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetWatchlistTmdbIdsAsync(Arg.Any<string>()).Returns(_ =>
+        {
+            Capture();
+            return Task.FromResult(new List<int> { 1233413 });
+        });
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
+        {
+            Capture();
+            return Task.FromResult(service);
+        };
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(_ =>
+        {
+            Capture();
+            return new List<BaseItem>();
+        });
+
+        await _runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None);
+
+        Assert.NotEmpty(phases);
+        Assert.All(phases, p =>
+        {
+            Assert.DoesNotContain("phase-privacy-user", p, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("lb-user", p, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    [Fact]
     public async Task TryRunForUserAsync_EmptyWatchlist_NoPlaylistCreated()
     {
         var (user, userId) = MakeUser("lachlan");
