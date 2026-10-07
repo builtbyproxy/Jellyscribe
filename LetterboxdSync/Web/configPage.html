@@ -56,16 +56,17 @@
                 #letterboxdSyncConfigPage .ws-brand small { display: block; font-size: 11px; color: var(--ws-faint); margin-top: -1px; }
                 #letterboxdSyncConfigPage .ws-nav { display: flex; flex-direction: column; gap: 2px; }
                 #letterboxdSyncConfigPage .ws-nav .ws-navlabel { font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ws-faint); padding: 6px 10px 4px; }
-                #letterboxdSyncConfigPage .ws-nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ws-muted); font-weight: 500; cursor: pointer; transition: .13s; }
-                #letterboxdSyncConfigPage .ws-nav a svg { width: 16px; height: 16px; opacity: .8; }
-                #letterboxdSyncConfigPage .ws-nav a:hover { background: var(--ws-surface-2); color: var(--ws-text); }
-                #letterboxdSyncConfigPage .ws-nav a.active { background: var(--ws-primary-soft); color: var(--ws-text); }
-                #letterboxdSyncConfigPage .ws-nav a.active svg { opacity: 1; color: var(--ws-primary); }
-                #letterboxdSyncConfigPage .ws-nav a .ws-count { margin-left: auto; font-family: var(--ws-mono); font-size: 11px; color: var(--ws-faint); }
+                #letterboxdSyncConfigPage .ws-nav button { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ws-muted); font-weight: 500; cursor: pointer; transition: .13s; border: 0; background: none; font-family: inherit; font-size: inherit; line-height: inherit; width: 100%; text-align: left; }
+                #letterboxdSyncConfigPage .ws-nav button svg { width: 16px; height: 16px; opacity: .8; }
+                #letterboxdSyncConfigPage .ws-nav button:hover { background: var(--ws-surface-2); color: var(--ws-text); }
+                #letterboxdSyncConfigPage .ws-nav button.active { background: var(--ws-primary-soft); color: var(--ws-text); }
+                #letterboxdSyncConfigPage .ws-nav button.active svg { opacity: 1; color: var(--ws-primary); }
+                #letterboxdSyncConfigPage .ws-nav button .ws-count { margin-left: auto; font-family: var(--ws-mono); font-size: 11px; color: var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-main { padding: 24px 28px 40px; min-width: 0; overflow-x: hidden; }
                 #letterboxdSyncConfigPage .ws-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
                 #letterboxdSyncConfigPage .ws-head h1 { font-size: 21px; font-weight: 650; letter-spacing: -.02em; margin: 0; }
                 #letterboxdSyncConfigPage .ws-head p { margin: 4px 0 0; color: var(--ws-muted); font-size: 13px; }
+                #letterboxdSyncConfigPage :focus-visible { outline: 2px solid var(--ws-focus); outline-offset: 2px; }
                 #letterboxdSyncConfigPage .ws-mono { font-family: var(--ws-mono); font-variant-numeric: tabular-nums; }
                 #letterboxdSyncConfigPage .ws-label { font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-btn { border: 1px solid var(--ws-border-strong); background: var(--ws-surface); color: var(--ws-text); font-family: inherit; font-size: 13px; font-weight: 550; padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: .14s; display: inline-flex; align-items: center; gap: 7px; }
@@ -159,13 +160,15 @@
                 #letterboxdSyncConfigPage .ws-checks label { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; font-size: 13px; }
                 #letterboxdSyncConfigPage .ws-checks input { margin-top: 2px; }
                 #letterboxdSyncConfigPage .ws-checks .desc { display: block; color: var(--ws-faint); font-size: 11.5px; }
-                #letterboxdSyncConfigPage .ws-modal-ov { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; }
-                #letterboxdSyncConfigPage .ws-modal-ov.show { display: grid; place-items: center; padding: 20px; }
+                #letterboxdSyncConfigPage .ws-modal-ov { display: none; position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; padding: 20px; box-sizing: border-box; color: var(--ws-text); background: rgba(0,0,0,.55); z-index: 1000; }
+                #letterboxdSyncConfigPage .ws-modal-ov::backdrop { background: transparent; }
+                #letterboxdSyncConfigPage .ws-modal-ov[open] { display: grid; place-items: center; }
                 #letterboxdSyncConfigPage .ws-modal { position: relative; background: var(--ws-surface); border: 1px solid var(--ws-border-strong); border-radius: 14px; padding: 22px; width: 100%; max-width: 480px; max-height: 88vh; overflow-y: auto; box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); }
                 #letterboxdSyncConfigPage .ws-modal h3 { margin: 0 0 14px; font-size: 16px; padding-right: 36px; }
                 #letterboxdSyncConfigPage .ws-modal-x { position: absolute; top: 12px; right: 14px; width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--ws-border); background: var(--ws-surface-2); color: var(--ws-muted); font-size: 21px; line-height: 1; cursor: pointer; display: grid; place-items: center; z-index: 2; }
                 #letterboxdSyncConfigPage .ws-modal-x:hover { color: var(--ws-text); border-color: var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-row { margin-bottom: 12px; }
+                #letterboxdSyncConfigPage #starRating { display: inline-block; border-radius: 8px; }
                 #letterboxdSyncConfigPage .ws-star { cursor: pointer; font-size: 1.6em; user-select: none; color: var(--ws-faint); position: relative; display: inline-block; }
                 #letterboxdSyncConfigPage .ws-star .ws-star-on { position: absolute; left: 0; top: 0; width: 0; overflow: hidden; color: var(--ws-warn); pointer-events: none; }
                 #letterboxdSyncConfigPage .ws-star.filled .ws-star-on { width: 100%; }
@@ -182,7 +185,7 @@
                     #letterboxdSyncConfigPage .ws-nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
                     #letterboxdSyncConfigPage .ws-nav::-webkit-scrollbar { display: none; }
                     #letterboxdSyncConfigPage .ws-navlabel { display: none; }
-                    #letterboxdSyncConfigPage .ws-nav a { white-space: nowrap; padding: 8px 13px; flex: 0 0 auto; }
+                    #letterboxdSyncConfigPage .ws-nav button { white-space: nowrap; padding: 8px 13px; flex: 0 0 auto; width: auto; }
                     #letterboxdSyncConfigPage .ws-main { padding: 16px 13px 34px; overflow-x: hidden; }
                     #letterboxdSyncConfigPage .ws-head { flex-direction: column; align-items: stretch; gap: 12px; }
                     #letterboxdSyncConfigPage .ws-head h1 { font-size: 18px; }
@@ -194,7 +197,7 @@
                     #letterboxdSyncConfigPage .ws-table thead th, #letterboxdSyncConfigPage .ws-table tbody td { padding: 10px 11px; }
                     #letterboxdSyncConfigPage .ws-table th:nth-child(3), #letterboxdSyncConfigPage .ws-table td:nth-child(3) { display: none; }
                     #letterboxdSyncConfigPage .ws-titlecell { gap: 8px; }
-                    #letterboxdSyncConfigPage .ws-modal-ov.show { padding: 10px 10px 32px; align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+                    #letterboxdSyncConfigPage .ws-modal-ov[open] { padding: 10px 10px 32px; align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch; }
                     #letterboxdSyncConfigPage .ws-modal { padding: 16px; max-width: none; margin: 6px auto; max-height: none; overflow-y: visible; }
                 }
                 #letterboxdSyncConfigPage .ws-tc .ws-mwhen { display: none; }
@@ -235,12 +238,12 @@
                         </div>
                         <nav class="ws-nav" id="wsNav">
                             <div class="ws-navlabel">You</div>
-                            <a class="active" data-sec="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</a>
-                            <a data-sec="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h4l2 6 4-14 2 8h4"/></svg>Activity</a>
+                            <button type="button" class="active" aria-current="page" data-sec="overview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Overview</button>
+                            <button type="button" data-sec="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12h4l2 6 4-14 2 8h4"/></svg>Activity</button>
                             <div class="ws-navlabel">Server</div>
-                            <a data-sec="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M4 20c0-3 2.2-5 5-5s5 2 5 5"/><circle cx="17" cy="8" r="2.6"/></svg>Accounts<span class="ws-count" id="acctCount"></span></a>
-                            <a data-sec="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Integrations</a>
-                            <a data-sec="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 8h8M8 12h8M8 16h5"/></svg>Logs</a>
+                            <button type="button" data-sec="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M4 20c0-3 2.2-5 5-5s5 2 5 5"/><circle cx="17" cy="8" r="2.6"/></svg>Accounts<span class="ws-count" id="acctCount"></span></button>
+                            <button type="button" data-sec="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Integrations</button>
+                            <button type="button" data-sec="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 8h8M8 12h8M8 16h5"/></svg>Logs</button>
                         </nav>
                         </div>
                     </aside>
@@ -322,7 +325,7 @@
                             <div class="ws-panel" style="padding:18px;margin-bottom:14px;">
                                 <div class="ws-sect-title" style="margin-top:0;"><h2>Seerr</h2><span class="rule"></span></div>
                                 <p class="ws-muted" style="font-size:12.5px;margin-top:0;">Auto-request titles missing from the library (films and TV shows).</p>
-                                <div class="ws-row"><label class="ws-field">Seerr URL</label><input type="text" class="ws-input" id="jellyseerrUrl" placeholder="http://seerr.local:5055" /></div>
+                                <div class="ws-row"><label class="ws-field" for="jellyseerrUrl">Seerr URL</label><input type="text" class="ws-input" id="jellyseerrUrl" placeholder="http://seerr.local:5055" /></div>
                                 <div class="ws-row"><label class="ws-field" for="jellyseerrApiKey">Seerr API key<span class="ws-saved" id="jellyseerrApiKeySaved" hidden>Saved</span></label><input type="password" class="ws-input" id="jellyseerrApiKey" autocomplete="new-password" placeholder="Settings → General → API Key" /><label class="ws-muted" id="jellyseerrApiKeyClearRow" style="display:none;gap:7px;align-items:center;margin-top:6px;font-size:12.5px;"><input type="checkbox" id="jellyseerrApiKeyClear" /> Remove saved key</label></div>
                                 <label class="ws-checks" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px;margin:4px 0 12px;"><input type="checkbox" id="autoApproveJellyseerr" /><span>Auto-approve requests created by Jellyscribe<span class="desc" style="display:block;color:var(--ws-faint);font-size:11.5px;">Requests are made as each user's own Seerr account, so Seerr only approves them straight away for users with Auto-Approve. With this on, Jellyscribe approves the rest with this API key so they reach Radarr/Sonarr. Turn it off to review them in Seerr yourself.</span></span></label>
                                 <div style="display:flex;gap:10px;align-items:center;"><button type="button" class="ws-btn" id="testJellyseerrBtn">Test connection</button><span id="jellyseerrTestStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
@@ -339,7 +342,7 @@
                                 <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="logsRefreshBtn">Refresh</button><button type="button" class="ws-btn primary" id="sendLogsBtn">Send to developer</button></div></div>
                             <div id="sendLogsBox" style="display:none;background:var(--ws-surface);border:1px solid var(--ws-border);border-radius:10px;padding:14px;margin-bottom:14px;">
                                 <p class="ws-muted" style="margin:0 0 10px;font-size:12.5px;">This bundles your recent log lines and plugin/Jellyfin versions and uploads them for diagnosis. Unlike anonymous telemetry, a bundle <b>may include show/film titles or a username</b> and is tied to this instance. You get a reference code to quote in a bug report.</p>
-                                <input type="text" class="ws-input" id="sendLogsNote" placeholder="Optional: what went wrong?" style="margin-bottom:10px;" />
+                                <input type="text" class="ws-input" id="sendLogsNote" aria-label="Note for the developer" placeholder="Optional: what went wrong?" style="margin-bottom:10px;" />
                                 <div style="display:flex;gap:8px;align-items:center;"><button type="button" class="ws-btn primary" id="sendLogsConfirm">Send bundle</button><button type="button" class="ws-btn" id="sendLogsCancel">Cancel</button><span id="sendLogsStatus" style="font-size:12.5px;"></span></div>
                             </div>
                             <div class="ws-panel"><pre class="ws-logs" id="logsOutput">Loading…</pre></div>
@@ -348,14 +351,14 @@
                 </div>
 
                 <!-- ACCOUNT EDIT MODAL -->
-                <div class="ws-modal-ov" id="acctModal"><div class="ws-modal">
+                <dialog class="ws-modal-ov" id="acctModal" aria-labelledby="acctModalTitle"><div class="ws-modal">
                     <button type="button" class="ws-modal-x" aria-label="Close">&times;</button>
                     <h3 id="acctModalTitle">Link a diary</h3>
-                    <div class="ws-row"><label class="ws-field">Service</label>
+                    <div class="ws-row"><label class="ws-field" for="mSvc">Service</label>
                         <select class="ws-input" id="mSvc"><option value="serializd">Serializd — TV</option><option value="letterboxd">Letterboxd — Film</option></select></div>
-                    <div class="ws-row"><label class="ws-field">Jellyfin user</label><select class="ws-input" id="mUser"></select></div>
-                    <div class="ws-row"><label class="ws-field" id="mUserLabel">Email or username</label><input type="text" class="ws-input" id="mUsername" /></div>
-                    <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="new-password" /></div>
+                    <div class="ws-row"><label class="ws-field" for="mUser">Jellyfin user</label><select class="ws-input" id="mUser"></select></div>
+                    <div class="ws-row"><label class="ws-field" id="mUserLabel" for="mUsername">Email or username</label><input type="text" class="ws-input" id="mUsername" autocomplete="username" /></div>
+                    <div class="ws-row"><label class="ws-field" for="mPassword">Password<span class="ws-saved" id="mPasswordSaved" hidden>Saved</span></label><input type="password" class="ws-input" id="mPassword" autocomplete="current-password" /></div>
                     <!-- NOTE: these ids deliberately avoid the word "cookie". Privacy and
                          anti-annoyance filter lists (Ghostery, uBlock annoyance lists, AdGuard,
                          Brave shields) carry generic cosmetic rules like [id*="cookie" i] to kill
@@ -366,11 +369,11 @@
                          Reported in issue #112. Keep the visible label as "Raw cookies"; only the
                          attributes need to stay boring. -->
                     <div class="ws-row" id="mAuthBlobRow" style="display:none;"><label class="ws-field" for="mAuthBlob">Raw cookies <span class="ws-muted" style="text-transform:none;">(recommended for Letterboxd)</span><span class="ws-saved" id="mAuthBlobSaved" hidden>Saved</span></label><input type="text" class="ws-input" id="mAuthBlob" autocomplete="off" placeholder="Paste from a signed-in browser (incl. cf_clearance)" /><label class="ws-muted" id="mAuthBlobClearRow" style="display:none;gap:7px;align-items:center;margin-top:6px;font-size:12.5px;"><input type="checkbox" id="mAuthBlobClear" /> Remove saved cookies</label></div>
-                    <div class="ws-row" id="mUserAgentRow" style="display:none;"><label class="ws-field">User-Agent <span class="ws-muted" style="text-transform:none;">(optional, match the browser you copied cookies from)</span></label><input type="text" class="ws-input" id="mUserAgent" placeholder="Mozilla/5.0 …" /></div>
+                    <div class="ws-row" id="mUserAgentRow" style="display:none;"><label class="ws-field" for="mUserAgent">User-Agent <span class="ws-muted" style="text-transform:none;">(optional, match the browser you copied cookies from)</span></label><input type="text" class="ws-input" id="mUserAgent" placeholder="Mozilla/5.0 …" /></div>
                     <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;"><button type="button" class="ws-btn" id="mVerifyBtn">Verify login</button><span id="mVerifyStatus" class="ws-muted" style="font-size:12.5px;"></span></div>
                     <div class="ws-checks" id="mChecks"></div>
-                    <div class="ws-row" id="mWatchNameRow" style="margin-top:12px;"><label class="ws-field">Watchlist name <span class="ws-muted" style="text-transform:none;">(optional)</span></label><input type="text" class="ws-input" id="mWatchName" placeholder="" /></div>
-                    <div class="ws-row" id="mLibRow" style="display:none;margin-top:12px;"><label class="ws-field">Excluded libraries <span class="ws-muted" style="text-transform:none;">(never synced to this account; applies to future syncs)</span></label><div class="ws-checks" id="mLibs"></div></div>
+                    <div class="ws-row" id="mWatchNameRow" style="margin-top:12px;"><label class="ws-field" for="mWatchName">Watchlist name <span class="ws-muted" style="text-transform:none;">(optional)</span></label><input type="text" class="ws-input" id="mWatchName" placeholder="" /></div>
+                    <div class="ws-row" id="mLibRow" style="display:none;margin-top:12px;"><span class="ws-field" id="mLibsLabel">Excluded libraries <span class="ws-muted" style="text-transform:none;">(never synced to this account; applies to future syncs)</span></span><div class="ws-checks" id="mLibs" role="group" aria-labelledby="mLibsLabel"></div></div>
                     <div style="display:flex;gap:10px;margin-top:18px;align-items:center;">
                         <button type="button" class="ws-btn primary" id="mSaveBtn">Save</button>
                         <button type="button" class="ws-btn" id="mCancelBtn">Cancel</button>
@@ -378,32 +381,32 @@
                     </div>
                     <div id="mConfirmRow" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--ws-crit);border-radius:8px;font-size:12.5px;align-items:center;gap:10px;flex-wrap:wrap;"><span>Remove this account? Jellyscribe stops syncing to it. Nothing on the diary itself is deleted.</span><span style="margin-left:auto;display:flex;gap:8px;"><button type="button" class="ws-btn danger" id="mConfirmRemoveBtn">Yes, remove</button><button type="button" class="ws-btn" id="mConfirmKeepBtn">Keep it</button></span></div>
                     <div id="mStatus" style="font-size:12.5px;margin-top:8px;"></div>
-                </div></div>
+                </div></dialog>
 
                 <!-- REVIEW MODAL -->
-                <div class="ws-modal-ov" id="reviewModal"><div class="ws-modal">
+                <dialog class="ws-modal-ov" id="reviewModal" aria-labelledby="reviewTitle"><div class="ws-modal">
                     <button type="button" class="ws-modal-x" aria-label="Close">&times;</button>
                     <h3 id="reviewTitle">Write review</h3>
-                    <textarea id="reviewText" rows="4" class="ws-input" placeholder="Write your review…"></textarea>
-                    <div class="ws-row" style="margin-top:12px;"><label class="ws-field">Rating</label><div id="starRating">
+                    <textarea id="reviewText" aria-label="Review" rows="4" class="ws-input" placeholder="Write your review…"></textarea>
+                    <div class="ws-row" style="margin-top:12px;"><span class="ws-field" id="ratingField">Rating</span><div id="starRating" role="slider" tabindex="0" aria-labelledby="ratingField" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0" aria-valuetext="No rating">
                         <span class="ws-star" data-val="1">&#9734;<span class="ws-star-on">&#9733;</span></span><span class="ws-star" data-val="2">&#9734;<span class="ws-star-on">&#9733;</span></span><span class="ws-star" data-val="3">&#9734;<span class="ws-star-on">&#9733;</span></span><span class="ws-star" data-val="4">&#9734;<span class="ws-star-on">&#9733;</span></span><span class="ws-star" data-val="5">&#9734;<span class="ws-star-on">&#9733;</span></span>
                         <span id="ratingLabel" class="ws-muted" style="margin-left:8px;font-size:12px;">No rating</span></div>
                         <input type="hidden" id="reviewRating" value="" /></div>
                     <label class="ws-muted" style="display:block;margin:8px 0;font-size:12.5px;"><input type="checkbox" id="reviewSpoilers" /> Contains spoilers</label>
                     <label class="ws-muted" id="reviewRewatchRow" style="display:block;margin:8px 0;font-size:12.5px;"><input type="checkbox" id="reviewRewatch" /> This is a rewatch</label>
                     <div id="rewatchDateRow" style="display:none;margin:8px 0;">
-                        <label class="ws-field" style="display:block;margin-bottom:4px;">Date watched</label>
+                        <label class="ws-field" for="reviewDate" style="display:block;margin-bottom:4px;">Date watched</label>
                         <input type="date" id="reviewDate" class="ws-input" style="max-width:200px;" />
                     </div>
                     <div id="reviewAccountRow" style="display:none;margin:8px 0;">
-                        <label class="ws-field" style="display:block;margin-bottom:4px;">Post as</label>
+                        <label class="ws-field" for="reviewAccount" style="display:block;margin-bottom:4px;">Post as</label>
                         <select id="reviewAccount" class="ws-input" style="max-width:280px;">
                             <option value="">All my Letterboxd accounts</option>
                         </select>
                         <span class="ws-muted" style="font-size:11.5px;display:block;margin-top:4px;">Defaults to posting on every linked Letterboxd account. Pick one to limit to that account only.</span>
                     </div>
                     <div style="display:flex;gap:10px;margin-top:8px;align-items:center;"><button type="button" class="ws-btn primary" id="reviewSubmit">Post review</button><button type="button" class="ws-btn" id="reviewCancel">Cancel</button><span id="reviewStatus" style="font-size:12.5px;"></span></div>
-                </div></div>
+                </div></dialog>
 
                 <script type="text/javascript">
                 (function () {
@@ -568,9 +571,9 @@
                         wireNav: function () {
                             var self = this, nav = document.getElementById('wsNav');
                             nav.addEventListener('click', function (e) {
-                                var a = e.target.closest('a[data-sec]'); if (!a) return;
-                                nav.querySelectorAll('a').forEach(function (x) { x.classList.remove('active'); });
-                                a.classList.add('active');
+                                var a = e.target.closest('button[data-sec]'); if (!a) return;
+                                nav.querySelectorAll('button[data-sec]').forEach(function (x) { x.classList.remove('active'); x.removeAttribute('aria-current'); });
+                                a.classList.add('active'); a.setAttribute('aria-current', 'page');
                                 var sec = a.getAttribute('data-sec');
                                 document.querySelectorAll('.ws-view').forEach(function (v) { v.classList.toggle('show', v.getAttribute('data-sec') === sec); });
                                 if (sec === 'activity') self.loadActivity(true);
@@ -609,32 +612,32 @@
                             document.getElementById('saveIntegrationsBtn').addEventListener('click', function () { self.saveIntegrations(); });
                             document.getElementById('testJellyseerrBtn').addEventListener('click', function () { self.testJellyseerr(); });
                             document.getElementById('logsRefreshBtn').addEventListener('click', function () { self.loadLogs(); });
-                            document.getElementById('mCancelBtn').addEventListener('click', function () { document.getElementById('acctModal').classList.remove('show'); });
+                            document.getElementById('mCancelBtn').addEventListener('click', function () { self.closeModal('acctModal'); });
                             document.getElementById('mSaveBtn').addEventListener('click', function () { self.saveAccount(); });
                             document.getElementById('mDeleteBtn').addEventListener('click', function () { self.confirmRemove(true); });
                             document.getElementById('mConfirmKeepBtn').addEventListener('click', function () { self.confirmRemove(false); });
                             document.getElementById('mConfirmRemoveBtn').addEventListener('click', function () { self.deleteAccount(); });
                             document.getElementById('mVerifyBtn').addEventListener('click', function () { self.verifyAccount(); });
                             document.getElementById('mSvc').addEventListener('change', function () { self.onSvcChange(); });
-                            document.getElementById('reviewCancel').addEventListener('click', function () { document.getElementById('reviewModal').classList.remove('show'); });
+                            document.getElementById('reviewCancel').addEventListener('click', function () { self.closeModal('reviewModal'); });
                             document.getElementById('reviewSubmit').addEventListener('click', function () { self.submitReview(); });
                             document.getElementById('reviewRewatch').addEventListener('change', function () {
                                 document.getElementById('rewatchDateRow').style.display = this.checked ? '' : 'none';
                             });
-                            // Close any modal via the ✕ button, the dimmed backdrop, or Escape. The backdrop counts
-                            // only when the press started there too: selecting text in a modal and releasing
-                            // outside it must not throw the draft away.
+                            // Close any modal via the ✕ button, the dimmed backdrop, or Escape (the dialog's own). The
+                            // backdrop counts only when the press started there too: selecting text in a modal and
+                            // releasing outside it must not throw the draft away.
                             ['acctModal', 'reviewModal'].forEach(function (id) {
                                 var ov = document.getElementById(id), pressedBackdrop = false;
                                 ov.addEventListener('pointerdown', function (e) { pressedBackdrop = e.target === ov; });
-                                ov.addEventListener('click', function (e) { if (e.target === ov && pressedBackdrop) ov.classList.remove('show'); pressedBackdrop = false; });
+                                ov.addEventListener('click', function (e) { if (e.target === ov && pressedBackdrop) self.closeModal(id); pressedBackdrop = false; });
+                                ov.addEventListener('close', function () { self.restoreFocus(id); });
                             });
-                            document.querySelectorAll('.ws-modal-x').forEach(function (x) {
-                                x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); });
+                            root.querySelectorAll('.ws-modal-x').forEach(function (x) {
+                                x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) self.closeModal(ov.id); });
                             });
-                            document.addEventListener('keydown', function (e) {
-                                if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); });
-                            });
+                            // Jellyfin hides this page (keeping it cached) when another is opened: never leave a dialog up over that one.
+                            root.addEventListener('viewhide', function () { self.closeModal('acctModal'); self.closeModal('reviewModal'); });
                             ['historyBody', 'actBody'].forEach(function (id) {
                                 document.getElementById(id).addEventListener('click', function (e) {
                                     var b = e.target.closest('.ws-review-btn'); if (!b) return;
@@ -656,6 +659,14 @@
                             document.getElementById('sendLogsBtn').addEventListener('click', function () { document.getElementById('sendLogsBox').style.display = 'block'; });
                             document.getElementById('sendLogsCancel').addEventListener('click', function () { document.getElementById('sendLogsBox').style.display = 'none'; });
                             document.getElementById('sendLogsConfirm').addEventListener('click', function () { self.sendLogs(); });
+                            // The rating is a slider: arrows move it by half a star, Home clears it, End is five stars.
+                            document.getElementById('starRating').addEventListener('keydown', function (e) {
+                                var v = parseFloat(document.getElementById('reviewRating').value) || 0;
+                                var step = { ArrowRight: 0.5, ArrowUp: 0.5, ArrowLeft: -0.5, ArrowDown: -0.5, PageUp: 1, PageDown: -1 }[e.key];
+                                if (e.key === 'Home') v = 0; else if (e.key === 'End') v = 5; else if (step) v = Math.min(5, Math.max(0, v + step)); else return;
+                                e.preventDefault();
+                                self.paintStars(v || null);
+                            });
                             document.querySelectorAll('#starRating .ws-star').forEach(function (star) {
                                 star.addEventListener('click', function (e) {
                                     var val = parseFloat(this.getAttribute('data-val'));
@@ -953,7 +964,7 @@
                             return rows.map(function (r) {
                                 return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>';
                             }).join('') +
-                            '<div class="ws-row" id="dateDaysRow" style="display:' + (a.EnableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.DateFilterDays || 7) + '" /></div>';
+                            '<div class="ws-row" id="dateDaysRow" style="display:' + (a.EnableDateFilter ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field" for="chkDateDays">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (a.DateFilterDays || 7) + '" /></div>';
                         },
                         // Stored ids for libraries this page listed are replaced by what is ticked; ids for
                         // libraries it did not list are kept, so a partial or failed library list can never
@@ -1007,7 +1018,8 @@
                             document.getElementById('mLibRow').style.display = (self.libraries || []).length ? 'block' : 'none';
                             document.getElementById('chkDate').addEventListener('change', function () { document.getElementById('dateDaysRow').style.display = this.checked ? 'block' : 'none'; });
                             self.onSvcChange();
-                            document.getElementById('acctModal').classList.add('show');
+                            self.openModal('acctModal');
+                            self.dropAutofill(document.getElementById('mUsername').value);
                         },
                         collectModal: function () {
                             var g = function (id) { return document.getElementById(id); };
@@ -1044,7 +1056,7 @@
                                 c[key] = self.withAccount(m.svc, c[key], orig, item);
                             }).then(function () {
                                 self.setModalBusy(false);
-                                document.getElementById('acctModal').classList.remove('show');
+                                self.closeModal('acctModal');
                                 Dashboard.processPluginConfigurationUpdateResult();
                             }, function (err) {
                                 self.setModalBusy(false);
@@ -1062,7 +1074,7 @@
                             self.setModalBusy(true);
                             self.saveConfig(function (c) { c[key] = (c[key] || []).filter(function (x) { return !self.sameAccount(svc, x, orig); }); }).then(function () {
                                 self.setModalBusy(false);
-                                document.getElementById('acctModal').classList.remove('show');
+                                self.closeModal('acctModal');
                             }, function (err) {
                                 self.setModalBusy(false);
                                 self.saveFailed(err, 'mStatus', 'Remove failed');
@@ -1105,6 +1117,37 @@
                                     });
                         },
 
+                        /* Modals are native dialogs: showModal() keeps focus inside, makes the page behind inert
+                           and closes on Escape. Focus starts on the first field and goes back on close to
+                           whatever opened the dialog. */
+                        returnFocus: {},
+                        openModal: function (id) {
+                            var ov = document.getElementById(id);
+                            if (ov.hasAttribute('open')) return;
+                            this.returnFocus[id] = document.activeElement;
+                            if (typeof ov.showModal === 'function') ov.showModal(); else ov.setAttribute('open', '');
+                            var first = Array.prototype.filter.call(ov.querySelectorAll('select, input, textarea'), function (x) { return !x.disabled && x.offsetParent !== null; })[0];
+                            if (first) first.focus();
+                        },
+                        closeModal: function (id) {
+                            var ov = document.getElementById(id);
+                            if (!ov.hasAttribute('open')) return;
+                            if (typeof ov.close === 'function') ov.close(); else { ov.removeAttribute('open'); this.restoreFocus(id); }
+                        },
+                        restoreFocus: function (id) {
+                            var to = this.returnFocus[id];
+                            this.returnFocus[id] = null;
+                            if (to && to.isConnected && typeof to.focus === 'function') to.focus();
+                        },
+                        /* The browser may fill its saved Jellyfin login into these fields. A saved diary password
+                           is never shown here, so a password the browser filled in by itself is cleared, and the
+                           login it put beside it is put back. */
+                        dropAutofill: function (login) {
+                            var pw = document.getElementById('mPassword'), user = document.getElementById('mUsername');
+                            var filled = function (el) { try { return el.matches(':autofill'); } catch (e) { try { return el.matches(':-webkit-autofill'); } catch (e2) { return false; } } };
+                            [100, 600].forEach(function (ms) { setTimeout(function () { if (filled(pw)) { pw.value = ''; user.value = login; } }, ms); });
+                        },
+
                         /* ===== Review ===== */
                         /* Paint the star widget to a 0.5-step value (null/0 clears). Single
                            writer for reviewRating and ratingLabel so click, reset, and
@@ -1112,6 +1155,8 @@
                         paintStars: function (val) {
                             document.getElementById('reviewRating').value = val || '';
                             document.getElementById('ratingLabel').textContent = val ? val + ' / 5' : 'No rating';
+                            document.getElementById('starRating').setAttribute('aria-valuenow', val || 0);
+                            document.getElementById('starRating').setAttribute('aria-valuetext', val ? val + ' out of 5 stars' : 'No rating');
                             document.querySelectorAll('#starRating .ws-star').forEach(function (s) {
                                 var sv = parseFloat(s.getAttribute('data-val'));
                                 s.classList.toggle('filled', !!val && sv <= val);
@@ -1137,7 +1182,7 @@
                             document.getElementById('reviewRewatchRow').style.display = isLetterboxd ? '' : 'none';
                             document.getElementById('reviewAccountRow').style.display = 'none';
                             if (isLetterboxd) this.populateReviewAccountDropdown();
-                            document.getElementById('reviewModal').classList.add('show');
+                            this.openModal('reviewModal');
                             this.prefillRating(svc, tmdbId);
                         },
                         /* Pre-fill the stars from the rating already stored in Jellyfin.
@@ -1207,7 +1252,7 @@
                                         // Partly posted: stay open with Post disabled, since posting again would
                                         // duplicate it on the accounts that took it.
                                         if (!(d.accounts || []).some(function (a) { return a.success === false; }))
-                                            setTimeout(function () { document.getElementById('reviewModal').classList.remove('show'); }, 1200);
+                                            setTimeout(function () { self.closeModal('reviewModal'); }, 1200);
                                     });
                                 }, function (r) {
                                     return body2json(r).then(function (d) {
