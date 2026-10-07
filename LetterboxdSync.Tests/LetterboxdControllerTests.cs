@@ -201,14 +201,24 @@ public class LetterboxdControllerTests
     }
 
     [Fact]
-    public void GetHistory_ThePageSizeTheDashboardsAskFor_IsServedInFull()
+    public void GetHistory_EveryPageSizeTheDashboardsAskFor_IsServedInFull()
     {
-        using var h = ResolvedUserHarness();
+        var asm = typeof(Plugin).Assembly;
+        var requested = new List<int>();
+        foreach (var page in new[] { "userPage.html", "configPage.html" })
+        {
+            var resource = asm.GetManifestResourceNames().Single(n => n.EndsWith(".Web." + page, StringComparison.Ordinal));
+            using var reader = new StreamReader(asm.GetManifestResourceStream(resource)!);
+            var html = reader.ReadToEnd();
+            // "/History?count=250" (userPage) and "/History', { count: 250" (configPage).
+            requested.AddRange(System.Text.RegularExpressions.Regex
+                .Matches(html, @"/History(?:\?count=|'\s*,\s*\{\s*count:\s*)(\d+)")
+                .Select(m => int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)));
+        }
 
-        // userPage.html and configPage.html both request 250 rows a page.
-        var result = h.Controller.GetHistory(count: 250);
-
-        Assert.Equal(250, Prop<int>(result, "count"));
+        Assert.NotEmpty(requested);
+        Assert.All(requested, n => Assert.True(n <= LetterboxdController.MaxHistoryPage,
+            $"a dashboard asks for {n} history rows but the endpoint serves at most {LetterboxdController.MaxHistoryPage}"));
     }
 
     [Fact]

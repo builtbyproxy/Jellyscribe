@@ -137,22 +137,24 @@ public class ApiClientRetryAfterTests
     [Fact]
     public async Task RateLimitWait_StopsWhenTheSyncIsCancelled()
     {
-        var filmRequests = 0;
+        var posts = 0;
+        using var cts = new CancellationTokenSource();
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: request =>
         {
-            if (request.RequestUri?.AbsolutePath.EndsWith("/films") != true) return null;
-            filmRequests++;
+            if (request.RequestUri?.AbsolutePath.EndsWith("/log-entries") != true) return null;
+            posts++;
+            cts.Cancel(); // the sync is stopped while the 429 comes back
             return RateLimited(TimeSpan.FromSeconds(50));
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-        var clock = Stopwatch.StartNew();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.LookupFilmByTmdbIdAsync(TmdbId, cts.Token));
+        // A write: its send is never cut off, so the cancellation can only land on the wait. An
+        // uncancellable wait would sit out the 50 s and post again.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.MarkAsWatchedAsync(
+            "test", "abc", new DateTime(2026, 10, 1), liked: false, cancellationToken: cts.Token));
 
-        Assert.Equal(1, filmRequests);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"waited {clock.Elapsed}");
+        Assert.Equal(1, posts);
     }
 }

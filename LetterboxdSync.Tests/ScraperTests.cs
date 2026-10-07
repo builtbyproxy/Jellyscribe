@@ -94,6 +94,12 @@ public class ScraperTests
             "<div class=\"review\"><a href=\"https://www.themoviedb.org/tv/1399/\">a show I liked</a></div>" +
             "<a href=\"https://www.themoviedb.org/movie/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>"));
 
+    [Theory]
+    [InlineData("film")]
+    [InlineData("Movie ")]
+    public void ReadTmdbEntry_AnUnfamiliarType_StillCountsAsAFilm(string type)
+        => Assert.Equal((198102, false), LetterboxdScraper.ReadTmdbEntry($"<html><body data-tmdb-id=\"198102\" data-tmdb-type=\"{type}\"></body></html>"));
+
     [Fact]
     public void ReadTmdbEntry_OlderMarkupWithNeither_StillCountsAsAFilm()
         => Assert.Equal((550, false), LetterboxdScraper.ReadTmdbEntry("<html><body data-tmdb-id=\"550\"></body></html>"));
@@ -140,18 +146,22 @@ public class ScraperTests
     public async Task CloudflareBackoff_StopsWhenTheSyncIsCancelled()
     {
         var requests = 0;
+        using var cts = new CancellationTokenSource();
         var handler = new ScraperMockHandler((_, _) =>
         {
             requests++;
+            // The sync is stopped during the backoff that follows this 403 (cancelling here would
+            // land on the send, which also takes the token).
+            cts.CancelAfter(TimeSpan.FromMilliseconds(300));
             return new HttpResponseMessage(HttpStatusCode.Forbidden);
         });
 
         var (http, _) = handler.CreateClients(TestLogger);
         using var __ = http;
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         var clock = System.Diagnostics.Stopwatch.StartNew();
 
-        // A 403 backs off 15 s or more before the next attempt.
+        // A 403 backs off 15 s or more before the next attempt; an uncancellable backoff would
+        // sit that out before the next send noticed the cancellation.
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => http.GetWithCloudflareRetryAsync("/tmdb/1", cancellationToken: cts.Token));
 

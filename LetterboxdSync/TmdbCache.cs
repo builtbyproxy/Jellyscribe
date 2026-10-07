@@ -17,7 +17,7 @@ public static class TmdbCache
     /// TMDb ids start at 1, so it never collides with a real one. <see cref="Get"/> never
     /// returns it; <see cref="TryGet"/> reports it as a known slug with no movie id.
     /// </summary>
-    public const int NotAFilm = 0;
+    internal const int NotAFilm = 0;
 
     private static readonly object _lock = new();
     private static Dictionary<string, int>? _cache;

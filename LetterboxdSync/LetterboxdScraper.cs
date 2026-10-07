@@ -89,7 +89,7 @@ public class LetterboxdScraper
         var filmHtml = await filmRes.Content.ReadAsStringAsync().ConfigureAwait(false);
         // Letterboxd also lists TV entries (miniseries, specials) as films, keyed by a TV id from
         // TMDb's separate TV numbering. Logging one for this movie would be the wrong title.
-        if (ReadTmdbEntry(filmHtml).NotAMovie)
+        if (ReadTmdbEntry(filmHtml).IsTv)
             throw new FilmNotFoundException(tmdbId, $"Letterboxd matched TMDb ID {tmdbId} to a TV entry ({filmSlug}), not a film.");
 
         var (filmId, productionId) = ExtractFilmIdentifiers(filmHtml, filmSlug, filmRes.Headers);
@@ -507,10 +507,10 @@ public class LetterboxdScraper
         }
 
         var filmHtml = await filmRes.Content.ReadAsStringAsync().ConfigureAwait(false);
-        var (id, notAMovie) = ReadTmdbEntry(filmHtml);
+        var (id, isTv) = ReadTmdbEntry(filmHtml);
         if (id.HasValue)
             TmdbCache.Set(slug, id.Value);
-        else if (notAMovie)
+        else if (isTv)
             // Remembered so later runs skip the page; a TV entry never becomes a film.
             TmdbCache.Set(slug, TmdbCache.NotAFilm);
 
@@ -524,23 +524,24 @@ public class LetterboxdScraper
     /// specials as films too, and their <c>data-tmdb-id</c> is a TMDb TV id: TMDb numbers movies
     /// and TV separately, so the same number can be an unrelated movie (tv/198102 is Hijack,
     /// movie/198102 Cutie Honey Flash). The API path skips TV links the same way. The entry is
-    /// TV when the body's <c>data-tmdb-type</c> says so or, without that attribute, when the TMDb
-    /// button links to a themoviedb.org /tv/ page; a page with neither counts as a film. Only the
-    /// button counts: a review or list on the page can link anywhere on themoviedb.org.
+    /// TV only when the body's <c>data-tmdb-type</c> is <c>tv</c> or, without that attribute, when
+    /// the TMDb button links to a themoviedb.org /tv/ page. Anything else counts as a film, so a
+    /// markup change can never turn every film into a cached "not a film". Only the button counts:
+    /// a review or list on the page can link anywhere on themoviedb.org.
     /// </summary>
-    internal static (int? MovieId, bool NotAMovie) ReadTmdbEntry(string filmHtml)
+    internal static (int? MovieId, bool IsTv) ReadTmdbEntry(string filmHtml)
     {
         var doc = new HtmlDocument();
         doc.LoadHtml(filmHtml);
         var body = doc.DocumentNode.SelectSingleNode("//body");
 
         var type = body?.GetAttributeValue("data-tmdb-type", string.Empty) ?? string.Empty;
-        var notAMovie = type.Length > 0
-            ? !type.Equals("movie", StringComparison.OrdinalIgnoreCase)
+        var isTv = type.Length > 0
+            ? type.Trim().Equals("tv", StringComparison.OrdinalIgnoreCase)
             : (doc.DocumentNode.SelectSingleNode("//a[@data-track-action='TMDB']")
                 ?.GetAttributeValue("href", string.Empty) ?? string.Empty)
                 .Contains("themoviedb.org/tv/", StringComparison.OrdinalIgnoreCase);
-        if (notAMovie)
+        if (isTv)
             return (null, true);
 
         var tmdbStr = body?.GetAttributeValue("data-tmdb-id", string.Empty);

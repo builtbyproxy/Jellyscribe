@@ -850,9 +850,11 @@ public class SerializdApiClientTests
     public async Task RateLimitWait_StopsWhenTheSyncIsCancelled()
     {
         int attempts = 0;
+        using var cts = new CancellationTokenSource();
         var handler = LoginThen(_ =>
         {
             attempts++;
+            cts.Cancel(); // the sync is stopped while the 429 comes back
             var resp = Json(HttpStatusCode.TooManyRequests, "{}");
             resp.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(50));
             return resp;
@@ -860,13 +862,13 @@ public class SerializdApiClientTests
 
         using var client = new SerializdApiClient(Log, handler);
         await client.AuthenticateAsync("me@example.com", "pw");
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
         var clock = System.Diagnostics.Stopwatch.StartNew();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => client.LogEpisodesAsync(1396, 3572, new[] { 1 }, cts.Token));
 
         Assert.Equal(1, attempts);
+        // An uncancellable wait would sit out the 50 s before the retry stopped at the request gate.
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"waited {clock.Elapsed}");
     }
 
@@ -889,7 +891,9 @@ public class SerializdApiClientTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SetShowMetaAsync(1396, rating: 5, like: false, cts.Token));
 
         Assert.Equal(1, attempts);
-        // The first backoff is at least 500 ms; a cancelled sync must not sit through it.
+        // An uncancellable backoff also ends in a cancellation (the retry stops at the request
+        // gate), so only the time tells them apart: the backoff is at least 500 ms, while a
+        // cancelled one returns at once.
         Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(450), $"waited {clock.Elapsed}");
     }
 

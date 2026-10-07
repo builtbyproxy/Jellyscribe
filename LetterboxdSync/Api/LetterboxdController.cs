@@ -1011,6 +1011,7 @@ public class LetterboxdController : JellyfinUserApiController
               && ep.ParentIndexNumber == seasonNumber && ep.IndexNumber == episodeNumber);
     }
 
+    /// <inheritdoc cref="TmdbLibraryLookup.FindByTmdbId"/>
     private IEnumerable<BaseItem> FindByTmdbId(User user, BaseItemKind kind, int tmdbId)
         => TmdbLibraryLookup.FindByTmdbId(_libraryManager, user, kind, tmdbId);
 

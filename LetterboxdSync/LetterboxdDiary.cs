@@ -257,7 +257,6 @@ public class LetterboxdDiary
     /// Sets the member's film rating through the site's rate action. Unlike the official API,
     /// this endpoint takes a 0-10 integer (half-stars x 2) and the numeric film id.
     /// </summary>
-    /// <param name="cancellationToken">Cancels the waits between attempts, never a request already sent.</param>
     public async Task SetFilmRatingAsync(string filmSlug, string filmId, double rating, CancellationToken cancellationToken = default)
     {
         var wireRating = ToRateEndpointScale(rating).ToString(CultureInfo.InvariantCulture);

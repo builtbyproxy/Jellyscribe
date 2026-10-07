@@ -61,7 +61,7 @@ The instance UUID SHALL be generated randomly when telemetry is first enabled, n
 
 ### Requirement: Weekly ping with jitter and week-boundary gating
 
-A daily `IScheduledTask` SHALL send the weekly ping. Each instance SHALL have a jitter slot: a start minute picked at random from 0 to 719 (00:00 to 11:59 UTC, a 12-hour window) when telemetry is first enabled, and picked again on Regenerate ID. A run SHALL send the weekly ping only when the UTC week (weeks start on Monday) has rolled over since the last successful ping and the current UTC time of day is at or past the instance's start minute; otherwise it skips, and a later daily run sends it. The task MUST NOT send if the server-computed week of the last successful ping has not yet rolled over, preventing two different payloads from targeting the same (instance, week) slot.
+A daily `IScheduledTask` SHALL send the weekly ping. Each instance SHALL have a jitter slot: a start minute picked at random from 0 to 719 (00:00 to 11:59 UTC, a 12-hour window) when telemetry is first enabled, and picked again on Regenerate ID. A run MUST NOT send the weekly ping before the instance's start minute (UTC time of day); a later daily run sends it instead. The task MUST NOT send if the server-computed week (UTC, starting Monday) of the last successful ping has not yet rolled over, preventing two different payloads from targeting the same (instance, week) slot.
 
 #### Scenario: A run before the instance's start minute waits
 
