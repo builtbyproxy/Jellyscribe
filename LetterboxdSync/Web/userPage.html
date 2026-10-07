@@ -254,7 +254,7 @@
                                 <div class="ws-tile"><div class="n ws-red" id="statFailed">-</div><div class="k ws-label">Failed</div></div>
                             </div>
                             <div class="ws-sect-title"><h2>Recent activity</h2><span class="rule"></span></div>
-                            <input type="search" class="ws-input" id="historySearch" placeholder="Search titles" style="max-width:320px;margin-bottom:10px;" />
+                            <input type="search" class="ws-input" id="historySearch" placeholder="Search titles" aria-label="Search activity by title" autocomplete="off" style="max-width:320px;margin-bottom:10px;" />
                             <div class="ws-filters" id="ovStatusFilters">
                                 <button type="button" class="ws-chip on" data-s="all">All</button>
                                 <button type="button" class="ws-chip" data-s="hide-skipped">Hide skipped</button>
@@ -335,7 +335,7 @@
                     var root = (me && (me.closest('#letterboxdUserPage') || (me.parentNode && me.parentNode.querySelector('#letterboxdUserPage')))) || document.getElementById('letterboxdUserPage');
                     function byId(id) { return root.querySelector('#' + id); }
                     var U = {
-                        serverUrl: '', token: '', ovFilter: 'all', merged: [], lb: [], sz: [], editing: null,
+                        serverUrl: '', token: '', ovFilter: 'all', merged: [], seen: {}, lb: [], sz: [], editing: null,
                         reviewSvc: '', reviewTmdb: 0, reviewSlug: '',
                         resolveAuth: function () {
                             try { if (typeof ApiClient !== 'undefined') { this.serverUrl = ApiClient.serverAddress(); this.token = ApiClient.accessToken(); if (this.serverUrl && this.token) return true; } } catch (e) {}
@@ -505,7 +505,8 @@
 
                         loadOverview: function () {
                             var self = this, LB = 'Jellyfin.Plugin.LetterboxdSync', SZ = 'Jellyfin.Plugin.LetterboxdSync/Serializd';
-                            self.histSrc = { letterboxd: { base: LB, loaded: 0, total: 0 }, serializd: { base: SZ, loaded: 0, total: 0 } };
+                            self.histSrc = { letterboxd: { base: LB, loaded: 0, total: 0, oldest: null }, serializd: { base: SZ, loaded: 0, total: 0, oldest: null } };
+                            var gen = self.histGen = (self.histGen || 0) + 1;
                             Promise.all([self.get(LB + '/Stats').then(self.json), self.get(SZ + '/Stats').then(self.json), self.fetchHistory('letterboxd'), self.fetchHistory('serializd')])
                                 .then(function (res) {
                                     var fs = res[0] || {}, ts = res[1] || {};
@@ -517,17 +518,21 @@
                                     byId('statSynced').textContent = (fs.success || 0) + (ts.success || 0);
                                     byId('statRewatches').textContent = (fs.rewatches || 0) + (ts.rewatches || 0);
                                     byId('statFailed').textContent = (fs.failed || 0) + (ts.failed || 0);
-                                    self.merged = self.byNewest(res[2].concat(res[3]));
+                                    if (gen !== self.histGen) return;
+                                    self.merged = []; self.seen = {};
+                                    self.addEvents(res[2].concat(res[3]));
                                     self.renderOverview();
                                     self.renderSparks();
                                     self.renderMore();
                                 }).catch(function () {
+                                    if (gen !== self.histGen) return;
                                     byId('historyBody').innerHTML = self.errorRow('your activity', 'loadOverview');
                                     byId('historyPagination').style.display = 'none';
                                     byId('historyMoreRow').style.display = 'none';
                                 });
                         },
-                        // The History endpoints page by offset; Letterboxd caps a page at 200.
+                        // The History endpoints page by offset. The server caps a Letterboxd page at 200, so
+                        // ask for exactly that and read the server's total to know whether more is left.
                         histChunk: 200,
                         byNewest: function (events) { return events.sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); }); },
                         fetchHistory: function (svc) {
@@ -536,30 +541,53 @@
                                 var events = (d && d.events) || [];
                                 h.loaded += events.length;
                                 h.total = events.length ? Math.max((d && d.total) || 0, h.loaded) : h.loaded;
+                                if (events.length) h.oldest = new Date(events[events.length - 1].Timestamp).getTime();
                                 return events.map(function (e) { e._svc = svc; return e; });
                             });
+                        },
+                        // Offset paging: an event logged between two loads shifts the older ones down, so the
+                        // next page starts with rows already shown. Keep one copy of each.
+                        eventKey: function (e) { return [e._svc, e.Timestamp, e.FilmTitle, e.Status, e.Source, e.Account || '', e.TmdbId].join('|'); },
+                        addEvents: function (events) {
+                            var self = this, fresh = events.filter(function (e) {
+                                var k = self.eventKey(e);
+                                if (self.seen[k]) return false;
+                                self.seen[k] = true; return true;
+                            });
+                            self.merged = self.byNewest(self.merged.concat(fresh));
+                        },
+                        // Each service pages on its own, so past the oldest loaded event of a service that has
+                        // more, the merged list would skip that service's rows. Show only what is complete.
+                        visibleEvents: function () {
+                            var cut = null, src = this.histSrc || {};
+                            Object.keys(src).forEach(function (svc) {
+                                var h = src[svc];
+                                if (h.loaded < h.total && h.oldest != null && (cut == null || h.oldest > cut)) cut = h.oldest;
+                            });
+                            return cut == null ? this.merged : this.merged.filter(function (e) { return new Date(e.Timestamp).getTime() >= cut; });
                         },
                         renderMore: function () {
                             var lb = this.histSrc.letterboxd, sz = this.histSrc.serializd;
                             var more = lb.loaded < lb.total || sz.loaded < sz.total;
                             byId('historyMoreRow').style.display = more ? 'flex' : 'none';
-                            byId('historyMoreInfo').textContent = (lb.loaded + sz.loaded) + ' of ' + (lb.total + sz.total) + ' loaded';
+                            byId('historyMoreInfo').textContent = (lb.loaded + sz.loaded) + ' of ' + (lb.total + sz.total) + ' events loaded';
                         },
-                        // ponytail: offset paging, so events logged between two loads can shift a row into
-                        // both pages and show it twice; dedupe on an event id if that ever bites.
                         loadMore: function () {
-                            var self = this, btn = byId('historyMore'), jobs = [];
+                            var self = this, btn = byId('historyMore'), jobs = [], gen = self.histGen;
+                            if (btn.disabled) return;
                             Object.keys(self.histSrc).forEach(function (svc) {
                                 var h = self.histSrc[svc];
                                 if (h.loaded >= h.total) return;
-                                jobs.push(self.fetchHistory(svc).then(function (events) { self.merged = self.byNewest(self.merged.concat(events)); }));
+                                // A reload since this started replaced the list; its pages would not line up.
+                                jobs.push(self.fetchHistory(svc).then(function (events) { if (gen === self.histGen) self.addEvents(events); }));
                             });
                             btn.disabled = true;
+                            byId('historyMoreInfo').textContent = 'Loading…';
                             Promise.all(jobs).then(function () {
-                                btn.disabled = false; self.renderOverview(); self.renderMore();
+                                btn.disabled = false; if (gen !== self.histGen) return; self.renderOverview(); self.renderMore();
                             }, function () {
-                                btn.disabled = false; self.renderOverview(); self.renderMore();
-                                byId('historyMoreInfo').innerHTML = '<span class="ws-red">Couldn\'t load older history.</span>';
+                                btn.disabled = false; if (gen !== self.histGen) return; self.renderOverview(); self.renderMore();
+                                byId('historyMoreInfo').innerHTML = '<span class="ws-red">Couldn\'t load older history. Try again.</span>';
                             });
                         },
                         json: function (r) { if (!r.ok) throw r; return r.json(); },
@@ -633,7 +661,7 @@
                         },
                         renderOverview: function () {
                             var self = this, f = this.ovFilter, q = this.ovQuery || '';
-                            var all = this.merged.filter(function (e) {
+                            var all = this.visibleEvents().filter(function (e) {
                                 return (f === 'all' || e._svc === f) && self.matchesStatus(e) && (!q || (e.FilmTitle || '').toLowerCase().indexOf(q) >= 0);
                             });
                             if (!all.length) { byId('historyBody').innerHTML = '<tr><td colspan="5" style="padding:2em;text-align:center;" class="ws-muted">' + (this.merged.length ? 'No items match these filters.' : 'No activity yet. Link an account and start watching.') + '</td></tr>'; byId('historyPagination').style.display = 'none'; return; }
@@ -697,7 +725,7 @@
                             var statuses = uniq(function (e) { return self.statusOf(e); }), sources = uniq(function (e) { return e.Source || ''; });
                             var pill = statuses.length === 1 ? self.pillHtml(statuses[0]) : '<span class="ws-pill Skipped">Mixed</span>';
                             return '<tr class="ws-grp"><td><button type="button" class="ws-grp-btn ws-tc" data-grp="' + id + '" aria-expanded="false"><span class="ws-badge tv">TV</span><div><div class="t">' + self.esc(u.show) +
-                                ' <span class="ws-grp-caret">▸</span></div><div class="m">' + u.events.length + ' episodes · ' + self.esc(episodeOf(oldest)) + '–' + self.esc(episodeOf(newest)) + '</div></div></button></td><td>' + pill +
+                                ' <span class="ws-grp-caret" aria-hidden="true">▸</span></div><div class="m">' + u.events.length + ' episodes · ' + self.esc(episodeOf(oldest)) + '–' + self.esc(episodeOf(newest)) + '<span class="ws-mwhen"> · ' + self.shortDate(new Date(newest.Timestamp)) + '</span></div></div></button></td><td>' + pill +
                                 '</td><td class="ws-src">' + (sources.length === 1 ? self.esc(sources[0]) : '') + '</td><td class="ws-when">' + self.whenOf(newest) + '</td><td></td></tr>';
                         },
 
