@@ -27,7 +27,7 @@
                 #letterboxdSyncConfigPage {
                     --ws-bg: #14161c; --ws-surface: #1c1f27; --ws-surface-2: #242833; --ws-raise: #2b3040;
                     --ws-border: rgba(255,255,255,.085); --ws-border-strong: rgba(255,255,255,.16);
-                    --ws-text: #edeff5; --ws-muted: #9aa1b5; --ws-faint: #6b7280;
+                    --ws-text: #edeff5; --ws-muted: #9aa1b5; --ws-faint: #8b93a5;
                     --ws-film: #e8b84b; --ws-tv: #90a6ee; --ws-primary: #e8b84b;
                     --ws-info: #5b8cff; --ws-warn: #e8a23c; --ws-crit: #e0714f; --ws-ok: #5fc9a8;
                     --ws-film-soft: rgba(232,184,75,.13); --ws-tv-soft: rgba(144,166,238,.14); --ws-primary-soft: rgba(232,184,75,.16);
@@ -73,7 +73,8 @@
                 #letterboxdSyncConfigPage .ws-label { font-family: var(--ws-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ws-faint); }
                 #letterboxdSyncConfigPage .ws-btn { border: 1px solid var(--ws-border-strong); background: var(--ws-surface); color: var(--ws-text); font-family: inherit; font-size: 13px; font-weight: 550; padding: 8px 14px; border-radius: 9px; cursor: pointer; transition: .14s; display: inline-flex; align-items: center; gap: 7px; }
                 #letterboxdSyncConfigPage .ws-btn:hover { border-color: var(--ws-faint); }
-                #letterboxdSyncConfigPage .ws-btn.primary { background: var(--ws-primary); border-color: var(--ws-primary); color: #fff; }
+                #letterboxdSyncConfigPage .ws-btn.primary { background: var(--ws-primary); border-color: var(--ws-primary); color: #14161c; }
+                #letterboxdSyncConfigPage .ws-btn:disabled { opacity: .45; cursor: not-allowed; }
                 #letterboxdSyncConfigPage .ws-btn.danger { color: var(--ws-crit); }
                 #letterboxdSyncConfigPage .ws-btn svg { width: 15px; height: 15px; }
                 #letterboxdSyncConfigPage .ws-filters { display: flex; gap: 7px; margin-bottom: 18px; flex-wrap: wrap; }
