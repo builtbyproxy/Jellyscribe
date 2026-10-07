@@ -216,6 +216,39 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhileALetterboxdSyncHoldsTheGate_SkipsWithoutLoggingIn()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        Plugin.Instance!.Configuration.Accounts.Add(new Account
+        {
+            UserJellyfinId = userId,
+            LetterboxdUsername = "u",
+            Enabled = true,
+            EnableDiaryImport = true
+        });
+        var factoryCalled = false;
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) =>
+        {
+            factoryCalled = true;
+            return Task.FromResult(Substitute.For<ILetterboxdService>());
+        };
+
+        Assert.True(await SyncGate.Instance.WaitAsync(0));
+        try
+        {
+            await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+        }
+        finally
+        {
+            SyncGate.Instance.Release();
+        }
+
+        Assert.False(factoryCalled, "a diary import must not hit Letterboxd while a sync holds the gate");
+        Assert.False(SyncGate.IsRunning);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_AuthFails_SkipsUserButContinues()
     {
         var (user, userId) = MakeUser("lachlan");

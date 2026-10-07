@@ -46,6 +46,26 @@ public class DiaryImportTask : IScheduledTask
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
+        // The same gate as the diary and watchlist syncs: an import alongside them would log in
+        // and scrape Letterboxd from the same IP at once, and fight over the progress display.
+        if (!await SyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogWarning("A Letterboxd sync is already running, skipping diary import");
+            return;
+        }
+
+        try
+        {
+            await ImportAllAsync(progress, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            SyncGate.Instance.Release();
+        }
+    }
+
+    private async Task ImportAllAsync(IProgress<double> progress, CancellationToken cancellationToken)
+    {
         var users = _userManager.GetUsers().ToList();
         var usersWithImport = 0;
 
