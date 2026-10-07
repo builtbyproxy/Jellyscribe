@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -23,6 +24,10 @@ public class LetterboxdScraper
     private static readonly Regex TitleRegex =
         new(@"<title[^>]*>(.*?)</title>", RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.CultureInvariant);
 
+    // tmdbId -> film, shared across instances so later runs and other accounts skip the two
+    // throttled requests. Never shared with LetterboxdApiClient: FilmId here is the numeric id.
+    private static readonly ConcurrentDictionary<int, FilmResult> FilmCache = new();
+
     public LetterboxdScraper(LetterboxdHttpClient http, ILogger logger)
     {
         _http = http;
@@ -31,6 +36,9 @@ public class LetterboxdScraper
 
     public async Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId)
     {
+        if (FilmCache.TryGetValue(tmdbId, out var cached))
+            return cached;
+
         await Task.Delay(3000 + Random.Shared.Next(2000)).ConfigureAwait(false);
 
         using var res = await _http.GetWithCloudflareRetryAsync($"/tmdb/{tmdbId}").ConfigureAwait(false);
@@ -63,7 +71,9 @@ public class LetterboxdScraper
 
         _logger.LogInformation("Resolved TMDb:{TmdbId} -> slug={Slug}, filmId={FilmId}, productionId={ProductionId}",
             tmdbId, filmSlug, filmId, productionId ?? "null");
-        return new FilmResult(filmSlug, filmId, productionId);
+        var result = new FilmResult(filmSlug, filmId, productionId);
+        FilmCache[tmdbId] = result;
+        return result;
     }
 
     public async Task<DiaryInfo> GetDiaryInfoAsync(string filmSlug, string username)

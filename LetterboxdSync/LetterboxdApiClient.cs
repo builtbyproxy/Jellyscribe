@@ -26,6 +26,10 @@ public class LetterboxdApiClient : ILetterboxdService
     // username must never get, or refresh, another account's token.
     private static readonly ConcurrentDictionary<string, TokenInfo> TokenCache = new();
 
+    // tmdbId -> film, shared across instances so later runs and other accounts skip the
+    // request. Never shared with the scraper: FilmId here is the LID.
+    private static readonly ConcurrentDictionary<int, FilmResult> FilmCache = new();
+
     public LetterboxdApiClient(ILogger logger, HttpMessageHandler? handler = null)
     {
         _logger = logger;
@@ -84,6 +88,9 @@ public class LetterboxdApiClient : ILetterboxdService
 
     public async Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId)
     {
+        if (FilmCache.TryGetValue(tmdbId, out var cached))
+            return cached;
+
         var response = await SendSignedAsync(HttpMethod.Get, "/films", queryParams: $"filmId=tmdb%3A{tmdbId}&perPage=1")
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -99,7 +106,9 @@ public class LetterboxdApiClient : ILetterboxdService
         var lid = film.GetProperty("id").GetString()!;
         var slug = ExtractSlugFromLink(film);
 
-        return new FilmResult(slug, lid, null);
+        var result = new FilmResult(slug, lid, null);
+        FilmCache[tmdbId] = result;
+        return result;
     }
 
     public async Task<DiaryInfo> GetDiaryInfoAsync(string filmIdOrSlug, string username)

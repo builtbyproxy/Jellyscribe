@@ -409,8 +409,11 @@ public class LetterboxdSyncRunner
                 using var filmLock = await FilmSyncLock.AcquireAsync(breakerUserId, lbAccount, tmdbId, cancellationToken)
                     .ConfigureAwait(false);
 
+                // Paces each film's Letterboxd requests. It runs alongside the lookup, so a cache
+                // miss on the scraping path (which throttles itself) isn't made to wait twice.
+                var pacing = Task.Delay(3000 + Random.Shared.Next(2000), cancellationToken);
                 var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
-                await Task.Delay(3000 + Random.Shared.Next(2000), cancellationToken).ConfigureAwait(false);
+                await pacing.ConfigureAwait(false);
 
                 var userData = _userDataManager.GetUserData(user, movie);
                 var viewingDate = ViewingDateFor(userData?.LastPlayedDate);
