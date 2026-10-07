@@ -122,6 +122,7 @@ public class ReviewRatingOnlyTests : IDisposable
     [InlineData(4.3)]
     [InlineData(0)]
     [InlineData(5.5)]
+    [InlineData(double.NaN)]
     public async Task RatingOnly_OffTheHalfStarScale_IsRefusedBeforeAnyLogin(double rating)
     {
         using var h = new ControllerTestHarness(currentUserId: UserId);
@@ -133,6 +134,37 @@ public class ReviewRatingOnlyTests : IDisposable
 
         Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(0, logins);
+    }
+
+    [Fact]
+    public async Task RatingOnly_Failure_ReplyCarriesOneShortLine()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "demo-cinephile");
+        var service = ApiLikeService();
+        service.SetFilmRatingAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<double>())
+            .ThrowsAsync(new Exception("Failed to rate the-godfather: Forbidden\n<html>" + new string('x', 400) + "</html>"));
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        var result = await h.Controller.PostReview(new ReviewRequest { FilmSlug = "the-godfather", Rating = 3, TmdbId = 238 });
+
+        var error = (string)Prop(result, "error")!;
+        Assert.StartsWith("Failed to rate the-godfather: Forbidden", error);
+        Assert.DoesNotContain("\n", error);
+        Assert.True(error.Length <= 161, error);
+    }
+
+    [Fact]
+    public async Task RatingOnly_Title_IsStoredAsOnePlainLine()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "demo-cinephile");
+        var service = ApiLikeService();
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        await h.Controller.PostReview(new ReviewRequest { FilmSlug = "the-godfather", Rating = 4, TmdbId = 238, Title = "The\r\nGodfather · Success" });
+
+        Assert.Equal("TheGodfather - Success · Rated 4 stars", Assert.Single(SyncHistory.GetPage(0, 10).Events).FilmTitle);
     }
 
     [Fact]

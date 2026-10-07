@@ -547,6 +547,8 @@ public class LetterboxdController : JellyfinUserApiController
     {
         if (string.IsNullOrWhiteSpace(request.FilmSlug))
             return BadRequest(new { error = "filmSlug is required" });
+        if (request.FilmSlug.Any(char.IsControl))
+            return BadRequest(new { error = "filmSlug is not a Letterboxd film slug" });
 
         // A rating with no text and no rewatch is not a diary entry (Letterboxd refuses an empty
         // review): it sets the member's film rating instead, the same call RatingSyncHandler makes.
@@ -557,7 +559,7 @@ public class LetterboxdController : JellyfinUserApiController
         if (ratingOnly)
         {
             var r = request.Rating!.Value;
-            if (r < 0.5 || r > 5.0 || Math.Abs((r * 2) - Math.Round(r * 2)) > 1e-9)
+            if (!double.IsFinite(r) || r < 0.5 || r > 5.0 || Math.Abs((r * 2) - Math.Round(r * 2)) > 1e-9)
                 return BadRequest(new { error = "A rating must be from 0.5 to 5 stars, in half stars" });
             if (request.TmdbId is not > 0)
                 return BadRequest(new { error = "A rating on its own needs the film's TMDb id" });
@@ -588,7 +590,7 @@ public class LetterboxdController : JellyfinUserApiController
         var jellyfinUsername = GetJellyfinUsername() ?? userId;
         var perAccount = new List<object>();
         var anySuccess = false;
-        Exception? lastError = null;
+        string? lastError = null;
 
         foreach (var account in accounts)
         {
@@ -630,14 +632,15 @@ public class LetterboxdController : JellyfinUserApiController
             {
                 // Logged, not recorded as a Failed event, as RatingSyncHandler does: Failed rows feed
                 // the diary sync's per-film rules, and a rating that did not land must not touch them.
-                lastError = ex;
+                // The reply carries the one-line, length-capped form: the raw message can quote a response body.
+                lastError = AuthBreaker.Sanitize(ex.Message) ?? "Failed to set the rating";
                 _logger.LogError("Failed to set the rating on {FilmSlug} as {LbUser}: {Message}",
-                    request.FilmSlug, account.LetterboxdUsername, AuthBreaker.Sanitize(ex.Message));
-                perAccount.Add(new { letterboxdUsername = account.LetterboxdUsername, success = false, error = ex.Message });
+                    request.FilmSlug, account.LetterboxdUsername, lastError);
+                perAccount.Add(new { letterboxdUsername = account.LetterboxdUsername, success = false, error = lastError });
             }
             catch (Exception ex)
             {
-                lastError = ex;
+                lastError = AuthBreaker.Sanitize(ex.Message) ?? "Failed to post the review";
                 _logger.LogError("Failed to post review for {FilmSlug} as {LbUser}: {Message}",
                     request.FilmSlug, account.LetterboxdUsername, ex.Message);
 
@@ -652,7 +655,7 @@ public class LetterboxdController : JellyfinUserApiController
                     Source = "review"
                 });
 
-                perAccount.Add(new { letterboxdUsername = account.LetterboxdUsername, success = false, error = ex.Message });
+                perAccount.Add(new { letterboxdUsername = account.LetterboxdUsername, success = false, error = lastError });
             }
         }
 
@@ -663,7 +666,7 @@ public class LetterboxdController : JellyfinUserApiController
             WriteJellyfinRating(userId, request.TmdbId, request.Rating);
 
         if (!anySuccess && lastError != null)
-            return BadRequest(new { error = lastError.Message, accounts = perAccount });
+            return BadRequest(new { error = lastError, accounts = perAccount });
 
         return Ok(new { success = true, ratedOnly = ratingOnly, accounts = perAccount });
     }
@@ -682,7 +685,9 @@ public class LetterboxdController : JellyfinUserApiController
         await service.SetFilmRatingAsync(film.Slug, film.FilmId, stars).ConfigureAwait(false);
 
         RatingPushStore.RecordPushed(userId, account.LetterboxdUsername, tmdbId, stars);
-        var title = string.IsNullOrWhiteSpace(request.Title) ? request.FilmSlug.Replace("-", " ") : request.Title.Trim();
+        // One plain line: no control characters, and no " · ", which the dashboards read as the title's end.
+        var title = new string((request.Title ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Replace('·', '-').Trim();
+        if (title.Length == 0) title = request.FilmSlug.Replace("-", " ");
         if (title.Length > 200) title = title[..200];
         SyncHistory.Record(new SyncEvent
         {

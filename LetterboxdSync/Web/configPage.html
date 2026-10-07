@@ -620,7 +620,9 @@
                                 });
                             });
                             document.getElementById('letterboxdSyncConfigPage').addEventListener('click', function (e) {
-                                var r = e.target.closest('[data-retry]'); if (r) self[r.getAttribute('data-retry')]();
+                                var r = e.target.closest('[data-retry]'), fn = r && r.getAttribute('data-retry');
+                                // Only the loaders a Retry button can name.
+                                if (['loadConfig', 'loadOverview', 'loadActivity'].indexOf(fn) >= 0) self[fn]();
                             });
                             document.getElementById('acctGroups').addEventListener('click', function (e) {
                                 var add = e.target.closest('[data-add-for]');

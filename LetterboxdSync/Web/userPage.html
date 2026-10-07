@@ -408,7 +408,9 @@
                             // Once per document: the in-app page re-runs this script on every visit.
                             if (!window.__jellyscribeEscapeHandler) { window.__jellyscribeEscapeHandler = true; document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); }); }
                             root.addEventListener('click', function (e) {
-                                var r = e.target.closest('[data-retry]'); if (r) self[r.getAttribute('data-retry')]();
+                                var r = e.target.closest('[data-retry]'), fn = r && r.getAttribute('data-retry');
+                                // Only the loaders a Retry button can name.
+                                if (['loadOverview', 'loadAccounts'].indexOf(fn) >= 0) self[fn]();
                             });
                             byId('historyBody').addEventListener('click', function (e) {
                                 var b = e.target.closest('.ws-review-btn'); if (!b) return;
