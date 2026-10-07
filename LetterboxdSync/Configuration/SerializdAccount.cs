@@ -56,9 +56,6 @@ public class SerializdAccount
         set => Password = SecretProtector.Unprotect(value) ?? string.Empty;
     }
 
-    /// <summary>Serializd username returned at login, for display in the UI. Not used for auth.</summary>
-    public string? SerializdUsername { get; set; }
-
     public bool Enabled { get; set; }
 
     /// <summary>Mark shows that are Jellyfin favourites as liked (hearted) on Serializd. Mirrors <see cref="Account.SyncFavorites"/>.</summary>
