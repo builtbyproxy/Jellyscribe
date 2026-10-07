@@ -212,13 +212,17 @@ public class LetterboxdDiary
                 continue;
             }
 
-            _logger.LogInformation("Review response for {FilmSlug}: status={Status}, body={Body}",
-                filmSlug, (int)res.StatusCode, LetterboxdHttpClient.Truncate(body, 500));
-
+            // A successful reply can echo the review back, so it is logged by size only. A failed
+            // one usually carries the error, so a short start of it is kept for diagnosis.
             if ((int)res.StatusCode < 200 || (int)res.StatusCode >= 300)
+            {
+                _logger.LogWarning("Review post for {FilmSlug} failed: status={Status}, body={Body}",
+                    filmSlug, (int)res.StatusCode, LetterboxdHttpClient.Truncate(body, 300));
                 throw new Exception($"Review post returned {(int)res.StatusCode} for {filmSlug}: {LetterboxdHttpClient.Truncate(body, 300)}");
+            }
 
-            _logger.LogInformation("Posted review for {FilmSlug}", filmSlug);
+            _logger.LogInformation("Posted review for {FilmSlug}: status={Status}, bodyLen={Len}",
+                filmSlug, (int)res.StatusCode, body.Length);
             _auth.ResetReauthGuard();
             return;
         }

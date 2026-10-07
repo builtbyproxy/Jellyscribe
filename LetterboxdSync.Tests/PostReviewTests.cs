@@ -258,6 +258,65 @@ public class PostReviewTests
         Assert.Contains($"\"diaryDate\":\"{today}\"", capturedBody!);
     }
 
+    private sealed class ListLogger : ILogger
+    {
+        public System.Collections.Generic.List<(LogLevel Level, string Message)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+            => Entries.Add((logLevel, formatter(state, exception)));
+    }
+
+    private static ReviewMockHandler EchoingReviewEndpoint(HttpStatusCode status, string body)
+    {
+        var handler = new ReviewMockHandler();
+        handler.Responder = (request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (request.Method == HttpMethod.Get && path == "/")
+                return CsrfRootResponse(handler);
+            if (request.Method == HttpMethod.Get && path == "/film/sinners/")
+                return FilmPageResponse();
+            if (request.Method == HttpMethod.Post && path.EndsWith("/api/v0/production-log-entries"))
+                return new HttpResponseMessage(status) { Content = new StringContent(body) };
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        };
+        return handler;
+    }
+
+    [Fact]
+    public async Task PostReviewAsync_Success_LogsStatusAndLength_NeverTheReplyBody()
+    {
+        // Letterboxd's reply to a new log entry can echo the review back.
+        const string review = "a private first draft about the ending";
+        var reply = "{\"id\":\"abc\",\"review\":{\"text\":\"" + review + "\"}}";
+        var logger = new ListLogger();
+
+        await EchoingReviewEndpoint(HttpStatusCode.OK, reply).CreateDiary(logger).PostReviewAsync("sinners", review, date: null);
+
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("private first draft"));
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Information
+            && e.Message.Contains("Posted review for sinners") && e.Message.Contains("status=200")
+            && e.Message.Contains($"bodyLen={reply.Length}"));
+    }
+
+    [Fact]
+    public async Task PostReviewAsync_Failure_LogsAShortStartOfTheReply()
+    {
+        var reply = "{\"error\":\"invalid rating\"}" + new string('x', 1000);
+        var logger = new ListLogger();
+
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            EchoingReviewEndpoint(HttpStatusCode.BadRequest, reply).CreateDiary(logger).PostReviewAsync("sinners", "x", date: null));
+
+        var entry = Assert.Single(logger.Entries, e => e.Message.Contains("Review post for sinners failed"));
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Contains("status=400", entry.Message);
+        Assert.Contains("invalid rating", entry.Message);
+        Assert.DoesNotContain(new string('x', 400), entry.Message);
+    }
+
     /// <summary>
     /// Self-contained mock handler that wires up an HttpClient + LetterboxdHttpClient
     /// + LetterboxdDiary chain. The Responder captures requests and produces responses;
