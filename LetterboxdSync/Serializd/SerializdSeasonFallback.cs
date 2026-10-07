@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Controller.Entities.TV;
 
@@ -24,22 +25,23 @@ internal static class SerializdSeasonFallback
     internal static Func<Series?, IReadOnlyDictionary<int, int>> SeasonLengthsReader { get; set; } = ReadSeasonLengths;
 
     public static async Task<SerializdSeasonTarget?> ResolveAsync(
-        ISerializdService service, int showTmdbId, int seasonNumber, Func<IReadOnlyDictionary<int, int>> seasonLengths)
+        ISerializdService service, int showTmdbId, int seasonNumber, Func<IReadOnlyDictionary<int, int>> seasonLengths,
+        CancellationToken cancellationToken = default)
     {
-        var seasonId = await service.ResolveSeasonIdAsync(showTmdbId, seasonNumber).ConfigureAwait(false);
+        var seasonId = await service.ResolveSeasonIdAsync(showTmdbId, seasonNumber, cancellationToken).ConfigureAwait(false);
         if (seasonId != null)
             return new SerializdSeasonTarget(seasonId.Value, 0);
 
         if (seasonNumber < 2)
             return null;
-        if (seasonNumber != 2 && await service.ResolveSeasonIdAsync(showTmdbId, 2).ConfigureAwait(false) != null)
+        if (seasonNumber != 2 && await service.ResolveSeasonIdAsync(showTmdbId, 2, cancellationToken).ConfigureAwait(false) != null)
             return null;
 
-        var firstSeasonId = await service.ResolveSeasonIdAsync(showTmdbId, 1).ConfigureAwait(false);
+        var firstSeasonId = await service.ResolveSeasonIdAsync(showTmdbId, 1, cancellationToken).ConfigureAwait(false);
         if (firstSeasonId == null)
             return null;
 
-        var firstSeasonCount = await service.GetSeasonEpisodeCountAsync(showTmdbId, 1).ConfigureAwait(false);
+        var firstSeasonCount = await service.GetSeasonEpisodeCountAsync(showTmdbId, 1, cancellationToken).ConfigureAwait(false);
         var offset = EpisodeOffset(seasonNumber, seasonLengths());
         if (firstSeasonCount == null || offset == null || offset >= firstSeasonCount)
             return null;

@@ -300,7 +300,7 @@ public class SerializdSyncRunner
         {
             if (targets.TryGetValue((show, season), out var cached)) return cached;
             var target = await SerializdSeasonFallback.ResolveAsync(service, show, season,
-                () => SerializdSeasonFallback.SeasonLengthsReader(seriesById.GetValueOrDefault(show)))
+                () => SerializdSeasonFallback.SeasonLengthsReader(seriesById.GetValueOrDefault(show)), cancellationToken)
                 .ConfigureAwait(false);
             targets[(show, season)] = target;
             if (target is { EpisodeOffset: > 0 })
@@ -357,8 +357,8 @@ public class SerializdSyncRunner
                         show, season);
                 if (fitting.Count == 0) continue;
 
-                await service.LogEpisodesAsync(show, target.SeasonId, fitting.Select(n => target.EpisodeFor(n)!.Value).ToList())
-                    .ConfigureAwait(false);
+                await service.LogEpisodesAsync(show, target.SeasonId, fitting.Select(n => target.EpisodeFor(n)!.Value).ToList(),
+                    cancellationToken).ConfigureAwait(false);
                 foreach (var n in fitting)
                     SerializdSyncHistory.Record(userId, account.Email, show, season, n);
                 failuresInARow = 0;
@@ -394,8 +394,8 @@ public class SerializdSyncRunner
                 var serializdEpisode = target?.EpisodeFor(r.Episode);
                 if (target == null || serializdEpisode == null) continue;
 
-                await service.CreateEpisodeLogAsync(r.Show, target.SeasonId, serializdEpisode.Value, r.WatchedAtUtc, r.Rating, isRewatch: false)
-                    .ConfigureAwait(false);
+                await service.CreateEpisodeLogAsync(r.Show, target.SeasonId, serializdEpisode.Value, r.WatchedAtUtc, r.Rating, isRewatch: false,
+                    cancellationToken).ConfigureAwait(false);
                 SerializdSyncHistory.Record(userId, account.Email, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
                 logged++;
                 failuresInARow = 0;
@@ -484,12 +484,12 @@ public class SerializdSyncRunner
 
             try
             {
-                await service.SetShowMetaAsync(tmdb, rating, favorite).ConfigureAwait(false);
+                await service.SetShowMetaAsync(tmdb, rating, favorite, cancellationToken).ConfigureAwait(false);
                 SerializdSyncHistory.Record(userId, account.Email, tmdb, 0, 0, SerializdSyncHistory.KindShowMeta);
                 _logger.LogInformation("Serializd: set show meta for TMDb {Show} (rating={Rating}, like={Like}) for {Username}",
                     tmdb, rating, favorite, user.Username);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 _logger.LogError("Serializd: failed setting show meta for TMDb {Show} for {Username}: {Message}",
                     tmdb, user.Username, ex.Message);

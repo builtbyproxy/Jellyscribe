@@ -840,6 +840,101 @@ public class SerializdApiClientTests
     }
 
     [Fact]
+    public async Task RateLimited_ForLongerThanTheCap_FailsAtOnceWithoutRetrying()
+    {
+        int attempts = 0;
+        var handler = LoginThen(_ =>
+        {
+            attempts++;
+            var resp = Json(HttpStatusCode.TooManyRequests, "{}");
+            resp.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromMinutes(10));
+            return resp;
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var ex = await Assert.ThrowsAsync<SerializdRequestException>(() => client.SetShowMetaAsync(1396, rating: 5, like: false));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, ex.StatusCode);
+        Assert.Equal(1, attempts);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"waited {clock.Elapsed}");
+    }
+
+    [Fact]
+    public async Task RateLimitWait_StopsWhenTheSyncIsCancelled()
+    {
+        int attempts = 0;
+        var handler = LoginThen(_ =>
+        {
+            attempts++;
+            var resp = Json(HttpStatusCode.TooManyRequests, "{}");
+            resp.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(50));
+            return resp;
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => client.LogEpisodesAsync(1396, 3572, new[] { 1 }, cts.Token));
+
+        Assert.Equal(1, attempts);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"waited {clock.Elapsed}");
+    }
+
+    [Fact]
+    public async Task ServerErrorBackoff_StopsWhenTheSyncIsCancelled()
+    {
+        int attempts = 0;
+        using var cts = new CancellationTokenSource();
+        var handler = LoginThen(_ =>
+        {
+            attempts++;
+            cts.Cancel(); // the sync is stopped while the first attempt is answered (a write, so the send itself is never cut off)
+            return Json(HttpStatusCode.ServiceUnavailable, "{}");
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.SetShowMetaAsync(1396, rating: 5, like: false, cts.Token));
+
+        Assert.Equal(1, attempts);
+        // The first backoff is at least 500 ms; a cancelled sync must not sit through it.
+        Assert.True(clock.Elapsed < TimeSpan.FromMilliseconds(450), $"waited {clock.Elapsed}");
+    }
+
+    [Fact]
+    public async Task Read_CancelledByTheCaller_IsNotRetriedAsATimeout()
+    {
+        int reads = 0;
+        using var cts = new CancellationTokenSource();
+        var handler = new AsyncApiMockHandler(async (req, ct) =>
+        {
+            if (req.RequestUri!.AbsolutePath.EndsWith("/login"))
+                return Json(HttpStatusCode.OK, "{\"username\":\"u\",\"token\":\"t\"}");
+            reads++;
+            cts.CancelAfter(50);
+            await Task.Delay(Timeout.Infinite, ct);
+            return Json(HttpStatusCode.OK, ShowJson);
+        });
+
+        using var client = new SerializdApiClient(Log, handler);
+        await client.AuthenticateAsync("me@example.com", "pw");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.ResolveSeasonIdAsync(1396, 1, cts.Token));
+
+        Assert.Equal(1, reads);
+        // Cut off by the caller, not left to run into the 60 s request timeout.
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"waited {clock.Elapsed}");
+    }
+
+    [Fact]
     public async Task TransientServerError_RetriesThenSucceeds()
     {
         int attempts = 0;

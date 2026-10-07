@@ -445,7 +445,7 @@ public class LetterboxdSyncRunner
 
                 // Throws when the check itself fails, which lands in the catch below as a
                 // retryable failure: an unanswered check must never be read as "not logged".
-                var diaryInfo = await service.GetDiaryInfoAsync(film.FilmId, lbAccount).ConfigureAwait(false);
+                var diaryInfo = await service.GetDiaryInfoAsync(film.FilmId, lbAccount, cancellationToken).ConfigureAwait(false);
                 blocksInARow = 0;
                 if (Helpers.IsDuplicate(diaryInfo.LastDate, viewingDate))
                 {
@@ -503,7 +503,7 @@ public class LetterboxdSyncRunner
                 double? lbRating = Helpers.MapRating(userData?.Rating);
 
                 await service.MarkAsWatchedAsync(film.Slug, film.FilmId, viewingDate, liked,
-                    film.ProductionId, isRewatch, lbRating).ConfigureAwait(false);
+                    film.ProductionId, isRewatch, lbRating, cancellationToken).ConfigureAwait(false);
 
                 _logger.LogInformation("{Action} {Title} (TMDb:{TmdbId}) to Letterboxd for {Username} as {LbUser} on {Date}",
                     isRewatch ? "Logged rewatch of" : "Logged", movie.Name, tmdbId, user.Username, lbAccount, viewingDateStr);
@@ -607,13 +607,13 @@ public class LetterboxdSyncRunner
     {
         if (service.IsWebsiteSession)
         {
-            var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
+            var film = await service.LookupFilmByTmdbIdAsync(tmdbId, cancellationToken).ConfigureAwait(false);
             await FilmPause(cancellationToken).ConfigureAwait(false);
             return film;
         }
 
         var pacing = FilmPause(cancellationToken);
-        var result = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
+        var result = await service.LookupFilmByTmdbIdAsync(tmdbId, cancellationToken).ConfigureAwait(false);
         await pacing.ConfigureAwait(false);
         return result;
     }

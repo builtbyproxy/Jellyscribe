@@ -101,7 +101,7 @@ public class SerializdWatchlistSyncRunner
                 {
                     await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     _logger.LogError("Serializd watchlist sync failed for {Username} as {Account}: {Message}",
                         user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
@@ -164,7 +164,7 @@ public class SerializdWatchlistSyncRunner
                 {
                     await SyncOneAsync(user, account, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     _logger.LogError("Serializd watchlist sync failed for {Username} as {Account}: {Message}",
                         user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
@@ -189,7 +189,7 @@ public class SerializdWatchlistSyncRunner
         using (var service = await SerializdServiceFactory
                    .CreateAuthenticatedAsync(account.Email, account.Password, _logger).ConfigureAwait(false))
         {
-            entries = await service.GetWatchlistAsync().ConfigureAwait(false);
+            entries = await service.GetWatchlistAsync(cancellationToken).ConfigureAwait(false);
         }
 
         WatchlistStats.SetTv(user.Id.ToString("N"), account.Email, entries.Count);

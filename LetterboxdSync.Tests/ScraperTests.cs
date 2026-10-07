@@ -62,6 +62,29 @@ public class ScraperTests
     }
 
     [Fact]
+    public async Task CloudflareBackoff_StopsWhenTheSyncIsCancelled()
+    {
+        var requests = 0;
+        var handler = new ScraperMockHandler((_, _) =>
+        {
+            requests++;
+            return new HttpResponseMessage(HttpStatusCode.Forbidden);
+        });
+
+        var (http, _) = handler.CreateClients(TestLogger);
+        using var __ = http;
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        // A 403 backs off 15 s or more before the next attempt.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => http.GetWithCloudflareRetryAsync("/tmdb/1", cancellationToken: cts.Token));
+
+        Assert.Equal(1, requests);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), $"waited {clock.Elapsed}");
+    }
+
+    [Fact]
     public async Task LookupFilmByTmdbId_NotFound_Throws()
     {
         var handler = new ScraperMockHandler((request, http) =>

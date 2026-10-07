@@ -164,33 +164,33 @@ public class SerializdApiClient : ISerializdService
         _logger.LogDebug("Authenticated with Serializd as {Account}", LogRedaction.AccountTag(_email));
     }
 
-    public async Task<int?> ResolveSeasonIdAsync(int showTmdbId, int seasonNumber)
+    public async Task<int?> ResolveSeasonIdAsync(int showTmdbId, int seasonNumber, CancellationToken cancellationToken = default)
     {
         if (SeasonCache.TryGetValue(showTmdbId, out var map) && map.TryGetValue(seasonNumber, out var cachedId))
             return cachedId;
 
         // Cache miss (or unknown season number): fetch the show fresh once. This
         // also refreshes a stale cache when a new season has aired since last time.
-        var fresh = await FetchSeasonMapAsync(showTmdbId).ConfigureAwait(false);
+        var fresh = await FetchSeasonMapAsync(showTmdbId, cancellationToken).ConfigureAwait(false);
         SeasonCache[showTmdbId] = fresh;
 
         return fresh.TryGetValue(seasonNumber, out var id) ? id : null;
     }
 
-    public async Task<int?> GetSeasonEpisodeCountAsync(int showTmdbId, int seasonNumber)
+    public async Task<int?> GetSeasonEpisodeCountAsync(int showTmdbId, int seasonNumber, CancellationToken cancellationToken = default)
     {
         if (!EpisodeCountCache.TryGetValue(showTmdbId, out var counts))
         {
-            SeasonCache[showTmdbId] = await FetchSeasonMapAsync(showTmdbId).ConfigureAwait(false);
+            SeasonCache[showTmdbId] = await FetchSeasonMapAsync(showTmdbId, cancellationToken).ConfigureAwait(false);
             counts = EpisodeCountCache.GetValueOrDefault(showTmdbId) ?? new Dictionary<int, int>();
         }
 
         return counts.TryGetValue(seasonNumber, out var count) ? count : null;
     }
 
-    private async Task<IReadOnlyDictionary<int, int>> FetchSeasonMapAsync(int showTmdbId)
+    private async Task<IReadOnlyDictionary<int, int>> FetchSeasonMapAsync(int showTmdbId, CancellationToken cancellationToken)
     {
-        using var resp = await SendAsync(HttpMethod.Get, $"/show/{showTmdbId}").ConfigureAwait(false);
+        using var resp = await SendAsync(HttpMethod.Get, $"/show/{showTmdbId}", cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -219,14 +219,14 @@ public class SerializdApiClient : ISerializdService
         return map;
     }
 
-    public async Task LogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers)
-        => await PostEpisodeLogAsync("/episode_log/add", showTmdbId, seasonId, episodeNumbers).ConfigureAwait(false);
+    public async Task LogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers, CancellationToken cancellationToken = default)
+        => await PostEpisodeLogAsync("/episode_log/add", showTmdbId, seasonId, episodeNumbers, cancellationToken).ConfigureAwait(false);
 
     public async Task UnlogEpisodesAsync(int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers)
-        => await PostEpisodeLogAsync("/episode_log/remove", showTmdbId, seasonId, episodeNumbers).ConfigureAwait(false);
+        => await PostEpisodeLogAsync("/episode_log/remove", showTmdbId, seasonId, episodeNumbers, CancellationToken.None).ConfigureAwait(false);
 
     public async Task CreateEpisodeLogAsync(int showTmdbId, int seasonId, int episodeNumber,
-        DateTime watchedAtUtc, int? rating, bool isRewatch)
+        DateTime watchedAtUtc, int? rating, bool isRewatch, CancellationToken cancellationToken = default)
     {
         // snake_case body (see /show/reviews/add). is_log=true makes it a dated Diary entry;
         // backdate is the watch date. rating is required by /show/reviews/add (omitting it
@@ -249,7 +249,7 @@ public class SerializdApiClient : ISerializdService
         payload["rating"] = rating is > 0 ? Math.Clamp(rating.Value, 1, 10) : 0;
 
         var body = JsonSerializer.Serialize(payload);
-        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -257,7 +257,8 @@ public class SerializdApiClient : ISerializdService
         }
     }
 
-    private async Task PostEpisodeLogAsync(string path, int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers)
+    private async Task PostEpisodeLogAsync(string path, int showTmdbId, int seasonId, IReadOnlyList<int> episodeNumbers,
+        CancellationToken cancellationToken)
     {
         // snake_case is load-bearing: camelCase returns 500.
         var body = JsonSerializer.Serialize(new Dictionary<string, object>
@@ -267,7 +268,7 @@ public class SerializdApiClient : ISerializdService
             ["show_id"] = showTmdbId,
         });
 
-        using var resp = await SendAsync(HttpMethod.Post, path, body).ConfigureAwait(false);
+        using var resp = await SendAsync(HttpMethod.Post, path, body, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -275,7 +276,7 @@ public class SerializdApiClient : ISerializdService
         }
     }
 
-    public async Task<List<SerializdWatchlistEntry>> GetWatchlistAsync()
+    public async Task<List<SerializdWatchlistEntry>> GetWatchlistAsync(CancellationToken cancellationToken = default)
     {
         await EnsureUsernameAsync().ConfigureAwait(false);
         if (string.IsNullOrEmpty(_username))
@@ -289,8 +290,8 @@ public class SerializdApiClient : ISerializdService
                 throw WatchlistIncomplete(entries.Count, $"more than {MaxWatchlistPages} pages");
 
             using var resp = await SendAsync(HttpMethod.Get,
-                $"/user/{Uri.EscapeDataString(_username)}/watchlistpage_v2/{page}?sort_by=date_added_desc")
-                .ConfigureAwait(false);
+                $"/user/{Uri.EscapeDataString(_username)}/watchlistpage_v2/{page}?sort_by=date_added_desc",
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
                 throw WatchlistIncomplete(entries.Count, $"status {(int)resp.StatusCode} on page {page}");
 
@@ -326,7 +327,7 @@ public class SerializdApiClient : ISerializdService
                         if (s.ValueKind == JsonValueKind.Number && s.TryGetInt32(out var sidVal))
                             serializdSeasonIds.Add(sidVal);
 
-                var seasonNumbers = await ResolveSeasonNumbersAsync(showTmdb, serializdSeasonIds).ConfigureAwait(false);
+                var seasonNumbers = await ResolveSeasonNumbersAsync(showTmdb, serializdSeasonIds, cancellationToken).ConfigureAwait(false);
                 entries.Add(new SerializdWatchlistEntry(showTmdb, seasonNumbers));
             }
 
@@ -352,7 +353,8 @@ public class SerializdApiClient : ISerializdService
         => new($"Could not read the whole Serializd watchlist: after {count} shows Serializd returned {reason}. Nothing was changed this run.");
 
     /// <summary>Maps Serializd internal season ids to season numbers via the show's season map.</summary>
-    private async Task<IReadOnlyList<int>> ResolveSeasonNumbersAsync(int showTmdbId, IReadOnlyList<int> serializdSeasonIds)
+    private async Task<IReadOnlyList<int>> ResolveSeasonNumbersAsync(int showTmdbId, IReadOnlyList<int> serializdSeasonIds,
+        CancellationToken cancellationToken)
     {
         if (serializdSeasonIds.Count == 0) return Array.Empty<int>();
 
@@ -361,7 +363,7 @@ public class SerializdApiClient : ISerializdService
         if (!SeasonCache.TryGetValue(showTmdbId, out var numberToId)
             || serializdSeasonIds.Any(sid => !numberToId.Values.Contains(sid)))
         {
-            numberToId = await FetchSeasonMapAsync(showTmdbId).ConfigureAwait(false);
+            numberToId = await FetchSeasonMapAsync(showTmdbId, cancellationToken).ConfigureAwait(false);
             SeasonCache[showTmdbId] = numberToId;
         }
 
@@ -375,7 +377,7 @@ public class SerializdApiClient : ISerializdService
         return numbers;
     }
 
-    public async Task<List<SerializdDiaryEpisode>> GetDiaryEpisodesAsync()
+    public async Task<List<SerializdDiaryEpisode>> GetDiaryEpisodesAsync(CancellationToken cancellationToken = default)
     {
         await EnsureUsernameAsync().ConfigureAwait(false);
         if (string.IsNullOrEmpty(_username))
@@ -386,7 +388,7 @@ public class SerializdApiClient : ISerializdService
         for (var page = 1; page <= 200; page++)
         {
             using var resp = await SendAsync(HttpMethod.Get,
-                $"/user/{Uri.EscapeDataString(_username)}/diary?page={page}").ConfigureAwait(false);
+                $"/user/{Uri.EscapeDataString(_username)}/diary?page={page}", cancellationToken: cancellationToken).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode) break;
 
             var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -519,7 +521,7 @@ public class SerializdApiClient : ISerializdService
             throw new SerializdRequestException(resp.StatusCode, $"Serializd episode review ({showTmdbId} S{seasonNumber}E{episodeNumber}) failed ({(int)resp.StatusCode}): {LetterboxdHttpClient.Truncate(respBody, 200)}");
     }
 
-    public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like)
+    public async Task SetShowMetaAsync(int showTmdbId, int? rating, bool like, CancellationToken cancellationToken = default)
     {
         // Whole-show entry, is_log:false so it's a rating/like rather than a Diary row.
         // season_id/episode_number are sent as null (the API requires the keys present).
@@ -541,7 +543,7 @@ public class SerializdApiClient : ISerializdService
         payload["rating"] = rating is > 0 ? Math.Clamp(rating.Value, 1, 10) : 0;
 
         var body = JsonSerializer.Serialize(payload);
-        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body).ConfigureAwait(false);
+        using var resp = await SendAsync(HttpMethod.Post, "/show/reviews/add", body, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (!resp.IsSuccessStatusCode)
         {
             var err = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -549,8 +551,12 @@ public class SerializdApiClient : ISerializdService
         }
     }
 
+    /// <param name="cancellationToken">Cancels the waits (the request gate, backoff and a
+    /// rate-limit pause) and a read in flight, never a write already sent: Serializd may have
+    /// applied it.</param>
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path,
-        string? body = null, bool authenticated = true, bool isRetry = false, int attempt = 0)
+        string? body = null, bool authenticated = true, bool isRetry = false, int attempt = 0,
+        CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(method, SerializdApiConstants.BaseUrl + path);
         if (authenticated && !string.IsNullOrEmpty(_token))
@@ -565,12 +571,16 @@ public class SerializdApiClient : ISerializdService
         // timeout starts once a slot is free, so waiting behind other requests never eats it.
         HttpResponseMessage? response = null;
         var failure = string.Empty;
-        await RequestGate.WaitAsync().ConfigureAwait(false);
+        await RequestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         CancellationTokenSource? timeout = null;
         try
         {
             timeout = new CancellationTokenSource(RequestTimeout);
-            response = await _http.SendAsync(request, timeout.Token).ConfigureAwait(false);
+            // Kept apart from the caller's token, so IsRetryableSendFailure still tells our own
+            // timeout from a cancellation.
+            using var send = CancellationTokenSource.CreateLinkedTokenSource(
+                timeout.Token, IsRead(method) ? cancellationToken : CancellationToken.None);
+            response = await _http.SendAsync(request, send.Token).ConfigureAwait(false);
         }
         catch (Exception ex) when (IsRetryableSendFailure(method, ex, timeout!) && attempt + 1 < MaxSendAttempts)
         {
@@ -584,17 +594,25 @@ public class SerializdApiClient : ISerializdService
 
         if (response == null)
         {
-            await BackoffAsync(path, failure, attempt).ConfigureAwait(false);
-            return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1).ConfigureAwait(false);
+            await BackoffAsync(path, failure, attempt, cancellationToken).ConfigureAwait(false);
+            return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1, cancellationToken).ConfigureAwait(false);
         }
 
-        if (response.StatusCode == (HttpStatusCode)429 && !isRetry)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests && !isRetry)
         {
-            var retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds ?? 10;
-            _logger.LogWarning("Serializd rate limited, waiting {Seconds}s", retryAfter);
+            // Longer than the cap: hand the 429 back so the caller fails this item now.
+            var wait = RetryAfterLimit.Wait(response.Headers.RetryAfter);
+            if (wait == null)
+            {
+                _logger.LogWarning("Serializd rate limited {Path} for longer than {Max}s, not retrying",
+                    path, RetryAfterLimit.Max.TotalSeconds);
+                return response;
+            }
+
+            _logger.LogWarning("Serializd rate limited, waiting {Seconds}s", wait.Value.TotalSeconds);
             response.Dispose();
-            await Task.Delay(TimeSpan.FromSeconds(retryAfter)).ConfigureAwait(false);
-            return await SendAsync(method, path, body, authenticated, isRetry: true).ConfigureAwait(false);
+            await Task.Delay(wait.Value, cancellationToken).ConfigureAwait(false);
+            return await SendAsync(method, path, body, authenticated, isRetry: true, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         // Transient server errors (Serializd 500s under load, plus 502/503/504): back off and
@@ -604,8 +622,8 @@ public class SerializdApiClient : ISerializdService
         if ((code == 500 || code == 502 || code == 503 || code == 504) && attempt + 1 < MaxSendAttempts)
         {
             response.Dispose();
-            await BackoffAsync(path, code.ToString(CultureInfo.InvariantCulture), attempt).ConfigureAwait(false);
-            return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1).ConfigureAwait(false);
+            await BackoffAsync(path, code.ToString(CultureInfo.InvariantCulture), attempt, cancellationToken).ConfigureAwait(false);
+            return await SendAsync(method, path, body, authenticated, isRetry, attempt + 1, cancellationToken).ConfigureAwait(false);
         }
 
         // Token went stale: clear the cache, re-login with stored credentials, retry once.
@@ -617,7 +635,7 @@ public class SerializdApiClient : ISerializdService
             TokenCache.TryRemove(_cacheKey, out _);
             _token = string.Empty;
             await LoginAsync().ConfigureAwait(false);
-            return await SendAsync(method, path, body, authenticated, isRetry: true).ConfigureAwait(false);
+            return await SendAsync(method, path, body, authenticated, isRetry: true, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         return response;
@@ -633,12 +651,14 @@ public class SerializdApiClient : ISerializdService
     /// </summary>
     internal static bool IsRetryableSendFailure(HttpMethod method, Exception ex, CancellationTokenSource timeout)
     {
-        if (method == HttpMethod.Get || method == HttpMethod.Head)
+        if (IsRead(method))
             return ex is HttpRequestException
                 || (ex is TaskCanceledException && (timeout.IsCancellationRequested || ex.InnerException is TimeoutException));
 
         return IsConnectFailure(ex);
     }
+
+    private static bool IsRead(HttpMethod method) => method == HttpMethod.Get || method == HttpMethod.Head;
 
     // The request never left this machine: no name, no connection, or no TLS session.
     private static bool IsConnectFailure(Exception ex)
@@ -648,12 +668,12 @@ public class SerializdApiClient : ISerializdService
             or HttpRequestError.ConnectionError or HttpRequestError.SecureConnectionError
         };
 
-    private async Task BackoffAsync(string path, string reason, int attempt)
+    private async Task BackoffAsync(string path, string reason, int attempt, CancellationToken cancellationToken)
     {
         var delayMs = (int)(Math.Pow(2, attempt) * 500) + Random.Shared.Next(0, 400); // ~0.5s, 1s, 2s (+jitter)
         _logger.LogWarning("Serializd {Path} failed ({Reason}); backing off {Ms}ms then retry {Next}/{Max}",
             path, reason, delayMs, attempt + 2, MaxSendAttempts);
-        await Task.Delay(delayMs).ConfigureAwait(false);
+        await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
     }
 
     public void Dispose()

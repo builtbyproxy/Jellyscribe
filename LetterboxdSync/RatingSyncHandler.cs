@@ -471,8 +471,8 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
 
             try
             {
-                var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
-                await service.SetFilmRatingAsync(film.Slug, film.FilmId, stars.Value).ConfigureAwait(false);
+                var film = await service.LookupFilmByTmdbIdAsync(tmdbId, ct).ConfigureAwait(false);
+                await service.SetFilmRatingAsync(film.Slug, film.FilmId, stars.Value, ct).ConfigureAwait(false);
 
                 RatingPushStore.RecordPushed(userIdN, account.LetterboxdUsername, tmdbId, stars.Value);
                 SyncHistory.Record(new SyncEvent
@@ -489,7 +489,7 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
                 _logger.LogInformation("Rated {Title} {Stars} stars on Letterboxd for {Username} as {LbUser}",
                     item.Name, stars.Value, user.Username, account.LetterboxdUsername);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 // Logged, not recorded as a Failed sync event: Failed events feed the diary runner's
                 // per-film abandon counter, and a rating push failing must never stop a film's

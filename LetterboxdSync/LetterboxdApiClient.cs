@@ -9,6 +9,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -126,13 +127,13 @@ public class LetterboxdApiClient : ILetterboxdService
         _logger.LogInformation("Authenticated with Letterboxd API as {Username}", username);
     }
 
-    public async Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId)
+    public async Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId, CancellationToken cancellationToken = default)
     {
         if (FilmCache.TryGetValue(tmdbId, out var cached))
             return cached;
 
-        var response = await SendSignedAsync(HttpMethod.Get, "/films", queryParams: $"filmId=tmdb%3A{tmdbId}&perPage=1")
-            .ConfigureAwait(false);
+        var response = await SendSignedAsync(HttpMethod.Get, "/films", queryParams: $"filmId=tmdb%3A{tmdbId}&perPage=1",
+            cancellationToken: cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -151,14 +152,14 @@ public class LetterboxdApiClient : ILetterboxdService
         return result;
     }
 
-    public async Task<DiaryInfo> GetDiaryInfoAsync(string filmIdOrSlug, string username)
+    public async Task<DiaryInfo> GetDiaryInfoAsync(string filmIdOrSlug, string username, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
 
         // filmIdOrSlug is the LID when coming from the API path
         var response = await SendSignedAsync(HttpMethod.Get, "/log-entries",
             queryParams: $"member={Uri.EscapeDataString(_memberId)}&film={Uri.EscapeDataString(filmIdOrSlug)}&perPage=1&sort=WhenAdded",
-            authenticated: true).ConfigureAwait(false);
+            authenticated: true, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // A failed check is not "no entries": reading it that way logs the film again, a
         // duplicate whenever it was already on the diary. The caller records a retryable failure.
@@ -186,7 +187,8 @@ public class LetterboxdApiClient : ILetterboxdService
     }
 
     public async Task MarkAsWatchedAsync(string filmSlug, string filmId, DateTime? date, bool liked,
-        string? productionId = null, bool rewatch = false, double? rating = null)
+        string? productionId = null, bool rewatch = false, double? rating = null,
+        CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
 
@@ -208,8 +210,8 @@ public class LetterboxdApiClient : ILetterboxdService
 
         var body = JsonSerializer.Serialize(bodyObj);
 
-        var response = await SendSignedAsync(HttpMethod.Post, "/log-entries", body, "application/json", authenticated: true)
-            .ConfigureAwait(false);
+        var response = await SendSignedAsync(HttpMethod.Post, "/log-entries", body, "application/json", authenticated: true,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -273,13 +275,13 @@ public class LetterboxdApiClient : ILetterboxdService
         }
     }
 
-    public async Task SetFilmRatingAsync(string filmSlug, string filmId, double rating)
+    public async Task SetFilmRatingAsync(string filmSlug, string filmId, double rating, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
 
         var body = JsonSerializer.Serialize(new Dictionary<string, object> { ["rating"] = rating });
-        var response = await SendSignedAsync(HttpMethod.Patch, $"/film/{Uri.EscapeDataString(filmId)}/me", body, "application/json", authenticated: true)
-            .ConfigureAwait(false);
+        var response = await SendSignedAsync(HttpMethod.Patch, $"/film/{Uri.EscapeDataString(filmId)}/me", body, "application/json", authenticated: true,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
         {
@@ -331,7 +333,7 @@ public class LetterboxdApiClient : ILetterboxdService
         return null;
     }
 
-    public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username)
+    public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
         var tmdbIds = new List<int>();
@@ -343,7 +345,7 @@ public class LetterboxdApiClient : ILetterboxdService
                 var tmdbId = ExtractTmdbId(item);
                 if (tmdbId.HasValue && seen.Add(tmdbId.Value))
                     tmdbIds.Add(tmdbId.Value);
-            }).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
 
         return tmdbIds;
     }
@@ -361,7 +363,7 @@ public class LetterboxdApiClient : ILetterboxdService
     /// superset of /log-entries (the diary endpoint), so films you rated without
     /// logging a watch are also included.
     /// </summary>
-    public async Task<List<DiaryFilmEntry>> GetDiaryFilmEntriesAsync(string username)
+    public async Task<List<DiaryFilmEntry>> GetDiaryFilmEntriesAsync(string username, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
         var entries = new List<DiaryFilmEntry>();
@@ -377,7 +379,7 @@ public class LetterboxdApiClient : ILetterboxdService
 
                 double? rating = ExtractMemberRating(item);
                 entries.Add(new DiaryFilmEntry(tmdbId.Value, rating));
-            }).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
 
         return entries;
     }
@@ -399,7 +401,8 @@ public class LetterboxdApiClient : ILetterboxdService
     /// to it), so a short list would quietly remove films, while a throw is logged by the
     /// caller and leaves everything as it was.
     /// </summary>
-    private async Task ReadAllPagesAsync(string path, string baseQuery, string what, Action<JsonElement> onItem)
+    private async Task ReadAllPagesAsync(string path, string baseQuery, string what, Action<JsonElement> onItem,
+        CancellationToken cancellationToken)
     {
         string? cursor = null;
         var seenCursors = new HashSet<string>(StringComparer.Ordinal);
@@ -408,7 +411,8 @@ public class LetterboxdApiClient : ILetterboxdService
         for (var page = 0; page < MaxPages; page++)
         {
             var qp = cursor == null ? baseQuery : $"{baseQuery}&cursor={Uri.EscapeDataString(cursor)}";
-            var response = await SendSignedAsync(HttpMethod.Get, path, queryParams: qp, authenticated: true).ConfigureAwait(false);
+            var response = await SendSignedAsync(HttpMethod.Get, path, queryParams: qp, authenticated: true,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -570,11 +574,43 @@ public class LetterboxdApiClient : ILetterboxdService
 
     // --- Private helpers ---
 
+    /// <summary>
+    /// Sends a signed request. A 429 is retried once after its Retry-After (at most
+    /// <see cref="RetryAfterLimit.Max"/>; longer, the 429 is returned and the caller fails the
+    /// item). The retry is signed afresh, since the signature covers the nonce and timestamp.
+    /// <paramref name="cancellationToken"/> cancels that wait and a read in flight, never a write
+    /// already sent, which may have landed.
+    /// </summary>
     private async Task<HttpResponseMessage> SendSignedAsync(HttpMethod method, string path,
-        string? body = null, string? contentType = null, string? queryParams = null, bool authenticated = false)
+        string? body = null, string? contentType = null, string? queryParams = null, bool authenticated = false,
+        CancellationToken cancellationToken = default)
+    {
+        var sendToken = method == HttpMethod.Get ? cancellationToken : CancellationToken.None;
+        var response = await SendSignedOnceAsync(method, path, body, contentType, queryParams, authenticated, sendToken)
+            .ConfigureAwait(false);
+        if (response.StatusCode != HttpStatusCode.TooManyRequests)
+            return response;
+
+        var wait = RetryAfterLimit.Wait(response.Headers.RetryAfter);
+        if (wait == null)
+        {
+            _logger.LogWarning("Letterboxd API rate limited {Path} for longer than {Max}s, not retrying",
+                path, RetryAfterLimit.Max.TotalSeconds);
+            return response;
+        }
+
+        _logger.LogWarning("Letterboxd API rate limited, waiting {Seconds}s", wait.Value.TotalSeconds);
+        response.Dispose();
+        await Task.Delay(wait.Value, cancellationToken).ConfigureAwait(false);
+        return await SendSignedOnceAsync(method, path, body, contentType, queryParams, authenticated, sendToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<HttpResponseMessage> SendSignedOnceAsync(HttpMethod method, string path,
+        string? body, string? contentType, string? queryParams, bool authenticated, CancellationToken cancellationToken)
     {
         var nonce = Guid.NewGuid().ToString();
-        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+        var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
 
         var url = $"{LetterboxdApiConstants.BaseUrl}{path}?apikey={LetterboxdApiConstants.ApiKey}&nonce={nonce}&timestamp={timestamp}";
         if (!string.IsNullOrEmpty(queryParams))
@@ -594,25 +630,7 @@ public class LetterboxdApiClient : ILetterboxdService
         if (body != null && contentType != null)
             request.Content = new StringContent(body, Encoding.UTF8, contentType);
 
-        var response = await _http.SendAsync(request).ConfigureAwait(false);
-
-        // Handle rate limiting
-        if (response.StatusCode == (HttpStatusCode)429)
-        {
-            var retryAfter = response.Headers.RetryAfter?.Delta?.TotalSeconds ?? 10;
-            _logger.LogWarning("Letterboxd API rate limited, waiting {Seconds}s", retryAfter);
-            await Task.Delay(TimeSpan.FromSeconds(retryAfter)).ConfigureAwait(false);
-
-            // Retry once
-            using var retryRequest = new HttpRequestMessage(method, url);
-            if (authenticated && !string.IsNullOrEmpty(_accessToken))
-                retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
-            if (body != null && contentType != null)
-                retryRequest.Content = new StringContent(body, Encoding.UTF8, contentType);
-            response = await _http.SendAsync(retryRequest).ConfigureAwait(false);
-        }
-
-        return response;
+        return await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
     private static string ComputeHmacSha256(string secret, string message)

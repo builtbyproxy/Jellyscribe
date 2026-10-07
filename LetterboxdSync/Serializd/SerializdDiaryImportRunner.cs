@@ -76,7 +76,7 @@ public class SerializdDiaryImportRunner
                 {
                     await ImportOneAsync(user, account, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     _logger.LogError("Serializd diary import failed for {Username} as {Account}: {Message}",
                         user.Username, LogRedaction.AccountTag(account.Email), ex.Message);
@@ -103,7 +103,7 @@ public class SerializdDiaryImportRunner
         using (var service = await SerializdServiceFactory
                    .CreateAuthenticatedAsync(account.Email, account.Password, _logger).ConfigureAwait(false))
         {
-            diary = await service.GetDiaryEpisodesAsync().ConfigureAwait(false);
+            diary = await service.GetDiaryEpisodesAsync(cancellationToken).ConfigureAwait(false);
         }
 
         if (diary.Count == 0) return;

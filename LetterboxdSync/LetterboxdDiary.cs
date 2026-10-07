@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -30,8 +31,11 @@ public class LetterboxdDiary
         _logger = logger;
     }
 
+    /// <param name="cancellationToken">Cancels the waits between attempts, never a request
+    /// already sent: a write cut off mid-flight may still have landed on the diary.</param>
     public async Task MarkAsWatchedAsync(string filmSlug, string filmId, DateTime? date, bool liked,
-        string? productionId = null, bool rewatch = false, double? rating = null)
+        string? productionId = null, bool rewatch = false, double? rating = null,
+        CancellationToken cancellationToken = default)
     {
         var viewingDate = date ?? DateTime.Now;
         _logger.LogDebug("MarkAsWatched: slug={Slug}, date={Date}, rewatch={Rewatch}, rating={Rating}",
@@ -62,7 +66,7 @@ public class LetterboxdDiary
                 case MarkResult.TransientError:
                     var delayMs = (attempt + 1) * 5000 + Random.Shared.Next(3000);
                     _logger.LogWarning("Transient error, retrying in {Delay}ms", delayMs);
-                    await Task.Delay(delayMs).ConfigureAwait(false);
+                    await Task.Delay(delayMs, cancellationToken).ConfigureAwait(false);
                     continue;
 
                 case MarkResult.AllEndpoints404:
@@ -70,7 +74,7 @@ public class LetterboxdDiary
                     {
                         var d = (attempt + 1) * 5000 + Random.Shared.Next(3000);
                         _logger.LogWarning("All endpoints returned 404, retrying in {Delay}ms", d);
-                        await Task.Delay(d).ConfigureAwait(false);
+                        await Task.Delay(d, cancellationToken).ConfigureAwait(false);
                     }
                     continue;
             }
@@ -253,7 +257,8 @@ public class LetterboxdDiary
     /// Sets the member's film rating through the site's rate action. Unlike the official API,
     /// this endpoint takes a 0-10 integer (half-stars x 2) and the numeric film id.
     /// </summary>
-    public async Task SetFilmRatingAsync(string filmSlug, string filmId, double rating)
+    /// <param name="cancellationToken">Cancels the waits between attempts, never a request already sent.</param>
+    public async Task SetFilmRatingAsync(string filmSlug, string filmId, double rating, CancellationToken cancellationToken = default)
     {
         var wireRating = ToRateEndpointScale(rating).ToString(CultureInfo.InvariantCulture);
 
@@ -291,7 +296,7 @@ public class LetterboxdDiary
                 var backoff = (attempt + 1) * 15000 + Random.Shared.Next(10000);
                 _logger.LogWarning("Rating {Slug} got 403. Backing off {Delay}ms (attempt {Attempt}/3)",
                     filmSlug, backoff, attempt + 1);
-                await Task.Delay(backoff).ConfigureAwait(false);
+                await Task.Delay(backoff, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 

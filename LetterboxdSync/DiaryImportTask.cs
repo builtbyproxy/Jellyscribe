@@ -147,11 +147,11 @@ public class DiaryImportTask : IScheduledTask
                 try
                 {
                     SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, "Scanning Letterboxd diary");
-                    entries = await service.GetDiaryFilmEntriesAsync(account.LetterboxdUsername).ConfigureAwait(false);
+                    entries = await service.GetDiaryFilmEntriesAsync(account.LetterboxdUsername, cancellationToken).ConfigureAwait(false);
                     _logger.LogInformation("Found {Count} films in {LbUser}'s Letterboxd diary",
                         entries.Count, account.LetterboxdUsername);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
                 {
                     _logger.LogError("Failed to fetch diary for {Username} as {LbUser}: {Message}",
                         user.Username, account.LetterboxdUsername, ex.Message);

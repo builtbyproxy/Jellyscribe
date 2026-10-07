@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
@@ -53,14 +54,14 @@ public class LetterboxdScraper
         _logger = logger;
     }
 
-    public async Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId)
+    public async Task<FilmResult> LookupFilmByTmdbIdAsync(int tmdbId, CancellationToken cancellationToken = default)
     {
         if (FilmCache.TryGetValue(tmdbId, out var cached))
             return cached;
 
-        await Task.Delay(3000 + Random.Shared.Next(2000)).ConfigureAwait(false);
+        await Task.Delay(3000 + Random.Shared.Next(2000), cancellationToken).ConfigureAwait(false);
 
-        using var res = await _http.GetWithCloudflareRetryAsync($"/tmdb/{tmdbId}").ConfigureAwait(false);
+        using var res = await _http.GetWithCloudflareRetryAsync($"/tmdb/{tmdbId}", cancellationToken: cancellationToken).ConfigureAwait(false);
 
         if (res.StatusCode == HttpStatusCode.Forbidden)
             throw new LetterboxdBlockedException(
@@ -82,7 +83,7 @@ public class LetterboxdScraper
         // Load film page to get the internal filmId and productionId
         using var filmReq = new HttpRequestMessage(HttpMethod.Get, $"/film/{filmSlug}/");
         _http.SetNavHeaders(filmReq.Headers, "same-origin", $"https://letterboxd.com/tmdb/{tmdbId}");
-        using var filmRes = await _http.Http.SendAsync(filmReq).ConfigureAwait(false);
+        using var filmRes = await _http.Http.SendAsync(filmReq, cancellationToken).ConfigureAwait(false);
         filmRes.EnsureSuccessStatusCode();
 
         var filmHtml = await filmRes.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -95,13 +96,13 @@ public class LetterboxdScraper
         return result;
     }
 
-    public async Task<DiaryInfo> GetDiaryInfoAsync(string filmSlug, string username)
+    public async Task<DiaryInfo> GetDiaryInfoAsync(string filmSlug, string username, CancellationToken cancellationToken = default)
     {
         var url = $"/{username}/film/{filmSlug}/diary/";
 
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         _http.SetNavHeaders(req.Headers, "same-origin");
-        using var res = await _http.Http.SendAsync(req).ConfigureAwait(false);
+        using var res = await _http.Http.SendAsync(req, cancellationToken).ConfigureAwait(false);
 
         // 404 is Letterboxd's answer for a member with no diary entry for the film. Any other
         // error, or a Cloudflare challenge page, means the check did not happen: reading that as
@@ -134,7 +135,7 @@ public class LetterboxdScraper
     /// the playlist and the Seerr watchlist to this list, so a short list would remove films the
     /// member still has watchlisted. The API path's reader behaves the same way.
     /// </summary>
-    public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username)
+    public async Task<List<int>> GetWatchlistTmdbIdsAsync(string username, CancellationToken cancellationToken = default)
     {
         var tmdbIds = new List<int>();
         var seenSlugs = new HashSet<string>(StringComparer.Ordinal);
@@ -148,11 +149,11 @@ public class LetterboxdScraper
             if (page > maxPages)
                 throw WatchlistIncomplete(username, tmdbIds.Count, $"more than {maxPages} pages");
 
-            await Task.Delay(2000 + Random.Shared.Next(2000)).ConfigureAwait(false);
+            await Task.Delay(2000 + Random.Shared.Next(2000), cancellationToken).ConfigureAwait(false);
 
             using var req = new HttpRequestMessage(HttpMethod.Get, $"/{username}/watchlist/page/{page}/");
             _http.SetNavHeaders(req.Headers, "same-origin");
-            using var res = await _http.Http.SendAsync(req).ConfigureAwait(false);
+            using var res = await _http.Http.SendAsync(req, cancellationToken).ConfigureAwait(false);
 
             if (!res.IsSuccessStatusCode)
                 throw WatchlistIncomplete(username, tmdbIds.Count, $"status {(int)res.StatusCode} on page {page}");
@@ -182,7 +183,7 @@ public class LetterboxdScraper
                 if (string.IsNullOrEmpty(slug) || !seenSlugs.Add(slug)) continue;
                 newOnPage++;
 
-                var tmdbId = await ResolveTmdbIdFromSlugAsync(slug, throwOnHttpError: true).ConfigureAwait(false);
+                var tmdbId = await ResolveTmdbIdFromSlugAsync(slug, cancellationToken, throwOnHttpError: true).ConfigureAwait(false);
                 if (tmdbId.HasValue)
                 {
                     tmdbIds.Add(tmdbId.Value);
@@ -223,9 +224,9 @@ public class LetterboxdScraper
     /// Uses /{username}/films/ (all watched films) rather than /films/diary/
     /// (which only shows films with dated diary entries).
     /// </summary>
-    public async Task<List<int>> GetDiaryTmdbIdsAsync(string username)
+    public async Task<List<int>> GetDiaryTmdbIdsAsync(string username, CancellationToken cancellationToken = default)
     {
-        var entries = await GetDiaryFilmEntriesAsync(username).ConfigureAwait(false);
+        var entries = await GetDiaryFilmEntriesAsync(username, cancellationToken).ConfigureAwait(false);
         return entries.Select(e => e.TmdbId).ToList();
     }
 
@@ -234,7 +235,7 @@ public class LetterboxdScraper
     /// (when present) for each. Same source as GetDiaryTmdbIdsAsync but preserves the
     /// per-film rating parsed from the poster HTML.
     /// </summary>
-    public async Task<List<DiaryFilmEntry>> GetDiaryFilmEntriesAsync(string username)
+    public async Task<List<DiaryFilmEntry>> GetDiaryFilmEntriesAsync(string username, CancellationToken cancellationToken = default)
     {
         var entries = new List<DiaryFilmEntry>();
         var seenTmdbIds = new HashSet<int>();
@@ -243,11 +244,11 @@ public class LetterboxdScraper
 
         while (page <= maxPages)
         {
-            await Task.Delay(2000 + Random.Shared.Next(2000)).ConfigureAwait(false);
+            await Task.Delay(2000 + Random.Shared.Next(2000), cancellationToken).ConfigureAwait(false);
 
             using var req = new HttpRequestMessage(HttpMethod.Get, $"/{username}/films/page/{page}/");
             _http.SetNavHeaders(req.Headers, "same-origin");
-            using var res = await _http.Http.SendAsync(req).ConfigureAwait(false);
+            using var res = await _http.Http.SendAsync(req, cancellationToken).ConfigureAwait(false);
 
             if (!res.IsSuccessStatusCode)
             {
@@ -309,7 +310,7 @@ public class LetterboxdScraper
 
                     var rating = ExtractRatingFromContainer(container);
 
-                    var tmdbId = await ResolveTmdbIdFromSlugAsync(slug).ConfigureAwait(false);
+                    var tmdbId = await ResolveTmdbIdFromSlugAsync(slug, cancellationToken).ConfigureAwait(false);
                     if (tmdbId.HasValue && seenTmdbIds.Add(tmdbId.Value))
                     {
                         entries.Add(new DiaryFilmEntry(tmdbId.Value, rating));
@@ -327,7 +328,7 @@ public class LetterboxdScraper
                         slug = poster.GetAttributeValue("data-item-slug", string.Empty);
                     if (string.IsNullOrEmpty(slug)) continue;
 
-                    var tmdbId = await ResolveTmdbIdFromSlugAsync(slug).ConfigureAwait(false);
+                    var tmdbId = await ResolveTmdbIdFromSlugAsync(slug, cancellationToken).ConfigureAwait(false);
                     if (tmdbId.HasValue && seenTmdbIds.Add(tmdbId.Value))
                     {
                         entries.Add(new DiaryFilmEntry(tmdbId.Value, null));
@@ -475,7 +476,7 @@ public class LetterboxdScraper
     /// <param name="throwOnHttpError">True for the watchlist read, where silently dropping a
     /// film whose page failed to load would remove it from the playlist. A 404 (the film is gone
     /// from Letterboxd) is still a plain null.</param>
-    private async Task<int?> ResolveTmdbIdFromSlugAsync(string slug, bool throwOnHttpError = false)
+    private async Task<int?> ResolveTmdbIdFromSlugAsync(string slug, CancellationToken cancellationToken, bool throwOnHttpError = false)
     {
         // Check cache first, avoids HTTP request for previously resolved slugs
         var cached = TmdbCache.Get(slug);
@@ -488,11 +489,11 @@ public class LetterboxdScraper
 
         SyncProgress.IncrementNewLookup(SyncProgress.TrackLetterboxd);
 
-        await Task.Delay(2000 + Random.Shared.Next(1000)).ConfigureAwait(false);
+        await Task.Delay(2000 + Random.Shared.Next(1000), cancellationToken).ConfigureAwait(false);
 
         using var filmReq = new HttpRequestMessage(HttpMethod.Get, $"/film/{slug}/");
         _http.SetNavHeaders(filmReq.Headers);
-        using var filmRes = await _http.Http.SendAsync(filmReq).ConfigureAwait(false);
+        using var filmRes = await _http.Http.SendAsync(filmReq, cancellationToken).ConfigureAwait(false);
         if (!filmRes.IsSuccessStatusCode)
         {
             if (throwOnHttpError && filmRes.StatusCode != HttpStatusCode.NotFound)

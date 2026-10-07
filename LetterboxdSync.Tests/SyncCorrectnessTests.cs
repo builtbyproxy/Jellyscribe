@@ -534,7 +534,8 @@ public class SyncCorrectnessTests : IDisposable
         Library(user, (movie, DateTime.UtcNow.AddHours(-1)));
         using var cts = new CancellationTokenSource();
         var service = Service();
-        service.LookupFilmByTmdbIdAsync(Arg.Any<int>()).Returns(_ =>
+        // Matched on the run's own token: the runner must hand it to the lookup.
+        service.LookupFilmByTmdbIdAsync(Arg.Any<int>(), cts.Token).Returns(_ =>
         {
             cts.Cancel(); // shutdown arrives while the film is in flight
             return new FilmResult("sinners-2025", "KQMM", null);
