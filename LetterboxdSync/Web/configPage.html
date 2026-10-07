@@ -466,18 +466,19 @@
                             // A "Remove saved ..." checkbox, where the field has one, shows only when something is saved.
                             if (clearRow) { clearRow.style.display = saved ? 'flex' : 'none'; document.getElementById(id + 'Clear').checked = false; }
                         },
-                        /* Saves the whole config, then reloads it, so the page never keeps a typed secret
-                           and every Saved indicator reflects what the server stored. */
-                        saveConfig: function () {
-                            var self = this;
-                            var reload = function () {
+                        /* Saves a copy of the config with edit(copy) applied, then reloads it from the server,
+                           so the page never keeps a typed secret and every Saved indicator reflects what was
+                           stored. A failed save leaves this.config untouched, so the open form can be retried. */
+                        saveConfig: function (edit) {
+                            var self = this, next = Object.assign({}, self.config);
+                            edit(next);
+                            return ApiClient.updatePluginConfiguration(self.PluginId, next).then(function () {
                                 return ApiClient.getPluginConfiguration(self.PluginId).then(function (c) {
                                     self.config = c;
                                     self.fillSecret('jellyseerrApiKey', !!c.HasJellyseerrApiKey, 'Leave blank to keep the saved key', 'Settings → General → API Key');
                                     self.renderAccounts();
-                                });
-                            };
-                            return ApiClient.updatePluginConfiguration(self.PluginId, self.config).then(reload, function (e) { reload(); throw e; });
+                                }, function () { });
+                            });
                         },
                         userName: function (idHex) {
                             var u = this.users.filter(function (x) { return (x.Id || '').replace(/-/g, '') === idHex; })[0];
@@ -900,28 +901,29 @@
                             if (m.svc === 'letterboxd' && m.username.indexOf('@') >= 0) { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Letterboxd no longer accepts an email address to sign in. Use your Letterboxd username, the name in letterboxd.com/&lt;username&gt;/.</span>'; return; }
                             var orig = self.editing.original;
                             var excludedLibs = self.mergeExcluded((orig && orig.ExcludedLibraryIds) || [], m.libs);
+                            var item;
                             if (m.svc === 'serializd') {
-                                self.config.SerializdAccounts = (self.config.SerializdAccounts || []).filter(function (x) { return x !== orig; });
                                 // Original* names the login this edit started from, so the server carries its saved
                                 // password across a changed email or a move to another Jellyfin user.
-                                self.config.SerializdAccounts.push({ UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalEmail: orig ? orig.Email : null, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs });
+                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalEmail: orig ? orig.Email : null, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
                             } else {
-                                self.config.Accounts = (self.config.Accounts || []).filter(function (x) { return x !== orig; });
-                                self.config.Accounts.push({ UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalLetterboxdUsername: orig ? orig.LetterboxdUsername : null, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, ClearRawCookies: !m.cookies && m.clearCookies, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs });
+                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalLetterboxdUsername: orig ? orig.LetterboxdUsername : null, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, ClearRawCookies: !m.cookies && m.clearCookies, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
                             }
+                            var key = m.svc === 'serializd' ? 'SerializdAccounts' : 'Accounts';
                             document.getElementById('mStatus').textContent = 'Saving…';
-                            self.saveConfig().then(function () {
+                            self.saveConfig(function (c) {
+                                c[key] = (c[key] || []).filter(function (x) { return x !== orig; }).concat([item]);
+                            }).then(function () {
                                 document.getElementById('acctModal').classList.remove('show');
                                 Dashboard.processPluginConfigurationUpdateResult();
                             }, function () { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Save failed.</span>'; });
                         },
                         deleteAccount: function () {
                             var self = this, orig = self.editing.original; if (!orig) return;
-                            if (self.editing.svc === 'serializd') self.config.SerializdAccounts = (self.config.SerializdAccounts || []).filter(function (x) { return x !== orig; });
-                            else self.config.Accounts = (self.config.Accounts || []).filter(function (x) { return x !== orig; });
-                            self.saveConfig().then(function () {
+                            var key = self.editing.svc === 'serializd' ? 'SerializdAccounts' : 'Accounts';
+                            self.saveConfig(function (c) { c[key] = (c[key] || []).filter(function (x) { return x !== orig; }); }).then(function () {
                                 document.getElementById('acctModal').classList.remove('show');
-                            });
+                            }, function () { document.getElementById('mStatus').innerHTML = '<span class="ws-red">Remove failed.</span>'; });
                         },
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
@@ -1055,15 +1057,15 @@
 
                         /* ===== Integrations & logs ===== */
                         saveIntegrations: function () {
-                            var self = this;
-                            self.config.JellyseerrUrl = document.getElementById('jellyseerrUrl').value.trim() || null;
-                            // Blank keeps the saved key (the server never sends it back); typing replaces it.
-                            self.config.JellyseerrApiKey = document.getElementById('jellyseerrApiKey').value.trim() || null;
-                            self.config.ClearJellyseerrApiKey = !self.config.JellyseerrApiKey && document.getElementById('jellyseerrApiKeyClear').checked;
-                            self.config.AutoApproveJellyseerrRequests = document.getElementById('autoApproveJellyseerr').checked;
-                            self.config.Telemetry = self.config.Telemetry || {};
-                            self.config.Telemetry.Enabled = document.getElementById('telemetryEnabled').checked;
-                            self.saveConfig().then(function () { Dashboard.processPluginConfigurationUpdateResult(); });
+                            var self = this, g = function (id) { return document.getElementById(id); };
+                            self.saveConfig(function (c) {
+                                c.JellyseerrUrl = g('jellyseerrUrl').value.trim() || null;
+                                // Blank keeps the saved key (the server never sends it back); typing replaces it.
+                                c.JellyseerrApiKey = g('jellyseerrApiKey').value.trim() || null;
+                                c.ClearJellyseerrApiKey = !c.JellyseerrApiKey && g('jellyseerrApiKeyClear').checked;
+                                c.AutoApproveJellyseerrRequests = g('autoApproveJellyseerr').checked;
+                                c.Telemetry = Object.assign({}, c.Telemetry, { Enabled: g('telemetryEnabled').checked });
+                            }).then(function () { Dashboard.processPluginConfigurationUpdateResult(); }, function () { g('jellyseerrTestStatus').innerHTML = '<span class="ws-red">Save failed.</span>'; });
                         },
                         testJellyseerr: function () {
                             var url = document.getElementById('jellyseerrUrl').value.trim(), key = document.getElementById('jellyseerrApiKey').value.trim();

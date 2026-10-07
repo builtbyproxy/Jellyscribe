@@ -32,7 +32,7 @@ public abstract class JellyfinUserApiController : ControllerBase
     /// Jellyfin's auth handler puts the Administrator role claim on admin sessions.
     /// </summary>
     protected string? GetCredentialOwnerId(string? requestedUserId)
-        => !string.IsNullOrWhiteSpace(requestedUserId) && User.IsInRole("Administrator")
+        => !string.IsNullOrWhiteSpace(requestedUserId) && CallerIsAdministrator()
             ? requestedUserId.Replace("-", string.Empty)
             : GetCurrentUserId();
 

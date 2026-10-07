@@ -25,14 +25,14 @@ internal static class SecretMerge
     private static bool SameUser(string? a, string? b)
         => string.Equals(a?.Replace("-", string.Empty), b?.Replace("-", string.Empty), StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Typed cookies win; otherwise the clear flag drops the stored ones, or they are kept.</summary>
-    internal static string? CookiesFor(string? incoming, bool clear, string? stored)
+    /// <summary>For a secret with a clear flag: a typed value wins; otherwise the flag drops the stored one, or it is kept.</summary>
+    internal static string? TypedClearedOrKept(string? incoming, bool clear, string? stored)
         => !string.IsNullOrEmpty(incoming) ? incoming : clear ? null : stored;
 
     internal static Account? FindStored(this PluginConfiguration stored, string userJellyfinId, string letterboxdUsername)
         => stored.Accounts?.FirstOrDefault(a =>
             SameUser(a.UserJellyfinId, userJellyfinId) &&
-            string.Equals(a.LetterboxdUsername, letterboxdUsername?.Trim(), StringComparison.OrdinalIgnoreCase));
+            string.Equals(a.LetterboxdUsername?.Trim(), letterboxdUsername?.Trim(), StringComparison.OrdinalIgnoreCase));
 
     internal static SerializdAccount? FindStoredSerializd(this PluginConfiguration stored, string userJellyfinId, string email)
         => stored.SerializdAccounts?.FirstOrDefault(a =>
@@ -43,7 +43,7 @@ internal static class SecretMerge
     internal static void KeepSecretsFrom(this Account incoming, Account? stored)
     {
         incoming.LetterboxdPassword = KeepIfEmpty(incoming.LetterboxdPassword, stored?.LetterboxdPassword) ?? string.Empty;
-        incoming.RawCookies = CookiesFor(incoming.RawCookies, incoming.ClearRawCookies, stored?.RawCookies);
+        incoming.RawCookies = TypedClearedOrKept(incoming.RawCookies, incoming.ClearRawCookies, stored?.RawCookies);
         incoming.ClearRawCookies = false;
     }
 
@@ -73,8 +73,7 @@ internal static class SecretMerge
             account.OriginalEmail = null;
         }
 
-        incoming.JellyseerrApiKey = !string.IsNullOrEmpty(incoming.JellyseerrApiKey) ? incoming.JellyseerrApiKey
-            : incoming.ClearJellyseerrApiKey ? null : stored.JellyseerrApiKey;
+        incoming.JellyseerrApiKey = TypedClearedOrKept(incoming.JellyseerrApiKey, incoming.ClearJellyseerrApiKey, stored.JellyseerrApiKey);
         incoming.ClearJellyseerrApiKey = false;
     }
 

@@ -407,10 +407,24 @@ public class WriteOnlySecretsTests : IDisposable
     [InlineData("http://seerr.local:5056", false)]
     [InlineData("https://seerr.local:5055", false)]
     [InlineData("not a url", false)]
-    public void IsStoredUrl_MatchesSchemeHostPortCaseInsensitively_AndThePathExactly(string url, bool expected)
+    public void IsStoredUrl_MatchesSchemeHostPortCaseInsensitively(string url, bool expected)
+        => Assert.Equal(expected, SecretMerge.IsStoredUrl(url, SeerrUrl));
+
+    [Fact]
+    public void IsStoredUrl_ComparesThePathExactly()
+        => Assert.False(SecretMerge.IsStoredUrl("http://seerr.local:5055/seerr", "http://seerr.local:5055/Seerr"));
+
+    [Fact]
+    public async Task Verify_BlankPasswordWithNothingStored_IsRefused()
     {
-        Assert.Equal(expected, SecretMerge.IsStoredUrl(url, SeerrUrl));
-        Assert.False(SecretMerge.IsStoredUrl("http://seerr.local:5055/seerr", "http://seerr.local:5055/Seerr"));
+        using var h = new ControllerTestHarness(UserId);
+        var called = false;
+        LetterboxdController.VerifyApiLoginForTesting = (_, _) => { called = true; return Task.CompletedTask; };
+        SerializdController.VerifyOverrideForTesting = (_, _, _) => { called = true; return Task.FromResult<string?>("me"); };
+
+        Assert.IsType<BadRequestObjectResult>(await h.Controller.VerifyLogin(new LetterboxdVerifyRequest { LetterboxdUsername = LbUser }));
+        Assert.IsType<BadRequestObjectResult>(await SerializdControllerFor(UserId).Verify(new SerializdController.VerifyRequest { Email = SzEmail }));
+        Assert.False(called);
     }
 
     // ----- Renames and owner moves carry the secrets with the account -----
@@ -532,17 +546,22 @@ public class WriteOnlySecretsTests : IDisposable
     }
 
     [Fact]
-    public void SerializdPutAccounts_EmailChangeWithBlankPassword_KeepsThePassword()
+    public void SerializdPutAccounts_EmailChangeWithBlankPassword_KeepsThePasswordAndSettings()
     {
         using var h = new ControllerTestHarness(UserId);
         Seed(h.Config);
+        h.Config.SerializdAccounts[0].WatchlistName = "Admin's name";
+        h.Config.SerializdAccounts[0].ExcludedLibraryIds = new() { "0123456789abcdef0123456789abcdef" };
 
         SerializdControllerFor(UserId).PutAccounts(new SerializdController.AccountsUpdateRequest
         {
             Accounts = new() { new SerializdController.AccountItem { Email = "demo@example.com", OriginalEmail = SzEmail } }
         });
 
-        Assert.Equal(SzPassword, h.Config.SerializdAccounts.Single().Password);
+        var account = h.Config.SerializdAccounts.Single();
+        Assert.Equal(SzPassword, account.Password);
+        Assert.Equal("Admin's name", account.WatchlistName);
+        Assert.Equal(new[] { "0123456789abcdef0123456789abcdef" }, account.ExcludedLibraryIds);
     }
 
     [Fact]
