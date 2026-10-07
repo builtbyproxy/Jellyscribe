@@ -787,6 +787,7 @@ public class LetterboxdController : JellyfinUserApiController
                 // too (until the next timestamped header) or the most useful diagnostic, the
                 // stack trace, gets shredded by a per-line filter.
                 var inMatch = false;
+                var inLegacyReviewBody = false;
                 while ((line = sr.ReadLine()) != null)
                 {
                     // Emails are masked here, in the one reader behind the Logs tab, the bundle
@@ -797,9 +798,12 @@ public class LetterboxdController : JellyfinUserApiController
                     {
                         inMatch = line.Contains("LetterboxdSync", StringComparison.Ordinal) ||
                                   line.Contains("Letterboxd ", StringComparison.Ordinal);
+                        // Older releases logged the review reply's body, which can echo the review;
+                        // such a line keeps its status and loses the body, continuation lines included.
+                        inLegacyReviewBody = inMatch && LogRedaction.TryCutLegacyReviewBody(ref line);
                         if (inMatch) lines.Add(line);
                     }
-                    else if (inMatch)
+                    else if (inMatch && !inLegacyReviewBody)
                     {
                         lines.Add(line); // continuation of a matched entry (stack frame / message)
                     }
@@ -819,7 +823,7 @@ public class LetterboxdController : JellyfinUserApiController
     // preview shows the same id the send then uploads.
     private static readonly string OneOffBundleId = Guid.NewGuid().ToString();
 
-    internal const int MaxNoteLength = 2000;
+    private const int MaxNoteLength = 2000;
 
     /// <summary>
     /// Assembles the exact diagnostic bundle JSON for the calling server. Used by both
@@ -828,10 +832,11 @@ public class LetterboxdController : JellyfinUserApiController
     /// </summary>
     private (string Json, int MatchedLines) BuildLogBundleJson(string? note)
     {
-        // The backend keeps the first 2000 characters of a note; cut it here so the preview
-        // shows what is kept.
+        // The ingest Worker keeps the first 2000 characters of a note (worker/src/index.ts);
+        // cut it here so the preview shows what is kept, never splitting a surrogate pair.
         if (string.IsNullOrEmpty(note)) note = null;
-        else if (note.Length > MaxNoteLength) note = note[..MaxNoteLength];
+        else if (note.Length > MaxNoteLength)
+            note = note[..(char.IsHighSurrogate(note[MaxNoteLength - 1]) ? MaxNoteLength - 1 : MaxNoteLength)];
 
         var (allLines, source, error) = ReadRecentLogLines();
         var matched = allLines.Count;
@@ -895,8 +900,8 @@ public class LetterboxdController : JellyfinUserApiController
     /// and returns a short reference code the user can quote in a bug report. Admin-only.
     /// Unlike telemetry this is NOT anonymous (log lines name films, shows, Jellyfin users
     /// and Letterboxd usernames) and only runs on this explicit, disclosed action. Works
-    /// whether or not telemetry is enabled; if no telemetry instance id exists, a one-off
-    /// id is generated for the bundle.
+    /// whether or not telemetry is enabled; if no telemetry instance id exists, the bundle
+    /// carries an id made once per server run, so a preview and the send that follows match.
     /// </summary>
     [HttpPost("Telemetry/SendLogs")]
     [Authorize(Policy = "RequiresElevation")]

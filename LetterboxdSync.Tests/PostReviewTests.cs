@@ -258,16 +258,6 @@ public class PostReviewTests
         Assert.Contains($"\"diaryDate\":\"{today}\"", capturedBody!);
     }
 
-    private sealed class ListLogger : ILogger
-    {
-        public System.Collections.Generic.List<(LogLevel Level, string Message)> Entries { get; } = new();
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(LogLevel logLevel) => true;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-            Func<TState, Exception?, string> formatter)
-            => Entries.Add((logLevel, formatter(state, exception)));
-    }
-
     private static ReviewMockHandler EchoingReviewEndpoint(HttpStatusCode status, string body)
     {
         var handler = new ReviewMockHandler();
@@ -308,7 +298,7 @@ public class PostReviewTests
         var logger = new ListLogger();
 
         await Assert.ThrowsAnyAsync<Exception>(() =>
-            EchoingReviewEndpoint(HttpStatusCode.BadRequest, reply).CreateDiary(logger).PostReviewAsync("sinners", "x", date: null));
+            EchoingReviewEndpoint(HttpStatusCode.BadRequest, reply).CreateDiary(logger).PostReviewAsync("sinners", "a fine film", date: null));
 
         var entry = Assert.Single(logger.Entries, e => e.Message.Contains("Review post for sinners failed"));
         Assert.Equal(LogLevel.Warning, entry.Level);
@@ -316,6 +306,14 @@ public class PostReviewTests
         Assert.Contains("invalid rating", entry.Message);
         Assert.DoesNotContain(new string('x', 400), entry.Message);
     }
+
+    [Theory]
+    [InlineData("{\"error\":\"invalid rating\"}", "ok", "{\"error\":\"invalid rating\"}")]
+    [InlineData("{\"error\":\"quoted: an honest review\"}", "an honest review", "{\"error\":\"quoted: [review]\"}")]
+    [InlineData("{\"text\":\"caf\\u00E9 noir\"}", "café noir", "{\"text\":\"[review]\"}")]
+    [InlineData("plain café noir", "café noir", "plain [review]")]
+    public void WithoutReview_CutsTheReview_ButLeavesAShortOneAlone(string body, string review, string expected)
+        => Assert.Equal(expected, LetterboxdDiary.WithoutReview(body, review));
 
     [Fact]
     public async Task PostReviewAsync_FailureThatQuotesTheReview_KeepsTheReviewOutOfTheLogAndTheError()

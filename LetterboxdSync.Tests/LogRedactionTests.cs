@@ -15,6 +15,9 @@ public class LogRedactionTests
     [InlineData("POST /login?username=demo%40EXAMPLE.com", "POST /login?username=[email]")]
     [InlineData("{\"email\":\"demo\\u0040example.com\"}", "{\"email\":\"[email]\"}")]
     [InlineData("<a>demo&#64;example.com</a>", "<a>[email]</a>")]
+    [InlineData("for o'brien@example.com", "for [email]")]
+    [InlineData("for user@münchen.de now", "for [email] now")]
+    [InlineData("next=%2Flogin%3Fu%3Ddemo%2540example.com", "next=[email]")] // an encoded URL is masked whole
     public void RedactEmails_MasksEveryAddress(string line, string expected)
         => Assert.Equal(expected, LogRedaction.RedactEmails(line));
 
@@ -25,6 +28,19 @@ public class LogRedactionTests
     [InlineData("")]
     public void RedactEmails_LeavesLinesWithoutAnAddressAlone(string line)
         => Assert.Equal(line, LogRedaction.RedactEmails(line));
+
+    [Fact]
+    public void TryCutLegacyReviewBody_KeepsTheStatus_DropsTheBody()
+    {
+        var line = "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.LetterboxdDiary: Review response for sinners: status=201, body={\"review\":{\"text\":\"my draft\"}}";
+
+        Assert.True(LogRedaction.TryCutLegacyReviewBody(ref line));
+        Assert.EndsWith("Review response for sinners: status=201, body=[removed]", line);
+
+        var other = "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.LetterboxdDiary: Posted review for sinners: status=200, bodyLen=40";
+        Assert.False(LogRedaction.TryCutLegacyReviewBody(ref other));
+        Assert.EndsWith("bodyLen=40", other);
+    }
 
     [Fact]
     public void AccountTag_IsShortStableAndNeverTheAddress()

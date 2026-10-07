@@ -191,7 +191,7 @@ Since v1.19.0 the plugin also adds the mirror as a second catalog repository ent
 
 When something goes wrong, the **Logs** tab has a **Send to developer** button. It uploads a diagnostic bundle privately and gives you a short **reference code** (e.g. `LBX-7Q2F9K`) to quote if you open a bug report. The bundle holds:
 
-- up to the last 500 Jellyscribe log lines from the server's two newest log files, the same kind of lines the Logs tab shows. Email addresses are replaced with `[email]` (Serializd accounts appear as a short tag such as `serializd-3fa2b1`); passwords, cookies, auth tokens and review text are never logged;
+- up to the last 500 Jellyscribe log lines from the server's two newest log files, the same kind of lines the Logs tab shows. Email addresses are replaced with `[email]` (Serializd accounts appear as a short tag such as `serializd-3fa2b1`); passwords, cookies, auth tokens and review text are never logged, and the review replies older versions logged are cut from these lines;
 - the plugin and Jellyfin versions, and which log files were read;
 - the telemetry snapshot that Preview shows, and your telemetry instance ID (if you have none, a one-off ID that stays the same until the server restarts);
 - your note, if you write one.

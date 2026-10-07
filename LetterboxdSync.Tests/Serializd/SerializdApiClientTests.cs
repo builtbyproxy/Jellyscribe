@@ -50,16 +50,6 @@ public class SerializdApiClientTests
         Assert.Equal(1, logins); // second client reused the cached token
     }
 
-    private sealed class ListLogger : Microsoft.Extensions.Logging.ILogger
-    {
-        public List<string> Messages { get; } = new();
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
-        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
-            TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-            => Messages.Add(formatter(state, exception));
-    }
-
     [Fact]
     public async Task Authenticate_NamesTheAccountByTag_NeverByEmail()
     {
@@ -72,9 +62,9 @@ public class SerializdApiClientTests
         using (var cached = new SerializdApiClient(logger, handler)) await cached.AuthenticateAsync("demo@example.com", "pw");
 
         var tag = LogRedaction.AccountTag("demo@example.com");
-        Assert.Contains(logger.Messages, m => m == "Authenticated with Serializd as " + tag);
-        Assert.Contains(logger.Messages, m => m == "Reusing cached Serializd token for " + tag);
-        Assert.DoesNotContain(logger.Messages, m => m.Contains("demo@example.com"));
+        Assert.Contains(logger.Entries, e => e.Message == "Authenticated with Serializd as " + tag);
+        Assert.Contains(logger.Entries, e => e.Message == "Reusing cached Serializd token for " + tag);
+        Assert.DoesNotContain(logger.Entries, e => e.Message.Contains("demo@example.com"));
     }
 
     [Fact]

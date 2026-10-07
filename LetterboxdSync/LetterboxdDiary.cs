@@ -232,13 +232,18 @@ public class LetterboxdDiary
         throw new Exception($"Failed to post review for {filmSlug} after {LetterboxdHttpClient.MaxRetries} attempts");
     }
 
+    private const int MinReviewToCut = 6;
+
     /// <summary>
     /// Replaces the review text in a reply body, as typed or as it appears inside a JSON string,
     /// with "[review]", so an error that quotes the submitted review never reaches a log line.
+    /// A review shorter than <see cref="MinReviewToCut"/> characters is left alone: cutting "ok"
+    /// out of every word of an error would destroy it, and so short a review reveals little.
     /// </summary>
     internal static string WithoutReview(string body, string? reviewText)
     {
-        if (string.IsNullOrEmpty(body) || string.IsNullOrWhiteSpace(reviewText)) return body;
+        if (string.IsNullOrEmpty(body) || string.IsNullOrWhiteSpace(reviewText) || reviewText.Trim().Length < MinReviewToCut)
+            return body;
         var jsonEscaped = JsonSerializer.Serialize(reviewText)[1..^1];
         return body.Replace(reviewText, "[review]", StringComparison.Ordinal)
                    .Replace(jsonEscaped, "[review]", StringComparison.Ordinal);

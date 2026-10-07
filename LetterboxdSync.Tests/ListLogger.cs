@@ -1,0 +1,19 @@
+using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
+
+namespace LetterboxdSync.Tests;
+
+/// <summary>Keeps every formatted log line, so a test can check what a class writes to the log.</summary>
+internal sealed class ListLogger : ILogger
+{
+    public List<(LogLevel Level, string Message)> Entries { get; } = new();
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+        Func<TState, Exception?, string> formatter)
+        => Entries.Add((logLevel, formatter(state, exception)));
+}

@@ -179,6 +179,24 @@ public class SendLogsTests : IDisposable
     }
 
     [Fact]
+    public void ReviewRepliesLoggedByOlderReleases_LoseTheirBody_ContinuationLinesIncluded()
+    {
+        var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");
+        System.IO.File.WriteAllText(logFile,
+            "[2026-06-14 10:00:00.000 +00:00] [INF] [1] LetterboxdSync.LetterboxdDiary: Review response for sinners: status=201, body={\"text\":\"first line of my draft\n" +
+            "second line of my draft\"}\n" +
+            "[2026-06-14 10:00:01.000 +00:00] [INF] [1] LetterboxdSync.Foo: next entry\n" +
+            "   at LetterboxdSync.Foo.Bar()\n");
+
+        var preview = Assert.IsType<ContentResult>(_h.Controller.PreviewLogs()).Content!;
+
+        Assert.DoesNotContain("my draft", preview);
+        Assert.Contains("Review response for sinners: status=201, body=[removed]", preview);
+        Assert.Contains("next entry", preview);
+        Assert.Contains("at LetterboxdSync.Foo.Bar()", preview);
+    }
+
+    [Fact]
     public void TheLogsTab_MasksEmailsToo()
     {
         var logFile = System.IO.Path.Combine(_h.LogDir, "log_20260614.log");

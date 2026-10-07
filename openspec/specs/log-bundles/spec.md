@@ -24,7 +24,7 @@ The "Send logs to developer" action SHALL require an explicit click and a confir
 
 ### Requirement: Bundle contents
 
-The bundle SHALL contain only: recent LetterboxdSync-tagged log lines (the same sanitized lines the Logs tab shows), the current telemetry snapshot, the plugin and Jellyfin versions, the collector status (which log files were read, how many lines matched), an instance id, and an optional user-supplied note. It MUST reuse the existing sanitized log reader so no content beyond the Logs-tab lines is included. The reader MUST replace every email address with `[email]`, and the plugin MUST NOT log Serializd account emails (log lines name those accounts by a short hash tag instead).
+The bundle SHALL contain only: recent LetterboxdSync-tagged log lines (the same sanitized lines the Logs tab shows), the current telemetry snapshot, the plugin and Jellyfin versions, the collector status (which log files were read, how many lines matched), an instance id, and an optional user-supplied note. It MUST reuse the existing sanitized log reader so no content beyond the Logs-tab lines is included. The reader MUST replace email addresses (including URL-encoded, HTML-entity and JSON-escaped forms) with `[email]` and MUST cut the body from review-reply lines that older releases logged, and the plugin MUST NOT log Serializd account emails (log lines name those accounts by a short hash tag instead) or the body of a successful review reply.
 
 #### Scenario: Email addresses never leave the server
 
