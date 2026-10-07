@@ -595,8 +595,9 @@ public class LetterboxdController : JellyfinUserApiController
     }
 
     /// <summary>
-    /// Checks the Seerr URL and API key from the admin settings form. Admin-only: it makes the
-    /// server GET any URL and echoes the error back.
+    /// Checks the Seerr URL and API key from the admin settings form. Admin-only, because it
+    /// makes the server GET any URL; failures return a fixed message so the response never
+    /// describes what answered (or did not answer) at that address.
     /// </summary>
     [HttpPost("TestJellyseerr")]
     [Authorize(Policy = "RequiresElevation")]
@@ -621,8 +622,10 @@ public class LetterboxdController : JellyfinUserApiController
         }
         catch (Exception ex)
         {
+            // The exception text names hosts, ports and TLS details of whatever the URL points
+            // at, so it goes to the server log only and the caller gets a fixed message.
             _logger.LogWarning("Seerr test failed: {Message}", ex.Message);
-            return BadRequest(new { success = false, error = ex.Message });
+            return BadRequest(new { success = false, error = "Could not connect to Seerr with that URL and API key. The server log has the details." });
         }
     }
 

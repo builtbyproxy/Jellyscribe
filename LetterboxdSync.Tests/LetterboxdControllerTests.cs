@@ -819,6 +819,26 @@ public class LetterboxdControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    [Fact]
+    public async Task TestJellyseerr_ConnectionFails_ReturnsGenericErrorWithoutExceptionText()
+    {
+        using var h = new ControllerTestHarness();
+
+        // Port 1 on loopback refuses the connection at once, so the client throws an
+        // HttpRequestException whose message names the host and port.
+        var result = await h.Controller.TestJellyseerr(new JellyseerrTestRequest
+        {
+            Url = "http://127.0.0.1:1",
+            ApiKey = "test-key"
+        });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.False(Prop<bool>(result, "success"));
+        var error = Prop<string>(result, "error");
+        Assert.Equal("Could not connect to Seerr with that URL and API key. The server log has the details.", error);
+        Assert.DoesNotContain("127.0.0.1", error!, StringComparison.Ordinal);
+    }
+
     // ----- GetLogs -----
 
     [Fact]
