@@ -5,8 +5,11 @@ name: Version Gate
 # corresponding release (the Release workflow short-circuits when a tag for
 # the current version already exists), leaving the change un-shipped and
 # users unaware. Patch-level bumps are fine for CI / refactor changes;
-# magnitude is a human judgement call, the gate only enforces "something
-# changed".
+# magnitude is a human judgement call. The gate enforces that the new version
+# is HIGHER than main's and not already tagged, so two PRs bumping to the same
+# number cannot both pass once the first has merged (the second would ship
+# under the first one's release and its notes would be lost). Re-run this
+# check (or require branches to be up to date) when main moves under a PR.
 #
 # NON-SHIPPING EXEMPTION: a PR whose entire diff sits in paths that never
 # affect what a user experiences (markdown, docs/, openspec/, site/, worker/,
@@ -58,7 +61,7 @@ jobs:
             case "$f" in
               *.md) ;;
               docs/*|openspec/*|site/*|worker/*|.github/*|LetterboxdSync.Tests/*) ;;
-              LICENSE|.gitignore|codecov.yml) ;;
+              LICENSE|.gitignore|codecov.yml|build.yaml) ;;
               *) NON_SHIPPING=false; break ;;
             esac
           done <<< "$CHANGED"
@@ -81,7 +84,21 @@ jobs:
             exit 1
           fi
 
-          echo "Version bump OK: $MAIN_V -> $PR_V"
+          # Must move forward, not just change: sort -V orders 2.10.0.0 after 2.9.0.0.
+          HIGHEST=$(printf '%s\n%s\n' "$MAIN_V" "$PR_V" | sort -V | tail -1)
+          if [ "$HIGHEST" != "$PR_V" ]; then
+            echo "::error::Version $PR_V is lower than main's $MAIN_V. Bump to a version above $MAIN_V."
+            exit 1
+          fi
+
+          # Must not already be released. Same tag rule as release.yml.
+          PR_TAG="v$(echo "$PR_V" | sed -E 's/\.0$//')"
+          if git ls-remote --exit-code --tags origin "refs/tags/$PR_TAG" > /dev/null 2>&1; then
+            echo "::error::Tag $PR_TAG already exists, so $PR_V has shipped. Bump to a version above it."
+            exit 1
+          fi
+
+          echo "Version bump OK: $MAIN_V -> $PR_V (tag $PR_TAG is free)"
 
           # If targetAbi.txt changed, require at least a minor bump. A bump
           # in the Jellyfin compatibility floor is a meaningful change for
