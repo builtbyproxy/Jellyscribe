@@ -12,6 +12,12 @@ namespace LetterboxdSync;
 /// </summary>
 public static class TmdbCache
 {
+    /// <summary>
+    /// Stored for a slug whose Letterboxd page is a TV entry, so it is not fetched again.
+    /// TMDb ids start at 1, so it never collides with a real one.
+    /// </summary>
+    public const int NotAFilm = 0;
+
     private static readonly object _lock = new();
     private static Dictionary<string, int>? _cache;
     private static ILogger? _logger;

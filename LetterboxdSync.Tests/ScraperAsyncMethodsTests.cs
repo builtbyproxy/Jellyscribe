@@ -200,6 +200,50 @@ public class ScraperAsyncMethodsTests : IDisposable
     }
 
     [Fact]
+    public async Task GetDiaryFilmEntriesAsync_ATvEntry_IsLeftOut_AndNotFetchedAgain()
+    {
+        // Hijack is a TV series Letterboxd lists as a film. Its TMDb TV id, 198102, is also the
+        // TMDb movie id of an unrelated film, which a member's library could hold.
+        TmdbCache.Set("sinners-2025", 1233413);
+        var tvPageReads = 0;
+        var handler = new MockHandler((request, _) =>
+        {
+            var path = request.RequestUri?.AbsolutePath ?? "";
+            if (path == "/8bitproxy/films/page/1/")
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "<html><body>" +
+                        "<li class='poster-container'><div data-film-slug='sinners-2025' data-component-class='LazyPoster'></div></li>" +
+                        "<li class='poster-container'><div data-film-slug='hijack-2023' data-component-class='LazyPoster'></div>" +
+                        "<span class='rating rated-6'>★★★</span></li>" +
+                        "</body></html>")
+                };
+            if (path == "/film/hijack-2023/")
+            {
+                tvPageReads++;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "<html><body class='film backdropped' data-tmdb-id='198102' data-tmdb-type='tv'>" +
+                        "<a href='https://www.themoviedb.org/tv/198102/' data-track-action='TMDB'>TMDB</a></body></html>")
+                };
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        var first = await scraper.GetDiaryFilmEntriesAsync("8bitproxy");
+        var second = await scraper.GetDiaryFilmEntriesAsync("8bitproxy");
+
+        Assert.Equal(new[] { 1233413 }, first.Select(e => e.TmdbId).ToArray());
+        Assert.Equal(new[] { 1233413 }, second.Select(e => e.TmdbId).ToArray());
+        Assert.Equal(1, tvPageReads);
+    }
+
+    [Fact]
     public async Task GetDiaryFilmEntriesAsync_SinglePage_ParsesRatingFromClass()
     {
         TmdbCache.Set("sinners-2025", 1233413);

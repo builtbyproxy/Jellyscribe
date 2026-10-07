@@ -87,6 +87,11 @@ public class LetterboxdScraper
         filmRes.EnsureSuccessStatusCode();
 
         var filmHtml = await filmRes.Content.ReadAsStringAsync().ConfigureAwait(false);
+        // Letterboxd also lists TV entries (miniseries, specials) as films, keyed by a TV id from
+        // TMDb's separate TV numbering. Logging one for this movie would be the wrong title.
+        if (ReadTmdbEntry(filmHtml).NotAMovie)
+            throw new FilmNotFoundException(tmdbId, $"Letterboxd matched TMDb ID {tmdbId} to a TV entry ({filmSlug}), not a film.");
+
         var (filmId, productionId) = ExtractFilmIdentifiers(filmHtml, filmSlug, filmRes.Headers);
 
         _logger.LogInformation("Resolved TMDb:{TmdbId} -> slug={Slug}, filmId={FilmId}, productionId={ProductionId}",
@@ -484,7 +489,7 @@ public class LetterboxdScraper
         {
             SyncProgress.IncrementCacheHit(SyncProgress.TrackLetterboxd);
             SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
-            return cached.Value;
+            return cached.Value == TmdbCache.NotAFilm ? null : cached.Value;
         }
 
         SyncProgress.IncrementNewLookup(SyncProgress.TrackLetterboxd);
@@ -503,20 +508,43 @@ public class LetterboxdScraper
         }
 
         var filmHtml = await filmRes.Content.ReadAsStringAsync().ConfigureAwait(false);
-        var filmDoc = new HtmlDocument();
-        filmDoc.LoadHtml(filmHtml);
-
-        var body = filmDoc.DocumentNode.SelectSingleNode("//body");
-        var tmdbStr = body?.GetAttributeValue("data-tmdb-id", string.Empty);
-        if (!string.IsNullOrEmpty(tmdbStr) && int.TryParse(tmdbStr, out var id))
-        {
-            TmdbCache.Set(slug, id);
-            SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
-            return id;
-        }
+        var (id, notAMovie) = ReadTmdbEntry(filmHtml);
+        if (id.HasValue)
+            TmdbCache.Set(slug, id.Value);
+        else if (notAMovie)
+            // Remembered so later runs skip the page; a TV entry never becomes a film.
+            TmdbCache.Set(slug, TmdbCache.NotAFilm);
 
         SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
-        return null;
+        return id;
+    }
+
+    /// <summary>
+    /// Reads a Letterboxd film page's TMDb entry. <c>MovieId</c> is the TMDb movie id on the
+    /// body, or null when there is none or the entry is TV. Letterboxd lists miniseries and TV
+    /// specials as films too, and their <c>data-tmdb-id</c> is a TMDb TV id: TMDb numbers movies
+    /// and TV separately, so the same number can be an unrelated movie (tv/198102 is Hijack,
+    /// movie/198102 Cutie Honey Flash). The API path skips TV links the same way. The entry is
+    /// TV when the body's <c>data-tmdb-type</c> says so or, without that attribute, when the TMDb
+    /// button links to a themoviedb.org /tv/ page; a page with neither counts as a film.
+    /// </summary>
+    internal static (int? MovieId, bool NotAMovie) ReadTmdbEntry(string filmHtml)
+    {
+        var doc = new HtmlDocument();
+        doc.LoadHtml(filmHtml);
+        var body = doc.DocumentNode.SelectSingleNode("//body");
+
+        var type = body?.GetAttributeValue("data-tmdb-type", string.Empty) ?? string.Empty;
+        var notAMovie = type.Length > 0
+            ? !type.Equals("movie", StringComparison.OrdinalIgnoreCase)
+            : (doc.DocumentNode.SelectSingleNode("//a[contains(@href, 'themoviedb.org/')]")
+                ?.GetAttributeValue("href", string.Empty) ?? string.Empty)
+                .Contains("themoviedb.org/tv/", StringComparison.OrdinalIgnoreCase);
+        if (notAMovie)
+            return (null, true);
+
+        var tmdbStr = body?.GetAttributeValue("data-tmdb-id", string.Empty);
+        return (int.TryParse(tmdbStr, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 ? id : null, false);
     }
 }
 

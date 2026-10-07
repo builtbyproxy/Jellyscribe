@@ -17,7 +17,7 @@ public class ScraperTests
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
 
     // Lookups are cached process-wide, and two tests here resolve the same id to different films.
-    public ScraperTests() => LetterboxdScraper.ResetFilmCacheForTesting(693134, 99999, 12345);
+    public ScraperTests() => LetterboxdScraper.ResetFilmCacheForTesting(693134, 99999, 12345, 198102);
 
     [Fact]
     public async Task LookupFilmByTmdbId_ValidFilm_ReturnsFilmResult()
@@ -59,6 +59,74 @@ public class ScraperTests
         Assert.Equal("dune-part-two", result.Slug);
         Assert.Equal("945898", result.FilmId);
         Assert.Equal("PROD-dune", result.ProductionId);
+    }
+
+    // Letterboxd film pages carry the TMDb entry on the body. TV titles Letterboxd lists as films
+    // (miniseries, specials) say data-tmdb-type="tv", and their id is from TMDb's TV numbering.
+    private const string MoviePage =
+        "<html><body class=\"film backdropped\" data-tmdb-id=\"198102\" data-tmdb-type=\"movie\">" +
+        "<a href=\"https://www.themoviedb.org/movie/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>";
+    private const string TvPage =
+        "<html><body class=\"film backdropped\" data-tmdb-id=\"198102\" data-tmdb-type=\"tv\">" +
+        "<a href=\"https://www.themoviedb.org/tv/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>";
+
+    [Fact]
+    public void ReadTmdbEntry_MoviePage_ReturnsTheMovieId()
+        => Assert.Equal((198102, false), LetterboxdScraper.ReadTmdbEntry(MoviePage));
+
+    [Fact]
+    public void ReadTmdbEntry_TvPage_IsNotAMovie()
+        => Assert.Equal((null, true), LetterboxdScraper.ReadTmdbEntry(TvPage));
+
+    [Fact]
+    public void ReadTmdbEntry_WithoutTheTypeAttribute_FallsBackToTheTmdbLink()
+    {
+        Assert.Equal((null, true), LetterboxdScraper.ReadTmdbEntry(
+            "<html><body data-tmdb-id=\"198102\"><a href=\"https://www.themoviedb.org/tv/198102/\">TMDB</a></body></html>"));
+        Assert.Equal((198102, false), LetterboxdScraper.ReadTmdbEntry(
+            "<html><body data-tmdb-id=\"198102\"><a href=\"https://www.themoviedb.org/movie/198102/\">TMDB</a></body></html>"));
+    }
+
+    [Fact]
+    public void ReadTmdbEntry_OlderMarkupWithNeither_StillCountsAsAFilm()
+        => Assert.Equal((550, false), LetterboxdScraper.ReadTmdbEntry("<html><body data-tmdb-id=\"550\"></body></html>"));
+
+    [Theory]
+    [InlineData("<html><body></body></html>")]
+    [InlineData("<html><body data-tmdb-id=\"\"></body></html>")]
+    [InlineData("<html><body data-tmdb-id=\"abc\"></body></html>")]
+    public void ReadTmdbEntry_NoUsableId_ReturnsNull(string html)
+        => Assert.Equal((null, false), LetterboxdScraper.ReadTmdbEntry(html));
+
+    [Fact]
+    public async Task LookupFilmByTmdbId_ResolvingToATvEntry_IsNotFound()
+    {
+        var filmPageRead = false;
+        var handler = new ScraperMockHandler((request, http) =>
+        {
+            var path = request.RequestUri?.PathAndQuery ?? "";
+            if (path.StartsWith("/tmdb/198102"))
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "<html><head><link rel=\"canonical\" href=\"https://letterboxd.com/film/hijack-2023/\" /></head></html>")
+                };
+            if (path == "/film/hijack-2023/")
+            {
+                filmPageRead = true;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(TvPage.Replace("<a ", "<div data-film-slug=\"hijack-2023\" data-film-id=\"1\"></div><a "))
+                };
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var (http, scraper) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        await Assert.ThrowsAsync<FilmNotFoundException>(() => scraper.LookupFilmByTmdbIdAsync(198102));
+        Assert.True(filmPageRead);
     }
 
     [Fact]
