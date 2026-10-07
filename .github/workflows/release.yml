@@ -150,6 +150,16 @@ jobs:
             SUBJECT=$(git log -1 --format=%s "${BUMP:-HEAD}")
             printf '%s' "$SUBJECT" > /tmp/subject.txt
             echo "Version bump commit: ${BUMP:-HEAD} ($SUBJECT)"
+            # GitHub keeps only one pending run per concurrency group, so if two
+            # version bumps queue behind a running release, the older one is
+            # cancelled. Say so loudly rather than let that version vanish.
+            if [ -n "$BUMP" ] && git cat-file -e "$BUMP^" 2>/dev/null; then
+              PREV=$(git show "$BUMP^:Directory.Build.props" | grep -oE '<AssemblyVersion>[^<]+' | head -1 | sed 's/<AssemblyVersion>//')
+              if [ -n "$PREV" ] && ! git show origin/main:manifest.json \
+                   | jq -e --arg v "$PREV" '.[0].versions | any(.version == $v)' > /dev/null; then
+                echo "::warning::The previous version $PREV is not in manifest.json either. Its release run was probably superseded; re-run that run from the Actions tab to ship it."
+              fi
+            fi
             PR=$(printf '%s' "$SUBJECT" | grep -oE '\(#[0-9]+\)$' | tr -d '(#)' || true)
             if [ -z "$PR" ]; then
               echo "::warning::No PR number in the version bump commit subject; using the subject as changelog."
@@ -169,14 +179,16 @@ jobs:
           fi
           # Clean and cap the notes before they reach manifest.json, the GitHub
           # Release, and every user's plugin catalog. The PR body can be edited
-          # after review, so: plain text only (template comments and any HTML
-          # tags stripped) and a hard length cap.
+          # after review, so: plain text only (template comments and HTML tags
+          # stripped, even across lines, then any stray '<' dropped so nothing
+          # can open a tag) and a hard length cap.
           python3 << 'PY'
           import re, sys
           MAX = 4000
           notes = open('/tmp/raw-notes.txt').read()
           notes = re.sub(r'<!--.*?(-->|\Z)', '', notes, flags=re.DOTALL)
-          notes = re.sub(r'<[^>\n]*>', '', notes)
+          notes = re.sub(r'</?[A-Za-z!][^>]*>', '', notes)
+          notes = notes.replace('<', '')
           notes = re.sub(r'[ \t]{2,}', ' ', notes)
           notes = re.sub(r'\n{3,}', '\n\n', notes).strip()
           if not notes:
@@ -310,7 +322,9 @@ jobs:
               exit 0
             fi
             TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-            echo "Inserting new $ASSEMBLY entry at top of manifest"
+            # Kept newest-first by version, so a late re-run of an older release
+            # (see the superseded-run warning in the build job) lands in order.
+            echo "Inserting new $ASSEMBLY entry into the manifest"
             jq --arg v "$ASSEMBLY" --arg cs "$CS" --arg url "$URL" --arg ts "$TS" --arg cl "$CHANGELOG" --arg abi "$ABI" \
               '.[0].versions = ([{
                 version: $v,
@@ -319,7 +333,7 @@ jobs:
                 sourceUrl: $url,
                 checksum: $cs,
                 timestamp: $ts
-              }] + .[0].versions)' \
+              }] + .[0].versions | sort_by(.version | split(".") | map(tonumber)) | reverse)' \
               manifest.json > manifest.tmp
             mv manifest.tmp manifest.json
             git add manifest.json
