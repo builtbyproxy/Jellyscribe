@@ -16,8 +16,10 @@ version: 2
 # without a minor bump, and any PR without a version bump at all. Let the
 # Dependabot PR sit open as a green/red compile signal otherwise.
 #
-# Scoped narrowly to Jellyfin.* for now; expand if other deps start causing
-# surprises. PR commit prefix is "build" so pr-title.yml accepts it.
+# The two Jellyfin.* entries below are that signal. Everything else (other
+# NuGet packages, the site's npm packages, the workflow actions) gets its own
+# weekly, grouped entry further down so security fixes are not missed. PR commit
+# prefixes are "build"/"ci" so pr-title.yml accepts them.
 
 updates:
   - package-ecosystem: nuget
@@ -49,3 +51,61 @@ updates:
     labels:
       - dependencies
       - jellyfin-sdk
+
+  # Every other NuGet package, in both projects (found through the solution at
+  # the repo root), as one grouped weekly PR. Jellyfin.* is ignored here because
+  # the two entries above own it. Newtonsoft.Json and Microsoft.AspNetCore.* are
+  # resolved from the Jellyfin host at runtime (only Jellyscribe.dll and
+  # HtmlAgilityPack.dll ship), so a bump past the host's copy could fail to load;
+  # they stay with the host. Microsoft.Extensions.* majors track .NET itself (10.x
+  # needs net10.0, see the Jellyfin 12 notes in CLAUDE.md), so only minor/patch.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "Jellyfin.*"
+      - dependency-name: "Newtonsoft.Json"
+      - dependency-name: "Microsoft.AspNetCore.*"
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      nuget:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+
+  # Site (jellyscribe.dev). Build-time only; nothing here ships in the plugin.
+  - package-ecosystem: npm
+    directory: /site
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      site:
+        patterns: ["*"]
+    commit-message:
+      prefix: build
+      include: scope
+    labels:
+      - dependencies
+
+  # Workflow actions are pinned to commit SHAs; this keeps the pins (and their
+  # version comments) moving.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+      include: scope
+    labels:
+      - dependencies
