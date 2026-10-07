@@ -5,6 +5,10 @@ using Xunit;
 
 namespace LetterboxdSync.Tests.Serializd;
 
+// SerializdSyncHistory is static (path override + cache). Other classes in the
+// "Plugin" collection reset it too (runner and playback tests), so this class
+// must run serially with them or a parallel reset can swap the file mid-test.
+[Collection("Plugin")]
 public class SerializdSyncHistoryTests : IDisposable
 {
     private readonly string _file;
