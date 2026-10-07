@@ -26,7 +26,7 @@ CI also collects coverage via `--collect:"XPlat Code Coverage"` into `TestResult
 
 Deploy a build to a Jellyfin server: `JELLYSCRIBE_DEPLOY_TARGET=user@host ./deploy.sh` (scp's `Jellyscribe.dll` + `HtmlAgilityPack.dll` and restarts the container; `JELLYSCRIBE_DEPLOY_PLUGINS_ROOT` overrides the plugins path).
 
-The telemetry/download Worker (`worker/`, deployed by hand with wrangler) has dependency-free tests for its pure helpers: `node --experimental-strip-types --test worker/test/dl.test.mjs` (Node 22.6+).
+The telemetry/download Worker (`worker/`, deployed by hand with wrangler) has dependency-free tests for its pure helpers: `node --experimental-strip-types --test worker/test/dl.test.mjs` (Node 22.6+; CI runs it in the `worker-tests` job). Merging a worker change does not deploy it, so the maintainer runs `npx wrangler deploy` from `worker/` afterwards.
 
 ## Architecture
 
@@ -79,7 +79,7 @@ The telemetry/download Worker (`worker/`, deployed by hand with wrangler) has de
 
 2. Merge with **Squash and merge**. The squash subject is the PR title with `(#NN)` appended; the release workflow extracts the PR number from that and fetches the PR body via `gh pr view` (the squash commit body itself is not reliable across merge methods).
 
-3. `release.yml` fires automatically on the push to `main` (one run at a time, `concurrency: release`). It reads `AssemblyVersion` from `Directory.Build.props` and stops if `manifest.json` on main already lists it. A read-only `build` job (no stored credentials) builds, tests, packages, and extracts the `## Release notes` section of the PR that bumped the version (comments and HTML stripped, capped at 4000 characters); a `publish` job with `contents: write`, which runs no repository build code, creates the GitHub Release at the built commit and pushes the manifest entry (using `targetAbi.txt`), retrying on a fresh main if the push races. If the tag exists but the manifest entry does not (a run that died half way), a rerun repairs it: it reuses the published asset and its checksum and only writes the manifest. Actions are pinned to commit SHAs; Dependabot's github-actions entry keeps them current.
+3. `release.yml` fires automatically on the push to `main` (one run at a time, `concurrency: release`). It reads `AssemblyVersion` from `Directory.Build.props` and stops if `manifest.json` on main already lists it. A read-only `build` job (no stored credentials) builds, tests, packages, and extracts the `## Release notes` section of the PR that bumped the version (comments and HTML stripped, capped at 4000 characters); a `publish` job with `contents: write`, which runs no repository build code, creates the GitHub Release at the built commit and pushes the manifest entry (using `targetAbi.txt`), retrying on a fresh main if the push races. If the tag exists but the manifest entry does not (a run that died half way), a rerun repairs it: when the release already has its asset, it skips the rebuild, reuses that asset's checksum and only writes the manifest; otherwise it rebuilds from the tag and uploads the missing asset. Actions are pinned to commit SHAs; Dependabot's github-actions entry keeps them current.
 
 4. `deploy-docs.yml` fires via `workflow_run` on Release completion, rebuilding jellyscribe.dev with the fresh manifest. (The `GITHUB_TOKEN`-authenticated auto-commit can't fire push-based workflows, hence the explicit `workflow_run` trigger.)
 

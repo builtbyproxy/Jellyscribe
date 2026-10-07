@@ -107,6 +107,24 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./TestResults/junit.xml
 
+  worker-tests:
+    # Dependency-free tests for the download/telemetry Worker's pure helpers
+    # (worker/src/dl.ts): the /dl/ path rule that keeps the redirect inside this
+    # repo's releases, checked against every URL in manifest.json, and the daily
+    # log-bundle cap. The Worker itself is deployed by hand, not from CI.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - name: Run worker tests
+        run: node --experimental-strip-types --test worker/test/dl.test.mjs
+
   jellyfin-12-prerelease:
     # Non-blocking early-warning probe for the Jellyfin 12 line. Jellyfin 12's SDK packages
     # ship lib/net10.0 only, so building against them forces net10.0, and a net10.0 assembly
