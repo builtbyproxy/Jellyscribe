@@ -131,8 +131,8 @@ few days).
       manifest entry. This URL lives on `workers.dev`, entirely independent
       of the `letterboxdsync.dev`/`jellyscribe.dev` DNS cutover in 5.2, so
       it was never at risk, verified anyway per the "must NOT move" note.
-- [x] 5.4 Done, end-to-end, on a throwaway container on the real media
-      server (`servarr`, via Tailscale, `jellyfin/jellyfin:latest`,
+- [x] 5.4 Done, end-to-end, on a throwaway container on the maintainer's test
+      server (`jellyfin/jellyfin:latest`,
       isolated name/port/no shared volumes, torn down after). Ran the
       startup wizard and repository-add via the Jellyfin REST API: added
       the exact repository URL end users have configured

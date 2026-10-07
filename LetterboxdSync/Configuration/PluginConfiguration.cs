@@ -24,7 +24,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public List<SerializdAccount> SerializdAccounts { get; set; } = new List<SerializdAccount>();
 
     /// <summary>
-    /// Base URL of the Seerr instance, e.g. "http://192.168.1.122:5055" or "https://requests.example.com".
+    /// Base URL of the Seerr instance, e.g. "http://seerr.local:5055" or "https://requests.example.com".
     /// Trailing slash is stripped at use time.
     /// </summary>
     public string? JellyseerrUrl { get; set; }

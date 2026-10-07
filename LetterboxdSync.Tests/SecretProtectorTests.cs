@@ -177,7 +177,7 @@ public class SecretProtectorTests : IDisposable
     {
         var config = new PluginConfiguration
         {
-            JellyseerrUrl = "http://192.168.1.122:5055",
+            JellyseerrUrl = "http://seerr.local:5055",
             JellyseerrApiKey = "MTIzNDU2Nzg5MA=="
         };
 

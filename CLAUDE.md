@@ -24,7 +24,7 @@ dotnet test --filter "FullyQualifiedName~ScraperTests.LookupBySlug_Returns_Resul
 
 CI also collects coverage via `--collect:"XPlat Code Coverage"` into `TestResults/`; Codecov consumes the Cobertura XML.
 
-Deploy a debug build to the local Jellyfin server: `./deploy.sh` (scp's `Jellyscribe.dll` + `HtmlAgilityPack.dll` and restarts the container).
+Deploy a build to a Jellyfin server: `JELLYSCRIBE_DEPLOY_TARGET=user@host ./deploy.sh` (scp's `Jellyscribe.dll` + `HtmlAgilityPack.dll` and restarts the container; `JELLYSCRIBE_DEPLOY_PLUGINS_ROOT` overrides the plugins path).
 
 ## Architecture
 

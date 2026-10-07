@@ -1,8 +1,15 @@
 #!/bin/bash
 set -e
 
-SERVER="lachlan@192.168.1.122"
-PLUGINS_ROOT="/docker/jellyfin/config/data/plugins"
+# The SSH target (e.g. user@jellyfin.example) comes from the environment, so no server
+# address lives in the repo.
+SERVER="${JELLYSCRIBE_DEPLOY_TARGET:-}"
+if [ -z "$SERVER" ]; then
+    echo "Usage: JELLYSCRIBE_DEPLOY_TARGET=user@host ./deploy.sh" >&2
+    echo "Optional: JELLYSCRIBE_DEPLOY_PLUGINS_ROOT (default /docker/jellyfin/config/data/plugins)" >&2
+    exit 1
+fi
+PLUGINS_ROOT="${JELLYSCRIBE_DEPLOY_PLUGINS_ROOT:-/docker/jellyfin/config/data/plugins}"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 read -s -p "Server password: " PASS
