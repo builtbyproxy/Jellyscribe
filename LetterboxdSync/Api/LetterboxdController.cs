@@ -685,8 +685,9 @@ public class LetterboxdController : JellyfinUserApiController
         await service.SetFilmRatingAsync(film.Slug, film.FilmId, stars).ConfigureAwait(false);
 
         RatingPushStore.RecordPushed(userId, account.LetterboxdUsername, tmdbId, stars);
-        // One plain line: no control characters, and no " · ", which the dashboards read as the title's end.
-        var title = new string((request.Title ?? string.Empty).Where(c => !char.IsControl(c)).ToArray()).Replace('·', '-').Trim();
+        // One plain line: control characters become spaces, and no " · ", which the dashboards read as the title's end.
+        var title = string.Join(' ', new string((request.Title ?? string.Empty).Select(c => char.IsControl(c) ? ' ' : c).ToArray())
+            .Replace('·', '-').Split(' ', StringSplitOptions.RemoveEmptyEntries));
         if (title.Length == 0) title = request.FilmSlug.Replace("-", " ");
         if (title.Length > 200) title = title[..200];
         SyncHistory.Record(new SyncEvent

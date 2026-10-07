@@ -116,6 +116,8 @@ public class ReviewRatingOnlyTests : IDisposable
         // Failed rows feed the diary sync's per-film rules; a rating that did not land leaves them alone.
         Assert.Empty(SyncHistory.GetPage(0, 10).Events);
         Assert.Null(RatingPushStore.GetLastPushed(UserId, "demo-cinephile", 238));
+        // Nothing landed on Letterboxd, so the Jellyfin rating is left alone too.
+        h.UserDataManager.DidNotReceiveWithAnyArgs().SaveUserData(default!, default!, default!, default, default);
     }
 
     [Theory]
@@ -155,6 +157,38 @@ public class ReviewRatingOnlyTests : IDisposable
     }
 
     [Fact]
+    public async Task DiaryReviewFailure_ReplyCarriesOneShortLine_Too()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "demo-cinephile");
+        var service = ApiLikeService();
+        service.PostReviewAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<double?>(), Arg.Any<int?>())
+            .ThrowsAsync(new Exception("Review failed: 403\r\n<html>" + new string('x', 400) + "</html>"));
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+
+        var result = await h.Controller.PostReview(new ReviewRequest { FilmSlug = "the-godfather", ReviewText = "great", TmdbId = 238 });
+
+        var error = (string)Prop(result, "error")!;
+        Assert.StartsWith("Review failed: 403", error);
+        Assert.DoesNotContain("\n", error);
+        Assert.True(error.Length <= 161, error);
+    }
+
+    [Fact]
+    public async Task FilmSlugWithAControlCharacter_IsRefusedBeforeAnyLogin()
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "demo-cinephile");
+        var logins = 0;
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => { logins++; return Task.FromResult(ApiLikeService()); };
+
+        var result = await h.Controller.PostReview(new ReviewRequest { FilmSlug = "the-godfather\r\nFAKE LOG LINE", ReviewText = "great", TmdbId = 238 });
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(0, logins);
+    }
+
+    [Fact]
     public async Task RatingOnly_Title_IsStoredAsOnePlainLine()
     {
         using var h = new ControllerTestHarness(currentUserId: UserId);
@@ -164,7 +198,7 @@ public class ReviewRatingOnlyTests : IDisposable
 
         await h.Controller.PostReview(new ReviewRequest { FilmSlug = "the-godfather", Rating = 4, TmdbId = 238, Title = "The\r\nGodfather · Success" });
 
-        Assert.Equal("TheGodfather - Success · Rated 4 stars", Assert.Single(SyncHistory.GetPage(0, 10).Events).FilmTitle);
+        Assert.Equal("The Godfather - Success · Rated 4 stars", Assert.Single(SyncHistory.GetPage(0, 10).Events).FilmTitle);
     }
 
     [Fact]

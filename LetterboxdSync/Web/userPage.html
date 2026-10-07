@@ -206,7 +206,7 @@
                 #letterboxdUserPage .ws-spin { width: 14px; height: 14px; flex: none; border: 2px solid var(--ws-border-strong); border-top-color: var(--ws-primary); border-radius: 50%; animation: wsSpin .8s linear infinite; }
                 #letterboxdUserPage .ws-spin.done { animation: none; border: 0; color: var(--ws-ok); }
                 @keyframes wsSpin { to { transform: rotate(360deg); } }
-                .ws-btn:disabled { opacity: .55; cursor: default; }
+                #letterboxdUserPage .ws-btn:disabled { opacity: .55; cursor: default; }
                 </style>
 
                 <div class="ws">
@@ -450,6 +450,8 @@
                                 });
                         },
                         json: function (r) { if (!r.ok) throw r; return r.json(); },
+                        // For writes: success is the status alone, so a reply without a JSON body still counts as saved.
+                        ok: function (r) { if (!r.ok) throw r; return r; },
                         errorHtml: function (what, retry) {
                             return '<span class="ws-red">Couldn\'t load ' + what + '.</span> <button type="button" class="ws-btn" data-retry="' + retry + '">Retry</button>';
                         },
@@ -740,11 +742,11 @@
                                 // original* names the login this edit started from, so its saved password follows a changed email.
                                 var item = { email: m.username, originalEmail: orig ? orig.email : null, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) list[self.editing.i] = item; else list.push(item);
-                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: list }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: list }).then(self.ok).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
                             } else {
                                 var itemL = { letterboxdUsername: m.username, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null, letterboxdPassword: m.password, rawCookies: m.cookies || null, clearRawCookies: !m.cookies && m.clearCookies, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) list[self.editing.i] = itemL; else list.push(itemL);
-                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: list }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: list }).then(self.ok).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
                             }
                         },
                         afterSave: function (err, failedWhat, doneText) {
@@ -763,7 +765,7 @@
                             byId('mStatus').textContent = 'Removing…';
                             self.setModalBusy(true);
                             self.put(tv ? 'Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts' : 'Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: list })
-                                .then(self.json).then(function () { self.afterSave(null, null, 'Removed.'); }, function (err) { self.afterSave(err, 'Remove failed'); });
+                                .then(self.ok).then(function () { self.afterSave(null, null, 'Removed.'); }, function (err) { self.afterSave(err, 'Remove failed'); });
                         },
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
