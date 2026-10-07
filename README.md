@@ -120,7 +120,7 @@ These apply the same way whether the account is a Letterboxd (film) or Serializd
 
 The **Dashboard** tab shows the same for both Letterboxd and Serializd accounts:
 - Sync statistics (total, synced, rewatches, skipped, failed, requested)
-- Recent activity with links to each title on Letterboxd or Serializd
+- Recent activity with links to each title on Letterboxd or Serializd, a title search, and **Load older history** to page back through everything Jellyscribe has logged. Consecutive episodes of one show fold into a single row you can expand
 - **Run Sync Now** button to trigger a sync on demand
 - **Review** buttons to write and post reviews directly to Letterboxd or Serializd
 
