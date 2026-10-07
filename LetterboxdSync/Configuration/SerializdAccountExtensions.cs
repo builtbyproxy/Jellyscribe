@@ -38,7 +38,27 @@ public static class SerializdAccountExtensions
         return enabled.FirstOrDefault(a => a.IsPrimary) ?? enabled[0];
     }
 
-    /// <summary>Resolved watchlist collection/playlist name, defaulting to "Serializd Watchlist".</summary>
+    /// <summary>The name every account's collection and playlist shared before collections were tracked per account.</summary>
+    public const string LegacyWatchlistName = "Serializd Watchlist";
+
+    /// <summary>
+    /// Resolved watchlist playlist name, defaulting to "Serializd Watchlist". Playlists belong to
+    /// one Jellyfin user, so the shared default cannot collide across users.
+    /// </summary>
     public static string GetWatchlistName(this SerializdAccount account)
-        => string.IsNullOrWhiteSpace(account.WatchlistName) ? "Serializd Watchlist" : account.WatchlistName!.Trim();
+        => string.IsNullOrWhiteSpace(account.WatchlistName) ? LegacyWatchlistName : account.WatchlistName!.Trim();
+
+    /// <summary>
+    /// Resolved watchlist collection name. Collections are server-wide, so the default carries the
+    /// Jellyfin username, like the Letterboxd playlist default carries the Letterboxd username.
+    /// The admin-set <see cref="SerializdAccount.WatchlistName"/> wins when present.
+    /// </summary>
+    public static string GetWatchlistCollectionName(this SerializdAccount account, string? jellyfinUsername)
+    {
+        if (!string.IsNullOrWhiteSpace(account.WatchlistName))
+            return account.WatchlistName!.Trim();
+        return string.IsNullOrWhiteSpace(jellyfinUsername)
+            ? LegacyWatchlistName
+            : $"{LegacyWatchlistName} ({jellyfinUsername})";
+    }
 }

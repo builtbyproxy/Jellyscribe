@@ -132,14 +132,11 @@ public class PlaylistReconcilerTests
     }
 
     // ===== Collections (Serializd.SerializdWatchlistSyncRunner.ReconcileCollectionAsync) =====
-    // Same shared core as the playlist tests above; a fix to the find/create/diff/wipe-guard
-    // logic now applies to both container kinds at once instead of needing to land twice.
+    // Same shared core as the playlist tests above; a fix to the create/diff/wipe-guard logic
+    // applies to both container kinds at once. The caller hands over the collection it owns
+    // (tracked by id), so these tests pass it in rather than seeding a name lookup.
 
     private readonly ICollectionManager _collectionManager = Substitute.For<ICollectionManager>();
-
-    private void LibraryHasCollection(BoxSet? boxSet)
-        => _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>())
-            .Returns(boxSet == null ? new List<BaseItem>() : new List<BaseItem> { boxSet });
 
     private static BoxSet MakeCollection(params Guid[] memberIds)
     {
@@ -151,11 +148,10 @@ public class PlaylistReconcilerTests
     [Fact]
     public async Task NoExistingCollection_NonEmptyDesired_CreatesIt()
     {
-        LibraryHasCollection(null);
         var desired = new HashSet<Guid> { Guid.NewGuid() };
 
         await PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, NullLogger.Instance, _user, "Serializd Watchlist", desired, sourceWasEmpty: false);
+            _collectionManager, NullLogger.Instance, _user, null, "Serializd Watchlist", desired, sourceWasEmpty: false);
 
         await _collectionManager.Received(1).CreateCollectionAsync(Arg.Is<CollectionCreationOptions>(
             o => o.Name == "Serializd Watchlist" && o.ItemIdList.Count == 1));
@@ -164,10 +160,8 @@ public class PlaylistReconcilerTests
     [Fact]
     public async Task NoExistingCollection_EmptyDesired_DoesNotCreate()
     {
-        LibraryHasCollection(null);
-
         await PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, NullLogger.Instance, _user, "Serializd Watchlist",
+            _collectionManager, NullLogger.Instance, _user, null, "Serializd Watchlist",
             new HashSet<Guid>(), sourceWasEmpty: true);
 
         await _collectionManager.DidNotReceive().CreateCollectionAsync(Arg.Any<CollectionCreationOptions>());
@@ -178,10 +172,8 @@ public class PlaylistReconcilerTests
     {
         var kept = Guid.NewGuid();
         var newItem = Guid.NewGuid();
-        LibraryHasCollection(MakeCollection(kept));
-
         await PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, NullLogger.Instance, _user, "Serializd Watchlist",
+            _collectionManager, NullLogger.Instance, _user, MakeCollection(kept), "Serializd Watchlist",
             new HashSet<Guid> { kept, newItem }, sourceWasEmpty: false);
 
         await _collectionManager.Received(1).AddToCollectionAsync(
@@ -194,10 +186,8 @@ public class PlaylistReconcilerTests
         var stale = Guid.NewGuid();
         var kept = Guid.NewGuid();
         var boxSet = MakeCollection(stale, kept);
-        LibraryHasCollection(boxSet);
-
         await PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, NullLogger.Instance, _user, "Serializd Watchlist",
+            _collectionManager, NullLogger.Instance, _user, boxSet, "Serializd Watchlist",
             new HashSet<Guid> { kept }, sourceWasEmpty: false);
 
         await _collectionManager.Received(1).RemoveFromCollectionAsync(
@@ -210,10 +200,8 @@ public class PlaylistReconcilerTests
         // A failed Serializd fetch must never be allowed to wipe an existing collection just
         // because the desired set came back empty this run.
         var member = Guid.NewGuid();
-        LibraryHasCollection(MakeCollection(member));
-
         await PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, NullLogger.Instance, _user, "Serializd Watchlist",
+            _collectionManager, NullLogger.Instance, _user, MakeCollection(member), "Serializd Watchlist",
             new HashSet<Guid>(), sourceWasEmpty: true);
 
         await _collectionManager.DidNotReceive().RemoveFromCollectionAsync(
@@ -224,10 +212,8 @@ public class PlaylistReconcilerTests
     public async Task ExistingCollection_AlreadyInSync_NoAddOrRemoveCalls()
     {
         var member = Guid.NewGuid();
-        LibraryHasCollection(MakeCollection(member));
-
         await PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, NullLogger.Instance, _user, "Serializd Watchlist",
+            _collectionManager, NullLogger.Instance, _user, MakeCollection(member), "Serializd Watchlist",
             new HashSet<Guid> { member }, sourceWasEmpty: false);
 
         await _collectionManager.DidNotReceive().AddToCollectionAsync(

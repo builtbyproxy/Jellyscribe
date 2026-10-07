@@ -6,6 +6,7 @@ using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Entities;
 using MediaBrowser.Controller.Collections;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
 using MediaBrowser.Model.Entities;
@@ -15,9 +16,9 @@ using Microsoft.Extensions.Logging;
 namespace LetterboxdSync;
 
 /// <summary>
-/// Create-or-update a named Jellyfin container (playlist or collection) to match a
-/// caller-computed desired set of media item ids. Shared by <see cref="WatchlistSyncRunner"/>
-/// (playlist of films) and <see cref="Serializd.SerializdWatchlistSyncRunner"/> (playlist of
+/// Create-or-update a Jellyfin container (a user's playlist found by name, or a collection the
+/// caller has already identified) to match a caller-computed desired set of media item ids.
+/// Shared by <see cref="WatchlistSyncRunner"/> (playlist of films) and <see cref="Serializd.SerializdWatchlistSyncRunner"/> (playlist of
 /// episodes, collection of shows), which independently reimplemented the same find/create/diff
 /// logic per container kind; a prior duplicate-add bug here (comparing playlist-entry ids
 /// against item ids instead of the wrapped item ids) is exactly the class of bug this exists
@@ -41,13 +42,17 @@ internal static class PlaylistReconciler
                 IncludeItemTypes = new[] { BaseItemKind.Playlist },
                 Recursive = true,
             }).FirstOrDefault(p => string.Equals(p.Name, playlistName, StringComparison.Ordinal)),
-            create: ids => playlistManager.CreatePlaylist(new PlaylistCreationRequest
+            create: async ids =>
             {
-                Name = playlistName,
-                UserId = user.Id,
-                MediaType = MediaType.Video,
-                ItemIdList = ids.ToArray(),
-            }),
+                await playlistManager.CreatePlaylist(new PlaylistCreationRequest
+                {
+                    Name = playlistName,
+                    UserId = user.Id,
+                    MediaType = MediaType.Video,
+                    ItemIdList = ids.ToArray(),
+                }).ConfigureAwait(false);
+                return (Guid?)null;
+            },
             // Source of truth: Playlist.LinkedChildren contains the wrapped media item ids.
             // Querying ParentId returns playlist *entries* whose BaseItem.Id is the entry guid,
             // not the wrapped item's guid; comparing that against desired item ids never
@@ -62,39 +67,42 @@ internal static class PlaylistReconciler
                 container.Id.ToString("N"), toRemove.Select(id => id.ToString("N")).ToArray()));
     }
 
-    public static Task ReconcileCollectionAsync(
-        ICollectionManager collectionManager, ILibraryManager libraryManager, ILogger logger,
-        User user, string collectionName, HashSet<Guid> desired, bool sourceWasEmpty)
+    /// <summary>
+    /// Reconciles one known collection, or creates it under <paramref name="collectionName"/>
+    /// when <paramref name="collection"/> is null. Unlike playlists there is no lookup by name
+    /// here: collections are server-wide, so the caller decides which collection is its own
+    /// (see <see cref="Serializd.SerializdCollectionStore"/>). Returns the id of the collection
+    /// reconciled or created, or null when nothing exists and nothing was created.
+    /// </summary>
+    public static Task<Guid?> ReconcileCollectionAsync(
+        ICollectionManager collectionManager, ILogger logger,
+        User user, BoxSet? collection, string collectionName, HashSet<Guid> desired, bool sourceWasEmpty)
     {
         return ReconcileContainerAsync(
             containerLabel: "Collection",
-            containerName: collectionName,
+            containerName: collection?.Name ?? collectionName,
             username: user.Username,
             desired: desired,
             sourceWasEmpty: sourceWasEmpty,
             logger: logger,
-            findExisting: () => libraryManager.GetItemList(new InternalItemsQuery
-            {
-                IncludeItemTypes = new[] { BaseItemKind.BoxSet },
-                Recursive = true,
-            }).FirstOrDefault(b => string.Equals(b.Name, collectionName, StringComparison.Ordinal)),
-            create: ids => collectionManager.CreateCollectionAsync(new CollectionCreationOptions
+            findExisting: () => collection,
+            create: async ids => (Guid?)(await collectionManager.CreateCollectionAsync(new CollectionCreationOptions
             {
                 Name = collectionName,
                 ItemIdList = ids.Select(g => g.ToString("N")).ToList(),
                 UserIds = new[] { user.Id },
-            }),
+            }).ConfigureAwait(false))?.Id,
             getExistingMembers: container => ((Folder)container).LinkedChildren
                 .Where(lc => lc.ItemId.HasValue).Select(lc => lc.ItemId!.Value).ToHashSet(),
             add: (container, toAdd) => collectionManager.AddToCollectionAsync(container.Id, toAdd),
             remove: (container, toRemove) => collectionManager.RemoveFromCollectionAsync(container.Id, toRemove));
     }
 
-    private static async Task ReconcileContainerAsync(
+    private static async Task<Guid?> ReconcileContainerAsync(
         string containerLabel, string containerName, string? username,
         HashSet<Guid> desired, bool sourceWasEmpty, ILogger logger,
         Func<BaseItem?> findExisting,
-        Func<HashSet<Guid>, Task> create,
+        Func<HashSet<Guid>, Task<Guid?>> create,
         Func<BaseItem, HashSet<Guid>> getExistingMembers,
         Func<BaseItem, Guid[], Task> add,
         Func<BaseItem, IEnumerable<Guid>, Task> remove)
@@ -103,12 +111,12 @@ internal static class PlaylistReconciler
 
         if (container == null)
         {
-            if (desired.Count == 0) return;
+            if (desired.Count == 0) return null;
 
-            await create(desired).ConfigureAwait(false);
+            var createdId = await create(desired).ConfigureAwait(false);
             logger.LogInformation("Created {Label} '{Name}' with {Count} item(s) for {Username}",
                 containerLabel, containerName, desired.Count, username);
-            return;
+            return createdId;
         }
 
         var existing = getExistingMembers(container);
@@ -131,5 +139,7 @@ internal static class PlaylistReconciler
                 containerLabel, containerName, username, toAdd.Length, toRemove.Length);
         else
             logger.LogInformation("{Label} '{Name}' already up to date for {Username}", containerLabel, containerName, username);
+
+        return container.Id;
     }
 }

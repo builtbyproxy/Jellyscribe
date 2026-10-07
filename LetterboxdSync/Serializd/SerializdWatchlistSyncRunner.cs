@@ -9,6 +9,7 @@ using LetterboxdSync;
 using LetterboxdSync.Configuration;
 using MediaBrowser.Controller.Collections;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Playlists;
@@ -21,7 +22,8 @@ namespace LetterboxdSync.Serializd;
 /// Mirrors a user's Serializd watchlist into Jellyfin, two ways (parity with the Letterboxd
 /// watchlist feature, adapted to TV's show→season→episode hierarchy):
 /// <list type="bullet">
-/// <item>a <b>collection</b> "Serializd Watchlist" of the watchlisted <i>shows</i> (browse), and</item>
+/// <item>a <b>collection</b> "Serializd Watchlist (username)" of the watchlisted <i>shows</i>
+/// (browse), one per account and tracked by id because collections are server-wide, and</item>
 /// <item>a <b>playlist</b> "Serializd Watchlist" of the <i>episodes</i> of the specific seasons
 /// you watchlisted (a play-queue; this is where season accuracy lives, since a playlist is
 /// episode-level anyway).</item>
@@ -235,9 +237,8 @@ public class SerializdWatchlistSyncRunner
         // resolved to a desired show/episode" (a real state, safe to reconcile away).
         var sourceWasEmpty = entries.Count == 0;
 
-        var name = account.GetWatchlistName();
-        await ReconcileCollectionAsync(user, desiredShows, name, sourceWasEmpty).ConfigureAwait(false);
-        await ReconcilePlaylistAsync(user, desiredEpisodes, name, sourceWasEmpty).ConfigureAwait(false);
+        await ReconcileCollectionAsync(user, account, desiredShows, sourceWasEmpty).ConfigureAwait(false);
+        await ReconcilePlaylistAsync(user, desiredEpisodes, account.GetWatchlistName(), sourceWasEmpty).ConfigureAwait(false);
 
         await SeerrIntegrationAsync(account, entries, seriesByTmdb, user, cancellationToken).ConfigureAwait(false);
     }
@@ -498,9 +499,151 @@ public class SerializdWatchlistSyncRunner
             jellyfinUsername, added, removed, addFailed, removeFailed);
     }
 
-    private Task ReconcileCollectionAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
-        => PlaylistReconciler.ReconcileCollectionAsync(
-            _collectionManager, _libraryManager, _logger, user, name, desired, sourceWasEmpty);
+    /// <summary>
+    /// Reconciles this account's own collection. Collections are visible server-wide and Jellyfin
+    /// allows any number with the same name, so the collection is the one recorded in
+    /// <see cref="SerializdCollectionStore"/>, never one found by name. Without a record (first run,
+    /// or the recorded collection was deleted) a new collection is created under a name no other
+    /// collection uses: Jellyfin derives a collection's folder, and so its item id, from the name,
+    /// so creating a same-named one would land in the existing collection.
+    /// </summary>
+    private async Task ReconcileCollectionAsync(User user, SerializdAccount account, HashSet<Guid> desired, bool sourceWasEmpty)
+    {
+        var userId = user.Id.ToString("N");
+        var configuredName = account.GetWatchlistCollectionName(user.Username);
+
+        SerializdCollectionStore.Entry? tracked;
+        try
+        {
+            tracked = SerializdCollectionStore.Get(userId, account.Email);
+        }
+        catch (Exception ex)
+        {
+            // Without the record we cannot tell which collection is ours; skipping is safer than
+            // creating a duplicate or guessing by name.
+            _logger.LogError("Skipping the Serializd watchlist collection for {Username}: could not read which collection is theirs ({Message})",
+                user.Username, ex.Message);
+            return;
+        }
+
+        BoxSet? collection = null;
+        if (tracked != null)
+        {
+            collection = _libraryManager.GetItemById(tracked.CollectionId) as BoxSet;
+            if (collection == null)
+                _logger.LogInformation("Serializd watchlist collection for {Username} no longer exists; a new one will be created", user.Username);
+        }
+        else
+        {
+            collection = AdoptLegacyCollection(user, account);
+            if (collection != null)
+            {
+                tracked = new SerializdCollectionStore.Entry { Id = collection.Id.ToString("N"), Name = configuredName };
+                SaveTracked(user, account, collection.Id, configuredName);
+            }
+        }
+
+        if (collection != null && tracked != null && !string.Equals(tracked.Name, configuredName, StringComparison.Ordinal))
+            await RenameCollectionAsync(user, account, collection, configuredName).ConfigureAwait(false);
+
+        var createName = configuredName;
+        if (collection == null)
+        {
+            var taken = AllCollections().Select(b => b.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (taken.Contains(configuredName) || taken.Contains(SerializdAccountExtensions.LegacyWatchlistName))
+                _logger.LogInformation(
+                    "Leaving existing collections named '{Name}' as they are: nothing shows they hold {Username}'s Serializd watchlist alone. "
+                    + "Creating this account's own collection instead; delete the old one in Jellyfin once it is no longer needed.",
+                    taken.Contains(configuredName) ? configuredName : SerializdAccountExtensions.LegacyWatchlistName, user.Username);
+            createName = UniqueName(configuredName, taken);
+        }
+
+        var id = await PlaylistReconciler.ReconcileCollectionAsync(
+            _collectionManager, _logger, user, collection, createName, desired, sourceWasEmpty).ConfigureAwait(false);
+
+        if (collection == null && id.HasValue)
+            SaveTracked(user, account, id.Value, configuredName);
+    }
+
+    private List<BoxSet> AllCollections()
+        => _libraryManager.GetItemList(new InternalItemsQuery
+        {
+            IncludeItemTypes = new[] { BaseItemKind.BoxSet },
+            Recursive = true,
+        }).OfType<BoxSet>().ToList();
+
+    /// <summary>
+    /// The one-off upgrade rule. Before collections were tracked by id, every account using the
+    /// default name wrote to the single collection named "Serializd Watchlist". That collection is
+    /// adopted only when it provably belonged to this account alone: this account uses the
+    /// default name (a custom name could have been pointed at any collection, so it proves
+    /// nothing), it is the only account with watchlist sync on the default name (so no one else's
+    /// shows are in it), exactly one collection has that name, and no account tracks it already.
+    /// Otherwise the old collection is left untouched and the caller creates a new one.
+    /// </summary>
+    private BoxSet? AdoptLegacyCollection(User user, SerializdAccount account)
+    {
+        if (!string.IsNullOrWhiteSpace(account.WatchlistName))
+            return null;
+
+        var sharers = Config.SerializdAccounts.Count(a => a.SyncWatchlist && string.IsNullOrWhiteSpace(a.WatchlistName));
+        if (sharers != 1)
+            return null;
+
+        var legacy = AllCollections()
+            .Where(b => string.Equals(b.Name, SerializdAccountExtensions.LegacyWatchlistName, StringComparison.Ordinal))
+            .ToList();
+        if (legacy.Count != 1)
+            return null;
+
+        if (SerializdCollectionStore.IsTrackedByAnotherAccount(legacy[0].Id, user.Id.ToString("N"), account.Email))
+            return null;
+
+        _logger.LogInformation("Serializd watchlist: keeping the existing '{Name}' collection as {Username}'s, the only account that synced into it",
+            legacy[0].Name, user.Username);
+        return legacy[0];
+    }
+
+    /// <summary>Applies an admin's changed collection name; a rename made in Jellyfin itself is otherwise left alone.</summary>
+    private async Task RenameCollectionAsync(User user, SerializdAccount account, BoxSet collection, string name)
+    {
+        try
+        {
+            collection.Name = name;
+            await _libraryManager.UpdateItemAsync(collection, collection.GetParent(), ItemUpdateType.MetadataEdit, CancellationToken.None)
+                .ConfigureAwait(false);
+            SaveTracked(user, account, collection.Id, name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not rename the Serializd watchlist collection for {Username} to '{Name}': {Message}",
+                user.Username, name, ex.Message);
+        }
+    }
+
+    private void SaveTracked(User user, SerializdAccount account, Guid collectionId, string appliedName)
+    {
+        try
+        {
+            SerializdCollectionStore.Set(user.Id.ToString("N"), account.Email, collectionId, appliedName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Could not record the Serializd watchlist collection for {Username}; the next run may create another one ({Message})",
+                user.Username, ex.Message);
+        }
+    }
+
+    /// <summary>"name", or "name 2", "name 3", ... when a collection already uses it (case-insensitively, as folder names may be).</summary>
+    internal static string UniqueName(string name, HashSet<string> taken)
+    {
+        if (!taken.Contains(name)) return name;
+        for (var n = 2; ; n++)
+        {
+            var candidate = $"{name} {n}";
+            if (!taken.Contains(candidate)) return candidate;
+        }
+    }
 
     private Task ReconcilePlaylistAsync(User user, HashSet<Guid> desired, string name, bool sourceWasEmpty)
         => PlaylistReconciler.ReconcileAsync(
