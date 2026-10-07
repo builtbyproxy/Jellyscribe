@@ -1129,15 +1129,17 @@
                            whatever opened the dialog. */
                         returnFocus: {},
                         openModal: function (id) {
-                            var ov = document.getElementById(id);
+                            var ov = root.querySelector('#' + id);
                             if (ov.hasAttribute('open')) return;
                             this.returnFocus[id] = document.activeElement;
                             if (typeof ov.showModal === 'function') ov.showModal(); else ov.setAttribute('open', '');
                             var first = Array.prototype.filter.call(ov.querySelectorAll('select, input, textarea'), function (x) { return !x.disabled && x.offsetParent !== null; })[0];
                             if (first) first.focus();
                         },
+                        // This page's own dialog, found through its root: Jellyfin may already have taken the page
+                        // out of the document when it reports the page hidden.
                         closeModal: function (id) {
-                            var ov = document.getElementById(id);
+                            var ov = root.querySelector('#' + id);
                             if (!ov.hasAttribute('open')) return;
                             if (typeof ov.close === 'function') ov.close(); else { ov.removeAttribute('open'); this.restoreFocus(id); }
                         },
