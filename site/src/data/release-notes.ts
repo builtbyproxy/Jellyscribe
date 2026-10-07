@@ -658,7 +658,7 @@ export const releaseNotes: ReleaseNotes[] = [
     highlights: {
       new: [
         'Active installs are now counted from ordinary catalog update checks and release downloads served through an edge mirror of the official manifest. GitHub download totals were useless for this (re-downloads and auto-updates inflate them), and the opt-in telemetry only sees servers that enabled it.',
-        'Uniqueness is approximated with a weekly-rotating anonymous fingerprint: your IP address is used transiently at the edge to compute it and is never stored, and counts cannot be linked across weeks. Unlike the opt-in telemetry, this counting is always on; it carries no other information about you, your server, or your library.',
+        'Uniqueness is approximated with a weekly-rotating pseudonymous fingerprint: your IP address is used transiently at the edge to compute it and is never stored in the counts. (Corrected later: the fingerprint uses a fixed secret salt, so whoever holds that salt could link a known IP\'s rows across weeks.) Unlike the opt-in telemetry, this counting is always on; it carries no other information about you, your server, or your library.',
       ],
       improvements: [
         'Release downloads in the plugin catalog now redirect through the mirror to the identical GitHub release file. Checksums are unchanged, so Jellyfin\'s integrity check on install and update passes exactly as before.',
