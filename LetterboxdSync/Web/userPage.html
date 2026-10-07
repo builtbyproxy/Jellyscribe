@@ -206,6 +206,7 @@
                 #letterboxdUserPage .ws-spin { width: 14px; height: 14px; flex: none; border: 2px solid var(--ws-border-strong); border-top-color: var(--ws-primary); border-radius: 50%; animation: wsSpin .8s linear infinite; }
                 #letterboxdUserPage .ws-spin.done { animation: none; border: 0; color: var(--ws-ok); }
                 @keyframes wsSpin { to { transform: rotate(360deg); } }
+                .ws-btn:disabled { opacity: .55; cursor: default; }
                 </style>
 
                 <div class="ws">
@@ -289,6 +290,7 @@
                     <div class="ws-row" id="mWatchNameRow" style="margin-top:12px;"><label class="ws-field">Watchlist name <span class="ws-muted" style="text-transform:none;">(optional)</span></label><input type="text" class="ws-input" id="mWatchName" placeholder="" /></div>
                     <div class="ws-row" id="mLibRow" style="display:none;margin-top:12px;"><label class="ws-field">Excluded libraries <span class="ws-muted" style="text-transform:none;">(never synced to this account; applies to future syncs)</span></label><div class="ws-checks" id="mLibs"></div></div>
                     <div style="display:flex;gap:10px;margin-top:18px;align-items:center;"><button type="button" class="ws-btn primary" id="mSaveBtn">Save</button><button type="button" class="ws-btn" id="mCancelBtn">Cancel</button><button type="button" class="ws-btn danger" id="mDeleteBtn" style="margin-left:auto;display:none;">Remove</button></div>
+                    <div id="mConfirmRow" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--ws-crit);border-radius:8px;font-size:12.5px;align-items:center;gap:10px;flex-wrap:wrap;"><span>Remove this account? Jellyscribe stops syncing to it. Nothing on the diary itself is deleted.</span><span style="margin-left:auto;display:flex;gap:8px;"><button type="button" class="ws-btn danger" id="mConfirmRemoveBtn">Yes, remove</button><button type="button" class="ws-btn" id="mConfirmKeepBtn">Keep it</button></span></div>
                     <div id="mStatus" style="font-size:12.5px;margin-top:8px;"></div>
                 </div></div>
 
@@ -385,7 +387,9 @@
                             byId('runWatchlistBtn').addEventListener('click', function () { self.runWatchlist(); });
                             byId('mCancelBtn').addEventListener('click', function () { byId('acctModal').classList.remove('show'); });
                             byId('mSaveBtn').addEventListener('click', function () { self.saveAccount(); });
-                            byId('mDeleteBtn').addEventListener('click', function () { self.deleteAccount(); });
+                            byId('mDeleteBtn').addEventListener('click', function () { self.confirmRemove(true); });
+                            byId('mConfirmKeepBtn').addEventListener('click', function () { self.confirmRemove(false); });
+                            byId('mConfirmRemoveBtn').addEventListener('click', function () { self.deleteAccount(); });
                             byId('mVerifyBtn').addEventListener('click', function () { self.verifyAccount(); });
                             byId('mSvc').addEventListener('change', function () { self.onSvcChange(); });
                             byId('reviewCancel').addEventListener('click', function () { byId('reviewModal').classList.remove('show'); });
@@ -393,7 +397,13 @@
                             byId('reviewRewatch').addEventListener('change', function () {
                                 byId('rewatchDateRow').style.display = this.checked ? '' : 'none';
                             });
-                            ['acctModal', 'reviewModal'].forEach(function (id) { byId(id).addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); }); });
+                            // Close on the backdrop only when the press started there too: selecting text in a
+                            // modal and releasing outside it must not throw the draft away.
+                            ['acctModal', 'reviewModal'].forEach(function (id) {
+                                var ov = byId(id), pressedBackdrop = false;
+                                ov.addEventListener('pointerdown', function (e) { pressedBackdrop = e.target === ov; });
+                                ov.addEventListener('click', function (e) { if (e.target === ov && pressedBackdrop) ov.classList.remove('show'); pressedBackdrop = false; });
+                            });
                             root.querySelectorAll('.ws-modal-x').forEach(function (x) { x.addEventListener('click', function () { var ov = this.closest('.ws-modal-ov'); if (ov) ov.classList.remove('show'); }); });
                             // Once per document: the in-app page re-runs this script on every visit.
                             if (!window.__jellyscribeEscapeHandler) { window.__jellyscribeEscapeHandler = true; document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.ws-modal-ov.show').forEach(function (m) { m.classList.remove('show'); }); }); }
@@ -449,15 +459,25 @@
                             if (err.json) return err.json().then(function (d) { return (d && d.error) || err.statusText || ('HTTP ' + err.status); }, function () { return err.statusText || ('HTTP ' + err.status); });
                             return Promise.resolve(err.message || String(err));
                         },
-                        saveFailed: function (err) {
+                        saveFailed: function (err, what) {
                             var self = this;
                             self.errText(err).then(function (msg) {
-                                byId('mStatus').innerHTML = '<span class="ws-red">Save failed: ' + self.esc(msg) + '</span>';
+                                byId('mStatus').innerHTML = '<span class="ws-red">' + (what || 'Save failed') + ': ' + self.esc(msg) + '</span>';
                             });
                         },
                         setModalBusy: function (busy) {
-                            byId('mSaveBtn').disabled = busy;
-                            byId('mDeleteBtn').disabled = busy;
+                            this.modalBusy = busy;
+                            ['mSaveBtn', 'mDeleteBtn', 'mConfirmRemoveBtn', 'mConfirmKeepBtn'].forEach(function (id) { byId(id).disabled = busy; });
+                        },
+                        confirmRemove: function (show) {
+                            byId('mConfirmRow').style.display = show ? 'flex' : 'none';
+                            byId('mDeleteBtn').style.display = show ? 'none' : '';
+                            byId('mStatus').textContent = '';
+                        },
+                        // Today in the viewer's own time zone, as yyyy-mm-dd (toISOString would give the UTC date).
+                        localDate: function () {
+                            var d = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+                            return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
                         },
                         renderSparks: function () {
                             var self = this, days = 14, now = Date.now(), dayMs = 86400000;
@@ -501,7 +521,8 @@
                                 var status = typeof e.Status === 'string' ? e.Status : ['Success', 'Skipped', 'Failed', 'Rewatch', 'Requested', 'Rated'][e.Status] || 'Success';
                                 var title = (e.FilmTitle || '').split(' · '), t = title[0], m = title[1] || '';
                                 var ts = new Date(e.Timestamp), when = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                var canReview = status === 'Success' || status === 'Rewatch' || status === 'Skipped';
+                                // A Letterboxd review needs the film's slug; rows without one (a paused or failed lookup) can't be reviewed.
+                                var canReview = (status === 'Success' || status === 'Rewatch' || status === 'Skipped') && (e._svc === 'serializd' || !!e.FilmSlug);
                                 var seM = (e._svc === 'serializd') ? (m || '').match(/S(\d+)E(\d+)/) : null;
                                 var btn = (canReview && e.TmdbId) ? '<button type="button" class="ws-review-btn" data-svc="' + self.esc(e._svc) + '" data-tmdb="' + self.esc(e.TmdbId) +
                                     '" data-title="' + self.esc(t) + '" data-slug="' + self.esc(e.FilmSlug) + '" data-season="' + (seM ? seM[1] : '') + '" data-episode="' + (seM ? seM[2] : '') + '">Review</button>' : '';
@@ -527,26 +548,41 @@
                             byId('runWatchlistBtn').textContent = f === 'all' ? 'Sync all watchlists' : 'Sync ' + svc + ' watchlist';
                         },
                         runSync: function () {
-                            var self = this, f = self.ovFilter; byId('syncStatus').textContent = '';
-                            self.startWatcher('Sync');
-                            var jobs = [];
-                            if (f === 'all' || f === 'serializd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow', {}).catch(function () {}));
-                            if (f === 'all' || f === 'letterboxd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/Sync', {}).catch(function () {}));
-                            Promise.all(jobs);
+                            var f = this.ovFilter, jobs = [];
+                            if (f === 'all' || f === 'serializd') jobs.push({ name: 'Serializd', path: 'Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow' });
+                            if (f === 'all' || f === 'letterboxd') jobs.push({ name: 'Letterboxd', path: 'Jellyfin.Plugin.LetterboxdSync/Sync' });
+                            this.startJobs('Sync', jobs);
                         },
                         runWatchlist: function () {
-                            var self = this, f = self.ovFilter; byId('syncStatus').textContent = '';
-                            self.startWatcher('Watchlist sync');
-                            var jobs = [];
-                            if (f === 'all' || f === 'serializd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow', {}).catch(function () {}));
-                            if (f === 'all' || f === 'letterboxd') jobs.push(self.post('Jellyfin.Plugin.LetterboxdSync/SyncWatchlist', {}).catch(function () {}));
-                            Promise.all(jobs);
+                            var f = this.ovFilter, jobs = [];
+                            if (f === 'all' || f === 'serializd') jobs.push({ name: 'Serializd', path: 'Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow' });
+                            if (f === 'all' || f === 'letterboxd') jobs.push({ name: 'Letterboxd', path: 'Jellyfin.Plugin.LetterboxdSync/SyncWatchlist' });
+                            this.startJobs('Watchlist sync', jobs);
                         },
-                        getProgress: function () { return this.get('Jellyfin.Plugin.LetterboxdSync/Progress').then(function (r) { return r.json(); }).catch(function () { return null; }); },
+                        setSyncBusy: function (busy) { byId('runSyncBtn').disabled = busy; byId('runWatchlistBtn').disabled = busy; },
+                        // Starts each job, shows the server's reason for any it refused (no account, already
+                        // running), and watches progress only when at least one was accepted (202).
+                        startJobs: function (label, jobs) {
+                            var self = this, st = byId('syncStatus');
+                            st.textContent = 'Starting…';
+                            self.setSyncBusy(true);
+                            Promise.all(jobs.map(function (j) {
+                                var name = jobs.length > 1 ? j.name + ': ' : '';
+                                return self.post(j.path, {}).then(function (r) {
+                                    if (r.status === 202) return { ok: true };
+                                    return self.errText(r).then(function (msg) { return { ok: false, msg: name + msg }; });
+                                }, function () { return { ok: false, msg: name + 'couldn\'t reach the server.' }; });
+                            })).then(function (res) {
+                                var errors = res.filter(function (x) { return !x.ok; }).map(function (x) { return x.msg; });
+                                st.innerHTML = errors.length ? '<span class="ws-red">' + self.esc(errors.join(' · ')) + '</span>' : '';
+                                if (res.some(function (x) { return x.ok; })) self.startWatcher(label); else self.setSyncBusy(false);
+                            });
+                        },
+                        getProgress: function () { return this.get('Jellyfin.Plugin.LetterboxdSync/Progress').then(this.json).catch(function () { return null; }); },
                         startWatcher: function (label) {
                             var self = this, w = self.watcher || (self.watcher = {});
                             if (w.timer) clearInterval(w.timer);
-                            w.sawRunning = false; w.ticks = 0;
+                            w.sawRunning = false; w.ticks = 0; w.failures = 0;
                             byId('jwTitle').textContent = label + '…';
                             byId('jwPhase').textContent = 'Starting…';
                             byId('jwCounts').textContent = '';
@@ -554,7 +590,7 @@
                             var fill = byId('jwFill'); fill.style.width = '0%'; fill.classList.add('indet');
                             byId('jwSpin').classList.remove('done'); byId('jwSpin').innerHTML = '';
                             byId('jobWatcher').style.display = 'block';
-                            byId('runSyncBtn').disabled = true; byId('runWatchlistBtn').disabled = true;
+                            self.setSyncBusy(true);
                             w.timer = setInterval(function () { self.pollProgress(); }, 1000);
                             self.pollProgress();
                         },
@@ -564,7 +600,10 @@
                             if (!root.isConnected) { clearInterval(w.timer); w.timer = null; return; }
                             w.ticks++;
                             self.getProgress().then(function (p) {
-                                if (!p) return;
+                                if (!w.timer) return; // finished while this poll was in flight
+                                // A failed poll counts too: after several in a row, stop and say so rather than spin forever.
+                                if (!p) { if (++w.failures > 6) self.finishWatcher('unknown'); return; }
+                                w.failures = 0;
                                 if (p.isRunning) {
                                     w.sawRunning = true;
                                     byId('jwTitle').textContent = p.taskName || 'Syncing';
@@ -579,15 +618,16 @@
                                 } else if (w.sawRunning || w.ticks > 6) { self.finishWatcher(w.sawRunning); }
                             });
                         },
-                        finishWatcher: function (completed) {
-                            var self = this, w = self.watcher;
+                        // state: true (it ran), false (nothing ran) or 'unknown' (progress could not be read).
+                        finishWatcher: function (state) {
+                            var self = this, w = self.watcher, completed = state === true, unknown = state === 'unknown';
                             if (w.timer) { clearInterval(w.timer); w.timer = null; }
-                            var fill = byId('jwFill'); fill.classList.remove('indet'); fill.style.width = '100%';
-                            var spin = byId('jwSpin'); spin.classList.add('done'); spin.innerHTML = completed ? '✓' : '';
-                            byId('jwTitle').textContent = completed ? 'Done' : 'Nothing to sync';
-                            byId('jwPhase').textContent = completed ? 'Sync complete' : 'Everything was already up to date';
-                            byId('runSyncBtn').disabled = false; byId('runWatchlistBtn').disabled = false;
-                            setTimeout(function () { byId('jobWatcher').style.display = 'none'; self.loadOverview(); }, completed ? 2600 : 1600);
+                            var fill = byId('jwFill'); fill.classList.remove('indet'); fill.style.width = unknown ? '0%' : '100%';
+                            var spin = byId('jwSpin'); spin.classList.add('done'); spin.innerHTML = completed ? '✓' : (unknown ? '!' : '');
+                            byId('jwTitle').textContent = completed ? 'Done' : (unknown ? 'Progress unavailable' : 'Nothing to sync');
+                            byId('jwPhase').textContent = completed ? 'Sync complete' : (unknown ? 'Couldn\'t read the sync\'s progress. It may still be running: check Recent activity in a minute.' : 'Everything was already up to date');
+                            self.setSyncBusy(false);
+                            setTimeout(function () { if (!root.isConnected) return; byId('jobWatcher').style.display = 'none'; self.loadOverview(); }, completed ? 2600 : (unknown ? 8000 : 1600));
                         },
 
                         /* ===== Accounts ===== */
@@ -664,6 +704,8 @@
                             byId('mWatchNameRow').style.display = self.canSetWatchlistName ? '' : 'none';
                             byId('mVerifyStatus').textContent = ''; byId('mStatus').textContent = '';
                             byId('mDeleteBtn').style.display = a ? '' : 'none';
+                            byId('mConfirmRow').style.display = 'none';
+                            this.setModalBusy(false);
                             byId('mChecks').innerHTML = self.checksFor(svc, a);
                             byId('mLibs').innerHTML = self.libsFor(a);
                             byId('mLibRow').style.display = (self.libraries || []).length ? 'block' : 'none';
@@ -684,38 +726,42 @@
                             var self = this, m = self.collectModal();
                             if (!m.username) { byId('mStatus').innerHTML = '<span class="ws-red">Username/email is required.</span>'; return; }
                             if (m.svc === 'letterboxd' && m.username.indexOf('@') >= 0) { byId('mStatus').innerHTML = '<span class="ws-red">Letterboxd no longer accepts an email address to sign in. Use your Letterboxd username, the name in letterboxd.com/&lt;username&gt;/.</span>'; return; }
+                            if (self.modalBusy) return;
                             byId('mStatus').textContent = 'Saving…';
                             var orig = self.editing ? (m.svc === 'serializd' ? self.sz : self.lb)[self.editing.i] : null;
-                            var prevLb = self.lb.slice(), prevSz = self.sz.slice();
+                            // The new list is built from a copy, so a failed save leaves the loaded list as it was
+                            // and pressing Save again cannot add the account twice.
+                            var list = (m.svc === 'serializd' ? self.sz : self.lb).slice();
                             self.setModalBusy(true);
                             var excludedLibs = self.mergeExcluded((orig && orig.excludedLibraryIds) || [], m.libs);
                             if (m.svc === 'serializd') {
                                 // original* names the login this edit started from, so its saved password follows a changed email.
                                 var item = { email: m.username, originalEmail: orig ? orig.email : null, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
-                                if (self.editing) self.sz[self.editing.i] = item; else self.sz.push(item);
-                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: self.sz }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.sz = prevSz; self.afterSave(err); });
+                                if (self.editing) list[self.editing.i] = item; else list.push(item);
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: list }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
                             } else {
                                 var itemL = { letterboxdUsername: m.username, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null, letterboxdPassword: m.password, rawCookies: m.cookies || null, clearRawCookies: !m.cookies && m.clearCookies, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
-                                if (self.editing) self.lb[self.editing.i] = itemL; else self.lb.push(itemL);
-                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: self.lb }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.lb = prevLb; self.afterSave(err); });
+                                if (self.editing) list[self.editing.i] = itemL; else list.push(itemL);
+                                self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: list }).then(self.json).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
                             }
                         },
-                        afterSave: function (err) {
+                        afterSave: function (err, failedWhat, doneText) {
                             var self = this;
                             self.setModalBusy(false);
-                            if (err) { self.saveFailed(err); return; }
+                            if (err) { self.saveFailed(err, failedWhat); return; }
                             // Reload after a save: the list must match what the server stored, and must not keep a typed secret.
                             self.loadAccounts();
-                            byId('acctModal').classList.remove('show'); byId('saveStatus').innerHTML = '<span class="ws-green">Saved.</span>';
+                            byId('acctModal').classList.remove('show'); byId('saveStatus').innerHTML = '<span class="ws-green">' + (doneText || 'Saved.') + '</span>';
                         },
+                        // Runs from the confirm step's "Yes, remove"; the account leaves the list only once the server has removed it.
                         deleteAccount: function () {
-                            var self = this; if (!self.editing) return;
-                            var tv = self.editing.svc === 'serializd', prev = (tv ? self.sz : self.lb).slice();
-                            (tv ? self.sz : self.lb).splice(self.editing.i, 1);
+                            var self = this; if (!self.editing || self.modalBusy) return;
+                            var tv = self.editing.svc === 'serializd', list = (tv ? self.sz : self.lb).slice();
+                            list.splice(self.editing.i, 1);
                             byId('mStatus').textContent = 'Removing…';
                             self.setModalBusy(true);
-                            self.put(tv ? 'Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts' : 'Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: tv ? self.sz : self.lb })
-                                .then(self.json).then(function () { self.afterSave(); }, function (err) { if (tv) self.sz = prev; else self.lb = prev; self.afterSave(err); });
+                            self.put(tv ? 'Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts' : 'Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: list })
+                                .then(self.json).then(function () { self.afterSave(null, null, 'Removed.'); }, function (err) { self.afterSave(err, 'Remove failed'); });
                         },
                         verifyMessage: function (ok, d) {
                             var esc = function (s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
@@ -739,14 +785,16 @@
                                 if (!lbUser || (!lbPw && !(orig && orig.hasPassword))) { st.innerHTML = '<span class="ws-red">Username and password required.</span>'; return; }
                                 st.innerHTML = '<span class="ws-muted">Verifying… (can take a few seconds)</span>';
                                 self.post('Jellyfin.Plugin.LetterboxdSync/Verify', { letterboxdUsername: lbUser, letterboxdPassword: lbPw || null, rawCookies: byId('mAuthBlob').value || null, clearRawCookies: byId('mAuthBlobClear').checked, userAgent: byId('mUserAgent').value.trim() || null, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null })
-                                    .then(function (r) { r.json().then(function (d) { st.innerHTML = self.verifyMessage(r.ok, d); }, function () { st.innerHTML = self.verifyMessage(r.ok, null); }); });
+                                    .then(function (r) { r.json().then(function (d) { st.innerHTML = self.verifyMessage(r.ok, d); }, function () { st.innerHTML = self.verifyMessage(r.ok, null); }); },
+                                        function () { st.innerHTML = self.unreachable(); });
                                 return;
                             }
                             var email = byId('mUsername').value.trim(), pw = byId('mPassword').value;
                             if (!email || (!pw && !(orig && orig.hasPassword))) { st.innerHTML = '<span class="ws-red">Email and password required.</span>'; return; }
                             st.innerHTML = '<span class="ws-muted">Verifying…</span>';
-                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw || null, originalEmail: orig ? orig.email : null }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.esc(d.username) + ')' : '') + '.</span>'; }); } else if (r.status === 429) { r.json().then(function (d) { st.innerHTML = '<span class="ws-red">' + self.esc(d.error) + '</span>'; }, function () { st.innerHTML = '<span class="ws-red">Too many login checks. Try again later.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } });
+                            this.post('Jellyfin.Plugin.LetterboxdSync/Serializd/Verify', { email: email, password: pw || null, originalEmail: orig ? orig.email : null }).then(function (r) { if (r.ok) { r.json().then(function (d) { st.innerHTML = '<span class="ws-green">Login OK' + (d.username ? ' (' + self.esc(d.username) + ')' : '') + '.</span>'; }, function () { st.innerHTML = '<span class="ws-green">Login OK.</span>'; }); } else if (r.status === 429) { r.json().then(function (d) { st.innerHTML = '<span class="ws-red">' + self.esc(d.error) + '</span>'; }, function () { st.innerHTML = '<span class="ws-red">Too many login checks. Try again later.</span>'; }); } else { st.innerHTML = '<span class="ws-red">Login failed.</span>'; } }, function () { st.innerHTML = self.unreachable(); });
                         },
+                        unreachable: function () { return '<span class="ws-red">Couldn\'t reach the server. Try again.</span>'; },
 
                         /* Paint the star widget to a 0.5-step value (null/0 clears). Single
                            writer for reviewRating and ratingLabel so click, reset, and
@@ -770,9 +818,10 @@
                             byId('reviewText').value = ''; byId('reviewSpoilers').checked = false;
                             byId('reviewRewatch').checked = false;
                             byId('rewatchDateRow').style.display = 'none';
-                            byId('reviewDate').value = new Date().toISOString().split('T')[0];
+                            byId('reviewDate').value = this.localDate();
                             this.paintStars(null);
                             byId('reviewStatus').textContent = '';
+                            byId('reviewSubmit').disabled = false; byId('reviewCancel').disabled = false;
                             var isLetterboxd = svc !== 'serializd';
                             byId('reviewRewatchRow').style.display = isLetterboxd ? '' : 'none';
                             byId('reviewAccountRow').style.display = 'none';
@@ -818,16 +867,41 @@
                             var rv = byId('reviewRating').value, rating = rv ? parseFloat(rv) : null;
                             var isRewatch = self.reviewSvc !== 'serializd' && byId('reviewRewatch').checked;
                             if (!text && !rating && !isRewatch) { byId('reviewStatus').innerHTML = '<span class="ws-red">Write a review, set a rating, or mark as rewatch.</span>'; return; }
-                            byId('reviewStatus').textContent = 'Posting…';
+                            var postBtn = byId('reviewSubmit'), cancelBtn = byId('reviewCancel'), st = byId('reviewStatus');
+                            if (postBtn.disabled) return;
+                            st.textContent = 'Posting…';
+                            // Both stay disabled while posting: a second press would post a second diary entry.
+                            postBtn.disabled = true; cancelBtn.disabled = true;
                             var url, body;
                             if (self.reviewSvc === 'serializd') { url = 'Jellyfin.Plugin.LetterboxdSync/Serializd/Review'; body = { tmdbId: self.reviewTmdb, rating: rating ? Math.round(rating * 2) : null, reviewText: text || null, containsSpoilers: byId('reviewSpoilers').checked, seasonNumber: self.reviewSeason || null, episodeNumber: self.reviewEpisode || null, title: self.reviewTitleText || null }; }
                             else {
                                 var date = byId('reviewDate').value;
                                 var lbUser = (byId('reviewAccount').value || '').trim();
                                 url = 'Jellyfin.Plugin.LetterboxdSync/Review';
-                                body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: byId('reviewSpoilers').checked, isRewatch: isRewatch, date: isRewatch && date ? date : null, rating: rating, letterboxdUsername: lbUser || null };
+                                body = { filmSlug: self.reviewSlug, tmdbId: self.reviewTmdb || null, reviewText: text || null, containsSpoilers: byId('reviewSpoilers').checked, isRewatch: isRewatch, date: isRewatch && date ? date : null, rating: rating, letterboxdUsername: lbUser || null, title: self.reviewTitleText || null };
                             }
-                            self.post(url, body).then(function (r) { if (r.ok) { byId('reviewStatus').innerHTML = '<span class="ws-green">Review posted!</span>'; setTimeout(function () { byId('reviewModal').classList.remove('show'); }, 1200); } else { byId('reviewStatus').innerHTML = '<span class="ws-red">Failed to post.</span>'; } });
+                            self.post(url, body).then(function (r) {
+                                return r.json().then(function (d) { return { r: r, d: d || {} }; }, function () { return { r: r, d: {} }; });
+                            }).then(function (x) {
+                                cancelBtn.disabled = false;
+                                st.innerHTML = self.reviewResult(x.r.ok, x.d, x.r.status);
+                                var failed = (x.d.accounts || []).filter(function (a) { return a.success === false; });
+                                // Fully posted: close. Partly posted: stay open with Post disabled, since posting
+                                // again would duplicate it on the accounts that took it. Not posted: allow a retry.
+                                if (x.r.ok && !failed.length) setTimeout(function () { byId('reviewModal').classList.remove('show'); }, 1200);
+                                else if (!x.r.ok) postBtn.disabled = false;
+                            }, function () { postBtn.disabled = false; cancelBtn.disabled = false; st.innerHTML = self.unreachable(); });
+                        },
+                        // The result line: what landed, then each account it did not land on with the server's reason.
+                        reviewResult: function (ok, d, status) {
+                            var self = this, failed = (d.accounts || []).filter(function (a) { return a.success === false; });
+                            var perAccount = failed.map(function (a) { return self.esc(a.letterboxdUsername) + ': ' + self.esc(a.error || 'failed'); }).join('; ');
+                            if (ok) {
+                                var done = '<span class="ws-green">' + (d.ratedOnly ? 'Rating saved to Letterboxd.' : 'Review posted!') + '</span>';
+                                return failed.length ? done + ' <span class="ws-red">Not posted to ' + perAccount + '</span>' : done;
+                            }
+                            if (failed.length > 1) return '<span class="ws-red">Failed to post. ' + perAccount + '</span>';
+                            return '<span class="ws-red">Failed to post: ' + self.esc(d.error || ('HTTP ' + status)) + '</span>';
                         }
                     };
                     window.WSU = U;
