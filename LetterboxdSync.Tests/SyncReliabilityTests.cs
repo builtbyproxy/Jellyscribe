@@ -28,7 +28,7 @@ namespace LetterboxdSync.Tests;
 [Collection("Plugin")]
 public class SyncReliabilityTests : IDisposable
 {
-    private static readonly Func<TimeSpan> DefaultPacing = LetterboxdSyncRunner.FilmPacing;
+    private static readonly Func<CancellationToken, Task> DefaultPause = LetterboxdSyncRunner.FilmPause;
 
     private readonly string _tempDir;
     private readonly IUserManager _userManager = Substitute.For<IUserManager>();
@@ -55,14 +55,14 @@ public class SyncReliabilityTests : IDisposable
         SyncHistory.ResetForTesting();
         AuthBreaker.DataPathOverride = Path.Combine(_tempDir, "auth-breaker.json");
         AuthBreaker.ResetForTesting();
-        LetterboxdSyncRunner.FilmPacing = () => TimeSpan.Zero;
+        LetterboxdSyncRunner.FilmPause = _ => Task.CompletedTask;
 
         _runner = new LetterboxdSyncRunner(NullLoggerFactory.Instance, _libraryManager, _userManager, _userDataManager);
     }
 
     public void Dispose()
     {
-        LetterboxdSyncRunner.FilmPacing = DefaultPacing;
+        LetterboxdSyncRunner.FilmPause = DefaultPause;
         LetterboxdServiceFactory.OverrideForTesting = null;
         SyncHistory.DataPathOverride = null;
         SyncHistory.ResetForTesting();

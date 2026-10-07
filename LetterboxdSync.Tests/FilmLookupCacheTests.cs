@@ -33,7 +33,7 @@ public class FilmLookupCacheTests : IDisposable
 {
     private static readonly ILogger Log = NullLoggerFactory.Instance.CreateLogger("test");
 
-    private static readonly Func<TimeSpan> DefaultPacing = LetterboxdSyncRunner.FilmPacing;
+    private static readonly Func<CancellationToken, Task> DefaultPause = LetterboxdSyncRunner.FilmPause;
 
     private readonly string _tempDir;
 
@@ -50,7 +50,7 @@ public class FilmLookupCacheTests : IDisposable
     public void Dispose()
     {
         LetterboxdServiceFactory.OverrideForTesting = null;
-        LetterboxdSyncRunner.FilmPacing = DefaultPacing;
+        LetterboxdSyncRunner.FilmPause = DefaultPause;
         SyncHistory.DataPathOverride = null;
         SyncHistory.ResetForTesting();
         try { Directory.Delete(_tempDir, true); } catch { }
@@ -182,40 +182,41 @@ public class FilmLookupCacheTests : IDisposable
         return (new LetterboxdSyncRunner(NullLoggerFactory.Instance, libraryManager, userManager, userDataManager), userId);
     }
 
-    private static ILetterboxdService SlowLookupService(bool website, TimeSpan lookup, Stopwatch clock,
-        List<(string Call, TimeSpan At)> calls)
+    // Records the order of the lookup and the pause, so the tests assert sequence, not timing.
+    private static ILetterboxdService RecordingService(bool website, List<string> calls)
     {
         var service = Substitute.For<ILetterboxdService>();
         service.IsWebsiteSession.Returns(website);
         service.LookupFilmByTmdbIdAsync(329865).Returns(async _ =>
         {
-            await Task.Delay(lookup);
-            lock (calls) calls.Add(("lookup-done", clock.Elapsed));
+            lock (calls) calls.Add("lookup-start");
+            await Task.Yield();
+            lock (calls) calls.Add("lookup-done");
             return new FilmResult("arrival", "290327", null);
         });
         service.GetDiaryInfoAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(_ =>
         {
-            lock (calls) calls.Add(("diary", clock.Elapsed));
+            lock (calls) calls.Add("diary");
             return new DiaryInfo(null, false);
         });
+        LetterboxdSyncRunner.FilmPause = _ =>
+        {
+            lock (calls) calls.Add("pause");
+            return Task.CompletedTask;
+        };
         return service;
     }
 
     [Fact]
-    public async Task Runner_OnTheApi_PacesAlongsideTheLookup()
+    public async Task Runner_OnTheApi_StartsThePauseBeforeTheLookup()
     {
-        var pacing = TimeSpan.FromMilliseconds(800);
-        LetterboxdSyncRunner.FilmPacing = () => pacing;
-        var clock = Stopwatch.StartNew();
-        var calls = new List<(string Call, TimeSpan At)>();
-        var service = SlowLookupService(website: false, lookup: TimeSpan.FromMilliseconds(800), clock, calls);
+        var calls = new List<string>();
+        var service = RecordingService(website: false, calls);
         var (runner, userId) = RunnerWithOneFilm(service);
 
         Assert.True(await runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None));
 
-        var lookupDone = calls.Single(c => c.Call == "lookup-done").At;
-        var diary = calls.Single(c => c.Call == "diary").At;
-        Assert.True(diary - lookupDone < TimeSpan.FromMilliseconds(500), $"diary came {diary - lookupDone} after the lookup");
+        Assert.Equal(new[] { "pause", "lookup-start", "lookup-done", "diary" }, calls);
         await service.Received(1).MarkAsWatchedAsync("arrival", "290327", Arg.Any<DateTime?>(), Arg.Any<bool>(),
             Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>());
     }
@@ -223,19 +224,14 @@ public class FilmLookupCacheTests : IDisposable
     // On the website the lookup fetches the film page itself; the diary page must not follow it
     // straight away, so the pause comes after the lookup, not alongside it.
     [Fact]
-    public async Task Runner_OnTheWebsite_PacesAfterTheLookup()
+    public async Task Runner_OnTheWebsite_PausesAfterTheLookup()
     {
-        var pacing = TimeSpan.FromMilliseconds(600);
-        LetterboxdSyncRunner.FilmPacing = () => pacing;
-        var clock = Stopwatch.StartNew();
-        var calls = new List<(string Call, TimeSpan At)>();
-        var service = SlowLookupService(website: true, lookup: TimeSpan.FromMilliseconds(600), clock, calls);
+        var calls = new List<string>();
+        var service = RecordingService(website: true, calls);
         var (runner, userId) = RunnerWithOneFilm(service);
 
         Assert.True(await runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None));
 
-        var lookupDone = calls.Single(c => c.Call == "lookup-done").At;
-        var diary = calls.Single(c => c.Call == "diary").At;
-        Assert.True(diary - lookupDone >= pacing - TimeSpan.FromMilliseconds(30), $"diary came {diary - lookupDone} after the lookup");
+        Assert.Equal(new[] { "lookup-start", "lookup-done", "pause", "diary" }, calls);
     }
 }

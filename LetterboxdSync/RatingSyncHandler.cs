@@ -160,13 +160,24 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
     /// leaves a rating unchanged (a favorite toggle on a film rated before this version, say) is
     /// recognised as such. Never overwrites a value <see cref="Observe"/> recorded meanwhile.
     /// </summary>
-    internal void SeedBaseline(CancellationToken ct) => SeedUsers(_userManager.GetUsers(), ct);
+    internal void SeedBaseline(CancellationToken ct)
+    {
+        var seeded = SeedUsers(_userManager.GetUsers(), ct);
+        _logger.LogInformation("Rating sync ready: {Count} existing film ratings recorded as the starting point", seeded);
+    }
 
     /// <summary>Seeds the users the first pass skipped who have turned rating sync on since.</summary>
     internal void SeedNewlyEnabledUsers(CancellationToken ct)
-        => SeedUsers(_userManager.GetUsers().Where(u => _unseededUsers.ContainsKey(u.Id)), ct);
+    {
+        var users = _userManager.GetUsers().Where(u => _unseededUsers.ContainsKey(u.Id)).ToList();
+        var before = _unseededUsers.Count;
+        var seeded = SeedUsers(users, ct);
+        if (_unseededUsers.Count < before)
+            _logger.LogInformation("Rating sync turned on for {Users} more user(s): {Count} existing film ratings recorded as their starting point",
+                before - _unseededUsers.Count, seeded);
+    }
 
-    private void SeedUsers(IEnumerable<Jellyfin.Database.Implementations.Entities.User> users, CancellationToken ct)
+    private int SeedUsers(IEnumerable<Jellyfin.Database.Implementations.Entities.User> users, CancellationToken ct)
     {
         var seeded = 0;
         foreach (var user in users)
@@ -197,7 +208,7 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
             _unseededUsers.TryRemove(user.Id, out _);
         }
 
-        _logger.LogInformation("Rating sync ready: {Count} existing film ratings recorded as the starting point", seeded);
+        return seeded;
     }
 
     internal void MarkBaselineReady() => _baselineReady = true;

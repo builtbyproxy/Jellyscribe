@@ -593,8 +593,9 @@ public class LetterboxdSyncRunner
         SyncProgress.Complete(SyncProgress.TrackLetterboxd);
     }
 
-    /// <summary>Gap between films' Letterboxd requests. A test hook replaces it.</summary>
-    internal static Func<TimeSpan> FilmPacing { get; set; } = () => TimeSpan.FromMilliseconds(3000 + Random.Shared.Next(2000));
+    /// <summary>The 3-5 s pause between films' Letterboxd requests. A test hook replaces it.</summary>
+    internal static Func<CancellationToken, Task> FilmPause { get; set; }
+        = ct => Task.Delay(3000 + Random.Shared.Next(2000), ct);
 
     /// <summary>
     /// Looks the film up and paces the film's requests. On the website the lookup itself requests
@@ -607,11 +608,11 @@ public class LetterboxdSyncRunner
         if (service.IsWebsiteSession)
         {
             var film = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
-            await Task.Delay(FilmPacing(), cancellationToken).ConfigureAwait(false);
+            await FilmPause(cancellationToken).ConfigureAwait(false);
             return film;
         }
 
-        var pacing = Task.Delay(FilmPacing(), cancellationToken);
+        var pacing = FilmPause(cancellationToken);
         var result = await service.LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
         await pacing.ConfigureAwait(false);
         return result;

@@ -45,6 +45,24 @@ public sealed class LetterboxdBlockedException : Exception
     }
 }
 
+/// <summary>
+/// The official API's token endpoint answered the login with an error status. The message is the
+/// same text callers have always logged.
+/// </summary>
+public sealed class LetterboxdApiAuthException : Exception
+{
+    public LetterboxdApiAuthException(System.Net.HttpStatusCode statusCode, string message) : base(message)
+    {
+        StatusCode = statusCode;
+    }
+
+    public System.Net.HttpStatusCode StatusCode { get; }
+
+    /// <summary>True for an answer that will not change on a retry soon (400, 401, 403).</summary>
+    public bool IsRejection => StatusCode is System.Net.HttpStatusCode.BadRequest
+        or System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden;
+}
+
 public static class SyncErrors
 {
     /// <summary>

@@ -48,10 +48,11 @@ public class DiaryImportTask : IScheduledTask
     {
         // The same gate as the diary and watchlist syncs: an import alongside them would log in
         // and scrape Letterboxd from the same IP at once, and fight over the progress display.
+        // It waits rather than skips, so a long first sync never costs the night's import.
         if (!await SyncGate.Instance.WaitAsync(0, cancellationToken).ConfigureAwait(false))
         {
-            _logger.LogWarning("A Letterboxd sync is already running, skipping diary import");
-            return;
+            _logger.LogInformation("A Letterboxd sync is running; the diary import starts when it finishes");
+            await SyncGate.Instance.WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         try

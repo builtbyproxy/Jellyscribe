@@ -216,7 +216,7 @@ public class DiaryImportTaskTests : IDisposable
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhileALetterboxdSyncHoldsTheGate_SkipsWithoutLoggingIn()
+    public async Task ExecuteAsync_WhileALetterboxdSyncHoldsTheGate_WaitsForItBeforeLoggingIn()
     {
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
@@ -235,16 +235,20 @@ public class DiaryImportTaskTests : IDisposable
         };
 
         Assert.True(await SyncGate.Instance.WaitAsync(0));
+        Task import;
         try
         {
-            await _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+            import = _task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
+            Assert.False(import.IsCompleted);
+            Assert.False(factoryCalled, "a diary import must not hit Letterboxd while a sync holds the gate");
         }
         finally
         {
             SyncGate.Instance.Release();
         }
 
-        Assert.False(factoryCalled, "a diary import must not hit Letterboxd while a sync holds the gate");
+        await import;
+        Assert.True(factoryCalled);
         Assert.False(SyncGate.IsRunning);
     }
 

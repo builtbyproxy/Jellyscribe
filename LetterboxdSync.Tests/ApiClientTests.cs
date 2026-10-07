@@ -127,7 +127,7 @@ public class ApiClientAuthTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        var ex = await Assert.ThrowsAsync<Exception>(() => client.AuthenticateAsync("bad", "creds"));
+        var ex = await Assert.ThrowsAsync<LetterboxdApiAuthException>(() => client.AuthenticateAsync("bad", "creds"));
         Assert.Contains("invalid_grant", ex.Message);
     }
 
@@ -235,7 +235,7 @@ public class ApiClientTokenCacheIsolationTests
         await owner.AuthenticateAsync(username, "right");
 
         using var attacker = new LetterboxdApiClient(TestLogger, handler);
-        await Assert.ThrowsAsync<Exception>(() => attacker.AuthenticateAsync(username, "wrong"));
+        await Assert.ThrowsAsync<LetterboxdApiAuthException>(() => attacker.AuthenticateAsync(username, "wrong"));
 
         Assert.Equal(2, grants.Count);
         Assert.Contains("password=wrong", grants[1]);
@@ -268,7 +268,7 @@ public class ApiClientTokenCacheIsolationTests
         await owner.AuthenticateAsync(username, "right");
 
         using var attacker = new LetterboxdApiClient(TestLogger, handler);
-        await Assert.ThrowsAsync<Exception>(() => attacker.AuthenticateAsync(username, "wrong"));
+        await Assert.ThrowsAsync<LetterboxdApiAuthException>(() => attacker.AuthenticateAsync(username, "wrong"));
         Assert.DoesNotContain(grants, g => g.Contains("grant_type=refresh_token"));
 
         // The owner's own stale token still goes through the refresh path.

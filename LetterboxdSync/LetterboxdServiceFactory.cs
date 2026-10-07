@@ -53,7 +53,7 @@ public static class LetterboxdServiceFactory
             return await OverrideForTesting(username, password, rawCookies, logger, userAgent).ConfigureAwait(false);
 
         var accountKey = Helpers.TokenCacheKey(username, password);
-        var apiFailed = false;
+        var apiRejected = false;
         if (ApiUnavailableUntil.TryGetValue(accountKey, out var until) && until > UtcNow())
         {
             logger.LogDebug("Official API was unavailable for {Username} recently; using the website until {Until:u}", username, until);
@@ -71,25 +71,31 @@ public static class LetterboxdServiceFactory
             catch (Exception ex)
             {
                 apiClient.Dispose();
-                apiFailed = true;
+                // Only a definite answer from the API is worth remembering; a timeout, a 5xx or a
+                // rate limit says nothing about the next attempt.
+                apiRejected = ex is LetterboxdApiAuthException { IsRejection: true };
                 logger.LogWarning("Official API auth failed for {Username}, falling back to scraping: {Message}",
                     username, ex.Message);
             }
         }
 
         var sessionKey = Helpers.TokenCacheKey(username, $"{password}\n{rawCookies}\n{userAgent}");
-        var cookies = WebsiteSessions.GetOrAdd(sessionKey, newKey =>
+        if (!WebsiteSessions.ContainsKey(sessionKey))
         {
             // New credentials, cookies or User-Agent for the account: drop its older sessions.
+            // TokenCacheKey starts with the account name and a newline.
             var accountPrefix = username + "\n";
             foreach (var stale in WebsiteSessions.Keys)
             {
                 if (stale.StartsWith(accountPrefix, StringComparison.Ordinal))
                     WebsiteSessions.TryRemove(stale, out _);
             }
+        }
 
-            return new CookieContainer();
-        });
+        // Services for one account can overlap (a scheduled run and a playback event). They share
+        // the jar, which is thread-safe; if one logs in again, the other picks up the new session
+        // cookies, and a stale CSRF token on its side takes the existing re-login path.
+        var cookies = WebsiteSessions.GetOrAdd(sessionKey, _ => new CookieContainer());
         var scraping = CreateWebsiteClient(logger, userAgent, cookies);
         try
         {
@@ -105,7 +111,7 @@ public static class LetterboxdServiceFactory
 
         // Only remember the API as unavailable when the website worked: if both failed, the cause
         // is the account or the network, and the next attempt should try the API again.
-        if (apiFailed)
+        if (apiRejected)
             ApiUnavailableUntil[accountKey] = UtcNow() + ApiUnavailableFor;
 
         logger.LogInformation("Using web scraping fallback for {Username}", username);

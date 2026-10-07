@@ -203,7 +203,7 @@ public class AuthBreakerTests : IDisposable
         {
             now += AuthBreaker.HalfOpenAfter;
             Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
-            AuthBreaker.RecordFailure("u1", "demo-cinephile", "Letterboxd login error: incorrect password");
+            AuthBreaker.RecordFailure("u1", "demo-cinephile", "Letterboxd returned 403 during login. Likely reCAPTCHA.");
         }
 
         now += TimeSpan.FromDays(30);
@@ -211,6 +211,21 @@ public class AuthBreakerTests : IDisposable
 
         AuthBreaker.Reset("u1", "demo-cinephile");
         Assert.False(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
+    }
+
+    // A wrong password is not an outage: retrying it only risks a lockout, so the breaker waits
+    // for re-saved credentials.
+    [Fact]
+    public void RejectedCredentials_AreNeverRetriedOnTheirOwn()
+    {
+        var now = new DateTime(2026, 10, 1, 3, 0, 0, DateTimeKind.Utc);
+        AuthBreaker.UtcNow = () => now;
+        for (var i = 0; i < AuthBreaker.Threshold; i++)
+            AuthBreaker.RecordFailure("u1", "demo-cinephile", "Letterboxd login error: Your credentials don't match.");
+
+        now += TimeSpan.FromDays(3);
+
+        Assert.True(AuthBreaker.BlocksLogin("u1", "demo-cinephile"));
     }
 
     [Fact]

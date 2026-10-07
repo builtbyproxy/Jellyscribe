@@ -112,7 +112,7 @@ public class LetterboxdApiClient : ILetterboxdService
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            throw new Exception($"Letterboxd API auth failed ({response.StatusCode}): {errorBody}");
+            throw new LetterboxdApiAuthException(response.StatusCode, $"Letterboxd API auth failed ({response.StatusCode}): {errorBody}");
         }
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);

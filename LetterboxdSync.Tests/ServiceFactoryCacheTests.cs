@@ -28,6 +28,8 @@ public class ServiceFactoryCacheTests : IDisposable
     private int _apiLogins;
     private DateTime _now = new(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
     private bool _websiteFails;
+    private Exception _apiFailure = new LetterboxdApiAuthException(HttpStatusCode.Unauthorized,
+        "Letterboxd API auth failed (Unauthorized): {\"error\":\"invalid_grant\"}");
 
     public ServiceFactoryCacheTests()
     {
@@ -40,7 +42,7 @@ public class ServiceFactoryCacheTests : IDisposable
                 .Returns(_ =>
                 {
                     _apiLogins++;
-                    return Task.FromException(new Exception("Letterboxd API returned 401"));
+                    return Task.FromException(_apiFailure);
                 });
             return api;
         };
@@ -77,6 +79,28 @@ public class ServiceFactoryCacheTests : IDisposable
         Assert.Equal(3, _jars.Count);
         Assert.Same(_jars[0], _jars[1]);
         Assert.Same(_jars[0], _jars[2]);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task ATransientApiFailure_IsNotRemembered(HttpStatusCode status)
+    {
+        _apiFailure = new LetterboxdApiAuthException(status, $"Letterboxd API auth failed ({status})");
+        await Create();
+        await Create();
+
+        Assert.Equal(2, _apiLogins);
+    }
+
+    [Fact]
+    public async Task ANetworkErrorOnTheApi_IsNotRemembered()
+    {
+        _apiFailure = new System.Net.Http.HttpRequestException("Connection refused");
+        await Create();
+        await Create();
+
+        Assert.Equal(2, _apiLogins);
     }
 
     [Fact]

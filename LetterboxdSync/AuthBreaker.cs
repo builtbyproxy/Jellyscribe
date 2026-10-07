@@ -50,8 +50,9 @@ public static class AuthBreaker
 
     /// <summary>
     /// An open breaker lets one login attempt through after this long, so an account paused by
-    /// an outage (rather than by a wrong password) resumes on its own. A failed attempt keeps it
-    /// open for another day; a successful one closes it.
+    /// an outage resumes on its own. A failed attempt keeps it open for another day; a successful
+    /// one closes it. A breaker whose last failure was Letterboxd rejecting the credentials never
+    /// retries (see <see cref="IsCredentialRejection"/>).
     /// </summary>
     public static readonly TimeSpan HalfOpenAfter = TimeSpan.FromHours(24);
 
@@ -125,7 +126,7 @@ public static class AuthBreaker
             if (e?.OpenedAtUtc == null)
                 return false;
 
-            if (e.FailedProbes >= MaxFailedProbes)
+            if (e.FailedProbes >= MaxFailedProbes || IsCredentialRejection(e.LastError))
                 return true;
 
             var now = UtcNow();
@@ -141,6 +142,14 @@ public static class AuthBreaker
             return false;
         }
     }
+
+    /// <summary>
+    /// True when Letterboxd itself turned the login down (a wrong password, a 2FA account), as
+    /// opposed to an outage or a block. Only re-saved credentials can fix that, so the breaker
+    /// never retries it on its own.
+    /// </summary>
+    internal static bool IsCredentialRejection(string? error)
+        => error != null && error.StartsWith("Letterboxd login error", StringComparison.Ordinal);
 
     /// <summary>Snapshot of every account whose breaker is currently open (admin dashboard badge).</summary>
     public static List<AuthBreakerEntry> GetOpenEntries()
