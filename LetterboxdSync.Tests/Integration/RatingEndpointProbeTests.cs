@@ -243,7 +243,8 @@ public class RatingEndpointProbeTests
         return result;
     }
 
-    private static async Task<(int Status, string Body)> SendAsync(HttpClient http, HttpMethod method, string path,
+    /// <summary>A signed request to the official API, independent of LetterboxdApiClient. Shared with the other live tests.</summary>
+    internal static async Task<(int Status, string Body)> SendAsync(HttpClient http, HttpMethod method, string path,
         string? query, string? body, string? contentType, string? token)
     {
         // Same signing scheme as LetterboxdApiClient.SendSignedAsync.

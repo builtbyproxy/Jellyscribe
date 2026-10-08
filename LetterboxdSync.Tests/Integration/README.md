@@ -59,6 +59,11 @@ removes the diary entries the test created via `DELETE /log-entry/{id}`.
 Tests are wrapped in `try/finally` so cleanup runs even on assertion failure.
 The test account stays predictable across runs.
 
+`ReviewExistingEntryLiveTests` goes further: it records the film's entries and
+watched/liked/watchlist/rating state before it writes, then deletes only the
+entries it created and restores that state in its `finally`, so it leaves the
+account exactly as it found it.
+
 Note: cleanup is API-only. The scraping fallback path in
 `ScrapingLetterboxdService` does not implement delete; write tests will skip
 themselves if the API auth fails for the test account.
