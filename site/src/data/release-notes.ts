@@ -10,6 +10,19 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.12.2',
+    headline: 'Smaller settings pages that update themselves after an upgrade',
+    summary:
+      'Both Jellyscribe dashboards, the admin settings page and your own page, now share one script and one stylesheet instead of each carrying its own copy. The pages are about five times smaller, and the shared part, fonts included, is downloaded once per version and then cached. They look and behave exactly as before. After a plugin upgrade, an open browser tab picks up the new version the next time the page is opened, with no reload needed. When you post a review that lands on a diary entry you had already logged, the result now says so, and any note from the server is shown under that account. The design follows Wouter Stulp\'s shared-assets work in his fork, reworked to keep the bundled fonts and to load the right version after an upgrade.',
+    highlights: {
+      improvements: [
+        'Both dashboards share one cached script and stylesheet, so each page is about five times smaller and looks exactly the same, with the bundled fonts kept (design by Wouter Stulp)',
+        'An open tab loads the new dashboard code after a plugin upgrade without a reload',
+        'The review result says when a review was added to the diary entry you already had, and shows any note from the server',
+      ],
+    },
+  },
+  {
     version: '2.12.1',
     headline: 'A review of a film already in your diary goes onto that entry',
     summary:
