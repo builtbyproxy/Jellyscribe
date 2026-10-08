@@ -251,7 +251,7 @@
                 (function () {
                     // This page's own root: the script sits inside it.
                     var me = document.currentScript;
-                    var root = (me && me.closest('#letterboxdSyncConfigPage')) || byId('letterboxdSyncConfigPage');
+                    var root = (me && me.closest('#letterboxdSyncConfigPage')) || document.getElementById('letterboxdSyncConfigPage');
                     function byId(id) { return root.querySelector('#' + id); }
                     var WS = {
                         PluginId: 'c7a3e1b9-5d42-4f8a-9c06-2b7d8e4f1a35',

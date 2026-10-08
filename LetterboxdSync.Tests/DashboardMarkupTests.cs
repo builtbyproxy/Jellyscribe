@@ -271,4 +271,15 @@ public class DashboardMarkupTests
         Assert.Contains("self.esc(a.letterboxdUsername)", body, StringComparison.Ordinal);
         Assert.Contains("return line + self.reviewAccountNotes(d.accounts || []);", js, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [MemberData(nameof(Pages))]
+    public void Page_FindsItsRootByIdWhenRunWithoutCurrentScript(string file, string root)
+    {
+        // Jellyfin's dashboard runs a configuration page's script through jQuery, where
+        // document.currentScript is null: the root then comes from the document, before byId exists.
+        var page = Read(file);
+        var line = Regex.Match(page, @"var root = [^\n]*").Value;
+        Assert.EndsWith("|| document.getElementById('" + root.Substring(1) + "');", line, StringComparison.Ordinal);
+    }
 }
