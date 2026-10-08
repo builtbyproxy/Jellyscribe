@@ -13,6 +13,8 @@ namespace LetterboxdSync.Tests;
 /// page), which have no JS test harness of their own: their colours meet WCAG AA contrast in both
 /// palettes, their styles stay inside the page instead of restyling Jellyfin's document, the phone
 /// layout can shrink to the screen, and every control can be reached and named by assistive tech.
+/// Most styles and code live in the shared jellyscribe.css and jellyscribe.js, so each page is checked
+/// as the browser sees it: the shared stylesheet followed by the page's own rules.
 /// </summary>
 public class DashboardMarkupTests
 {
@@ -32,20 +34,43 @@ public class DashboardMarkupTests
         return reader.ReadToEnd();
     }
 
-    private static string Style(string page)
+    // The page's own <style> block.
+    private static string PageStyle(string page)
     {
-        var start = page.IndexOf("<style>", StringComparison.Ordinal);
+        var start = page.IndexOf("<style>", StringComparison.Ordinal) + "<style>".Length;
         return page.Substring(start, page.IndexOf("</style>", start, StringComparison.Ordinal) - start);
     }
 
-    // The declarations of the rule whose selector is exactly `selector`.
+    // What styles the page: the shared stylesheet, then the page's own rules (which come later).
+    private static string Style(string file) => Read("jellyscribe.css") + "\n" + PageStyle(Read(file));
+
+    // The page's code: its own script and the shared one.
+    private static string Code(string file) => Read(file) + "\n" + Read("jellyscribe.js");
+
+    // The declarations of every rule (outside or inside a media query) whose selector list names
+    // `selector` exactly, in source order.
+    private static List<string> Rules(string style, string selector)
+    {
+        style = Regex.Replace(style, @"/\*.*?\*/", "", RegexOptions.Singleline);
+        return Regex.Matches(style, @"([^{}]+)\{([^{}]*)\}")
+            .Where(m => m.Groups[1].Value.Split(',').Select(x => x.Trim()).Contains(selector))
+            .Select(m => m.Groups[2].Value).ToList();
+    }
+
+    private static string Rule(string style, string selector)
+    {
+        var rules = Rules(style, selector);
+        Assert.True(rules.Count > 0, "no rule for " + selector);
+        return string.Join(";", rules);
+    }
+
+    // The colour tokens a selector sets; a later rule overrides an earlier one.
     private static Dictionary<string, string> Tokens(string style, string selector)
     {
-        var at = style.IndexOf(selector + " {", StringComparison.Ordinal);
-        Assert.True(at >= 0, "no rule for " + selector);
-        var body = style.Substring(at, style.IndexOf('}', at) - at);
-        return Regex.Matches(body, @"(--ws-[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})")
-            .ToDictionary(m => m.Groups[1].Value, m => m.Groups[2].Value);
+        var tokens = new Dictionary<string, string>();
+        foreach (Match m in Regex.Matches(Rule(style, selector), @"(--ws-[a-z0-9-]+):\s*(#[0-9a-fA-F]{6})"))
+            tokens[m.Groups[1].Value] = m.Groups[2].Value;
+        return tokens;
     }
 
     private static double Luminance(string hex)
@@ -68,7 +93,7 @@ public class DashboardMarkupTests
     [MemberData(nameof(Pages))]
     public void TextAndStatusColours_ReachAA_OnEverySurface_InBothPalettes(string file, string root)
     {
-        var style = Style(Read(file));
+        var style = Style(file);
         var dark = Tokens(style, root);
         var light = dark.ToDictionary(kv => kv.Key, kv => kv.Value);
         foreach (var kv in Tokens(style, root + ".ws-light")) light[kv.Key] = kv.Value;
@@ -90,42 +115,51 @@ public class DashboardMarkupTests
     [MemberData(nameof(Pages))]
     public void PrimaryButton_HasDarkTextOnGold_AndDisabledButtonsLookDisabled(string file, string root)
     {
-        var style = Style(Read(file));
-        var primary = Regex.Match(style, Regex.Escape(root) + @" \.ws-btn\.primary \{[^}]*background: var\(--ws-primary\);[^}]*color: (#[0-9a-fA-F]{6});");
+        var style = Style(file);
+        var primary = Regex.Match(Rule(style, root + " .ws-btn.primary"), @"background: var\(--ws-primary\);[^}]*color: (#[0-9a-fA-F]{6});");
         Assert.True(primary.Success, "primary button rule not found");
         Assert.True(Contrast(primary.Groups[1].Value, Tokens(style, root)["--ws-primary"]) >= 4.5);
-        var disabled = Regex.Match(style, Regex.Escape(root) + @" \.ws-btn:disabled \{([^}]*)\}");
-        Assert.True(disabled.Success, "no disabled-button rule");
-        var opacity = Regex.Match(disabled.Groups[1].Value, @"opacity:\s*([\d.]+)");
+        var disabled = Rule(style, root + " .ws-btn:disabled");
+        var opacity = Regex.Match(disabled, @"opacity:\s*([\d.]+)");
         Assert.True(opacity.Success && double.Parse(opacity.Groups[1].Value, CultureInfo.InvariantCulture) <= 0.6, "disabled buttons must be visibly dimmed");
-        Assert.Contains("cursor: not-allowed", disabled.Groups[1].Value, StringComparison.Ordinal);
+        Assert.Contains("cursor: not-allowed", disabled, StringComparison.Ordinal);
     }
 
     [Theory]
     [MemberData(nameof(Pages))]
     public void Styles_NeverTargetJellyfinsDocument_NorFollowTheOsTheme(string file, string root)
     {
-        var style = Regex.Replace(Style(Read(file)).Substring("<style>".Length), @"/\*.*?\*/", "", RegexOptions.Singleline);
-        // Every rule is scoped to the page root (or is a font face or keyframes); nothing styles html or body.
-        var selectors = Regex.Matches(style, @"(?:^|[{}])\s*([^{}@][^{}]*?)\s*\{")
-            .Select(m => m.Groups[1].Value.Trim())
-            .Where(s => s.Length > 0 && !s.StartsWith("@", StringComparison.Ordinal) && !Regex.IsMatch(s, @"^(\d+%|from|to)(,|$)"));
-        var unscoped = selectors.SelectMany(s => s.Split(',')).Select(s => s.Trim()).Where(s => !s.StartsWith(root, StringComparison.Ordinal)).ToList();
-        Assert.True(unscoped.Count == 0, "unscoped selectors: " + string.Join(" | ", unscoped));
+        // Every rule is scoped to a dashboard root (or is a font face or keyframes); nothing styles html or
+        // body. The page's own rules name only its own root; the shared sheet names only the two roots.
+        foreach (var (css, roots) in new[] { (PageStyle(Read(file)), new[] { root }), (Read("jellyscribe.css"), new[] { "#letterboxdSyncConfigPage", "#letterboxdUserPage" }) })
+        {
+            var style = Regex.Replace(css, @"/\*.*?\*/", "", RegexOptions.Singleline);
+            var selectors = Regex.Matches(style, @"(?:^|[{}])\s*([^{}@][^{}]*?)\s*\{")
+                .Select(m => m.Groups[1].Value.Trim())
+                .Where(s => s.Length > 0 && !s.StartsWith("@", StringComparison.Ordinal) && !Regex.IsMatch(s, @"^(\d+%|from|to)(,|$)"));
+            var unscoped = selectors.SelectMany(s => s.Split(',')).Select(s => s.Trim())
+                .Where(s => !roots.Any(r => s == r || s.StartsWith(r + " ", StringComparison.Ordinal) || s.StartsWith(r + ".", StringComparison.Ordinal))).ToList();
+            Assert.True(unscoped.Count == 0, "unscoped selectors: " + string.Join(" | ", unscoped));
+        }
+        var all = Style(file);
         // The palette follows Jellyfin's theme (applyTheme), with the OS only as the fallback outside Jellyfin.
-        Assert.DoesNotContain("prefers-color-scheme", style, StringComparison.Ordinal);
+        Assert.DoesNotContain("prefers-color-scheme", all, StringComparison.Ordinal);
     }
 
     [Theory]
     [MemberData(nameof(Pages))]
     public void PhoneLayout_CanShrinkToTheScreen(string file, string root)
     {
-        var style = Style(Read(file));
+        var style = Style(file);
         var phone = style.Substring(style.IndexOf("@media (max-width: 820px)", StringComparison.Ordinal));
-        Assert.Contains(root + " .ws { grid-template-columns: minmax(0,1fr);", phone, StringComparison.Ordinal);
-        Assert.Contains(root + " .ws-rail, " + root + " .ws-rail-inner, " + root + " .ws-nav { min-width: 0; }", phone, StringComparison.Ordinal);
+        phone = phone.Substring(0, phone.IndexOf("\n}", StringComparison.Ordinal));
+        Assert.Contains("grid-template-columns: minmax(0,1fr);", Rule(phone, root + " .ws"), StringComparison.Ordinal);
+        foreach (var part in new[] { " .ws-rail", " .ws-rail-inner", " .ws-nav" })
+            Assert.Contains(Rules(phone, root + part), r => r.Trim() == "min-width: 0;");
+        // The page's own rules never set the grid's columns, which would beat the phone rule above.
+        Assert.DoesNotContain(Rules(PageStyle(Read(file)), root + " .ws"), r => r.Contains("grid-template-columns", StringComparison.Ordinal));
         // The When column is hidden on phones, so a short date goes into each row's title line.
-        Assert.Contains(root + " .ws-tc .ws-mwhen { display: inline; }", style, StringComparison.Ordinal);
+        Assert.Contains("display: inline;", Rule(style, root + " .ws-tc .ws-mwhen"), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -152,14 +186,14 @@ public class DashboardMarkupTests
         Assert.Contains("id=\"mUsername\" autocomplete=\"off\"", page, StringComparison.Ordinal);
         Assert.Contains("id=\"mPassword\" autocomplete=\"new-password\"", page, StringComparison.Ordinal);
         Assert.DoesNotContain("current-password", page, StringComparison.Ordinal);
-        Assert.Contains(root + " :focus-visible { outline: 2px solid var(--ws-focus);", page, StringComparison.Ordinal);
+        Assert.Contains("outline: 2px solid var(--ws-focus);", Rule(Style(file), root + " :focus-visible"), StringComparison.Ordinal);
     }
 
     [Theory]
     [MemberData(nameof(Files))]
     public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file)
     {
-        var page = Read(file);
+        var page = Code(file);
         Assert.Contains("id=\"historySearch\" placeholder=\"Search titles\" aria-label=\"Search activity by title\"", page, StringComparison.Ordinal);
         Assert.Contains("<button type=\"button\" class=\"ws-btn\" id=\"historyMore\">Load older history</button>", page, StringComparison.Ordinal);
 
@@ -176,6 +210,7 @@ public class DashboardMarkupTests
         // The group header of a binge is a button that says whether it is open, and every value it
         // shows (show name, first and last episode) goes through the page's escaper.
         var at = page.IndexOf("groupHtml: function", StringComparison.Ordinal);
+        Assert.True(page.IndexOf("groupHtml: function", at + 1, StringComparison.Ordinal) < 0, "groupHtml is defined once, in jellyscribe.js");
         Assert.True(at >= 0, "no groupHtml");
         var groupHtml = Regex.Match(page.Substring(at), @"^groupHtml: function[\s\S]*?\n\s*\},").Value;
         Assert.NotEmpty(groupHtml);
@@ -188,12 +223,12 @@ public class DashboardMarkupTests
     [MemberData(nameof(Files))]
     public void AccountDialog_NamesTheServicesPlainly_AndRewordsTheWatchlistToggleWhenTheServiceChanges(string file)
     {
-        var page = Read(file);
+        var page = Code(file);
         Assert.Contains("<option value=\"serializd\">Serializd: TV</option><option value=\"letterboxd\">Letterboxd: Film</option>", page, StringComparison.Ordinal);
         // A new account opens as Serializd; switching it to Letterboxd must reword the watchlist toggle too.
         var at = page.IndexOf("onSvcChange: function", StringComparison.Ordinal);
         Assert.True(at >= 0, "no onSvcChange");
-        var end = new[] { "fillSecret: function", "openAccount: function" }
+        var end = new[] { "fillSecret: function", "openAccount: function", "collectModal: function" }
             .Select(n => page.IndexOf(n, at, StringComparison.Ordinal)).Where(i => i > at).Min();
         Assert.Contains("watchDesc.textContent = this.watchDesc(svc)", page.Substring(at, end - at), StringComparison.Ordinal);
         Assert.Matches(@"'chkWatch', svc === 'serializd' \? !!a\.\w+ : !!a\.\w+, this\.watchDesc\(svc\)\]", page);

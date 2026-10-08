@@ -205,7 +205,7 @@ public class LetterboxdControllerTests
     {
         var asm = typeof(Plugin).Assembly;
         var requested = new List<int>();
-        foreach (var page in new[] { "userPage.html", "configPage.html" })
+        foreach (var page in new[] { "userPage.html", "configPage.html", "jellyscribe.js" })
         {
             var resource = asm.GetManifestResourceNames().Single(n => n.EndsWith(".Web." + page, StringComparison.Ordinal));
             using var reader = new StreamReader(asm.GetManifestResourceStream(resource)!);

@@ -120,6 +120,50 @@ public class SidebarControllerTests
         Assert.Equal(typeof(SidebarController).Assembly.GetName().Version!.ToString(), SidebarController.AssetVersion);
     }
 
+    /// <summary>
+    /// The build stamps its version into both pages and the shared script: the pages ask for the shared
+    /// files with ?v=&lt;version&gt; and start only with the shared code registered under that same
+    /// version, so a page never runs against an older shared script left in the browser tab.
+    /// </summary>
+    [Theory]
+    [InlineData("configPage.html", "WS")]
+    [InlineData("userPage.html", "WSU")]
+    public void Pages_LoadTheSharedAssetsOfTheirOwnVersion(string page, string global)
+    {
+        var html = Text(page);
+        var version = SidebarController.AssetVersion;
+        Assert.Contains("var V = '" + version + "';", html, StringComparison.Ordinal);
+        Assert.Contains("sharedAsset('link', 'jellyscribe.css')", html, StringComparison.Ordinal);
+        Assert.Contains("sharedAsset('script', 'jellyscribe.js')", html, StringComparison.Ordinal);
+        Assert.Contains("ApiClient.getUrl(path, { v: V })", html, StringComparison.Ordinal);
+        // The reuse key carries the version, and the factory is looked up by it.
+        Assert.Contains("'[data-v=\"' + V + '\"]'", html, StringComparison.Ordinal);
+        Assert.Contains("window.JellyscribeShared[V]", html, StringComparison.Ordinal);
+        Assert.Contains("window." + global + " = ", html, StringComparison.Ordinal);
+        Assert.Contains("registry['" + version + "'] = function (root)", Text("jellyscribe.js"), StringComparison.Ordinal);
+        foreach (var file in new[] { "configPage.html", "userPage.html", "jellyscribe.js", "jellyscribe.css" })
+            Assert.DoesNotContain("@@JELLYSCRIBE_VERSION@@", Text(file), StringComparison.Ordinal);
+    }
+
+    /// <summary>The look keeps its bundled typefaces: the shared stylesheet carries them, once.</summary>
+    [Fact]
+    public void SharedStylesheet_KeepsTheBundledFonts()
+    {
+        var css = Text("jellyscribe.css");
+        foreach (var face in new[] { "'WS Sans'; font-style: normal; font-weight: 400;", "'WS Sans'; font-style: normal; font-weight: 500;", "'WS Sans'; font-style: normal; font-weight: 600 900;",
+                     "'WS Mono'; font-style: normal; font-weight: 400;", "'WS Mono'; font-style: normal; font-weight: 500;", "'WS Mono'; font-style: normal; font-weight: 600 900;" })
+            Assert.Equal(1, CountOf(css, "@font-face { font-family: " + face + " font-display: swap; src: url(data:font/woff2;base64,"));
+        foreach (var page in new[] { "configPage.html", "userPage.html" })
+            Assert.DoesNotContain("@font-face", Text(page), StringComparison.Ordinal);
+    }
+
+    private static int CountOf(string s, string part)
+    {
+        int n = 0, at = 0;
+        while ((at = s.IndexOf(part, at, StringComparison.Ordinal)) >= 0) { n++; at += part.Length; }
+        return n;
+    }
+
     [Fact]
     public void GetSidebarJs_NavLinkLabelIsJellyscribe()
     {
