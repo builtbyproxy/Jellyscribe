@@ -10,6 +10,19 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.12.1',
+    headline: 'A review of a film already in your diary goes onto that entry',
+    summary:
+      'Reviewing a film from your activity list no longer adds a second watch to your Letterboxd diary. When the film is already in your diary from a sync, the review and its star rating now go onto that diary entry, keeping its original date. A review is never written over one you already wrote on Letterboxd: you are asked to edit that one on Letterboxd instead. If the entry can\'t be found, or your account is signed in through the Letterboxd website rather than the official API, the review is saved as a new entry on the day you watched the film rather than today, and the result tells you so.',
+    highlights: {
+      fixes: [
+        'Reviewing a film already in your diary puts the review and rating on that diary entry instead of logging a second watch dated today.',
+        'A review that can\'t be added to the existing entry is saved on the day you watched the film, not today, and the result says why.',
+        'A review you already wrote on Letterboxd is never overwritten.',
+      ],
+    },
+  },
+  {
     version: '2.12.0',
     headline: 'Search and your whole history in the activity list',
     summary:
