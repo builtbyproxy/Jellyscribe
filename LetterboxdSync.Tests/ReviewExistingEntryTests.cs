@@ -247,6 +247,31 @@ public class ReviewExistingEntryTests : IDisposable
     }
 
     [Fact]
+    public async Task TheReview_HoldsTheFilmsSyncLock_SoASyncOfTheFilmWaits()
+    {
+        var service = Service(ReviewAttachResult.Attached);
+        var heldDuringAttach = false;
+        service.AddReviewToDiaryEntryAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<double?>())
+            .Returns(async _ =>
+            {
+                // A sync of the same film for the same account cannot get the lock while the review has it.
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+                try { using var l = await FilmSyncLock.AcquireAsync(UserId, Account, TmdbId, cts.Token); }
+                catch (OperationCanceledException) { heldDuringAttach = true; }
+                return ReviewAttachResult.Attached;
+            });
+        using var h = Harness(service);
+        LoggedBySync();
+
+        await h.Controller.PostReview(Review());
+
+        Assert.True(heldDuringAttach);
+        // And released once the review is done.
+        using var afterwards = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var released = await FilmSyncLock.AcquireAsync(UserId, Account, TmdbId, afterwards.Token);
+    }
+
+    [Fact]
     public async Task AMalformedDate_IsRefusedBeforeAnyLogin()
     {
         var logins = 0;

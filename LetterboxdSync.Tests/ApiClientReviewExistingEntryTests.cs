@@ -79,7 +79,7 @@ public class ApiClientReviewExistingEntryTests
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
-        var client = new LetterboxdApiClient(NullLogger.Instance, handler);
+        var client = new LetterboxdApiClient(NullLogger.Instance, handler) { EntryReadRetryDelay = TimeSpan.Zero };
         await client.AuthenticateAsync("review-existing-user", "pass");
         return (client, sent);
     }
@@ -134,7 +134,36 @@ public class ApiClientReviewExistingEntryTests
         var result = await client.AddReviewToDiaryEntryAsync(TmdbId, Watched, "A tense room.", false, 4.0);
 
         Assert.Equal(ReviewAttachResult.NoEntry, result);
+        // Read twice, since diary reads lag writes, before answering that there is none.
+        Assert.Equal(2, sent.Count(s => s.Method == HttpMethod.Get));
         Assert.DoesNotContain(sent, s => s.Method != HttpMethod.Get);
+    }
+
+    [Fact]
+    public async Task AnEntryNotListedYet_IsFoundOnTheSecondRead()
+    {
+        LetterboxdApiClient.ResetFilmCacheForTesting(TmdbId);
+        var reads = 0;
+        var patched = new List<string>();
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/films", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, "{\"items\":[{\"id\":\"" + Lid + "\",\"name\":\"12 Angry Men\",\"links\":[]}]}");
+            if (path.EndsWith("/log-entries", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, ++reads == 1 ? "{\"items\":[]}" : "{\"items\":[" + Entry("fresh", "2024-03-09") + "]}");
+            if (request.Method == HttpMethod.Patch)
+            {
+                patched.Add(path);
+                return Json(HttpStatusCode.OK, "{\"data\":{},\"messages\":[]}");
+            }
+            return null;
+        });
+        using var client = new LetterboxdApiClient(NullLogger.Instance, handler) { EntryReadRetryDelay = TimeSpan.Zero };
+        await client.AuthenticateAsync("review-existing-user", "pass");
+
+        Assert.Equal(ReviewAttachResult.Attached, await client.AddReviewToDiaryEntryAsync(TmdbId, Watched, "Words.", false, null));
+        Assert.EndsWith("/log-entry/fresh", Assert.Single(patched));
     }
 
     [Fact]
@@ -228,7 +257,7 @@ public class ApiClientReviewExistingEntryTests
             }
             return null;
         });
-        using var client = new LetterboxdApiClient(NullLogger.Instance, handler);
+        using var client = new LetterboxdApiClient(NullLogger.Instance, handler) { EntryReadRetryDelay = TimeSpan.Zero };
         await client.AuthenticateAsync("review-existing-user", "pass");
 
         Assert.Equal(ReviewAttachResult.Attached, await client.AddReviewToDiaryEntryAsync(TmdbId, Watched, "Words.", false, null));

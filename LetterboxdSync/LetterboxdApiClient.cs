@@ -288,11 +288,16 @@ public class LetterboxdApiClient : ILetterboxdService
         EnsureAuthenticated();
 
         var film = await LookupFilmByTmdbIdAsync(tmdbId).ConfigureAwait(false);
-        var onDate = (await GetMemberLogEntriesAsync(film.FilmId).ConfigureAwait(false))
-            .Where(e => e.DiaryDate?.Date == diaryDate.Date)
-            .ToList();
+        var onDate = await EntriesOnAsync(film.FilmId, diaryDate).ConfigureAwait(false);
         if (onDate.Count == 0)
-            return ReviewAttachResult.NoEntry;
+        {
+            // Diary reads lag writes: an entry the sync logged moments ago may not be listed yet,
+            // and "no entry" makes the caller log a second one. Look once more before saying so.
+            await Task.Delay(EntryReadRetryDelay).ConfigureAwait(false);
+            onDate = await EntriesOnAsync(film.FilmId, diaryDate).ConfigureAwait(false);
+            if (onDate.Count == 0)
+                return ReviewAttachResult.NoEntry;
+        }
 
         var target = onDate.FirstOrDefault(e => !e.HasReview);
         if (target == null)
@@ -333,6 +338,14 @@ public class LetterboxdApiClient : ILetterboxdService
 
         return ReviewAttachResult.Attached;
     }
+
+    /// <summary>The wait before reading a film's diary entries a second time. Tests shorten it.</summary>
+    internal TimeSpan EntryReadRetryDelay { get; set; } = TimeSpan.FromSeconds(3);
+
+    private async Task<List<LogEntrySummary>> EntriesOnAsync(string filmLid, DateTime diaryDate)
+        => (await GetMemberLogEntriesAsync(filmLid).ConfigureAwait(false))
+            .Where(e => e.DiaryDate?.Date == diaryDate.Date)
+            .ToList();
 
     /// <summary>One of the member's log entries for a film, as <c>GET /log-entries</c> lists it.</summary>
     internal sealed record LogEntrySummary(string Id, DateTime? DiaryDate, bool HasReview);

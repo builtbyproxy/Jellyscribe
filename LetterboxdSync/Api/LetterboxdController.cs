@@ -632,6 +632,12 @@ public class LetterboxdController : JellyfinUserApiController
                     continue;
                 }
 
+                // Held like the syncs hold it, so a sync of this film cannot log it between the
+                // history lookup below and the review's own history row.
+                using var filmLock = request.TmdbId is > 0
+                    ? await FilmSyncLock.AcquireAsync(userId.ToLowerInvariant(), account.LetterboxdUsername, request.TmdbId.Value).ConfigureAwait(false)
+                    : null;
+
                 // A review of a film this plugin already logged for the account goes on that diary
                 // entry. Posting it as a new entry would log a second watch, dated today.
                 var loggedOn = !request.IsRewatch && string.IsNullOrEmpty(request.Date)
