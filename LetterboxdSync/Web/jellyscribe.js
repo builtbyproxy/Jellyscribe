@@ -636,20 +636,33 @@
                     var failed = (x.d.accounts || []).filter(function (a) { return a.success === false; });
                     // Fully posted: close. Partly posted: stay open with Post disabled, since posting
                     // again would duplicate it on the accounts that took it. Not posted: allow a retry.
-                    if (x.r.ok && !failed.length) setTimeout(function () { self.closeModal('reviewModal'); }, 1200);
+                    // A note from the server stays up long enough to read.
+                    if (x.r.ok && !failed.length) setTimeout(function () { self.closeModal('reviewModal'); }, st.querySelector('.ws-review-note') ? 6000 : 1200);
                     else if (!x.r.ok) postBtn.disabled = false;
                 }, function () { postBtn.disabled = false; cancelBtn.disabled = false; st.innerHTML = self.unreachable(); });
             },
-            // The result line: what landed, then each account it did not land on with the server's reason.
+            // The result line: what landed, then each account it did not land on with the server's reason,
+            // then a line for each account the server said more about.
             reviewResult: function (ok, d, status) {
                 var self = this, failed = (d.accounts || []).filter(function (a) { return a.success === false; });
                 var perAccount = failed.map(function (a) { return self.esc(a.letterboxdUsername) + ': ' + self.esc(a.error || 'failed'); }).join('; ');
+                var line;
                 if (ok) {
                     var done = '<span class="ws-green">' + (d.ratedOnly ? 'Rating saved to Letterboxd.' : 'Review posted!') + '</span>';
-                    return failed.length ? done + ' <span class="ws-red">Not posted to ' + perAccount + '</span>' : done;
-                }
-                if (failed.length > 1) return '<span class="ws-red">Failed to post. ' + perAccount + '</span>';
-                return '<span class="ws-red">Failed to post: ' + self.esc(d.error || ('HTTP ' + status)) + '</span>';
+                    line = failed.length ? done + ' <span class="ws-red">Not posted to ' + perAccount + '</span>' : done;
+                } else if (failed.length > 1) line = '<span class="ws-red">Failed to post. ' + perAccount + '</span>';
+                else line = '<span class="ws-red">Failed to post: ' + self.esc(d.error || ('HTTP ' + status)) + '</span>';
+                return line + self.reviewAccountNotes(d.accounts || []);
+            },
+            // Per account, when the server says so: the review went onto the diary entry already there
+            // (addedToEntry) and any note it sent, as plain text. Nothing for accounts without either.
+            reviewAccountNotes: function (accounts) {
+                var self = this;
+                return accounts.filter(function (a) { return a.addedToEntry === true || (a.note && String(a.note).trim()); }).map(function (a) {
+                    var what = a.addedToEntry === true ? 'Added to the existing diary entry.' : '';
+                    return '<span class="ws-review-note" style="display:block;margin-top:4px;"><b>' + self.esc(a.letterboxdUsername) + ':</b> ' + what +
+                        (a.note ? '<span class="ws-muted" style="display:block;">' + self.esc(a.note) + '</span>' : '') + '</span>';
+                }).join('');
             }
         };
     };

@@ -254,4 +254,20 @@ public class DashboardMarkupTests
         // The consent text no longer promises what the payload does not keep.
         Assert.DoesNotContain("exact numbers", page, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ReviewResult_SaysWhenAReviewJoinedTheExistingEntry_AndShowsTheServersNoteAsText()
+    {
+        // Both dashboards post reviews through the shared review code; a per-account addedToEntry and
+        // note are optional, and the note is the server's text, so it goes through the escaper.
+        var js = Read("jellyscribe.js");
+        var at = js.IndexOf("reviewAccountNotes: function", StringComparison.Ordinal);
+        Assert.True(at >= 0, "no reviewAccountNotes");
+        var body = js.Substring(at, js.IndexOf("\n            }", at, StringComparison.Ordinal) - at);
+        Assert.Contains("a.addedToEntry === true", body, StringComparison.Ordinal);
+        Assert.Contains("Added to the existing diary entry.", body, StringComparison.Ordinal);
+        Assert.Contains("self.esc(a.note)", body, StringComparison.Ordinal);
+        Assert.Contains("self.esc(a.letterboxdUsername)", body, StringComparison.Ordinal);
+        Assert.Contains("return line + self.reviewAccountNotes(d.accounts || []);", js, StringComparison.Ordinal);
+    }
 }
