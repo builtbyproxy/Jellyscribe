@@ -110,7 +110,10 @@ public class SidebarControllerTests
         string CacheFor(string? v)
         {
             var controller = WithRequest();
-            Assert.IsType<FileStreamResult>(kind == "css" ? controller.GetSharedCss(v) : controller.GetSharedJs(v));
+            var file = Assert.IsType<FileStreamResult>(kind == "css" ? controller.GetSharedCss(v) : controller.GetSharedJs(v));
+            // Revalidation can be answered with 304: the tag names this build.
+            Assert.NotNull(file.EntityTag);
+            Assert.StartsWith("\"" + SidebarController.AssetVersion + "-", file.EntityTag!.Tag.ToString(), StringComparison.Ordinal);
             return controller.Response.Headers.CacheControl.ToString();
         }
 
