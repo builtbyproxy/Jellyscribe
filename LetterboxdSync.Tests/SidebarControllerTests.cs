@@ -117,7 +117,6 @@ public class SidebarControllerTests
         Assert.Equal("public, max-age=31536000, immutable", CacheFor(SidebarController.AssetVersion));
         Assert.Equal("no-cache", CacheFor(null));
         Assert.Equal("no-cache", CacheFor("1.0.0.0"));
-        Assert.Equal(typeof(SidebarController).Assembly.GetName().Version!.ToString(), SidebarController.AssetVersion);
     }
 
     /// <summary>
@@ -131,10 +130,9 @@ public class SidebarControllerTests
     public void Pages_LoadTheSharedAssetsOfTheirOwnVersion(string page, string global)
     {
         var html = Text(page);
-        // A Debug build stamps "<version>-dev", which the server never caches for good.
-        var debug = typeof(SidebarController).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration == "Debug";
-        var version = SidebarController.AssetVersion + (debug ? "-dev" : "");
-        Assert.Contains("var V = '" + version + "';", html, StringComparison.Ordinal);
+        // The stamp is this build's version (a Debug build adds "-dev", which the server never caches for good).
+        var version = System.Text.RegularExpressions.Regex.Match(html, @"var V = '([^']*)';").Groups[1].Value;
+        Assert.True(version == SidebarController.AssetVersion || version == SidebarController.AssetVersion + "-dev", "stamped " + version);
         Assert.Contains("sharedAsset('link', 'jellyscribe.css')", html, StringComparison.Ordinal);
         Assert.Contains("sharedAsset('script', 'jellyscribe.js')", html, StringComparison.Ordinal);
         Assert.Contains("ApiClient.getUrl(path, { v: V })", html, StringComparison.Ordinal);

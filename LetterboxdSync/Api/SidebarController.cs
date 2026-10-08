@@ -18,7 +18,7 @@ public class SidebarController : ControllerBase
     /// <summary>
     /// The version the dashboards put in the shared assets' URLs (?v=), stamped into them at build time.
     /// </summary>
-    internal static readonly string AssetVersion = typeof(SidebarController).Assembly.GetName().Version?.ToString() ?? "0";
+    internal static readonly string AssetVersion = typeof(SidebarController).Assembly.GetName().Version!.ToString();
 
     private readonly Assembly _assembly = typeof(SidebarController).Assembly;
 
@@ -37,16 +37,14 @@ public class SidebarController : ControllerBase
         return File(stream, "application/javascript");
     }
 
-    /// <summary>The script both dashboards share, loaded by each page as jellyscribe.js?v=&lt;version&gt;.</summary>
-    /// <param name="v">The plugin version the page was built with.</param>
+    /// <summary>The script both dashboards share.</summary>
     [HttpGet("jellyscribe.js")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetSharedJs([FromQuery] string? v = null) => SharedAsset("jellyscribe.js", "application/javascript; charset=utf-8", v);
 
-    /// <summary>The stylesheet (and bundled fonts) both dashboards share, loaded as jellyscribe.css?v=&lt;version&gt;.</summary>
-    /// <param name="v">The plugin version the page was built with.</param>
+    /// <summary>The stylesheet (and bundled fonts) both dashboards share.</summary>
     [HttpGet("jellyscribe.css")]
     [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]

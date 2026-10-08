@@ -263,7 +263,8 @@ public class DashboardMarkupTests
         var js = Read("jellyscribe.js");
         var at = js.IndexOf("reviewAccountNotes: function", StringComparison.Ordinal);
         Assert.True(at >= 0, "no reviewAccountNotes");
-        var body = js.Substring(at, js.IndexOf("\n            }", at, StringComparison.Ordinal) - at);
+        var next = js.IndexOf(": function", at + "reviewAccountNotes: function".Length, StringComparison.Ordinal);
+        var body = next < 0 ? js.Substring(at) : js.Substring(at, next - at);
         Assert.Contains("a.addedToEntry === true", body, StringComparison.Ordinal);
         Assert.Contains("Added to the existing diary entry.", body, StringComparison.Ordinal);
         Assert.Contains("self.esc(a.note)", body, StringComparison.Ordinal);
