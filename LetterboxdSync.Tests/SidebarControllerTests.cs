@@ -131,7 +131,9 @@ public class SidebarControllerTests
     public void Pages_LoadTheSharedAssetsOfTheirOwnVersion(string page, string global)
     {
         var html = Text(page);
-        var version = SidebarController.AssetVersion;
+        // A Debug build stamps "<version>-dev", which the server never caches for good.
+        var debug = typeof(SidebarController).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration == "Debug";
+        var version = SidebarController.AssetVersion + (debug ? "-dev" : "");
         Assert.Contains("var V = '" + version + "';", html, StringComparison.Ordinal);
         Assert.Contains("sharedAsset('link', 'jellyscribe.css')", html, StringComparison.Ordinal);
         Assert.Contains("sharedAsset('script', 'jellyscribe.js')", html, StringComparison.Ordinal);
@@ -143,6 +145,28 @@ public class SidebarControllerTests
         Assert.Contains("registry['" + version + "'] = function (root)", Text("jellyscribe.js"), StringComparison.Ordinal);
         foreach (var file in new[] { "configPage.html", "userPage.html", "jellyscribe.js", "jellyscribe.css" })
             Assert.DoesNotContain("@@JELLYSCRIBE_VERSION@@", Text(file), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The shared files are served to anyone, so they stay static: no credential-like literal, no
+    /// inline handler built from data, and an escaper that covers every character that matters in
+    /// text and in a quoted attribute (account names and titles from other users go through it).
+    /// </summary>
+    [Fact]
+    public void AnonymousScripts_HoldNoSecrets_AndTheSharedEscaperCoversQuotes()
+    {
+        foreach (var file in new[] { "sidebar.js", "jellyscribe.js" })
+        {
+            var js = Text(file);
+            Assert.DoesNotMatch(@"(?i)(api[_-]?key|access[_-]?token|password)\s*[:=]\s*['""][^'""]+['""]", js);
+            Assert.DoesNotMatch(@"\b[0-9a-f]{32}\b", js);
+        }
+        var shared = Text("jellyscribe.js");
+        Assert.DoesNotContain("onclick", shared, StringComparison.OrdinalIgnoreCase);
+        var esc = System.Text.RegularExpressions.Regex.Match(shared, @"\n\s+esc: function \(s\) \{ (.*) \},\n").Groups[1].Value;
+        foreach (var pair in new[] { "/&/g, '&amp;'", "/\"/g, '&quot;'", "/</g, '&lt;'", "/>/g, '&gt;'" })
+            Assert.Contains(pair, esc, StringComparison.Ordinal);
+        Assert.Contains("escAttr: function (s) { return this.esc(s); }", shared, StringComparison.Ordinal);
     }
 
     /// <summary>The look keeps its bundled typefaces: the shared stylesheet carries them, once.</summary>

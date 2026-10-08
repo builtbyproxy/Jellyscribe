@@ -58,8 +58,15 @@
     </Task>
   </UsingTask>
 
+  <!-- A Debug build (deploy.sh) keeps the release's version, so its stamp gets "-dev": the server then
+       never lets a browser cache it for good, and a redeployed debug build is picked up. -->
+  <PropertyGroup>
+    <WebAssetVersion>$(AssemblyVersion)</WebAssetVersion>
+    <WebAssetVersion Condition="'$(Configuration)' == 'Debug'">$(AssemblyVersion)-dev</WebAssetVersion>
+  </PropertyGroup>
+
   <Target Name="StampWebAssetVersion" BeforeTargets="BeforeBuild">
-    <StampVersion Source="%(VersionedWebAsset.FullPath)" Destination="$(IntermediateOutputPath)web\%(VersionedWebAsset.Filename)%(VersionedWebAsset.Extension)" Version="$(AssemblyVersion)" />
+    <StampVersion Source="%(VersionedWebAsset.FullPath)" Destination="$(IntermediateOutputPath)web\%(VersionedWebAsset.Filename)%(VersionedWebAsset.Extension)" Version="$(WebAssetVersion)" />
   </Target>
 
 </Project>

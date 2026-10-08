@@ -198,7 +198,7 @@
                         byId('statFilm').textContent = fs.total || 0;
                         byId('statTv').textContent = ts.total || 0;
                         var fw = fs.watchlist, tw = ts.watchlist;
-                        byId('statWatchlist').textContent = (fw == null && tw == null) ? '—' : ((fw || 0) + (tw || 0));
+                        byId('statWatchlist').textContent = (fw == null && tw == null) ? '\u2014' : ((fw || 0) + (tw || 0));
                         byId('statWatchlistSub').textContent = (fw == null && tw == null) ? 'run a watchlist sync' : ((tw || 0) + ' shows · ' + (fw || 0) + ' films');
                         byId('statSynced').textContent = (fs.success || 0) + (ts.success || 0);
                         byId('statRewatches').textContent = (fs.rewatches || 0) + (ts.rewatches || 0);
