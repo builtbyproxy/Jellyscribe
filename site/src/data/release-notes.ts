@@ -10,6 +10,24 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.11.1',
+    headline: 'Episode reviews on single-season shows, and gentler rate-limit handling',
+    summary:
+      'Jellyscribe is steadier when Letterboxd or Serializd ask it to slow down. A rate-limit pause is honoured for up to a minute. Anything longer skips the film or episode until the next sync, and a Letterboxd sync that keeps hitting the limit stops early instead of trying every film. Letterboxd retries are now accepted instead of refused as a repeat. Stopping a sync, or restarting Jellyfin, no longer waits out a long pause. When you sign in with your Letterboxd website login, a TV series that Letterboxd lists as a film can no longer be mistaken for a movie with the same TMDb number, so the wrong film is never marked watched or rated. A Serializd review of an episode now lands on the same episode a log would: for a show Serializd lists as a single season, it goes to the right episode of that season, and it is refused if Serializd has no such episode. The activity lists on both dashboards show the full page they ask for again.',
+    highlights: {
+      improvements: [
+        'A rate-limit pause from Letterboxd or Serializd is honoured for up to a minute. A longer one skips the item until the next sync, and a Letterboxd sync that keeps hitting the limit stops early.',
+        'Stopping a sync or restarting Jellyfin no longer waits out a rate-limit pause or a retry backoff.',
+      ],
+      fixes: [
+        'Letterboxd retries after a rate limit are now accepted instead of refused as a repeat.',
+        'With the Letterboxd website login, a TV series that Letterboxd lists as a film is no longer mistaken for a movie with the same TMDb number.',
+        'A Serializd episode review on a show Serializd lists as a single season now lands on the right episode, and is refused if Serializd has no such episode.',
+        'The activity lists on both dashboards show the full page they ask for again.',
+      ],
+    },
+  },
+  {
     version: '2.11.0',
     headline: 'See exactly what telemetry and log bundles send',
     summary:
