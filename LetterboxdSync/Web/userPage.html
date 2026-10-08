@@ -531,8 +531,8 @@
                                     byId('historyMoreRow').style.display = 'none';
                                 });
                         },
-                        // The History endpoints page by offset. The server caps a Letterboxd page at 200, so
-                        // ask for exactly that and read the server's total to know whether more is left.
+                        // The History endpoints page by offset. The server caps a page at 250; ask for 200
+                        // per page and read the server's total to know whether more is left.
                         histChunk: 200,
                         byNewest: function (events) { return events.sort(function (a, b) { return new Date(b.Timestamp) - new Date(a.Timestamp); }); },
                         fetchHistory: function (svc) {

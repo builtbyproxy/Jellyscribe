@@ -210,10 +210,11 @@ public class LetterboxdControllerTests
             var resource = asm.GetManifestResourceNames().Single(n => n.EndsWith(".Web." + page, StringComparison.Ordinal));
             using var reader = new StreamReader(asm.GetManifestResourceStream(resource)!);
             var html = reader.ReadToEnd();
-            // "/History?count=250" (userPage) and "/History', { count: 250" (configPage).
+            // Literal sizes in the request ("/History?count=250", "/History', { count: 250") and the
+            // page-size settings the requests use ("histChunk: 200", "pageSize: 25").
             requested.AddRange(System.Text.RegularExpressions.Regex
-                .Matches(html, @"/History(?:\?count=|'\s*,\s*\{\s*count:\s*)(\d+)")
-                .Select(m => int.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture)));
+                .Matches(html, @"/History(?:\?count=|'\s*,\s*\{\s*count:\s*)(\d+)|\b(?:histChunk|pageSize):\s*(\d+)")
+                .Select(m => int.Parse(m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture)));
         }
 
         Assert.NotEmpty(requested);
