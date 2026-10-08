@@ -225,7 +225,7 @@ public class ScraperAsyncMethodsTests : IDisposable
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
-                        "<html><body class='film backdropped' data-tmdb-id='198102' data-tmdb-type='tv'>" +
+                        "<html><body class='film backdropped' data-tmdb-id='' data-tmdb-type='movie'>" +
                         "<a href='https://www.themoviedb.org/tv/198102/' data-track-action='TMDB'>TMDB</a></body></html>")
                 };
             }

@@ -61,22 +61,29 @@ public class ScraperTests
         Assert.Equal("PROD-dune", result.ProductionId);
     }
 
-    // Letterboxd film pages carry the TMDb entry on the body. TV titles Letterboxd lists as films
-    // (miniseries, specials) say data-tmdb-type="tv", and their id is from TMDb's TV numbering.
+    // Shapes copied from live letterboxd.com pages on 2026-10-08. A film (The Godfather) carries its
+    // TMDb movie id on the body and a TMDb button to /movie/. A TV entry Letterboxd lists as a film
+    // (Chernobyl) still says data-tmdb-type="movie", has an empty data-tmdb-id, and only its TMDb
+    // button links to /tv/.
     private const string MoviePage =
-        "<html><body class=\"film backdropped\" data-tmdb-id=\"198102\" data-tmdb-type=\"movie\">" +
-        "<a href=\"https://www.themoviedb.org/movie/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>";
+        "<html><body class=\"film backdropped\" data-tmdb-id=\"238\" data-tmdb-type=\"movie\">" +
+        "<a href=\"https://www.themoviedb.org/movie/238/\" class=\"micro-button track-event\" data-track-action=\"TMDB\" target=\"_blank\">TMDB</a></body></html>";
     private const string TvPage =
-        "<html><body class=\"film backdropped\" data-tmdb-id=\"198102\" data-tmdb-type=\"tv\">" +
-        "<a href=\"https://www.themoviedb.org/tv/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>";
+        "<html><body class=\"film backdropped\" data-tmdb-id=\"\" data-tmdb-type=\"movie\">" +
+        "<a href=\"https://www.themoviedb.org/tv/87108/\" class=\"micro-button track-event\" data-track-action=\"TMDB\" target=\"_blank\">TMDB</a></body></html>";
 
     [Fact]
     public void ReadTmdbEntry_MoviePage_ReturnsTheMovieId()
-        => Assert.Equal((198102, false), LetterboxdScraper.ReadTmdbEntry(MoviePage));
+        => Assert.Equal((238, false), LetterboxdScraper.ReadTmdbEntry(MoviePage));
 
     [Fact]
     public void ReadTmdbEntry_TvPage_IsNotAMovie()
         => Assert.Equal((null, true), LetterboxdScraper.ReadTmdbEntry(TvPage));
+
+    [Fact]
+    public void ReadTmdbEntry_TvButtonWinsOverAMovieTypeAndAnId()
+        => Assert.Equal((null, true), LetterboxdScraper.ReadTmdbEntry(
+            "<html><body data-tmdb-id=\"198102\" data-tmdb-type=\"movie\"><a href=\"https://www.themoviedb.org/tv/198102/\" data-track-action=\"TMDB\">TMDB</a></body></html>"));
 
     [Fact]
     public void ReadTmdbEntry_WithoutTheTypeAttribute_FallsBackToTheTmdbLink()

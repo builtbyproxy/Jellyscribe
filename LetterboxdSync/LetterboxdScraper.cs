@@ -521,13 +521,12 @@ public class LetterboxdScraper
     /// <summary>
     /// Reads a Letterboxd film page's TMDb entry. <c>MovieId</c> is the TMDb movie id on the
     /// body, or null when there is none or the entry is TV. Letterboxd lists miniseries and TV
-    /// specials as films too, and their <c>data-tmdb-id</c> is a TMDb TV id: TMDb numbers movies
-    /// and TV separately, so the same number can be an unrelated movie (tv/198102 is Hijack,
-    /// movie/198102 Cutie Honey Flash). The API path skips TV links the same way. The entry is
-    /// TV only when the body's <c>data-tmdb-type</c> is <c>tv</c> or, without that attribute, when
-    /// the TMDb button links to a themoviedb.org /tv/ page. Anything else counts as a film, so a
-    /// markup change can never turn every film into a cached "not a film". Only the button counts:
-    /// a review or list on the page can link anywhere on themoviedb.org.
+    /// specials as films too. TMDb numbers movies and TV separately, so a TV id must never be
+    /// used as a movie id. On live pages (checked 2026-10-08) a TV entry such as Chernobyl has
+    /// <c>data-tmdb-type="movie"</c> and an empty <c>data-tmdb-id</c>; only the TMDb button links to
+    /// a themoviedb.org /tv/ page. So the button decides: the entry is TV when the TMDb button
+    /// links to /tv/, or when the body says <c>data-tmdb-type="tv"</c>. Only the button counts, not
+    /// any themoviedb.org link on the page, because a review or list can link anywhere.
     /// </summary>
     internal static (int? MovieId, bool IsTv) ReadTmdbEntry(string filmHtml)
     {
@@ -536,11 +535,10 @@ public class LetterboxdScraper
         var body = doc.DocumentNode.SelectSingleNode("//body");
 
         var type = body?.GetAttributeValue("data-tmdb-type", string.Empty) ?? string.Empty;
-        var isTv = type.Length > 0
-            ? type.Trim().Equals("tv", StringComparison.OrdinalIgnoreCase)
-            : (doc.DocumentNode.SelectSingleNode("//a[@data-track-action='TMDB']")
-                ?.GetAttributeValue("href", string.Empty) ?? string.Empty)
-                .Contains("themoviedb.org/tv/", StringComparison.OrdinalIgnoreCase);
+        var tmdbButton = doc.DocumentNode.SelectSingleNode("//a[@data-track-action='TMDB']")
+            ?.GetAttributeValue("href", string.Empty) ?? string.Empty;
+        var isTv = tmdbButton.Contains("themoviedb.org/tv/", StringComparison.OrdinalIgnoreCase)
+            || type.Trim().Equals("tv", StringComparison.OrdinalIgnoreCase);
         if (isTv)
             return (null, true);
 
