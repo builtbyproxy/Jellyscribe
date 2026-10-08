@@ -42,7 +42,8 @@ public class WebAssetFilterSafetyTests
         foreach (var name in asm.GetManifestResourceNames()
                      .Where(n => n.Contains(".Web.", StringComparison.Ordinal)
                                  && (n.EndsWith(".html", StringComparison.Ordinal)
-                                     || n.EndsWith(".js", StringComparison.Ordinal))))
+                                     || n.EndsWith(".js", StringComparison.Ordinal)
+                                     || n.EndsWith(".css", StringComparison.Ordinal))))
         {
             yield return new object[] { name };
         }

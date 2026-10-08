@@ -31,9 +31,35 @@
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Web\configPage.html" />
-    <EmbeddedResource Include="Web\userPage.html" />
     <EmbeddedResource Include="Web\sidebar.js" />
+    <EmbeddedResource Include="Web\jellyscribe.css" />
+    <!-- Both dashboards load jellyscribe.js/.css with ?v=<this build's version>, and jellyscribe.js
+         registers itself under the same version, so these three are embedded from copies with the
+         version stamped in (StampWebAssetVersion below). -->
+    <VersionedWebAsset Include="Web\configPage.html;Web\userPage.html;Web\jellyscribe.js" />
+    <EmbeddedResource Include="@(VersionedWebAsset->'$(IntermediateOutputPath)web\%(Filename)%(Extension)')" LogicalName="LetterboxdSync.Web.%(Filename)%(Extension)" />
   </ItemGroup>
+
+  <!-- Copies a file with @@JELLYSCRIBE_VERSION@@ replaced, byte for byte otherwise, and leaves the copy
+       untouched when it would not change. -->
+  <UsingTask TaskName="StampVersion" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Source ParameterType="System.String" Required="true" />
+      <Destination ParameterType="System.String" Required="true" />
+      <Version ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var text = System.IO.File.ReadAllText(Source).Replace("@@JELLYSCRIBE_VERSION@@", Version);
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Destination));
+        if (!System.IO.File.Exists(Destination) || System.IO.File.ReadAllText(Destination) != text)
+            System.IO.File.WriteAllText(Destination, text, new System.Text.UTF8Encoding(false));
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="StampWebAssetVersion" BeforeTargets="BeforeBuild">
+    <StampVersion Source="%(VersionedWebAsset.FullPath)" Destination="$(IntermediateOutputPath)web\%(VersionedWebAsset.Filename)%(VersionedWebAsset.Extension)" Version="$(AssemblyVersion)" />
+  </Target>
 
 </Project>

@@ -19,10 +19,13 @@ public class ControllerAuthorizationTests
     private const string AdminPolicy = "RequiresElevation";
 
     /// <summary>Actions anyone may call without signing in. The web client loads sidebar.js
-    /// from the index page before any user is known.</summary>
+    /// from the index page before any user is known, and the dashboards' shared static script and
+    /// stylesheet are served the same way.</summary>
     private static readonly HashSet<string> ExpectedAnonymous = new(StringComparer.Ordinal)
     {
         "SidebarController.GetSidebarJs",
+        "SidebarController.GetSharedJs",
+        "SidebarController.GetSharedCss",
     };
 
     /// <summary>Actions only a Jellyfin administrator may call.</summary>
