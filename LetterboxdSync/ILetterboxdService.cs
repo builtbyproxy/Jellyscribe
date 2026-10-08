@@ -31,6 +31,18 @@ public interface ILetterboxdService : IDisposable
     Task PostReviewAsync(string filmSlug, string? reviewText, bool containsSpoilers = false,
         bool isRewatch = false, string? date = null, double? rating = null, int? tmdbId = null);
 
+    /// <summary>
+    /// Puts a review, and the rating when one is given, on the member's existing diary entry for
+    /// this film dated <paramref name="diaryDate"/>, instead of logging another watch. Never logs
+    /// a new entry itself: on <see cref="ReviewAttachResult.NoEntry"/> or
+    /// <see cref="ReviewAttachResult.Unsupported"/> the caller decides what to post. The default is
+    /// Unsupported, which is the website session's answer: the site flow it uses can only add
+    /// entries.
+    /// </summary>
+    Task<ReviewAttachResult> AddReviewToDiaryEntryAsync(int tmdbId, DateTime diaryDate, string reviewText,
+        bool containsSpoilers, double? rating)
+        => Task.FromResult(ReviewAttachResult.Unsupported);
+
     Task<List<int>> GetWatchlistTmdbIdsAsync(string username, CancellationToken cancellationToken = default);
 
     Task<List<int>> GetDiaryTmdbIdsAsync(string username);
@@ -46,4 +58,20 @@ public interface ILetterboxdService : IDisposable
     /// watched, which removes it from the member's watchlist.
     /// </summary>
     Task SetFilmRatingAsync(string filmSlug, string filmId, double rating, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Outcome of <see cref="ILetterboxdService.AddReviewToDiaryEntryAsync"/>.</summary>
+public enum ReviewAttachResult
+{
+    /// <summary>This session cannot edit a diary entry. Nothing was changed.</summary>
+    Unsupported = 0,
+
+    /// <summary>The review is now on the existing entry.</summary>
+    Attached,
+
+    /// <summary>The member has no entry for the film on that date. Nothing was changed.</summary>
+    NoEntry,
+
+    /// <summary>Every entry for the film on that date already has a review, left as it is.</summary>
+    AlreadyReviewed,
 }

@@ -670,8 +670,10 @@ public class LetterboxdControllerTests
 
             Assert.IsType<OkObjectResult>(result);
             Assert.True(Prop<bool>(result, "success"));
+            // With no earlier diary entry it is a new one, dated today, and the date is sent
+            // explicitly so the history row records the same day the entry has.
             await service.Received(1).PostReviewAsync(
-                "sinners", "great", false, false, null, 4.5, 1233413);
+                "sinners", "great", false, false, System.DateTime.Now.ToString("yyyy-MM-dd"), 4.5, 1233413);
         }
         finally
         {
@@ -729,9 +731,11 @@ public class LetterboxdControllerTests
             });
 
             Assert.IsType<OkObjectResult>(result);
+            // Every argument is a matcher: NSubstitute cannot tell a literal null from a matcher's slot.
             await service.Received(1).PostReviewAsync(
-                "sinners", null, false, true,
-                NSubstitute.Arg.Any<string?>(), NSubstitute.Arg.Any<double?>(), 1233413);
+                NSubstitute.Arg.Is("sinners"), NSubstitute.Arg.Is<string?>(t => t == null),
+                NSubstitute.Arg.Is(false), NSubstitute.Arg.Is(true),
+                NSubstitute.Arg.Any<string?>(), NSubstitute.Arg.Any<double?>(), NSubstitute.Arg.Is<int?>(1233413));
         }
         finally
         {
