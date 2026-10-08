@@ -53,17 +53,18 @@ public class ReviewExistingEntryTests : IDisposable
         return h;
     }
 
-    private static void LoggedBySync(string account = Account, DateTime? viewed = null)
+    private static void LoggedBySync(string account = Account, DateTime? viewed = null, string username = JellyfinUser,
+        SyncStatus status = SyncStatus.Success)
         => SyncHistory.Record(new SyncEvent
         {
             FilmTitle = "12 Angry Men",
             FilmSlug = "12-angry-men",
             TmdbId = TmdbId,
-            Username = JellyfinUser,
+            Username = username,
             Account = account,
             Timestamp = DateTime.UtcNow.AddDays(-1),
             ViewingDate = viewed ?? Watched,
-            Status = SyncStatus.Success,
+            Status = status,
         });
 
     private static ILetterboxdService Service(ReviewAttachResult outcome)
@@ -186,6 +187,41 @@ public class ReviewExistingEntryTests : IDisposable
         await service.DidNotReceiveWithAnyArgs().AddReviewToDiaryEntryAsync(default, default, default!, default, default);
         await service.Received(1).PostReviewAsync("12-angry-men", "A tense room.", true, false,
             Arg.Is<string?>(d => d == DateTime.Now.ToString("yyyy-MM-dd")), 4.5, TmdbId);
+    }
+
+    [Fact]
+    public async Task AnotherJellyfinUsersEntry_IsNotUsed()
+    {
+        var service = Service(ReviewAttachResult.Attached);
+        using var h = Harness(service);
+        LoggedBySync(username: "fedcba9876543210fedcba9876543210");
+
+        await h.Controller.PostReview(Review());
+
+        await service.DidNotReceiveWithAnyArgs().AddReviewToDiaryEntryAsync(default, default, default!, default, default);
+    }
+
+    [Fact]
+    public async Task ARewatchRow_IsTheEntryTheReviewGoesOn()
+    {
+        var service = Service(ReviewAttachResult.Attached);
+        using var h = Harness(service);
+        LoggedBySync();
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = "12 Angry Men",
+            FilmSlug = "12-angry-men",
+            TmdbId = TmdbId,
+            Username = JellyfinUser,
+            Account = Account,
+            Timestamp = DateTime.UtcNow,
+            ViewingDate = new DateTime(2025, 1, 2),
+            Status = SyncStatus.Rewatch,
+        });
+
+        await h.Controller.PostReview(Review());
+
+        await service.Received(1).AddReviewToDiaryEntryAsync(TmdbId, new DateTime(2025, 1, 2), "A tense room.", true, 4.5);
     }
 
     [Fact]

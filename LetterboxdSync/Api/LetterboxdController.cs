@@ -634,7 +634,10 @@ public class LetterboxdController : JellyfinUserApiController
                     ? SyncHistory.GetLastSuccessfulSyncDate(jellyfinUsername, request.TmdbId.Value, account.LetterboxdUsername)
                     : null;
 
-                var postDate = string.IsNullOrEmpty(request.Date) ? DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : request.Date;
+                // Today is the server's local day, the same day a sync would log a watch on.
+                var postDate = string.IsNullOrEmpty(request.Date)
+                    ? Helpers.ToLocalViewingDate(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                    : request.Date;
                 var addedToEntry = false;
                 string? note = null;
                 if (loggedOn is { } entryDate)

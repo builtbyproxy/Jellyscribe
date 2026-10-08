@@ -88,8 +88,10 @@ public class ReviewExistingEntryLiveTests
         }
         finally
         {
+            // Only entries on the test's own date that were not there before: anything else on the
+            // account is left alone, even an entry for this film added meanwhile.
             var keep = before.Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
-            foreach (var created in (await ListAsync(http, token, memberId, film.FilmId)).Where(e => !keep.Contains(e.Id)))
+            foreach (var created in (await ListAsync(http, token, memberId, film.FilmId)).Where(e => e.Date == DiaryDay && !keep.Contains(e.Id)))
             {
                 var (status, _) = await RatingEndpointProbeTests.SendAsync(http, HttpMethod.Delete, $"/log-entry/{Uri.EscapeDataString(created.Id)}", null, null, null, token);
                 _output.WriteLine($"cleanup: DELETE /log-entry/{created.Id} -> HTTP {status}");

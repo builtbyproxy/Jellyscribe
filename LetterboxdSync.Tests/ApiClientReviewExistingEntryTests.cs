@@ -190,15 +190,49 @@ public class ApiClientReviewExistingEntryTests
     }
 
     [Fact]
-    public async Task FailedUpdate_Throws_WithTheStatus()
+    public async Task FailedUpdate_Throws_WithTheStatusOnly_NeverTheEchoedReview()
     {
+        const string review = "Line one\n\"quoted\" caf\u00e9";
         var (client, _) = await ClientAsync(new[] { Entry("ours", "2024-03-09") },
-            patch: _ => Json(HttpStatusCode.BadRequest, "{\"message\":\"bad\"}"));
+            patch: body => Json(HttpStatusCode.BadRequest, "{\"message\":\"invalid\",\"echo\":" + body + "}"));
         using var owned = client;
 
-        var ex = await Assert.ThrowsAnyAsync<Exception>(() => client.AddReviewToDiaryEntryAsync(TmdbId, Watched, "Words.", false, null));
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() => client.AddReviewToDiaryEntryAsync(TmdbId, Watched, review, false, null));
 
         Assert.Contains("BadRequest", ex.Message);
+        Assert.DoesNotContain("quoted", ex.Message);
+        Assert.DoesNotContain("Line one", ex.Message);
+    }
+
+    [Fact]
+    public async Task EntriesOnALaterPage_AreFound()
+    {
+        LetterboxdApiClient.ResetFilmCacheForTesting(TmdbId);
+        var patched = new List<string>();
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("/films", StringComparison.Ordinal))
+                return Json(HttpStatusCode.OK, "{\"items\":[{\"id\":\"" + Lid + "\",\"name\":\"12 Angry Men\",\"links\":[]}]}");
+            if (path.EndsWith("/log-entries", StringComparison.Ordinal))
+            {
+                // Letterboxd pages with an opaque cursor: next goes back as cursor.
+                return request.RequestUri.Query.Contains("cursor=page2", StringComparison.Ordinal)
+                    ? Json(HttpStatusCode.OK, "{\"items\":[" + Entry("old", "2024-03-09") + "]}")
+                    : Json(HttpStatusCode.OK, "{\"next\":\"page2\",\"items\":[" + Entry("new", "2025-06-01") + "]}");
+            }
+            if (request.Method == HttpMethod.Patch)
+            {
+                patched.Add(path);
+                return Json(HttpStatusCode.OK, "{\"data\":{},\"messages\":[]}");
+            }
+            return null;
+        });
+        using var client = new LetterboxdApiClient(NullLogger.Instance, handler);
+        await client.AuthenticateAsync("review-existing-user", "pass");
+
+        Assert.Equal(ReviewAttachResult.Attached, await client.AddReviewToDiaryEntryAsync(TmdbId, Watched, "Words.", false, null));
+        Assert.EndsWith("/log-entry/old", Assert.Single(patched));
     }
 
     [Fact]

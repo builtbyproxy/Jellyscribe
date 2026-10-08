@@ -318,11 +318,12 @@ public class LetterboxdApiClient : ILetterboxdService
             throw new Exception("Letterboxd API token expired. Will re-authenticate on next sync.");
         }
 
-        // A reply can echo the review, so any part of it that reaches an error has the review cut out.
-        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        // A failed reply can echo the review in whatever escaping Letterboxd chose, so the error
+        // carries only the status.
         if (!response.IsSuccessStatusCode)
-            throw new Exception($"Failed to add the review to the diary entry: {response.StatusCode} " +
-                LetterboxdHttpClient.Truncate(LetterboxdDiary.WithoutReview(json, reviewText), 300));
+            throw new Exception($"Failed to add the review to the diary entry: {response.StatusCode}");
+
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
         // A LogEntryUpdateResponse reports a refused field (a rating off the scale, say) as an
         // Error message in a 200 reply, the same shape as a film relationship update.
@@ -336,62 +337,43 @@ public class LetterboxdApiClient : ILetterboxdService
     /// <summary>One of the member's log entries for a film, as <c>GET /log-entries</c> lists it.</summary>
     internal sealed record LogEntrySummary(string Id, DateTime? DiaryDate, bool HasReview, string? ReviewText, double? Rating);
 
-    // A member's entries for one film fit on one page: logging a single film more than 100 times
-    // is not a case worth paging for.
-    private const int LogEntriesPerFilmPage = 100;
-
     /// <summary>
-    /// The member's log entries for one film (<c>GET /log-entries?member=&amp;film=</c>), newest
-    /// first. A failed read throws: reading it as "no entries" would log the film again.
+    /// The member's log entries for one film (<c>GET /log-entries?member=&amp;film=</c>), every
+    /// page. A failed or incomplete read throws: reading it as "no entries" would log the film again.
     /// </summary>
     internal async Task<List<LogEntrySummary>> GetMemberLogEntriesAsync(string filmLid)
     {
         EnsureAuthenticated();
 
-        var response = await SendSignedAsync(HttpMethod.Get, "/log-entries",
-            queryParams: $"member={Uri.EscapeDataString(_memberId)}&film={Uri.EscapeDataString(filmLid)}&perPage={LogEntriesPerFilmPage}&sort=WhenAdded",
-            authenticated: true).ConfigureAwait(false);
-
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            ClearCachedToken();
-            throw new Exception("Letterboxd API token expired. Will re-authenticate on next sync.");
-        }
-
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"Could not read the Letterboxd diary entries for this film: returned {(int)response.StatusCode}");
-
-        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        using var doc = JsonDocument.Parse(json);
-        if (!doc.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
-            throw new Exception("Could not read the Letterboxd diary entries for this film: the reply had no list of entries");
-
         var entries = new List<LogEntrySummary>();
-        foreach (var item in items.EnumerateArray())
-        {
-            if (!item.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String
-                || string.IsNullOrEmpty(idEl.GetString()))
-                continue;
-
-            DateTime? date = null;
-            if (item.TryGetProperty("diaryDetails", out var details) && details.ValueKind == JsonValueKind.Object
-                && details.TryGetProperty("diaryDate", out var dateEl) && dateEl.ValueKind == JsonValueKind.String
-                && DateTime.TryParse(dateEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
-                date = parsed;
-
-            // A Review carries the member's text as LBML (as typed) and as HTML (text).
-            string? reviewText = null;
-            var hasReview = item.TryGetProperty("review", out var review) && review.ValueKind == JsonValueKind.Object;
-            if (hasReview)
+        await ReadAllPagesAsync("/log-entries",
+            $"member={Uri.EscapeDataString(_memberId)}&film={Uri.EscapeDataString(filmLid)}&perPage=100&sort=WhenAdded",
+            "diary entries for this film",
+            item =>
             {
-                reviewText = review.TryGetProperty("lbml", out var lbml) && lbml.ValueKind == JsonValueKind.String ? lbml.GetString()
-                    : review.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String ? text.GetString()
-                    : null;
-            }
+                if (!item.TryGetProperty("id", out var idEl) || idEl.ValueKind != JsonValueKind.String
+                    || string.IsNullOrEmpty(idEl.GetString()))
+                    return;
 
-            double? rating = item.TryGetProperty("rating", out var r) && r.ValueKind == JsonValueKind.Number ? r.GetDouble() : null;
-            entries.Add(new LogEntrySummary(idEl.GetString()!, date, hasReview, reviewText, rating));
-        }
+                DateTime? date = null;
+                if (item.TryGetProperty("diaryDetails", out var details) && details.ValueKind == JsonValueKind.Object
+                    && details.TryGetProperty("diaryDate", out var dateEl) && dateEl.ValueKind == JsonValueKind.String
+                    && DateTime.TryParse(dateEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
+                    date = parsed;
+
+                // A Review carries the member's text as LBML (as typed) and as HTML (text).
+                string? reviewText = null;
+                var hasReview = item.TryGetProperty("review", out var review) && review.ValueKind == JsonValueKind.Object;
+                if (hasReview)
+                {
+                    reviewText = review.TryGetProperty("lbml", out var lbml) && lbml.ValueKind == JsonValueKind.String ? lbml.GetString()
+                        : review.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String ? text.GetString()
+                        : null;
+                }
+
+                double? rating = item.TryGetProperty("rating", out var r) && r.ValueKind == JsonValueKind.Number ? r.GetDouble() : null;
+                entries.Add(new LogEntrySummary(idEl.GetString()!, date, hasReview, reviewText, rating));
+            }, CancellationToken.None).ConfigureAwait(false);
 
         return entries;
     }
