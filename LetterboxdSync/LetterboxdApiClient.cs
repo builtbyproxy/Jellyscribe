@@ -335,7 +335,7 @@ public class LetterboxdApiClient : ILetterboxdService
     }
 
     /// <summary>One of the member's log entries for a film, as <c>GET /log-entries</c> lists it.</summary>
-    internal sealed record LogEntrySummary(string Id, DateTime? DiaryDate, bool HasReview, string? ReviewText, double? Rating);
+    internal sealed record LogEntrySummary(string Id, DateTime? DiaryDate, bool HasReview);
 
     /// <summary>
     /// The member's log entries for one film (<c>GET /log-entries?member=&amp;film=</c>), every
@@ -347,7 +347,7 @@ public class LetterboxdApiClient : ILetterboxdService
 
         var entries = new List<LogEntrySummary>();
         await ReadAllPagesAsync("/log-entries",
-            $"member={Uri.EscapeDataString(_memberId)}&film={Uri.EscapeDataString(filmLid)}&perPage=100&sort=WhenAdded",
+            $"member={Uri.EscapeDataString(_memberId)}&film={Uri.EscapeDataString(filmLid)}&perPage=100",
             "diary entries for this film",
             item =>
             {
@@ -361,18 +361,9 @@ public class LetterboxdApiClient : ILetterboxdService
                     && DateTime.TryParse(dateEl.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
                     date = parsed;
 
-                // A Review carries the member's text as LBML (as typed) and as HTML (text).
-                string? reviewText = null;
+                // Any review object counts, even an empty one: an entry that has one is never written over.
                 var hasReview = item.TryGetProperty("review", out var review) && review.ValueKind == JsonValueKind.Object;
-                if (hasReview)
-                {
-                    reviewText = review.TryGetProperty("lbml", out var lbml) && lbml.ValueKind == JsonValueKind.String ? lbml.GetString()
-                        : review.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String ? text.GetString()
-                        : null;
-                }
-
-                double? rating = item.TryGetProperty("rating", out var r) && r.ValueKind == JsonValueKind.Number ? r.GetDouble() : null;
-                entries.Add(new LogEntrySummary(idEl.GetString()!, date, hasReview, reviewText, rating));
+                entries.Add(new LogEntrySummary(idEl.GetString()!, date, hasReview));
             }, CancellationToken.None).ConfigureAwait(false);
 
         return entries;

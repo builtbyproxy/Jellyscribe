@@ -575,6 +575,11 @@ public class LetterboxdController : JellyfinUserApiController
         if (string.IsNullOrWhiteSpace(request.ReviewText) && !request.IsRewatch && !ratingOnly)
             return BadRequest(new { error = "reviewText is required unless logging a rewatch or setting a rating" });
 
+        // The diary date goes to Letterboxd and onto the history row, which needs it to read it back.
+        if (!string.IsNullOrEmpty(request.Date)
+            && !DateTime.TryParseExact(request.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+            return BadRequest(new { error = "date must be a day in the form yyyy-MM-dd" });
+
         if (ratingOnly)
         {
             var r = request.Rating!.Value;
@@ -677,8 +682,7 @@ public class LetterboxdController : JellyfinUserApiController
                     Username = jellyfinUsername,
                     Account = account.LetterboxdUsername,
                     Timestamp = DateTime.UtcNow,
-                    ViewingDate = DateTime.TryParseExact(postDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var viewed)
-                        ? viewed : null,
+                    ViewingDate = DateTime.ParseExact(postDate, "yyyy-MM-dd", CultureInfo.InvariantCulture),
                     Status = status,
                     Source = "review"
                 });

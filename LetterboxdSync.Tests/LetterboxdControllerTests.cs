@@ -673,7 +673,7 @@ public class LetterboxdControllerTests
             // With no earlier diary entry it is a new one, dated today, and the date is sent
             // explicitly so the history row records the same day the entry has.
             await service.Received(1).PostReviewAsync(
-                "sinners", "great", false, false, System.DateTime.Now.ToString("yyyy-MM-dd"), 4.5, 1233413);
+                "sinners", "great", false, false, Helpers.ToLocalViewingDate(System.DateTime.UtcNow).ToString("yyyy-MM-dd"), 4.5, 1233413);
         }
         finally
         {

@@ -86,6 +86,9 @@ public class ReviewExistingEntryTests : IDisposable
         Date = date,
     };
 
+    // The day the controller dates a new entry on, by the same rule.
+    private static DateTime Today => Helpers.ToLocalViewingDate(DateTime.UtcNow);
+
     private static SyncEvent ReviewRow() => SyncHistory.GetPage(0, 50).Events.Single(e => e.Source == "review");
 
     [Fact]
@@ -186,7 +189,7 @@ public class ReviewExistingEntryTests : IDisposable
 
         await service.DidNotReceiveWithAnyArgs().AddReviewToDiaryEntryAsync(default, default, default!, default, default);
         await service.Received(1).PostReviewAsync("12-angry-men", "A tense room.", true, false,
-            Arg.Is<string?>(d => d == DateTime.Now.ToString("yyyy-MM-dd")), 4.5, TmdbId);
+            Arg.Is<string?>(d => d == Today.ToString("yyyy-MM-dd")), 4.5, TmdbId);
     }
 
     [Fact]
@@ -225,6 +228,54 @@ public class ReviewExistingEntryTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateRefused_IsReported_AndItsFailedRowStaysOutOfTheFilmsDiarySync()
+    {
+        var service = Substitute.For<ILetterboxdService>();
+        service.AddReviewToDiaryEntryAsync(Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<double?>())
+            .Returns<Task<ReviewAttachResult>>(_ => throw new Exception("Letterboxd refused the review update: InvalidRatingValue: bad"));
+        using var h = Harness(service);
+        LoggedBySync();
+
+        var result = await h.Controller.PostReview(Review());
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        await service.DidNotReceiveWithAnyArgs().PostReviewAsync(default!, default, default, default, default, default, default);
+        var failed = SyncHistory.GetPage(0, 50).Events.Single(e => e.Status == SyncStatus.Failed);
+        // As before this change, a failed review is not tied to the film, so it never feeds the diary sync's abandon rules.
+        Assert.Equal(0, failed.TmdbId);
+        Assert.Equal(0, SyncHistory.GetConsecutiveFailureCount(JellyfinUser, TmdbId, Account));
+    }
+
+    [Fact]
+    public async Task AMalformedDate_IsRefusedBeforeAnyLogin()
+    {
+        var logins = 0;
+        using var h = Harness(Service(ReviewAttachResult.Attached));
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => { logins++; return Task.FromResult(Service(ReviewAttachResult.Attached)); };
+
+        var result = await h.Controller.PostReview(Review(rewatch: true, date: "05/01/2026"));
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(0, logins);
+    }
+
+    [Fact]
+    public async Task NoTmdbId_SkipsTheLookup_AndPostsANewEntryToday()
+    {
+        var service = Service(ReviewAttachResult.Attached);
+        using var h = Harness(service);
+        LoggedBySync();
+
+        var request = Review();
+        request.TmdbId = null;
+        await h.Controller.PostReview(request);
+
+        await service.DidNotReceiveWithAnyArgs().AddReviewToDiaryEntryAsync(default, default, default!, default, default);
+        await service.Received(1).PostReviewAsync("12-angry-men", "A tense room.", true, false,
+            Arg.Is<string?>(d => d == Today.ToString("yyyy-MM-dd")), 4.5, Arg.Is<int?>(t => t == null));
+    }
+
+    [Fact]
     public async Task NeverLogged_IsANewEntryToday_RecordedWithItsFilmAndDate()
     {
         var service = Service(ReviewAttachResult.Attached);
@@ -235,10 +286,10 @@ public class ReviewExistingEntryTests : IDisposable
         await service.DidNotReceiveWithAnyArgs().AddReviewToDiaryEntryAsync(default, default, default!, default, default);
         var row = ReviewRow();
         Assert.Equal(TmdbId, row.TmdbId);
-        Assert.Equal(DateTime.Now.Date, row.ViewingDate);
+        Assert.Equal(Today, row.ViewingDate);
         Assert.Equal(Account, row.Account);
         // The next sync's duplicate check now sees today's entry.
-        Assert.True(SyncHistory.WasSuccessfullySynced(JellyfinUser, TmdbId, DateTime.Now.Date, Account));
+        Assert.True(SyncHistory.WasSuccessfullySynced(JellyfinUser, TmdbId, Today, Account));
     }
 
     [Fact]

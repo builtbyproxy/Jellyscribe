@@ -236,7 +236,7 @@ public class ApiClientReviewExistingEntryTests
     }
 
     [Fact]
-    public async Task ListedEntries_AreReadWithTheirDateReviewAndRating()
+    public async Task ListedEntries_AreReadWithTheirDateAndWhetherTheyHaveAReview()
     {
         var (client, _) = await ClientAsync(new[]
         {
@@ -247,8 +247,21 @@ public class ApiClientReviewExistingEntryTests
 
         var entries = await client.GetMemberLogEntriesAsync(Lid);
 
-        Assert.Equal(2, entries.Count);
-        Assert.Equal(new LetterboxdApiClient.LogEntrySummary("a", Watched, true, "Kept.", 4.0), entries[0]);
-        Assert.Equal(new LetterboxdApiClient.LogEntrySummary("b", Watched.AddDays(1), false, null, null), entries[1]);
+        Assert.Equal(new[]
+        {
+            new LetterboxdApiClient.LogEntrySummary("a", Watched, true),
+            new LetterboxdApiClient.LogEntrySummary("b", Watched.AddDays(1), false),
+        }, entries);
+    }
+
+    [Fact]
+    public async Task AnEmptyReviewObject_StillCountsAsAReview()
+    {
+        var withEmptyReview = Entry("ours", "2024-03-09").TrimEnd('}') + ",\"review\":{}}";
+        var (client, sent) = await ClientAsync(new[] { withEmptyReview });
+        using var owned = client;
+
+        Assert.Equal(ReviewAttachResult.AlreadyReviewed, await client.AddReviewToDiaryEntryAsync(TmdbId, Watched, "Words.", false, null));
+        Assert.DoesNotContain(sent, s => s.Method != HttpMethod.Get);
     }
 }

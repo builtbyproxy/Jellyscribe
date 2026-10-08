@@ -88,14 +88,22 @@ public class ReviewExistingEntryLiveTests
         }
         finally
         {
-            // Only entries on the test's own date that were not there before: anything else on the
-            // account is left alone, even an entry for this film added meanwhile.
-            var keep = before.Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
-            foreach (var created in (await ListAsync(http, token, memberId, film.FilmId)).Where(e => e.Date == DiaryDay && !keep.Contains(e.Id)))
+            // Each step on its own, so a failed list or delete never skips restoring the film's state.
+            // Only entries on the test's own date that were not there before are deleted: anything
+            // else on the account is left alone, even an entry for this film added meanwhile.
+            try
             {
-                var (status, _) = await RatingEndpointProbeTests.SendAsync(http, HttpMethod.Delete, $"/log-entry/{Uri.EscapeDataString(created.Id)}", null, null, null, token);
-                _output.WriteLine($"cleanup: DELETE /log-entry/{created.Id} -> HTTP {status}");
-                await Task.Delay(250);
+                var keep = before.Select(e => e.Id).ToHashSet(StringComparer.Ordinal);
+                foreach (var created in (await ListAsync(http, token, memberId, film.FilmId)).Where(e => e.Date == DiaryDay && !keep.Contains(e.Id)))
+                {
+                    var (status, _) = await RatingEndpointProbeTests.SendAsync(http, HttpMethod.Delete, $"/log-entry/{Uri.EscapeDataString(created.Id)}", null, null, null, token);
+                    _output.WriteLine($"cleanup: DELETE /log-entry/{created.Id} -> HTTP {status}");
+                    await Task.Delay(250);
+                }
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"cleanup: deleting the test's entries failed: {ex.Message}");
             }
 
             await RestoreAsync(http, token, film.FilmId, originalRelationship);
@@ -156,8 +164,15 @@ public class ReviewExistingEntryLiveTests
 
         foreach (var body in patches)
         {
-            var (status, _) = await RatingEndpointProbeTests.SendAsync(http, HttpMethod.Patch, $"/film/{lid}/me", null, body, "application/json", token);
-            _output.WriteLine($"restore: PATCH /film/{lid}/me {body} -> HTTP {status}");
+            try
+            {
+                var (status, _) = await RatingEndpointProbeTests.SendAsync(http, HttpMethod.Patch, $"/film/{lid}/me", null, body, "application/json", token);
+                _output.WriteLine($"restore: PATCH /film/{lid}/me {body} -> HTTP {status}");
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"restore: PATCH /film/{lid}/me {body} failed: {ex.Message}");
+            }
         }
     }
 
