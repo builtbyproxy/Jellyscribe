@@ -10,6 +10,28 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.12.0',
+    headline: 'Search and your whole history in the activity list',
+    summary:
+      'The activity list now reaches your whole history. A search box above the status filters finds any title. A "Load older history" button pages back through everything Jellyscribe has logged, instead of the list quietly stopping after a couple of hundred entries. A binge of one show folds into a single row that shows the episode range and any failures, and opens with a click or the keyboard. Prev and Next switch off at the ends. The same works on the admin dashboard\'s overview and its Activity tab. In the account dialog, the watchlist option\'s description now changes when you switch a new account between Serializd and Letterboxd, and the service names read "Serializd: TV" and "Letterboxd: Film". Thanks to Wouter Stulp, whose search, episode grouping and older-history work is included.',
+    highlights: {
+      new: [
+        'Search your activity by title on both dashboards',
+        'Load older history pages back through everything Jellyscribe has logged, with a count of what is loaded',
+        'A binge of one show folds into a single row you can open, showing the episode range and any failures (thanks to Wouter Stulp)',
+      ],
+      improvements: [
+        'Prev and Next switch off at the ends of the activity list and the admin Activity tab',
+        'An empty search says when older history is still left to load',
+      ],
+      fixes: [
+        'The activity list no longer stops silently after a couple of hundred entries',
+        'An entry that shifted between two pages no longer shows twice',
+        'Switching a new account to Letterboxd now rewords the watchlist option, which kept its TV wording',
+      ],
+    },
+  },
+  {
     version: '2.11.1',
     headline: 'Episode reviews on single-season shows, and gentler rate-limit handling',
     summary:
