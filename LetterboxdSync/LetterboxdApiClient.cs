@@ -72,6 +72,13 @@ public class LetterboxdApiClient : ILetterboxdService
 
     internal HttpClient HttpForTesting => _http;
 
+    /// <summary>The signed-in member's id (an id, never a secret), for tests and the live suite's output.</summary>
+    internal string MemberIdForTesting => _memberId;
+
+    /// <summary>Test hook: put an entry in the shared token cache, as an older sign-in might have left it.</summary>
+    internal static void SeedTokenCacheForTesting(string username, string password, TokenInfo info)
+        => TokenCache[Helpers.TokenCacheKey(username, password)] = info;
+
     private static HttpClient WithDefaultHeaders(HttpClient http)
     {
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -83,8 +90,10 @@ public class LetterboxdApiClient : ILetterboxdService
     {
         _cacheKey = Helpers.TokenCacheKey(username, password);
 
-        // Check token cache first
-        if (TokenCache.TryGetValue(_cacheKey, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow.AddMinutes(5))
+        // Check token cache first. An entry is only ever stored with its member id, but one without
+        // it is never reused: every member-scoped call would send "member=" and get a 404.
+        if (TokenCache.TryGetValue(_cacheKey, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow.AddMinutes(5)
+            && !string.IsNullOrEmpty(cached.MemberId))
         {
             _accessToken = cached.AccessToken;
             _memberId = cached.MemberId;
@@ -119,10 +128,7 @@ public class LetterboxdApiClient : ILetterboxdService
         }
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        ParseTokenResponse(json);
-
-        // Fetch member ID
-        await FetchMemberIdAsync().ConfigureAwait(false);
+        await CompleteSignInAsync(json).ConfigureAwait(false);
 
         _logger.LogInformation("Authenticated with Letterboxd API as {Username}", username);
     }
@@ -747,20 +753,28 @@ public class LetterboxdApiClient : ILetterboxdService
         return Convert.ToHexStringLower(hash);
     }
 
-    private void ParseTokenResponse(string json)
+    /// <summary>
+    /// Takes the token from an /auth/token reply, reads the member id with it, and only then
+    /// caches the pair. Caching the token first left a window (and, if /me failed, an hour) in
+    /// which another sign-in of the same account reused it with no member id, so its diary reads
+    /// sent "member=" and Letterboxd answered 404.
+    /// </summary>
+    private async Task CompleteSignInAsync(string tokenJson)
     {
-        using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
+        string refreshToken;
+        int expiresIn;
+        using (var doc = JsonDocument.Parse(tokenJson))
+        {
+            var root = doc.RootElement;
+            _accessToken = root.GetProperty("access_token").GetString()!;
+            refreshToken = root.TryGetProperty("refresh_token", out var rt) ? rt.GetString() ?? string.Empty : string.Empty;
+            expiresIn = root.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
+        }
 
-        _accessToken = root.GetProperty("access_token").GetString()!;
-        var refreshToken = root.TryGetProperty("refresh_token", out var rt) ? rt.GetString() ?? string.Empty : string.Empty;
-        var expiresIn = root.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
+        _memberId = string.Empty;
+        await FetchMemberIdAsync().ConfigureAwait(false);
 
-        TokenCache[_cacheKey] = new TokenInfo(
-            _accessToken,
-            refreshToken,
-            DateTime.UtcNow.AddSeconds(expiresIn),
-            _memberId);
+        TokenCache[_cacheKey] = new TokenInfo(_accessToken, refreshToken, DateTime.UtcNow.AddSeconds(expiresIn), _memberId);
     }
 
     private async Task RefreshTokenAsync(string refreshToken)
@@ -771,8 +785,7 @@ public class LetterboxdApiClient : ILetterboxdService
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        ParseTokenResponse(json);
-        await FetchMemberIdAsync().ConfigureAwait(false);
+        await CompleteSignInAsync(json).ConfigureAwait(false);
     }
 
     private async Task FetchMemberIdAsync()
@@ -782,13 +795,10 @@ public class LetterboxdApiClient : ILetterboxdService
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
-        _memberId = doc.RootElement.GetProperty("member").GetProperty("id").GetString()!;
-
-        // Update cache with member ID
-        if (TokenCache.TryGetValue(_cacheKey, out var cached))
-        {
-            TokenCache[_cacheKey] = cached with { MemberId = _memberId };
-        }
+        var memberId = doc.RootElement.GetProperty("member").GetProperty("id").GetString();
+        if (string.IsNullOrEmpty(memberId))
+            throw new InvalidOperationException("Letterboxd's /me reply had no member id.");
+        _memberId = memberId;
     }
 
     private void ClearCachedToken()
@@ -802,6 +812,9 @@ public class LetterboxdApiClient : ILetterboxdService
     {
         if (string.IsNullOrEmpty(_accessToken))
             throw new InvalidOperationException("Not authenticated. Call AuthenticateAsync first.");
+        // Every member-scoped call needs it; without it Letterboxd answers "member=" with a 404.
+        if (string.IsNullOrEmpty(_memberId))
+            throw new InvalidOperationException("Signed in to Letterboxd without a member id. Call AuthenticateAsync again.");
     }
 
     private static string ExtractSlugFromLink(JsonElement film)
