@@ -59,6 +59,9 @@ public class ReviewExistingEntryLiveTests
         using var client = new LetterboxdApiClient(new XunitLogger(_output));
         await client.AuthenticateAsync(user!, pass!);
         var film = await client.LookupFilmByTmdbIdAsync(TmdbTwelveAngryMen);
+        // Ids only, never a token: a mismatch here explains a member-scoped 404 at a glance.
+        _output.WriteLine($"member id: test {memberId}, client {(string.IsNullOrEmpty(client.MemberIdForTesting) ? "(empty)" : client.MemberIdForTesting)}; film {film.Slug} LID {film.FilmId}");
+        Assert.Equal(memberId, client.MemberIdForTesting);
 
         var before = await ListAsync(http, token, memberId, film.FilmId);
         Skip.If(before.Any(e => e.Date == DiaryDay),
