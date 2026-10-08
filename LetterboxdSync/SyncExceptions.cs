@@ -78,14 +78,16 @@ public sealed class SerializdRequestException : Exception
 public static class SyncErrors
 {
     /// <summary>
-    /// True when the failure was Letterboxd refusing the request (a 403 or a Cloudflare
-    /// challenge) rather than anything about the film.
+    /// True when the failure was Letterboxd refusing the request (a 403, a Cloudflare challenge,
+    /// or a 429 whose Retry-After is longer than the clients wait) rather than anything about the
+    /// film. Every later request in the run would be refused the same way.
     /// </summary>
     public static bool IsBlock(Exception ex) => ex switch
     {
         LetterboxdBlockedException => true,
         DiaryCheckFailedException d => d.Blocked,
-        System.Net.Http.HttpRequestException h => h.StatusCode == System.Net.HttpStatusCode.Forbidden,
+        System.Net.Http.HttpRequestException h => h.StatusCode
+            is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests,
         _ => false,
     };
 

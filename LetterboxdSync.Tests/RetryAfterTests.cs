@@ -135,6 +135,21 @@ public class ApiClientRetryAfterTests
     }
 
     [Fact]
+    public async Task DiaryCheck_RateLimitedForLongerThanTheCap_IsABlock_SoTheRunStopsSoon()
+    {
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: request =>
+            request.RequestUri?.AbsolutePath.EndsWith("/log-entries") == true ? RateLimited(TimeSpan.FromMinutes(10)) : null);
+
+        using var client = new LetterboxdApiClient(TestLogger, handler);
+        await client.AuthenticateAsync("user", "pass");
+
+        var ex = await Assert.ThrowsAsync<DiaryCheckFailedException>(() => client.GetDiaryInfoAsync("abc", "user"));
+
+        Assert.True(ex.Blocked);
+        Assert.True(SyncErrors.IsBlock(ex));
+    }
+
+    [Fact]
     public async Task RateLimitWait_StopsWhenTheSyncIsCancelled()
     {
         var posts = 0;

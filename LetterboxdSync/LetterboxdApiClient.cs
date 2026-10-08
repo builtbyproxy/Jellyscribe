@@ -165,7 +165,8 @@ public class LetterboxdApiClient : ILetterboxdService
         // duplicate whenever it was already on the diary. The caller records a retryable failure.
         if (!response.IsSuccessStatusCode)
             throw new DiaryCheckFailedException(
-                $"Could not check the Letterboxd diary: returned {(int)response.StatusCode}");
+                $"Could not check the Letterboxd diary: returned {(int)response.StatusCode}",
+                blocked: response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests);
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);

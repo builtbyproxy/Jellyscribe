@@ -570,7 +570,7 @@ public class LetterboxdSyncRunner
                         Account = lbAccount,
                         Timestamp = DateTime.UtcNow,
                         Status = SyncStatus.Skipped,
-                        Error = $"Letterboxd blocked {blocksInARow} requests in a row (usually Cloudflare); the other {remaining} films wait for the next sync",
+                        Error = $"Letterboxd blocked {blocksInARow} requests in a row (usually Cloudflare, or a long rate limit); the other {remaining} films wait for the next sync",
                         Source = source
                     });
                     break;

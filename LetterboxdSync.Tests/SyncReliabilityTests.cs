@@ -137,6 +137,8 @@ public class SyncReliabilityTests : IDisposable
 
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, true)]
+    // A 429 reaches the runner only when its Retry-After is longer than the client waits.
+    [InlineData(HttpStatusCode.TooManyRequests, true)]
     [InlineData(HttpStatusCode.ServiceUnavailable, false)]
     public async Task OnlyBlocksTripTheBreaker(HttpStatusCode status, bool stops)
     {
