@@ -1,0 +1,111 @@
+name: Live Letterboxd tests
+
+# Reusable: runs the Integration test category against real letterboxd.com with
+# the dedicated test account, then writes a summary that says whether the
+# website-login fallback (the scraping path) was covered. Called by:
+#   integration.yml   pull requests and manual runs
+#   live-checks.yml   weekly, opens an issue when it fails
+#   release.yml       before publishing, against the exact commit being shipped
+#
+# Callers own concurrency: every run writes to the same test account, so
+# integration.yml and live-checks.yml queue on the letterboxd-test-account group.
+#
+# Secrets (repository secrets, passed explicitly by each caller):
+#   LETTERBOXD_TEST_USERNAME / PASSWORD  required to run anything; when either is
+#                                        missing (fork PRs, unconfigured forks)
+#                                        the tests are skipped and the run passes
+#   LETTERBOXD_TEST_RAW_COOKIES          optional; without it the two scraping
+#                                        tests skip with a clear message and the
+#                                        summary says the scraping path was not
+#                                        covered. Refresh steps: CLAUDE.md, Build & Test.
+#   LETTERBOXD_TEST_USER_AGENT           optional; must match the browser the
+#                                        cookies came from
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to test. Empty means the caller's own commit.
+        type: string
+        default: ''
+    secrets:
+      LETTERBOXD_TEST_USERNAME:
+        required: false
+      LETTERBOXD_TEST_PASSWORD:
+        required: false
+      LETTERBOXD_TEST_RAW_COOKIES:
+        required: false
+      LETTERBOXD_TEST_USER_AGENT:
+        required: false
+    outputs:
+      ran:
+        description: true when credentials were present and the tests ran
+        value: ${{ jobs.live.outputs.ran }}
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      ran: ${{ steps.creds.outputs.have_creds }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Check for credentials
+        id: creds
+        env:
+          LETTERBOXD_TEST_USERNAME: ${{ secrets.LETTERBOXD_TEST_USERNAME }}
+          LETTERBOXD_TEST_PASSWORD: ${{ secrets.LETTERBOXD_TEST_PASSWORD }}
+          LETTERBOXD_TEST_RAW_COOKIES: ${{ secrets.LETTERBOXD_TEST_RAW_COOKIES }}
+        run: |
+          if [ -n "$LETTERBOXD_TEST_USERNAME" ] && [ -n "$LETTERBOXD_TEST_PASSWORD" ]; then
+            echo "have_creds=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_creds=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Letterboxd test credentials not configured for this run (likely a fork PR or missing repo secrets). Integration tests skipped."
+            {
+              echo "## Live Letterboxd tests"
+              echo
+              echo "Skipped: the Letterboxd test credentials are not available to this run, so neither the official API nor the website-login fallback was covered."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$LETTERBOXD_TEST_RAW_COOKIES" ]; then
+            echo "have_cookies=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_cookies=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run integration tests
+        if: steps.creds.outputs.have_creds == 'true'
+        env:
+          LETTERBOXD_TEST_USERNAME: ${{ secrets.LETTERBOXD_TEST_USERNAME }}
+          LETTERBOXD_TEST_PASSWORD: ${{ secrets.LETTERBOXD_TEST_PASSWORD }}
+          LETTERBOXD_TEST_RAW_COOKIES: ${{ secrets.LETTERBOXD_TEST_RAW_COOKIES }}
+          LETTERBOXD_TEST_USER_AGENT: ${{ secrets.LETTERBOXD_TEST_USER_AGENT }}
+        run: >-
+          dotnet test -c Release --no-build --verbosity normal
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=live.trx"
+          --results-directory "$RUNNER_TEMP/live-results"
+          --filter "Category=Integration"
+
+      - name: Summarise coverage
+        if: always() && steps.creds.outputs.have_creds == 'true'
+        run: python3 -I .github/scripts/live_test_summary.py "$RUNNER_TEMP/live-results/live.trx" "${{ steps.creds.outputs.have_cookies }}"

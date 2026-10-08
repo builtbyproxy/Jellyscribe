@@ -25,7 +25,7 @@ are for pre-release sanity checks and reproducing live bugs.
    export LETTERBOXD_TEST_USERNAME="your-test-account"
    export LETTERBOXD_TEST_PASSWORD="your-test-password"
 
-   # Optional, supply if Cloudflare 403s on raw login
+   # Optional locally; on GitHub Actions the two scraping-path tests skip without them
    export LETTERBOXD_TEST_RAW_COOKIES="cf_clearance=...; letterboxd.session=..."
    export LETTERBOXD_TEST_USER_AGENT="Mozilla/5.0 ..."
    ```
@@ -71,20 +71,35 @@ themselves if the API auth fails for the test account.
 
 ## CI
 
-A GitHub Actions workflow at `.github/workflows/integration.yml` runs the
-suite on every push to `main`, every PR, and on demand
-(`workflow_dispatch`). Credentials come from repository secrets. The default
-`ci.yml` workflow filters integration tests out so the unit run stays the
-fast-feedback path.
+The suite runs through the reusable workflow `.github/workflows/live-tests.yml`,
+called from three places:
+
+- `integration.yml`, on PRs that touch plugin code and on demand
+  (`workflow_dispatch`).
+- `live-checks.yml`, every Monday at 06:00 UTC against `main` and on demand.
+  When it fails it opens one issue labelled `live-check-failure`, or comments
+  on the one already open, with a link to the run.
+- `release.yml`, against the exact commit about to be shipped. A release is
+  not published unless the suite passes (see CLAUDE.md, Releasing).
+
+Credentials come from repository secrets. The default `ci.yml` workflow
+filters integration tests out so the unit run stays the fast-feedback path.
 
 To wire up:
 
 1. Repo Settings → Secrets and variables → Actions → New repository secret
 2. Add `LETTERBOXD_TEST_USERNAME` and `LETTERBOXD_TEST_PASSWORD` (and
    optionally `LETTERBOXD_TEST_RAW_COOKIES` / `LETTERBOXD_TEST_USER_AGENT`)
-3. Push or open a PR, the workflow runs automatically
+3. Open a PR that touches plugin code, or run a workflow from the Actions tab
 
-If the secrets aren't configured (e.g. on a fork PR, where GitHub doesn't
-forward repo secrets), the workflow detects the missing credentials and
-skips with a notice instead of failing. External contributors aren't
-blocked.
+If the credentials aren't configured (e.g. on a fork PR, where GitHub doesn't
+forward repo secrets), the workflow detects that and skips with a notice
+instead of failing. External contributors aren't blocked.
+
+The two website-login (scraping) tests, `Scraping_LookupFilmByTmdbId_...` and
+`Scraping_SetFilmRating_...`, also need `LETTERBOXD_TEST_RAW_COOKIES`, because
+Cloudflare refuses the website sign-in from CI without browser cookies. Without
+it they skip on GitHub Actions with a message naming the variable (local runs
+still try the plain sign-in), and every run's summary says
+whether the scraping path was covered. How to refresh the cookie, and why it
+may still be refused from a GitHub runner: CLAUDE.md, Build & Test.

@@ -15,13 +15,40 @@ name: Release
 #                                              then write the manifest entry
 #   - neither                                -> normal release
 #
-# Two jobs, so the write token never shares a job with build or test code:
-#   build   (contents: read)  checks out with no stored credentials, builds,
-#                             tests, packages, prepares the release notes, and
-#                             uploads them as an artifact.
-#   publish (contents: write) runs no repository build code: it creates or
-#                             repairs the GitHub release and commits the
-#                             manifest entry.
+# Three jobs, so the write token never shares a job with build or test code:
+#   build      (contents: read)  checks out with no stored credentials, builds,
+#                                tests, packages, prepares the release notes,
+#                                and uploads them as an artifact.
+#   live-check (contents: read)  runs the live Letterboxd suite (live-tests.yml)
+#                                against the exact commit build packaged. A new
+#                                release is never published unless it passes.
+#   publish    (contents: write) runs no repository build code: it creates or
+#                                repairs the GitHub release and commits the
+#                                manifest entry.
+#
+# Why live-check runs here instead of waiting for integration.yml: the commit's
+# own Integration run would have to be found and polled, it may not exist (paths
+# filter, collapsed queued runs), and a pending run in integration.yml's shared
+# concurrency group is cancelled when a newer PR run queues behind it. Running
+# the suite in this workflow is deterministic. It deliberately does NOT join the
+# letterboxd-test-account group for the same reason (a cancelled live-check
+# would silently skip the release); integration.yml no longer runs on pushes to
+# main, so it never tests the same commit at the same time. A PR run can still
+# overlap and make a write test flaky: use "Re-run failed jobs", which reruns
+# live-check and then publish.
+#
+# Skip-if-no-secret: when the test credentials are not configured (a fork),
+# live-check passes with a notice. When only LETTERBOXD_TEST_RAW_COOKIES is
+# missing, the scraping tests skip and the run summary says so.
+#
+# Repair mode skips live-check: the tag it repairs was created by a publish job
+# that already needed a passing live-check, and a repair only adds the asset or
+# the manifest entry for a release that is already public.
+#
+# Escape hatch: when letterboxd.com is down, or Letterboxd has revoked the
+# bundled API key (runbook in SECURITY.md), the live suite cannot pass and would
+# block every release. Setting the repository variable RELEASE_LIVE_CHECK to
+# "off" skips live-check and publishes with a warning. Delete it afterwards.
 #
 # Version bumps happen in regular PRs (gated by version-gate.yml). This
 # workflow doesn't decide the version; it just ships whatever the project
@@ -258,9 +285,34 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  publish:
+  live-check:
     needs: build
-    if: needs.build.outputs.mode != 'skip'
+    if: needs.build.outputs.mode == 'release' && vars.RELEASE_LIVE_CHECK != 'off'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/live-tests.yml
+    with:
+      ref: ${{ needs.build.outputs.sha }}
+    secrets:
+      LETTERBOXD_TEST_USERNAME: ${{ secrets.LETTERBOXD_TEST_USERNAME }}
+      LETTERBOXD_TEST_PASSWORD: ${{ secrets.LETTERBOXD_TEST_PASSWORD }}
+      LETTERBOXD_TEST_RAW_COOKIES: ${{ secrets.LETTERBOXD_TEST_RAW_COOKIES }}
+      LETTERBOXD_TEST_USER_AGENT: ${{ secrets.LETTERBOXD_TEST_USER_AGENT }}
+
+  publish:
+    needs: [build, live-check]
+    # A new release needs a passing live-check; it may go ahead with live-check
+    # skipped only for a repair or with the RELEASE_LIVE_CHECK=off escape hatch.
+    # !cancelled() lets this job evaluate when live-check is skipped.
+    if: >-
+      !cancelled()
+      && needs.build.result == 'success'
+      && (
+        (needs.build.outputs.mode == 'release'
+          && (needs.live-check.result == 'success'
+            || (needs.live-check.result == 'skipped' && vars.RELEASE_LIVE_CHECK == 'off')))
+        || (needs.build.outputs.mode == 'repair' && needs.live-check.result == 'skipped')
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -272,6 +324,14 @@ jobs:
       BUILT_SHA: ${{ needs.build.outputs.sha }}
       ABI: ${{ needs.build.outputs.abi }}
     steps:
+      - name: Warn when the live check was bypassed
+        if: needs.build.outputs.mode == 'release' && needs.live-check.result == 'skipped'
+        run: echo "::warning::RELEASE_LIVE_CHECK is off, so $TAG is published without the live Letterboxd tests. Delete the repository variable once Letterboxd is reachable again."
+
+      - name: Warn when the live check had no credentials
+        if: needs.live-check.result == 'success' && needs.live-check.outputs.ran != 'true'
+        run: echo "::warning::The Letterboxd test secrets are not configured, so live-check passed without running anything and $TAG is published untested against letterboxd.com."
+
       # This job never runs dotnet, npm, or any script from the repository. It
       # checks out main only to edit manifest.json and push it.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
