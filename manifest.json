@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.12.3.0",
+        "changelog": "When an admin edits a linked diary on the Jellyscribe settings page, the save now starts from the account as it is stored and changes only what the form shows. Before, the page rebuilt the account from scratch, so any account setting the form did not list would have been reset to its default on the next edit. Nothing is lost today, because every current setting is on the form, but future settings are now safe from the moment they ship.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.12.3/jellyfin-plugin-letterboxd-v2.12.3.zip",
+        "checksum": "609e337406976fe65eb4f0a1c3285bab",
+        "timestamp": "2026-10-09T02:35:58Z"
+      },
+      {
         "version": "2.12.2.0",
         "changelog": "Both Jellyscribe dashboards, the admin settings page and your own page, now share one script and one stylesheet instead of each carrying its own copy. The pages are about five times smaller, and the shared part, fonts included, is downloaded once per version and then cached. They look and behave exactly as before. After a plugin upgrade, an open browser tab picks up the new version the next time the page is opened, with no reload needed. When you post a review that lands on a diary entry you had already logged, the result now says so, and any note from the server is shown under that account. The design follows Wouter Stulp's shared-assets work in his fork, reworked to keep the bundled fonts and to load the right version after an upgrade.\n\n```markdown",
         "targetAbi": "10.11.9.0",
