@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.12.3',
+    headline: 'Editing an account keeps every setting it already has',
+    summary:
+      'When an admin edits a linked diary on the Jellyscribe settings page, the save now starts from the account as it is stored and changes only what the form shows. Before, the page rebuilt the account from scratch, so any account setting the form did not list would have been reset to its default on the next edit. Nothing is lost today, because every current setting is on the form, but future settings are now safe from the moment they ship.',
+    highlights: {
+      fixes: [
+        'Editing an account on the admin settings page keeps every stored setting the form does not show, instead of resetting it.',
+      ],
+    },
+  },
+  {
     version: '2.12.2',
     headline: 'Smaller settings pages that update themselves after an upgrade',
     summary:
