@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="HtmlAgilityPack" Version="1.6.11" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
     <!-- FLOOR POLICY: Jellyfin assemblies carry full per-patch AssemblyVersions, so the
          SDK version we compile against IS the minimum Jellyfin a release can load on
          (strict binding; proven live on 10.11.10 with a 10.11.11-built DLL, issue #63).
@@ -24,6 +24,8 @@
          need a newer API - never via a routine dependency bump. CI enforces the match. -->
     <PackageReference Include="Jellyfin.Controller" Version="10.11.9" />
     <PackageReference Include="Jellyfin.Model" Version="10.11.9" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.20" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.20" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <!-- Encrypts stored secrets (Letterboxd password/cookies, Seerr API key) at rest.
          See LetterboxdSync/Security/SecretProtector.cs for the threat model. -->
