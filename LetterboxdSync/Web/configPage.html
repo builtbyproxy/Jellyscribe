@@ -376,6 +376,13 @@
                             if (at >= 0) next[at] = item; else next.push(item);
                             return next;
                         },
+                        // The stored copy of orig with the form's values laid over it, so an account field this
+                        // form does not edit keeps its stored value instead of being dropped by the save.
+                        overStored: function (svc, list, orig, item) {
+                            var self = this, stored = null;
+                            if (orig && self.editing && self.editing.svc === svc) (list || []).some(function (x) { if (self.sameAccount(svc, x, orig)) { stored = x; return true; } return false; });
+                            return stored ? Object.assign({}, stored, item) : item;
+                        },
 
                         /* Re-reads the stored config right before saving and applies only edit(copy) to it, so
                            whatever changed since this page loaded (users adding or editing their own accounts,
@@ -568,7 +575,7 @@
                             byId('mStatus').textContent = 'Saving…';
                             self.setModalBusy(true);
                             self.saveConfig(function (c) {
-                                c[key] = self.withAccount(m.svc, c[key], orig, item);
+                                c[key] = self.withAccount(m.svc, c[key], orig, self.overStored(m.svc, c[key], orig, item));
                             }).then(function () {
                                 self.setModalBusy(false);
                                 self.closeModal('acctModal');
