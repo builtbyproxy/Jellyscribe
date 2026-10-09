@@ -377,7 +377,9 @@
                             return next;
                         },
                         // The stored copy of orig with the form's values laid over it, so an account field this
-                        // form does not edit keeps its stored value instead of being dropped by the save.
+                        // form does not edit keeps its stored value instead of being dropped by the save. So the
+                        // form must send every field it edits, cleared ones as [], null or false, never omitted.
+                        // The stored Has* flags ride along harmlessly: the server computes them, a posted one is ignored.
                         overStored: function (svc, list, orig, item) {
                             var self = this, stored = null;
                             if (orig && self.editing && self.editing.svc === svc) (list || []).some(function (x) { if (self.sameAccount(svc, x, orig)) { stored = x; return true; } return false; });
