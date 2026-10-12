@@ -142,5 +142,55 @@ class BuildNotesTests(unittest.TestCase):
         self.assertTrue(notes.endswith("..."))
 
 
+    def test_unreadable_pr_falls_back_to_title(self):
+        def broken(_number):
+            raise rn.subprocess.CalledProcessError(1, "gh")
+        warnings = []
+        notes = rn.build_notes([("a", "2.13.0.0", "feat: two (#167)")], broken, warnings.append, silent)
+        self.assertEqual(notes, "feat: two")
+        self.assertTrue(any("#167" in w for w in warnings))
+
+
+class MainTests(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = self._tmp.name
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def path(self, name, text=None):
+        p = os.path.join(self.dir, name)
+        if text is not None:
+            with open(p, "w") as f:
+                f.write(text)
+        return p
+
+    def test_clean_mode_cleans_and_caps_an_existing_body(self):
+        src = self.path("in.txt", "<!-- c -->Edited <b>on GitHub</b>. " + "word " * 1000)
+        out = self.path("out.txt")
+        self.assertEqual(rn.main(["release_notes.py", "--clean", src, out]), 0)
+        text = open(out).read().strip()
+        self.assertTrue(text.startswith("Edited on GitHub."))
+        self.assertNotIn("<", text)
+        self.assertLessEqual(len(text), rn.MAX)
+
+    def test_release_mode_writes_combined_notes_without_gh(self):
+        os.makedirs(self.path("repo"))
+        repo = Repo(self.path("repo"))
+        repo.commit("Release v2.12.3", version="2.12.3.0")
+        repo.commit("Hotfix one", version="2.12.4.0")
+        repo.commit("Hotfix two", version="2.12.5.0")
+        manifest = self.path("manifest.json", '[{"versions": [{"version": "2.12.3.0"}]}]')
+        out = self.path("notes.txt")
+        cwd = os.getcwd()
+        os.chdir(repo.path)
+        try:
+            self.assertEqual(rn.main(["release_notes.py", manifest, out]), 0)
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(open(out).read(), "Hotfix one\n\nHotfix two\n")
+
+
 if __name__ == "__main__":
     unittest.main()

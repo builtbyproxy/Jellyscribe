@@ -1,6 +1,10 @@
 """Write the release notes for the version release.yml is about to publish.
 
 Usage: release_notes.py <manifest.json from origin/main> <output file>
+       release_notes.py --clean <input file> <output file>
+
+The --clean form only cleans and caps existing text: repair mode uses it on the
+body of a release that is already published.
 
 The notes are every unshipped version bump's "## Release notes" PR section,
 oldest first. A bump is a commit that raised Directory.Build.props's
@@ -77,7 +81,8 @@ def unshipped_bumps(repo, shipped, head="HEAD"):
     AssemblyVersion above every shipped version, oldest first."""
     highest = max((version_key(v) for v in shipped), default=())
     bumps = []
-    for sha in git(repo, "log", "--format=%H", "-G<AssemblyVersion>", head, "--", PROPS).split():
+    # --topo-order: never let commit dates put an older bump before a newer one.
+    for sha in git(repo, "log", "--topo-order", "--format=%H", "-G<AssemblyVersion>", head, "--", PROPS).split():
         version = version_at(repo, sha)
         if not version:
             continue
@@ -95,12 +100,21 @@ def gh_pr_body(number):
                           check=True, capture_output=True, text=True).stdout
 
 
+def fetch_section(fetch_body, number, warn):
+    """The cleaned notes section of a PR, or '' when the PR can't be read."""
+    try:
+        return clean(extract_section(fetch_body(number)))
+    except (subprocess.CalledProcessError, OSError) as e:
+        warn(f"Could not read PR #{number} ({e.__class__.__name__}).")
+        return ""
+
+
 def build_notes(bumps, fetch_body=gh_pr_body, warn=print, notice=print):
     """The cleaned, capped notes for a release made of these bumps (oldest first)."""
     parts = []
     for _sha, version, subject in bumps:
         m = PR_RE.search(subject)
-        section = clean(extract_section(fetch_body(m.group(1)))) if m else ""
+        section = fetch_section(fetch_body, m.group(1), warn) if m else ""
         if not section:
             warn(f"No '## Release notes' text for {version} ({subject_title(subject)}); "
                  "using its PR title. Add the section to keep the changelog consistent.")
@@ -114,6 +128,12 @@ def build_notes(bumps, fetch_body=gh_pr_body, warn=print, notice=print):
 
 
 def main(argv):
+    warn = lambda m: print(f"::warning::{m}")
+    if len(argv) == 4 and argv[1] == "--clean":
+        notes = cap(clean(open(argv[2]).read()), warn)
+        with open(argv[3], "w") as f:
+            f.write(notes + "\n")
+        return 0
     if len(argv) != 3:
         sys.stderr.write(__doc__)
         return 2
@@ -125,9 +145,7 @@ def main(argv):
         head = git(".", "log", "-1", "--format=%s").strip()
         bumps = [("HEAD", version_at(".", "HEAD") or "?", head)]
     print(f"Version bump commits: {', '.join(f'{v} {s[:10]}' for s, v, _ in bumps)}")
-    notes = build_notes(bumps,
-                        warn=lambda m: print(f"::warning::{m}"),
-                        notice=lambda m: print(f"::notice::{m}"))
+    notes = build_notes(bumps, warn=warn, notice=lambda m: print(f"::notice::{m}"))
     with open(argv[2], "w") as f:
         f.write(notes + "\n")
     return 0

@@ -39,6 +39,8 @@ Cloudflare also pins `cf_clearance` to the IP address that solved the challenge 
 
 The telemetry/download Worker (`worker/`, deployed by hand with wrangler) has dependency-free tests for its pure helpers: `node --experimental-strip-types --test worker/test/dl.test.mjs` (Node 22.6+; CI runs it in the `worker-tests` job). Merging a worker change does not deploy it, so the maintainer runs `npx wrangler deploy` from `worker/` afterwards.
 
+The release plumbing has its own dependency-free tests, run by the required `Release scripts` job in `ci.yml`: `python3 -m unittest discover -s .github/scripts -p 'test_*.py'` (`release_notes.py`, which writes each release's notes) and `node --experimental-strip-types --test site/test/fold-notes.test.mjs` (the site's folding of notes for versions that never shipped).
+
 ## Architecture
 
 ### Service abstraction with fallback

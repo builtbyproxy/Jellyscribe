@@ -27,3 +27,7 @@ release-notes.md
 # Wrangler local state/cache (contains account id + name)
 .wrangler/
 worker/.wrangler/
+
+# Python bytecode from running the release script tests locally.
+__pycache__/
+*.pyc

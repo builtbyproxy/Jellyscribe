@@ -27,7 +27,7 @@ function merge(own: ReleaseNotes | undefined, folded: ReleaseNotes[], version: s
   // Without an entry of its own, the newest folded entry supplies the headline.
   const base = own ?? folded[folded.length - 1];
   const extra = own ? folded : folded.slice(0, -1);
-  if (extra.length === 0) return { ...base, version };
+  if (extra.length === 0) return { ...base, version, highlights: { ...base.highlights } };
   const summaries = [base.summary, ...extra.map((n) => n.summary)].filter((s): s is string => !!s);
   const highlights: ReleaseNotes['highlights'] = {};
   for (const key of CATEGORIES) {
