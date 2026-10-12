@@ -769,6 +769,7 @@ public class WatchlistSyncRunnerTests : IDisposable
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]
+    [InlineData(true, true)]
     public async Task TryRunForUserAsync_AutoRequest_SkipsFilmsAlreadyWatched(bool backfill, bool requestWatched)
     {
         // Issue #165: a watched film that a cleanup tool deleted is still on the watchlist and
