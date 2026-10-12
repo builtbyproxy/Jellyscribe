@@ -256,6 +256,9 @@ jobs:
         || (needs.build.outputs.mode == 'repair' && needs.live-check.result == 'skipped')
       )
     runs-on: ubuntu-latest
+    # The release environment holds RELEASE_DEPLOY_KEY and only deploys from main,
+    # so no job on another branch can read the key.
+    environment: release
     permissions:
       contents: write
     env:
@@ -275,11 +278,16 @@ jobs:
         run: echo "::warning::The Letterboxd test secrets are not configured, so live-check passed without running anything and $TAG is published untested against letterboxd.com."
 
       # This job never runs dotnet, npm, or any script from the repository. It
-      # checks out main only to edit manifest.json and push it.
+      # checks out main only to edit manifest.json and push it. The push goes over
+      # SSH as the release deploy key, the only actor the main ruleset lets push
+      # without a pull request (see CLAUDE.md, "Merge gates on main"). Unlike a
+      # GITHUB_TOKEN push, it starts workflows: this one again (it sees the version
+      # in manifest.json and stops), ci.yml, and deploy-docs.yml.
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           ref: main
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Download release files
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0

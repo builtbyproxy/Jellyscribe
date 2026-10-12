@@ -12,26 +12,26 @@
 
 ## 3. Push the manifest commit with a deploy key
 
-- [ ] 3.1 Confirm the ruleset API accepts a `DeployKey` bypass actor (dry check against the API docs and the live ruleset schema) before anything depends on it.
-- [ ] 3.2 Generate an ed25519 key pair. Add the public half as the repository's only write deploy key ("Release manifest push"), create the `release` environment limited to `main`, and store the private half as its `RELEASE_DEPLOY_KEY` secret.
-- [ ] 3.3 Prove the key can push: push a throwaway branch over SSH with the key, delete the branch, then delete the local private key.
-- [ ] 3.4 In `release.yml`'s publish job, add `environment: release` and check out `main` with `ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}`.
-- [ ] 3.5 Update `deploy-docs.yml`'s trigger comment: the manifest push now starts it too, and `workflow_run` stays so a fallback to `GITHUB_TOKEN` cannot leave the site stale.
+- [x] 3.1 Confirm the ruleset API accepts a `DeployKey` bypass actor (dry check against the API docs and the live ruleset schema) before anything depends on it.
+- [x] 3.2 Generate an ed25519 key pair. Add the public half as the repository's only write deploy key ("Release manifest push"), create the `release` environment limited to `main`, and store the private half as its `RELEASE_DEPLOY_KEY` secret.
+- [x] 3.3 Prove the key can push: push a throwaway branch over SSH with the key, delete the branch, then delete the local private key.
+- [x] 3.4 In `release.yml`'s publish job, add `environment: release` and check out `main` with `ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}`.
+- [x] 3.5 Update `deploy-docs.yml`'s trigger comment: the manifest push now starts it too, and `workflow_run` stays so a fallback to `GITHUB_TOKEN` cannot leave the site stale.
 
 ## 4. Distinct required check names and the CI job
 
-- [ ] 4.1 Name the jobs `Version Gate` (`version-gate.yml`) and `PR Title` (`pr-title.yml`).
-- [ ] 4.2 Add a `Release scripts` job to `ci.yml` that runs the Python and site tests on every PR and push.
+- [x] 4.1 Name the jobs `Version Gate` (`version-gate.yml`) and `PR Title` (`pr-title.yml`).
+- [x] 4.2 Add a `Release scripts` job to `ci.yml` that runs the Python and site tests on every PR and push.
 
 ## 5. Docs
 
-- [ ] 5.1 Update `CLAUDE.md`'s Releasing section:
+- [x] 5.1 Update `CLAUDE.md`'s Releasing section:
    - step 3: the notes now come from `release_notes.py` and combine every unshipped bump;
    - step 4: deploy-docs also fires on the manifest push, and why `workflow_run` stays;
    - a new "Merge gates on main" subsection: the ruleset rules, required checks, bypass actors, the `release` environment and deploy key (only write deploy key, rotation, rollback);
    - the `release-notes.ts` rule: an unshipped version's entry folds into the next release;
    - a Past incidents entry for 2.12.4.
-- [ ] 5.2 Update the PR template's comment if it mentions the old single-version behaviour.
+- [x] 5.2 Update the PR template's comment if it mentions the old single-version behaviour. (2026-10-12: checked, it does not; no change.)
 
 ## 6. Roll out
 
