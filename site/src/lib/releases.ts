@@ -1,6 +1,6 @@
 import manifest from '../../../manifest.json';
 import { releaseNotes, type ReleaseNotes } from '../data/release-notes';
-import { foldNotes } from './fold-notes';
+import { compareVersions, foldNotes } from './fold-notes';
 
 export type Release = {
   version: string;
@@ -34,11 +34,6 @@ const notesByShippedVersion = foldNotes(
 
 const repoUrl = 'https://github.com/builtbyproxy/Jellyscribe';
 
-function semverKey(v: string): number {
-  const [maj, min, patch] = v.split('.').map((n) => parseInt(n, 10) || 0);
-  return maj * 1_000_000 + min * 1_000 + patch;
-}
-
 function shortVersion(manifestVersion: string): string {
   return manifestVersion.replace(/\.0$/, '');
 }
@@ -64,6 +59,6 @@ export const releases: Release[] = manifestEntries
       notes: notesByShippedVersion[v],
     };
   })
-  .sort((a, b) => semverKey(b.version) - semverKey(a.version));
+  .sort((a, b) => compareVersions(b.version, a.version));
 
 export const latestRelease = releases[0];

@@ -1,7 +1,7 @@
 // Run: node --experimental-strip-types --test site/test/fold-notes.test.mjs (Node 22.6+)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { foldNotes } from '../src/lib/fold-notes.ts';
+import { compareVersions, foldNotes } from '../src/lib/fold-notes.ts';
 
 const fix = {
   version: '2.12.4',
@@ -52,4 +52,18 @@ test('shipped versions with their own notes and nothing to fold are unchanged', 
   const out = foldNotes([fix, feat], ['2.12.4', '2.13.0']);
   assert.deepEqual(out['2.12.4'], fix);
   assert.deepEqual(out['2.13.0'], feat);
+});
+
+test('without an entry of its own, folded notes read oldest first under the newest headline', () => {
+  const a = { version: '2.12.4', headline: 'A', summary: 'A.', highlights: { fixes: ['a'] } };
+  const b = { version: '2.12.5', headline: 'B', summary: 'B.', highlights: { fixes: ['b'] } };
+  const out = foldNotes([b, a], ['2.12.3', '2.13.0']);
+  assert.equal(out['2.13.0'].headline, 'B');
+  assert.equal(out['2.13.0'].summary, 'A.\n\nB.');
+  assert.deepEqual(out['2.13.0'].highlights.fixes, ['a', 'b']);
+});
+
+test('compareVersions orders numerically, part by part', () => {
+  assert.deepEqual(['2.9.0', '2.13.0', '2.12.4', '10.0.0'].sort(compareVersions), ['2.9.0', '2.12.4', '2.13.0', '10.0.0']);
+  assert.equal(compareVersions('2.13.0', '2.13.0.0'), 0);
 });

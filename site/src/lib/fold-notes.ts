@@ -12,7 +12,8 @@ export function versionKey(v: string): number[] {
   return v.split('.').map((n) => parseInt(n, 10) || 0);
 }
 
-function compare(a: string, b: string): number {
+/** Orders versions such as "2.13.0" and "2.12.4" numerically, part by part. */
+export function compareVersions(a: string, b: string): number {
   const x = versionKey(a);
   const y = versionKey(b);
   for (let i = 0; i < Math.max(x.length, y.length); i++) {
@@ -24,18 +25,18 @@ function compare(a: string, b: string): number {
 
 function merge(own: ReleaseNotes | undefined, folded: ReleaseNotes[], version: string): ReleaseNotes | undefined {
   if (!own && folded.length === 0) return undefined;
-  // Without an entry of its own, the newest folded entry supplies the headline.
-  const base = own ?? folded[folded.length - 1];
-  const extra = own ? folded : folded.slice(0, -1);
-  if (extra.length === 0) return { ...base, version, highlights: { ...base.highlights } };
-  const summaries = [base.summary, ...extra.map((n) => n.summary)].filter((s): s is string => !!s);
+  // The version's own entry comes first, then the folded ones oldest first. Without
+  // an entry of its own, the newest folded entry supplies the headline.
+  const parts = own ? [own, ...folded] : folded;
+  const head = own ?? folded[folded.length - 1];
+  const summaries = parts.map((n) => n.summary).filter((s): s is string => !!s);
   const highlights: ReleaseNotes['highlights'] = {};
   for (const key of CATEGORIES) {
-    const items = [...(base.highlights[key] ?? []), ...extra.flatMap((n) => n.highlights[key] ?? [])];
+    const items = parts.flatMap((n) => n.highlights[key] ?? []);
     if (items.length) highlights[key] = items;
   }
   return {
-    ...base,
+    ...head,
     version,
     summary: summaries.length ? summaries.join('\n\n') : undefined,
     highlights,
@@ -44,17 +45,17 @@ function merge(own: ReleaseNotes | undefined, folded: ReleaseNotes[], version: s
 
 /** Notes to show for each shipped version (short form, e.g. "2.13.0"). */
 export function foldNotes(notes: ReleaseNotes[], shipped: string[]): Record<string, ReleaseNotes> {
-  const shippedSorted = [...shipped].sort(compare);
+  const shippedSorted = [...shipped].sort(compareVersions);
   const shippedSet = new Set(shipped);
   const own = new Map(notes.filter((n) => shippedSet.has(n.version)).map((n) => [n.version, n]));
-  const unshipped = notes.filter((n) => !shippedSet.has(n.version)).sort((a, b) => compare(a.version, b.version));
+  const unshipped = notes.filter((n) => !shippedSet.has(n.version)).sort((a, b) => compareVersions(a.version, b.version));
 
   const result: Record<string, ReleaseNotes> = {};
   let previous: string | undefined;
   for (const version of shippedSorted) {
     // Oldest first, so summaries and highlights read in the order they were written.
     const folded = unshipped.filter(
-      (n) => compare(n.version, version) < 0 && (previous === undefined || compare(n.version, previous) > 0),
+      (n) => compareVersions(n.version, version) < 0 && (previous === undefined || compareVersions(n.version, previous) > 0),
     );
     const merged = merge(own.get(version), folded, version);
     if (merged) result[version] = merged;

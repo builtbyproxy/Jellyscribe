@@ -182,7 +182,10 @@ jobs:
              && gh release view "$TAG" --json body --jq .body > /tmp/existing-body.txt 2>/dev/null \
              && [ -s /tmp/existing-body.txt ]; then
             echo "Using the existing release body for $TAG"
-            python3 .github/scripts/release_notes.py --clean /tmp/existing-body.txt dist/release-body.txt
+            # Repair has the tag checked out, which may predate the script, so
+            # run main's copy.
+            git show origin/main:.github/scripts/release_notes.py > /tmp/release_notes.py
+            python3 /tmp/release_notes.py --clean /tmp/existing-body.txt dist/release-body.txt
           else
             # Every version bump above the newest shipped version contributes its
             # PR's "## Release notes", oldest first. Usually that is one PR; a
