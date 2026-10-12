@@ -43,6 +43,8 @@ public class AccountUpdateRequest
 
     public bool BackfillAvailableRequests { get; set; }
 
+    public bool RequestWatchedTitles { get; set; }
+
     public bool MirrorJellyseerrWatchlist { get; set; }
 
     public bool SkipPreviouslySynced { get; set; } = true;

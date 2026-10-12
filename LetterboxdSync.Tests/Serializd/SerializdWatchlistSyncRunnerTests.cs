@@ -659,6 +659,21 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task AutoRequest_AccountOptedInToWatchedTitles_RequestsTheWholeShowAsBefore()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        Plugin.Instance!.Configuration.SerializdAccounts[0].RequestWatchedTitles = true;
+        foreach (var season in new[] { 1, 2, 3 })
+            SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, season, 1);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":\"all\"", body);
+    }
+
+    [Fact]
     public async Task AutoRequest_UnwatchedShow_IsStillRequestedWhole()
     {
         // History for other shows, other accounts and show-level ratings must not hold back a
