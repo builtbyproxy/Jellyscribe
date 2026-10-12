@@ -139,4 +139,14 @@ public class SerializdSyncHistoryTests : IDisposable
         Assert.Equal(new[] { 4 }, watched[200]);
         Assert.Equal(new[] { 5, 6 }, watched[300].OrderBy(s => s));
     }
+
+    [Fact]
+    public void WatchedSeasonsByShow_MatchesTheAccountEmailWhateverItsCase()
+    {
+        SerializdSyncHistory.Record("user1", "TvFan@Example.com", 100, 1, 1);
+
+        var watched = SerializdSyncHistory.WatchedSeasonsByShow("user1", "tvfan@example.com");
+
+        Assert.Equal(new[] { 1 }, watched[100]);
+    }
 }

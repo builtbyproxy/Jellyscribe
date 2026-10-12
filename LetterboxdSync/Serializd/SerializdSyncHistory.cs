@@ -150,7 +150,8 @@ public static class SerializdSyncHistory
 
         // Account-scoped: user|email|show|season|episode[|kind]. Legacy: user|show|season|episode[|kind].
         int first;
-        if (string.Equals(parts[1], accountEmail, StringComparison.Ordinal) && parts.Length is 5 or 6)
+        // Case-insensitive: re-saving the account with different capitalisation must not hide its history.
+        if (string.Equals(parts[1], accountEmail, StringComparison.OrdinalIgnoreCase) && parts.Length is 5 or 6)
             first = 2;
         else if (parts.Length is 4 or 5 && int.TryParse(parts[1], out _))
             first = 1;

@@ -664,8 +664,9 @@ public static class SyncHistory
         {
             if (e.TmdbId != tmdbId) continue;
             if (!BelongsTo(e, username, userId)) continue;
-            if (string.Equals(e.Source, SyncEventSources.DiaryImport, StringComparison.Ordinal)) return true;
+            // Diary-import rows carry no account today, so they count for every account of the user.
             if (!MatchesAccount(e, account)) continue;
+            if (string.Equals(e.Source, SyncEventSources.DiaryImport, StringComparison.Ordinal)) return true;
             if (e.Status == SyncStatus.Success || e.Status == SyncStatus.Rewatch || IsSettledSkip(e)) return true;
         }
         return false;
