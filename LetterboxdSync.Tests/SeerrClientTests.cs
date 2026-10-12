@@ -42,6 +42,37 @@ public class SeerrClientTests
         Assert.True(posted, "request endpoint should have been called");
     }
 
+    // ----- TV season list (issue #165) -----
+
+    [Theory]
+    [InlineData("{\"seasons\":[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2}]}", "1,2")]
+    [InlineData("{\"seasons\":[]}", "")]
+    [InlineData("{\"seasons\":[{\"seasonNumber\":\"1\"},{\"seasonNumber\":3}]}", "3")]
+    public async Task GetSeriesSeasonNumbersAsync_ReadsRegularSeasons(string body, string expected)
+    {
+        var handler = new SeerrHandler(req => req.RequestUri!.AbsolutePath.EndsWith("/api/v1/tv/95396")
+            ? JsonResponse(body)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+
+        var seasons = await client.GetSeriesSeasonNumbersAsync(95396);
+
+        Assert.NotNull(seasons);
+        Assert.Equal(expected, string.Join(",", seasons!));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError, "{}")]
+    [InlineData(HttpStatusCode.OK, "{\"name\":\"Severance\"}")]
+    [InlineData(HttpStatusCode.OK, "not json")]
+    public async Task GetSeriesSeasonNumbersAsync_UnreadableAnswer_ReturnsNull(HttpStatusCode status, string body)
+    {
+        var handler = new SeerrHandler(_ => new HttpResponseMessage(status) { Content = new StringContent(body) });
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+
+        Assert.Null(await client.GetSeriesSeasonNumbersAsync(95396));
+    }
+
     // ----- Request creation: who Seerr treats as the requester -----
     // FakeSeerr below models Seerr's real rules (seerr-team/seerr, server/middleware/auth.ts and
     // server/entity/MediaRequest.ts): an API-key call acts as user 1 (the owner admin) unless

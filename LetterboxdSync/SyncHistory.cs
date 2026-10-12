@@ -644,6 +644,35 @@ public static class SyncHistory
     }
 
     /// <summary>
+    /// True if this user has watched the film as far as the history knows: a diary entry was
+    /// logged for this account (Success or Rewatch), Letterboxd's diary already had the viewing,
+    /// or the diary import marked it played. The watchlist auto-request reads this so a film that
+    /// was watched and then deleted from the library is not requested again (issue #165).
+    /// </summary>
+    public static bool HasWatched(string username, int tmdbId, string? account = null)
+    {
+        lock (_lock)
+        {
+            return HasWatched(EventsForFilm(tmdbId), username, tmdbId, account);
+        }
+    }
+
+    internal static bool HasWatched(IEnumerable<SyncEvent> events, string username, int tmdbId, string? account = null)
+    {
+        var userId = ResolveUserId(username);
+        foreach (var e in events)
+        {
+            if (e.TmdbId != tmdbId) continue;
+            if (!BelongsTo(e, username, userId)) continue;
+            // Diary-import rows carry no account today, so they count for every account of the user.
+            if (!MatchesAccount(e, account)) continue;
+            if (string.Equals(e.Source, SyncEventSources.DiaryImport, StringComparison.Ordinal)) return true;
+            if (e.Status == SyncStatus.Success || e.Status == SyncStatus.Rewatch || IsSettledSkip(e)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// True if DiaryImportTask has previously marked this user's Jellyfin copy of this
     /// film as played because the film was found on their Letterboxd diary. The runner
     /// uses this as a guard against the import-then-export loop described in

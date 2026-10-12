@@ -118,6 +118,54 @@ public static class SerializdSyncHistory
         }
     }
 
+    /// <summary>
+    /// For each show, the seasons with at least one episode this user and account has watched:
+    /// logged to Serializd (watched or dated log) or imported from the Serializd diary. Show-level
+    /// rating rows and specials (season 0) never count. The watchlist auto-request reads this so a
+    /// show that was watched and then deleted from the library is not requested again (issue #165).
+    /// Pre-account-scoping rows count for every account, as in <see cref="Has"/>.
+    /// </summary>
+    public static Dictionary<int, HashSet<int>> WatchedSeasonsByShow(string userJellyfinId, string accountEmail)
+    {
+        var result = new Dictionary<int, HashSet<int>>();
+        lock (_lock)
+        {
+            foreach (var key in Load())
+            {
+                if (!TryParseWatchedKey(key, userJellyfinId, accountEmail, out var show, out var season)) continue;
+                if (!result.TryGetValue(show, out var seasons))
+                    result[show] = seasons = new HashSet<int>();
+                seasons.Add(season);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool TryParseWatchedKey(string key, string userJellyfinId, string accountEmail, out int show, out int season)
+    {
+        show = season = 0;
+        var parts = key.Split('|');
+        if (parts.Length < 4 || !string.Equals(parts[0], userJellyfinId, StringComparison.Ordinal)) return false;
+
+        // Account-scoped: user|email|show|season|episode[|kind]. Legacy: user|show|season|episode[|kind].
+        int first;
+        // Case-insensitive: re-saving the account with different capitalisation must not hide its history.
+        if (string.Equals(parts[1], accountEmail, StringComparison.OrdinalIgnoreCase) && parts.Length is 5 or 6)
+            first = 2;
+        else if (parts.Length is 4 or 5 && int.TryParse(parts[1], out _))
+            first = 1;
+        else
+            return false;
+
+        var kind = parts.Length > first + 3 ? parts[first + 3] : KindWatched;
+        if (kind != KindWatched && kind != KindLog && kind != SerializdDiaryImportRunner.KindImported) return false;
+
+        return int.TryParse(parts[first], out show)
+            && int.TryParse(parts[first + 1], out season)
+            && season > 0;
+    }
+
     public static void Record(string userJellyfinId, string accountEmail, int showTmdbId, int seasonNumber, int episodeNumber, string kind = KindWatched)
     {
         lock (_lock)
