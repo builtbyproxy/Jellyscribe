@@ -1,7 +1,7 @@
 ## 1. Release notes across several version bumps
 
 - [ ] 1.1 Add `.github/scripts/release_notes.py`. It finds the version bump commits above the highest shipped version, fetches each PR's `## Release notes` (oldest first, with an injectable fetcher), falls back to the subject, cleans and caps the text, and prints a notice naming folded versions.
-- [ ] 1.2 Add `.github/scripts/test_release_notes.py` (unittest, throwaway git repos). Cover: one bump; two bumps in one push; a later non-bump commit at HEAD; a missing notes section; no PR number; the 4000-character cap; a shipped version stopping the walk; comment and tag stripping.
+- [ ] 1.2 Add `.github/scripts/test_release_notes.py` (unittest, throwaway git repos). Cover: one bump; two bumps in one push; a later non-bump commit at HEAD; a missing notes section; no PR number; the 4000-character cap; a shipped version stopping the walk; a version-line change that is not a rise; comment and tag stripping. Git calls pass their own identity and default branch.
 - [ ] 1.3 Replace the build job's inline notes logic in `release.yml` with the script, keeping repair mode's reuse of the existing release body.
 
 ## 2. Unshipped notes on the site
@@ -13,10 +13,10 @@
 ## 3. Push the manifest commit with a deploy key
 
 - [ ] 3.1 Confirm the ruleset API accepts a `DeployKey` bypass actor (dry check against the API docs and the live ruleset schema) before anything depends on it.
-- [ ] 3.2 Generate an ed25519 key pair. Add the public half as the repository's only write deploy key ("Release manifest push"), create the `release` environment limited to `main`, and store the private half as its `RELEASE_DEPLOY_KEY` secret. Delete the local private key.
-- [ ] 3.3 Prove the key can push. Push a throwaway branch over SSH with the key and delete it, all before deleting the local copy.
+- [ ] 3.2 Generate an ed25519 key pair. Add the public half as the repository's only write deploy key ("Release manifest push"), create the `release` environment limited to `main`, and store the private half as its `RELEASE_DEPLOY_KEY` secret.
+- [ ] 3.3 Prove the key can push: push a throwaway branch over SSH with the key, delete the branch, then delete the local private key.
 - [ ] 3.4 In `release.yml`'s publish job, add `environment: release` and check out `main` with `ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}`.
-- [ ] 3.5 Remove the `workflow_run` trigger and its comment from `deploy-docs.yml`, so the push of the manifest commit is the one site redeploy.
+- [ ] 3.5 Update `deploy-docs.yml`'s trigger comment: the manifest push now starts it too, and `workflow_run` stays so a fallback to `GITHUB_TOKEN` cannot leave the site stale.
 
 ## 4. Distinct required check names and the CI job
 
@@ -25,7 +25,12 @@
 
 ## 5. Docs
 
-- [ ] 5.1 Update `CLAUDE.md`'s Releasing section. Cover the enforced gates, the deploy key and `release` environment (only write deploy key, rotation steps), combined notes for several bumps in one push, unshipped notes folding on the site, and the deploy-docs trigger now coming from the push.
+- [ ] 5.1 Update `CLAUDE.md`'s Releasing section:
+   - step 3: the notes now come from `release_notes.py` and combine every unshipped bump;
+   - step 4: deploy-docs also fires on the manifest push, and why `workflow_run` stays;
+   - a new "Merge gates on main" subsection: the ruleset rules, required checks, bypass actors, the `release` environment and deploy key (only write deploy key, rotation, rollback);
+   - the `release-notes.ts` rule: an unshipped version's entry folds into the next release;
+   - a Past incidents entry for 2.12.4.
 - [ ] 5.2 Update the PR template's comment if it mentions the old single-version behaviour.
 
 ## 6. Roll out

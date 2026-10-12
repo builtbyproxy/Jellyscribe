@@ -42,9 +42,11 @@ A `DeployKey` bypass covers every deploy key on the repository, so the repositor
 Unlike `GITHUB_TOKEN`, a deploy-key push starts workflows:
 - **`release.yml`** runs again on the manifest commit. Its first step already sees the version listed in `manifest.json` and does nothing, and the `release` concurrency group queues it behind the run that pushed.
 - **`ci.yml`** runs on the push, which is harmless.
-- **`deploy-docs.yml`** would now deploy twice: once on the push (its `manifest.json` path filter) and once on `workflow_run`.
+- **`deploy-docs.yml`** now starts twice: once on the push (its `manifest.json` path filter) and once on `workflow_run`.
 
-So `workflow_run` is removed from `deploy-docs.yml`, along with its comment, and the push trigger alone redeploys the site after each release. If the deploy key were ever replaced by `GITHUB_TOKEN` again, the site would go stale. The runbook in `CLAUDE.md` names this coupling.
+`deploy-docs.yml` keeps both triggers, so a release now deploys the site twice. Its `pages` concurrency group already runs deploys one at a time without cancelling, so the second deploy only republishes the same build.
+
+Removing `workflow_run` was considered and rejected. The site would then redeploy only because the push token starts workflows, and falling back to `GITHUB_TOKEN` (the rollback path) would leave the site stale without any failure to notice.
 
 ### 3. The ruleset
 
@@ -68,18 +70,21 @@ Requiring an up-to-date branch matters for Version Gate: it compares the PR agai
 `.github/scripts/release_notes.py` replaces the inline shell and Python in the build job's "Extract release body" step. For a new release it:
 
 1. Reads the shipped versions from `manifest.json` on `origin/main` and takes the highest.
-2. Walks `git log -G'<AssemblyVersion>' -- Directory.Build.props` from `HEAD`, reading each commit's version, and keeps the commits whose version is higher than the highest shipped one. Stopping at the shipped version, rather than using `github.event.before`, also covers queued runs that collapsed. The release workflow may run on a later commit than the last bump.
+2. Walks `git log -G'<AssemblyVersion>' -- Directory.Build.props` from `HEAD`. For each commit it reads the `AssemblyVersion` at that commit and at its parent, and counts the commit as a bump only when the version strictly rose. It keeps the bumps whose version is higher than the highest shipped one. Stopping at the shipped version, rather than using `github.event.before`, also covers queued runs that collapsed. The release workflow may run on a later commit than the last bump.
 3. Fetches each of those PRs' `## Release notes` section (PR number from the squash subject, through `gh pr view`), oldest first. A bump commit without a PR number or without the section contributes its subject line, as today.
 4. Joins the sections with a blank line, then applies the existing cleaning (comments and tags stripped, stray `<` dropped, whitespace squeezed) and the 4000-character cap.
 5. Prints a `::notice::` naming every version folded into this release when there is more than one, replacing the misleading "re-run that run" warning.
 
-Repair mode keeps reading the existing release body. The script exposes its PR-body fetcher so tests can feed fixtures, and `.github/scripts/test_release_notes.py` (unittest, standard library only) builds throwaway git repositories to cover:
+Requiring an up-to-date branch (decision 3) does not make several bumps in one push impossible. GitHub merges a `gh stack` stack as one push, as it did on 2026-10-12, and stacked PRs are this repository's preferred workflow. Failing such a release was considered and rejected: it would break every stack with two shipping layers.
+
+Repair mode keeps reading the existing release body. The script exposes its PR-body fetcher so tests can feed fixtures. The cleaning, extraction and combining functions are pure and are tested without git. `.github/scripts/test_release_notes.py` (unittest, standard library only) builds throwaway git repositories in a `tempfile.TemporaryDirectory`, passing `-c user.name`, `-c user.email` and `-c init.defaultBranch=main` on every git call so the runner's git configuration cannot change the result. It covers:
 - one bump;
 - two bumps in one push;
 - a later non-bump commit at `HEAD`;
 - a missing notes section;
 - the cap;
-- that a shipped version stops the walk.
+- that a shipped version stops the walk;
+- a commit touching the version line without raising it, which is not a bump.
 
 The PR body stays untrusted input. The script only reads it, and it reaches the release through the same cleaning as today.
 
@@ -125,7 +130,7 @@ The manifest changelog for 2.13.0 stays as published, because only `release.yml`
 5. Repair the v2.13.0 release body.
 6. At the next release, confirm the publish job pushed the manifest commit over SSH and that `deploy-docs.yml` ran once, from that push. If the push fails, re-running the publish job repairs the release once the cause is fixed. The manifest entry is the only thing missing in that state.
 
-**Rollback:** set the ruleset back to its previous rules (deletion and non_fast_forward, Admin "always"). Removing the `ssh-key` input returns the publish job to `GITHUB_TOKEN`, and that needs `workflow_run` back on `deploy-docs.yml`.
+**Rollback:** set the ruleset back to its previous rules (deletion and non_fast_forward, Admin "always"). Removing the `ssh-key` input returns the publish job to `GITHUB_TOKEN`, and `deploy-docs.yml` keeps working through `workflow_run`.
 
 ## Open Questions
 
