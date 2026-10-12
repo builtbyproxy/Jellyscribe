@@ -175,77 +175,19 @@ jobs:
         run: |
           set -e
           mkdir -p dist
-          # Repair: the release may already carry the notes it shipped with.
+          # Repair: the release already carries the notes it shipped with.
           if [ "${{ steps.check.outputs.mode }}" = "repair" ] \
-             && gh release view "$TAG" --json body --jq .body > /tmp/raw-notes.txt 2>/dev/null \
-             && [ -s /tmp/raw-notes.txt ]; then
+             && gh release view "$TAG" --json body --jq .body > dist/release-body.txt 2>/dev/null \
+             && [ -s dist/release-body.txt ]; then
             echo "Using the existing release body for $TAG"
-            printf '%s' "$(git log -1 --format=%s HEAD)" > /tmp/subject.txt
           else
-            # The PR that bumped the version owns the notes. Normally that is
-            # this push's squash commit, but when queued runs collapse (a later
-            # push supersedes a pending one), HEAD can be a later, unrelated
-            # merge, so find the commit that last changed AssemblyVersion.
-            BUMP=$(git log -1 --format=%H -G'<AssemblyVersion>' HEAD -- Directory.Build.props)
-            SUBJECT=$(git log -1 --format=%s "${BUMP:-HEAD}")
-            printf '%s' "$SUBJECT" > /tmp/subject.txt
-            echo "Version bump commit: ${BUMP:-HEAD} ($SUBJECT)"
-            # GitHub keeps only one pending run per concurrency group, so if two
-            # version bumps queue behind a running release, the older one is
-            # cancelled. Say so loudly rather than let that version vanish.
-            if [ -n "$BUMP" ] && git cat-file -e "$BUMP^" 2>/dev/null; then
-              PREV=$(git show "$BUMP^:Directory.Build.props" | grep -oE '<AssemblyVersion>[^<]+' | head -1 | sed 's/<AssemblyVersion>//')
-              if [ -n "$PREV" ] && ! git show origin/main:manifest.json \
-                   | jq -e --arg v "$PREV" '.[0].versions | any(.version == $v)' > /dev/null; then
-                echo "::warning::The previous version $PREV is not in manifest.json either. Its release run was probably superseded; re-run that run from the Actions tab to ship it."
-              fi
-            fi
-            PR=$(printf '%s' "$SUBJECT" | grep -oE '\(#[0-9]+\)$' | tr -d '(#)' || true)
-            if [ -z "$PR" ]; then
-              echo "::warning::No PR number in the version bump commit subject; using the subject as changelog."
-              : > /tmp/raw-notes.txt
-            else
-              echo "Fetching PR body for PR #$PR"
-              gh pr view "$PR" --json body --jq .body > /tmp/pr-body.txt
-              python3 << 'PY'
-          import re
-          body = open('/tmp/pr-body.txt').read()
-          m = re.search(
-              r'^##\s+Release notes\s*$(.*?)(?=^##\s|\Z)',
-              body, re.MULTILINE | re.DOTALL)
-          open('/tmp/raw-notes.txt', 'w').write(m.group(1) if m else '')
-          PY
-            fi
+            # Every version bump above the newest shipped version contributes its
+            # PR's "## Release notes", oldest first. Usually that is one PR; a
+            # gh stack merge can bring several in one push, and only the newest
+            # version is released (see .github/scripts/release_notes.py).
+            git show origin/main:manifest.json > /tmp/manifest-main.json
+            python3 .github/scripts/release_notes.py /tmp/manifest-main.json dist/release-body.txt
           fi
-          # Clean and cap the notes before they reach manifest.json, the GitHub
-          # Release, and every user's plugin catalog. The PR body can be edited
-          # after review, so: plain text only (template comments and HTML tags
-          # stripped, even across lines, then any stray '<' dropped so nothing
-          # can open a tag) and a hard length cap.
-          python3 << 'PY'
-          import re, sys
-          MAX = 4000
-          notes = open('/tmp/raw-notes.txt').read()
-          notes = re.sub(r'<!--.*?(-->|\Z)', '', notes, flags=re.DOTALL)
-          notes = re.sub(r'</?[A-Za-z!][^>]*>', '', notes)
-          notes = notes.replace('<', '')
-          notes = re.sub(r'[ \t]{2,}', ' ', notes)
-          notes = re.sub(r'\n{3,}', '\n\n', notes).strip()
-          if not notes:
-              subj = open('/tmp/subject.txt').read().split('\n', 1)[0]
-              notes = re.sub(r' \(#\d+\)$', '', subj).strip()
-              sys.stderr.write(
-                  "::warning::No '## Release notes' text found; falling back to "
-                  "the PR title. Add the section to keep the manifest changelog "
-                  "consistent with the older releases.\n")
-          if len(notes) > MAX:
-              cut = notes.rfind(' ', 0, MAX - 3)
-              notes = notes[:cut if cut > 0 else MAX - 3].rstrip() + '...'
-              sys.stderr.write(
-                  f"::warning::Release notes were longer than {MAX} characters "
-                  "and have been truncated.\n")
-          open('dist/release-body.txt', 'w').write(notes + '\n')
-          PY
           echo "--- release body preview ---"
           head -c 800 dist/release-body.txt
           echo

@@ -1,14 +1,14 @@
 ## 1. Release notes across several version bumps
 
-- [ ] 1.1 Add `.github/scripts/release_notes.py`. It finds the version bump commits above the highest shipped version, fetches each PR's `## Release notes` (oldest first, with an injectable fetcher), falls back to the subject, cleans and caps the text, and prints a notice naming folded versions.
-- [ ] 1.2 Add `.github/scripts/test_release_notes.py` (unittest, throwaway git repos). Cover: one bump; two bumps in one push; a later non-bump commit at HEAD; a missing notes section; no PR number; the 4000-character cap; a shipped version stopping the walk; a version-line change that is not a rise; comment and tag stripping. Git calls pass their own identity and default branch.
-- [ ] 1.3 Replace the build job's inline notes logic in `release.yml` with the script, keeping repair mode's reuse of the existing release body.
+- [x] 1.1 Add `.github/scripts/release_notes.py`. It finds the version bump commits above the highest shipped version, fetches each PR's `## Release notes` (oldest first, with an injectable fetcher), falls back to the subject, cleans and caps the text, and prints a notice naming folded versions.
+- [x] 1.2 Add `.github/scripts/test_release_notes.py` (unittest, throwaway git repos). Cover: one bump; two bumps in one push; a later non-bump commit at HEAD; a missing notes section; no PR number; the 4000-character cap; a shipped version stopping the walk; a version-line change that is not a rise; comment and tag stripping. Git calls pass their own identity and default branch.
+- [x] 1.3 Replace the build job's inline notes logic in `release.yml` with the script, keeping repair mode's reuse of the existing release body.
 
 ## 2. Unshipped notes on the site
 
-- [ ] 2.1 Add `site/src/lib/fold-notes.ts` (pure) and use it in `site/src/lib/releases.ts` in place of `notesByVersion[v]`.
-- [ ] 2.2 Add `site/test/fold-notes.test.mjs` (Node test runner). Cover: folding into a shipped version, a shipped version without its own entry, an entry newer than every shipped version, and several unshipped entries in order.
-- [ ] 2.3 Build the site and check the v2.13.0 entry on the Releases page shows the folded 2.12.4 notes. Take before and after screenshots.
+- [x] 2.1 Add `site/src/lib/fold-notes.ts` (pure) and use it in `site/src/lib/releases.ts` in place of `notesByVersion[v]`.
+- [x] 2.2 Add `site/test/fold-notes.test.mjs` (Node test runner). Cover: folding into a shipped version, a shipped version without its own entry, an entry newer than every shipped version, and several unshipped entries in order.
+- [x] 2.3 Build the site and check the v2.13.0 entry on the Releases page shows the folded 2.12.4 notes. Take before and after screenshots.
 
 ## 3. Push the manifest commit with a deploy key
 
