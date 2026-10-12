@@ -241,6 +241,47 @@ public class SeerrClient : IDisposable
     }
 
     /// <summary>
+    /// The regular season numbers (specials excluded) Seerr knows for a TV show, from the same
+    /// <c>/api/v1/tv/{id}</c> lookup as the title. Null when the lookup fails or carries no
+    /// season list, so the caller can tell "no seasons" from "could not find out".
+    /// </summary>
+    public async Task<List<int>?> GetSeriesSeasonNumbersAsync(int tmdbId)
+    {
+        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
+        try
+        {
+            using var response = await GetAsync(url).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogDebug("Seerr TV season lookup non-success for TMDb {TmdbId}: {Status}",
+                    tmdbId, (int)response.StatusCode);
+                return null;
+            }
+
+            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("seasons", out var seasons) || seasons.ValueKind != JsonValueKind.Array)
+                return null;
+
+            var numbers = new List<int>();
+            foreach (var s in seasons.EnumerateArray())
+            {
+                if (s.TryGetProperty("seasonNumber", out var sn) && sn.ValueKind == JsonValueKind.Number
+                    && sn.TryGetInt32(out var n) && n > 0)
+                    numbers.Add(n);
+            }
+
+            return numbers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Seerr TV season lookup errored for TMDb {TmdbId}: {Message}",
+                tmdbId, ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Outcome of a request attempt. <see cref="AlreadyExists"/> means Seerr already
     /// had the title in some non-UNKNOWN state (pending, processing, available, blocklisted)
     /// and we did NOT POST a new request; it should not be counted as a fresh request.

@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.12.4',
+    headline: 'Shows and films you have already watched are not requested again',
+    summary:
+      'With Seerr auto-request on, a watchlisted title that a cleanup tool deleted after you watched it no longer comes back. Before, Jellyscribe saw it missing from the library and filed a new Seerr request under your name, so a show you had finished could download again every time it was cleared out. Now anything Jellyscribe has logged for you is left alone. For TV this works season by season: seasons you have watched are skipped, and a season you have not started, such as a new one, is still requested. Films and shows you have never watched are requested exactly as before.',
+    highlights: {
+      fixes: [
+        'A watchlisted show or film you already watched is not requested again through Seerr after a cleanup tool deletes it.',
+        'For TV, only the seasons you have never watched are requested, so a new season of a show you finished still arrives.',
+      ],
+    },
+  },
+  {
     version: '2.12.3',
     headline: 'Editing an account keeps every setting it already has',
     summary:
