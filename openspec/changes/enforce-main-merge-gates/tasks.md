@@ -35,7 +35,7 @@
 
 ## 6. Roll out
 
-- [ ] 6.1 Open the PR (non-shipping: no version bump or release notes) and get CI green.
+- [x] 6.1 Open the PR (non-shipping: no version bump or release notes) and get CI green. (2026-10-12: #169, all checks green.)
 - [ ] 6.2 After it merges, update ruleset 24695636. Add `pull_request` (squash only, no approvals) and `required_status_checks` (strict; `build-and-test`, `Version Gate`, `PR Title`, `Release scripts`, all from integration 15368). Set the bypass actors to `DeployKey` always and Admin `pull_request`.
 - [ ] 6.3 Verify. A direct push to `main` from the maintainer's account is refused, and a PR shows the four required checks.
 - [ ] 6.4 Rewrite the v2.13.0 GitHub release body to carry the 2.12.4 notes followed by the 2.13.0 notes.
