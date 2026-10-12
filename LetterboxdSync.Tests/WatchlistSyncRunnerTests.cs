@@ -766,16 +766,20 @@ public class WatchlistSyncRunnerTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task TryRunForUserAsync_AutoRequest_SkipsFilmsAlreadyWatched(bool backfill)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task TryRunForUserAsync_AutoRequest_SkipsFilmsAlreadyWatched(bool backfill, bool requestWatched)
     {
         // Issue #165: a watched film that a cleanup tool deleted is still on the watchlist and
         // missing from the library. It must not be requested again; an unwatched one still is.
+        // An account that opts in to re-requesting watched titles gets every one requested.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId, autoRequest: true);
         Plugin.Instance!.Configuration.Accounts[0].BackfillAvailableRequests = backfill;
+        Plugin.Instance!.Configuration.Accounts[0].RequestWatchedTitles = requestWatched;
 
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
         Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
@@ -834,8 +838,15 @@ public class WatchlistSyncRunnerTests : IDisposable
         {
             await _runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None);
 
-            var body = Assert.Single(posted);
-            Assert.Contains($"\"mediaId\":{unwatchedFilm}", body);
+            if (requestWatched)
+            {
+                Assert.Equal(3, posted.Count);
+            }
+            else
+            {
+                var body = Assert.Single(posted);
+                Assert.Contains($"\"mediaId\":{unwatchedFilm}", body);
+            }
         }
         finally
         {

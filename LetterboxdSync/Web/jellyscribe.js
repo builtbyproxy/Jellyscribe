@@ -504,7 +504,7 @@
                     userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
                     enabled: g('chkEnabled').checked, fav: g('chkFav').checked, ratings: g('chkRatings') ? g('chkRatings').checked : true, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
                     primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,
-                    backfill: g('chkBackfill').checked, mirror: g('chkMirror').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked,
+                    backfill: g('chkBackfill').checked, rereq: g('chkRerequest').checked, mirror: g('chkMirror').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked,
                     libs: Array.prototype.map.call(root.querySelectorAll('#mLibs .mLibChk:checked'), function (x) { return x.getAttribute('data-id'); }) };
             },
             // The checks both pages make before saving an account; false when the form was refused.

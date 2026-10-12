@@ -307,7 +307,8 @@ public class SerializdWatchlistSyncRunner
                 }
             }
 
-            requests = await DropWatchedSeasonsAsync(seerr, user, account, requests).ConfigureAwait(false);
+            if (!account.RequestWatchedTitles)
+                requests = await DropWatchedSeasonsAsync(seerr, user, account, requests).ConfigureAwait(false);
 
             int requested = 0, existing = 0, failed = 0;
             foreach (var (tmdb, seasons) in requests)
