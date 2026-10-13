@@ -68,6 +68,50 @@ public class AuthTests
     }
 
     [Fact]
+    public async Task AuthenticateAsync_SignInPageWithoutCsrfField_PostsTheCookieToken()
+    {
+        // Issue #140: the sign-in form no longer carries __csrf; the token is only in the cookie.
+        string? postedBody = null;
+
+        var handler = new AuthMockHandler((request, http) =>
+        {
+            var path = request.RequestUri?.PathAndQuery ?? "";
+
+            if (request.Method == HttpMethod.Get && path.StartsWith("/sign-in"))
+            {
+                http.CookieContainer.Add(BaseUri, new Cookie("com.xk72.webparts.csrf", "cookie-csrf"));
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("<form action=\"/user/login.do\"><input type=\"hidden\" name=\"authenticationCode\" value=\"\" /></form>")
+                };
+            }
+
+            if (request.Method == HttpMethod.Post && path.Contains("login.do"))
+            {
+                postedBody = request.Content?.ReadAsStringAsync().Result;
+                http.CookieContainer.Add(BaseUri, new Cookie("letterboxd.user.CURRENT", "new-session"));
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"result\":\"success\"}")
+                };
+            }
+
+            if (request.Method == HttpMethod.Get && path == "/")
+                return new HttpResponseMessage(HttpStatusCode.OK);
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var (http, auth) = handler.CreateClients(TestLogger);
+        using var _ = http;
+
+        await auth.AuthenticateAsync("testuser", "testpass");
+
+        Assert.NotNull(postedBody);
+        Assert.Contains("__csrf=cookie-csrf", postedBody);
+    }
+
+    [Fact]
     public async Task AuthenticateAsync_ExistingSession_ReusesWithoutLogin()
     {
         int loginCount = 0;
