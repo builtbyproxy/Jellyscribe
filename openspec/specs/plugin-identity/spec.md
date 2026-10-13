@@ -15,15 +15,15 @@ normal update rather than requiring reinstall.
   name, old assembly name) polls its configured repository URL after the
   rebrand release ships
 - **THEN** it resolves the plugin by GUID, sees a newer version available, and
-  updates in place — the user sees the plugin's display name change to
+  updates in place: the user sees the plugin's display name change to
   "Jellyscribe" in their Dashboard, with no reinstall and no reconfiguration
 
 #### Scenario: Repository URL is untouched by the rename
 - **WHEN** any part of this change (repo rename, domain change, site rebuild,
   display name change) ships
 - **THEN** `https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json`
-  — the URL users already have entered under Dashboard > Plugins >
-  Repositories — continues to serve the same manifest schema at the same
+  (the URL users already have entered under Dashboard > Plugins >
+  Repositories) continues to serve the same manifest schema at the same
   address; nothing in this change edits or replaces it
 
 ### Requirement: Rebrand carries no functional or data changes
