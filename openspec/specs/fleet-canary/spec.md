@@ -1,7 +1,7 @@
 # fleet-canary Specification
 
 ## Purpose
-TBD - created by archiving change add-opt-in-telemetry. Update Purpose after archive.
+The daily check that compares error rates between plugin versions across the opted-in fleet and files an issue when a release regresses; shipped with telemetry in 1.16.0 (#62).
 ## Requirements
 ### Requirement: Daily deterministic regression check
 

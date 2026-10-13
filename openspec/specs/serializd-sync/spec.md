@@ -1,7 +1,7 @@
 # serializd-sync Specification
 
 ## Purpose
-TBD - created by archiving change add-serializd-tv-sync. Update Purpose after archive.
+Linking a Serializd account and logging TV episodes there, in real time on playback and in a scheduled catch-up, with Serializd failures kept away from Letterboxd syncing; shipped in 2.0.0 (#94).
 ## Requirements
 ### Requirement: Serializd account linking
 Each Jellyfin user SHALL be able to link one or more Serializd accounts, each

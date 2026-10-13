@@ -1,7 +1,7 @@
 # telemetry-collection Specification
 
 ## Purpose
-TBD - created by archiving change add-opt-in-telemetry. Update Purpose after archive.
+The plugin side of opt-in telemetry: off by default, a one-time prompt, an anonymous minimal weekly payload with a regenerable instance id, and persisted counters; shipped in 1.16.0 (#62).
 ## Requirements
 ### Requirement: Telemetry is opt-in and off by default
 
