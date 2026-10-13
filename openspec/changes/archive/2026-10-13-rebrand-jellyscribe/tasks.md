@@ -2,9 +2,8 @@ Was blocked on `add-serializd-tv-sync` shipping to `main` first; the
 maintainer chose to bundle both into `feat/serializd-tv-scrobble` instead
 (2026-07-15) rather than wait. That branch has since merged to `main`
 (PR #94, `2.0.0.0`, followed by the `2.1.0.0` follow-up release).
-Sections 0-6 are all done as of 2026-07-16 except 4.3 (private agent-infra
-docs, separate repo/session) and 6.4 (too recent to confirm, re-check in a
-few days).
+Sections 0-6 are all done as of 2026-07-16; 4.3 was finished on 2026-10-13
+and the change archived then.
 
 ## 0. Verify before committing to anything
 
@@ -59,9 +58,10 @@ few days).
       `TransferBento.astro`, `DashboardPeek.astro` deleted (superseded by
       the new aligned-grid `flow-row`/`travel-row`/`infra-card` sections
       built directly into `index.astro`).
-- [ ] 2.3 Test: no automated visual regression harness for `site/`; verified
+- [x] 2.3 Test: no automated visual regression harness for `site/`; verified
       manually via the `/browse` skill at 1440px and 390px instead (no
-      console errors, no layout breaks).
+      console errors, no layout breaks). Ticked at archive (2026-10-13): the
+      manual check is the verification; no harness was planned.
 
 ## 3. Plugin identity
 
@@ -106,9 +106,9 @@ few days).
       references updated, both now note the namespace/project-folder stay
       `LetterboxdSync` while `AssemblyName` and user-visible surfaces say
       Jellyscribe. `deploy.sh` dll reference in CLAUDE.md fixed too.
-- [ ] 4.3 Update mental-model references to the old product name in the
-      private agent-infra docs. Not done in this session, separate repo,
-      separate session.
+- [x] 4.3 Update mental-model references to the old product name in the
+      private agent-infra docs. Done 2026-10-13 in that repo: docs, skills and
+      scripts now name Jellyscribe and point at the renamed checkout and repo.
 
 ## 5. Infra
 

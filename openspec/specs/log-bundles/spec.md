@@ -1,7 +1,7 @@
 # log-bundles Specification
 
 ## Purpose
-TBD - created by archiving change add-send-logs. Update Purpose after archive.
+Sending a log bundle to the developer only after the admin's explicit consent, independent of telemetry, with a quotable reference code and bounded private retention; shipped in 1.17.0 (#73).
 ## Requirements
 ### Requirement: Explicit, disclosed consent before sending
 

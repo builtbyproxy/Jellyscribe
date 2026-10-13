@@ -1,7 +1,7 @@
 # watchlist-request-activity Specification
 
 ## Purpose
-TBD - created by archiving change surface-seerr-request-activity. Update Purpose after archive.
+Recording each Seerr auto-request from the watchlist sync, successful or failed, as activity the dashboards show, while requests that already existed stay silent; shipped in 2.1.1 (#98).
 ## Requirements
 ### Requirement: Successful Seerr auto-request recorded as activity
 The plugin SHALL record a `SyncEvent` with `Status = SyncStatus.Requested`

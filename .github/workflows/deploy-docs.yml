@@ -10,8 +10,9 @@ on:
   workflow_dispatch:
   # Auto-deploy after every successful Release. The Release workflow's
   # manifest commit is pushed with the release deploy key, which starts the
-  # push trigger above too, so a release deploys twice; the pages group below
-  # runs them one after the other and the second republishes the same build.
+  # push trigger above and a second (skipping) Release run, so a release
+  # triggers three deploys. The pages group below runs one at a time and
+  # cancels a queued run that a newer one replaces, so the site ends current.
   # This trigger stays because a GITHUB_TOKEN push (the rollback for the deploy
   # key) starts no workflows, and without it the site would go stale on every
   # release, as it did after v1.12.0 and v1.13.0.

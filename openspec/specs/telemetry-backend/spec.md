@@ -1,7 +1,7 @@
 # telemetry-backend Specification
 
 ## Purpose
-TBD - created by archiving change add-opt-in-telemetry. Update Purpose after archive.
+How the private ingest Worker stores and validates opt-in telemetry pings (one table, server-computed week, capped input, no client database access) and fails loudly; shipped with telemetry in 1.16.0 (#62).
 ## Requirements
 ### Requirement: Single-table storage with server-computed week
 
