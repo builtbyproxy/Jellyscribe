@@ -9,11 +9,12 @@ on:
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
   # Auto-deploy after every successful Release. The Release workflow's
-  # manifest auto-commit is authenticated with GITHUB_TOKEN, which
-  # deliberately does NOT trigger other workflows (anti-loop safety). Without
-  # this trigger the site would stay stale on every plugin release. See the
-  # post-v1.12.0 / v1.13.0 incident: the site was missing two releases until
-  # this was added.
+  # manifest commit is pushed with the release deploy key, which starts the
+  # push trigger above too, so a release deploys twice; the pages group below
+  # runs them one after the other and the second republishes the same build.
+  # This trigger stays because a GITHUB_TOKEN push (the rollback for the deploy
+  # key) starts no workflows, and without it the site would go stale on every
+  # release, as it did after v1.12.0 and v1.13.0.
   workflow_run:
     workflows: [Release]
     types: [completed]

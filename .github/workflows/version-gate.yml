@@ -26,6 +26,8 @@ on:
 
 jobs:
   check:
+    # The check name the main ruleset requires; keep it unique across workflows.
+    name: Version Gate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR

@@ -1,5 +1,6 @@
 import manifest from '../../../manifest.json';
-import { notesByVersion, type ReleaseNotes } from '../data/release-notes';
+import { releaseNotes, type ReleaseNotes } from '../data/release-notes';
+import { compareVersions, foldNotes } from './fold-notes';
 
 export type Release = {
   version: string;
@@ -25,12 +26,13 @@ type ManifestEntry = {
 
 const manifestEntries = manifest[0].versions as ManifestEntry[];
 
-const repoUrl = 'https://github.com/builtbyproxy/Jellyscribe';
+// Notes for a version that never shipped appear with the next one that did.
+const notesByShippedVersion = foldNotes(
+  releaseNotes,
+  manifestEntries.map((e) => shortVersion(e.version)),
+);
 
-function semverKey(v: string): number {
-  const [maj, min, patch] = v.split('.').map((n) => parseInt(n, 10) || 0);
-  return maj * 1_000_000 + min * 1_000 + patch;
-}
+const repoUrl = 'https://github.com/builtbyproxy/Jellyscribe';
 
 function shortVersion(manifestVersion: string): string {
   return manifestVersion.replace(/\.0$/, '');
@@ -54,9 +56,9 @@ export const releases: Release[] = manifestEntries
       githubReleaseUrl: `${repoUrl}/releases/tag/v${v}`,
       tag: `v${v}`,
       anchor: `v${v.replace(/\./g, '-')}`,
-      notes: notesByVersion[v],
+      notes: notesByShippedVersion[v],
     };
   })
-  .sort((a, b) => semverKey(b.version) - semverKey(a.version));
+  .sort((a, b) => compareVersions(b.version, a.version));
 
 export const latestRelease = releases[0];
