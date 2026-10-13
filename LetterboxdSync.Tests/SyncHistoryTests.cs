@@ -158,4 +158,43 @@ public class SyncHistoryTests : IDisposable
             Assert.Equal(events[i].FilmTitle, deserialized!.FilmTitle);
         }
     }
+
+    // ----- HasWatched (issue #165: watched films are not auto-requested again) -----
+
+    private static SyncEvent Evt(SyncStatus status, string? account = "lb-a", string? error = null, string? source = null)
+        => new() { FilmTitle = "Sinners", TmdbId = 1233413, Username = "lachlan", Account = account, Timestamp = DateTime.UtcNow, Status = status, Error = error, Source = source };
+
+    [Theory]
+    [InlineData(SyncStatus.Success, null)]
+    [InlineData(SyncStatus.Rewatch, null)]
+    [InlineData(SyncStatus.Skipped, SyncHistory.AlreadyOnDiaryError)]
+    [InlineData(SyncStatus.Skipped, SyncHistory.BackstopErrorPrefix + "2026-01-01")]
+    public void HasWatched_TrueForAViewingThisAccountLogged(SyncStatus status, string? error)
+    {
+        Assert.True(SyncHistory.HasWatched(new[] { Evt(status, error: error) }, "lachlan", 1233413, "lb-a"));
+    }
+
+    [Fact]
+    public void HasWatched_FalseForOtherAccountsFailuresRatingsAndRequests()
+    {
+        var events = new[]
+        {
+            Evt(SyncStatus.Success, account: "lb-b"),
+            Evt(SyncStatus.Failed),
+            Evt(SyncStatus.Rated),
+            Evt(SyncStatus.Requested),
+            Evt(SyncStatus.Skipped, error: "No TMDb id"),
+        };
+
+        Assert.False(SyncHistory.HasWatched(events, "lachlan", 1233413, "lb-a"));
+    }
+
+    [Fact]
+    public void HasWatched_DiaryImportWithoutAnAccountCountsForEveryAccount()
+    {
+        var events = new[] { Evt(SyncStatus.Skipped, account: null, source: SyncEventSources.DiaryImport) };
+
+        Assert.True(SyncHistory.HasWatched(events, "lachlan", 1233413, "lb-a"));
+        Assert.False(SyncHistory.HasWatched(events, "someone-else", 1233413, "lb-a"));
+    }
 }

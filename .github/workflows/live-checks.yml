@@ -1,0 +1,66 @@
+name: Live checks (weekly)
+
+# Runs the live Letterboxd suite against main every Monday at 06:00 UTC (and on
+# demand), so a Letterboxd change that breaks the official API path or the
+# website-login fallback shows up within a week even when nothing is merged.
+# On failure it opens one issue labelled live-check-failure, or comments on the
+# one already open, with a link to the run. Close the issue once fixed.
+#
+# The website-login (scraping) tests need the LETTERBOXD_TEST_RAW_COOKIES
+# secret. Without it they skip, the run still passes, and the run summary says
+# the scraping path was not covered. Refresh steps: CLAUDE.md, Build & Test.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+# Same queue as integration.yml: every run writes to the same test account.
+concurrency:
+  group: letterboxd-test-account
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  live:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/live-tests.yml
+    secrets:
+      LETTERBOXD_TEST_USERNAME: ${{ secrets.LETTERBOXD_TEST_USERNAME }}
+      LETTERBOXD_TEST_PASSWORD: ${{ secrets.LETTERBOXD_TEST_PASSWORD }}
+      LETTERBOXD_TEST_RAW_COOKIES: ${{ secrets.LETTERBOXD_TEST_RAW_COOKIES }}
+      LETTERBOXD_TEST_USER_AGENT: ${{ secrets.LETTERBOXD_TEST_USER_AGENT }}
+
+  report-failure:
+    needs: live
+    if: failure()
+    runs-on: ubuntu-latest
+    # The only job with a write token, and it checks out and runs no repository code.
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      SHA: ${{ github.sha }}
+      REF: ${{ github.ref_name }}
+    steps:
+      - name: Open or update the live-check issue
+        run: |
+          set -e
+          LABEL=live-check-failure
+          gh label create "$LABEL" --color B60205 \
+            --description "The weekly live Letterboxd check failed" 2>/dev/null || true
+          BODY="The live Letterboxd check failed on ${REF} at ${SHA}.
+
+          Run: ${RUN_URL}
+
+          Likely causes: Letterboxd changed its API or website markup; the test account's credentials stopped working; the bundled Letterboxd API key was revoked (see the runbook in SECURITY.md); a transient Letterboxd or Cloudflare outage (re-run the workflow to check). Close this issue once the check passes again."
+          EXISTING=$(gh issue list --label "$LABEL" --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+            echo "Commented on #$EXISTING"
+          else
+            gh issue create --title "Weekly live Letterboxd check failed" --label "$LABEL" --body "$BODY"
+          fi

@@ -3,9 +3,9 @@ import Layout from '../layouts/Layout.astro';
 import Icon from '../components/Icon.astro';
 import { latestRelease } from '../lib/releases';
 
-const repoUrl = 'https://github.com/builtbyproxy/jellyfin-plugin-letterboxd';
+const repoUrl = 'https://github.com/builtbyproxy/Jellyscribe';
 const manifestUrl = 'https://lbsync-telemetry.lachlanbyoung.workers.dev/manifest.json';
-const fileTransformationManifestUrl = 'https://www.iamparadox.dev/jellyfin/plugins/manifest.json';
+const rawManifestUrl = 'https://raw.githubusercontent.com/builtbyproxy/Jellyscribe/main/manifest.json';
 const fileTransformationRepoUrl = 'https://github.com/IAmParadox27/jellyfin-plugin-file-transformation';
 const releasesUrl = `${repoUrl}/releases`;
 const latestReleaseUrl = `${repoUrl}/releases/latest`;
@@ -25,11 +25,11 @@ const travelRows = [
   { icon: 'heart', title: 'Favorites → likes', aside: 'zero clicks', stars: false, body: "Heart it in Jellyfin. It's liked over there by the next sync, no extra step." },
   { icon: 'pencil', title: 'Written reviews', aside: '', stars: false, stamp: true, body: 'Compose from the Jellyfin dashboard with rating, spoiler tag, rewatch flag, even a specific episode, and it posts exactly as written.' },
   { icon: 'import', title: 'Watched status, too', aside: '', stars: false, body: "Already marked something watched on Letterboxd or Serializd? Jellyfin picks that up too, no need to log it twice." },
-  { icon: 'list', title: 'Watchlist, mirrored', aside: '', stars: false, body: 'Your watchlist becomes a Jellyfin collection and playlist on its own, and mirrors into your Jellyseerr watchlist too. Anything missing gets requested through Jellyseerr, attributed to you.' },
+  { icon: 'list', title: 'Watchlist, mirrored', aside: '', stars: false, body: "Your watchlist becomes a Jellyfin playlist (shows from Serializd get a collection too), and can be mirrored one way into your Seerr watchlist. Anything missing gets requested through Seerr, attributed to you." },
 ];
 
 const infraCards = [
-  { title: 'Multi-user, multi-account', body: "Every Jellyfin user links their own Letterboxd and Serializd logins from the sidebar, no admin access needed. A shared profile just means more than one diary gets the same entry." },
+  { title: 'Multi-user, multi-account', body: "Every Jellyfin user links their own Letterboxd and Serializd logins from their own Jellyscribe page, no admin access needed. A shared profile just means more than one diary gets the same entry." },
   { title: 'Retries with judgment', body: 'Already-synced titles never re-hit the API. Failures retry first when limits ease; three strikes and an item waits for the next run instead of hammering forever.' },
   { title: 'Self-healing auth', body: 'A stale login re-authenticates and retries on its own, on either service. No manual re-login, ever.' },
   { title: 'TV sync just works', body: "Letterboxd sometimes needs a cookie pasted in to get past a login wall. Serializd never does, so TV sync has nothing to babysit." },
@@ -45,7 +45,7 @@ const infraCards = [
     name: 'Jellyscribe',
     description: 'Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep, Letterboxd for film, Serializd for TV.',
     applicationCategory: 'MultimediaApplication',
-    operatingSystem: 'Jellyfin 10.11+',
+    operatingSystem: 'Jellyfin 10.11.9 or newer, including Jellyfin 12',
     url: 'https://jellyscribe.dev/',
     downloadUrl: releasesUrl,
     softwareVersion: latestRelease.version,
@@ -201,7 +201,7 @@ const infraCards = [
             <div class="head-copy">
               <div class="feat-eyebrow">What moves with it</div>
               <h3>Not just the watch. The whole entry.</h3>
-              <p>Rating, like, review, watchlist, all of it travels both directions, automatically.</p>
+              <p>Ratings and watched status flow both ways. Likes, reviews, and your watchlist come along too, automatically.</p>
             </div>
           </div>
 
@@ -266,15 +266,6 @@ const infraCards = [
           <h3>Plugin repository</h3>
           <ol class="steps">
             <li>Open <strong>Dashboard &rarr; Plugins &rarr; Repositories</strong> in Jellyfin.</li>
-            <li>Add the <strong>File Transformation</strong> repository (needed for the sidebar link to appear):
-              <div class="install-pill install-pill-inline" data-pill>
-                <code class="install-pill-url">{fileTransformationManifestUrl}</code>
-                <button class="install-pill-btn" type="button" data-copy={fileTransformationManifestUrl} aria-label="Copy File Transformation manifest URL">
-                  <span class="copy-icon" aria-hidden="true">⧉</span>
-                  <span class="copy-text">Copy</span>
-                </button>
-              </div>
-            </li>
             <li>Add the <strong>Jellyscribe</strong> repository:
               <div class="install-pill install-pill-inline" data-pill>
                 <code class="install-pill-url">{manifestUrl}</code>
@@ -284,17 +275,27 @@ const infraCards = [
                 </button>
               </div>
             </li>
-            <li>Open the <strong>Catalog</strong>, install <strong>File Transformation</strong>, then install <strong>Jellyscribe</strong>.</li>
-            <li>Restart Jellyfin, then hard-refresh the web UI (Ctrl/Cmd + Shift + R) so the sidebar link loads.</li>
+            <li>Open the <strong>Catalog</strong> and install <strong>Jellyscribe</strong>. No other plugin is needed.</li>
+            <li>Restart Jellyfin, then hard-refresh the web UI (Ctrl/Cmd + Shift + R) so the Jellyscribe link appears in the sidebar (Jellyfin 10.11) or the profile menu (Jellyfin 12).</li>
           </ol>
+          <div class="install-note">
+            <p>This URL is a mirror of the GitHub manifest that keeps an anonymous count of installs. Prefer the manifest not to be counted? Add the GitHub one instead, it serves the identical catalog:</p>
+            <div class="install-pill install-pill-inline" data-pill>
+              <code class="install-pill-url">{rawManifestUrl}</code>
+              <button class="install-pill-btn" type="button" data-copy={rawManifestUrl} aria-label="Copy GitHub manifest URL">
+                <span class="copy-icon" aria-hidden="true">⧉</span>
+                <span class="copy-text">Copy</span>
+              </button>
+            </div>
+            <p>Plugin downloads still go through the mirror and are counted either way; a manual install from GitHub Releases avoids both.</p>
+          </div>
         </div>
 
         <div class="install-card">
           <h3>Manual install</h3>
           <ol class="steps">
-            <li>Install the <a href={fileTransformationRepoUrl} rel="noopener">File Transformation plugin</a> first, required for the Letterboxd sidebar link.</li>
             <li>Download the latest Jellyscribe ZIP from <a href={latestReleaseUrl} rel="noopener">Releases</a>.</li>
-            <li>Extract <code>Jellyscribe.dll</code> and <code>HtmlAgilityPack.dll</code> into your Jellyfin plugins directory.</li>
+            <li>Extract <code>Jellyscribe.dll</code> and <code>HtmlAgilityPack.dll</code> into your Jellyfin plugins directory (<code>config/plugins/</code> on Jellyfin 12).</li>
             <li>Restart Jellyfin.</li>
           </ol>
           <a class="text-link" href={releasesUrl} rel="noopener">Browse all releases &rarr;</a>
@@ -302,9 +303,9 @@ const infraCards = [
       </div>
 
       <div class="reqs">
-        <div class="req"><span class="req-label">Jellyfin</span><span class="req-value">10.11 or newer</span></div>
+        <div class="req"><span class="req-label">Jellyfin</span><span class="req-value">10.11.9 or newer, including 12.x</span></div>
         <div class="req"><span class="req-label">Requires</span><span class="req-value">A Letterboxd and/or Serializd account</span></div>
-        <div class="req"><span class="req-label">For sidebar link</span><span class="req-value"><a href={fileTransformationRepoUrl} rel="noopener">File Transformation plugin</a></span></div>
+        <div class="req"><span class="req-label">Other plugins</span><span class="req-value">None. <a href={fileTransformationRepoUrl} rel="noopener">File Transformation</a> is optional, used if you already run it</span></div>
         <div class="req"><span class="req-label">License</span><span class="req-value">MIT</span></div>
       </div>
     </div>
@@ -314,36 +315,36 @@ const infraCards = [
     <div class="container">
       <div class="section-head">
         <h2>Setup in under a minute</h2>
-        <p>Once the plugin is installed, each user links their own Letterboxd account, Serializd account, or both, from the Jellyfin dashboard.</p>
+        <p>Once the plugin is installed, each user links their own Letterboxd account, Serializd account, or both, from their Jellyscribe page. Admins can manage everyone's accounts from the plugin dashboard.</p>
       </div>
 
       <ol class="setup-steps">
         <li>
           <div class="step-num">1</div>
           <div class="step-body">
-            <h3>Open the plugin page</h3>
-            <p>Go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong>, then switch to the <strong>Letterboxd</strong> or <strong>TV / Serializd</strong> tab.</p>
+            <h3>Open Jellyscribe</h3>
+            <p>Click <strong>Jellyscribe</strong> in the Jellyfin sidebar (Jellyfin 10.11) or the profile menu (Jellyfin 12), or bookmark <code>#/jellyscribe</code>, then open <strong>My accounts</strong>. Admins can instead go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong> and open <strong>Accounts</strong>.</p>
           </div>
         </li>
         <li>
           <div class="step-num">2</div>
           <div class="step-body">
-            <h3>Add an account</h3>
-            <p>Click <strong>+ Add Account</strong>, pick a Jellyfin user, and enter their Letterboxd or Serializd credentials. Check <strong>Enabled</strong>.</p>
+            <h3>Link a diary</h3>
+            <p>Click <strong>+ Link a diary</strong>, choose Letterboxd (film) or Serializd (TV), and enter your Letterboxd username (not your email) or Serializd email or username, and the password. Click <strong>Verify login</strong>, leave <strong>Enabled</strong> ticked, and <strong>Save</strong>.</p>
           </div>
         </li>
         <li>
           <div class="step-num">3</div>
           <div class="step-body">
             <h3>Watch something</h3>
-            <p>That's it. Finish a film or an episode in Jellyfin and check your diary. A daily scheduled sync catches anything missed.</p>
+            <p>That's it. Finish a film or an episode in Jellyfin and check your diary. A daily scheduled sync catches anything missed, or press <strong>Sync all now</strong> on the Overview to catch up straight away.</p>
           </div>
         </li>
       </ol>
 
       <div class="tip">
         <strong>Seeing Cloudflare 403s?</strong>
-        <p>Log into Letterboxd in your browser, grab the <code>Cookie</code> header from DevTools, and paste it into the plugin's <strong>Raw Cookies</strong> field. The plugin will use the official API first and only fall back to scraping when needed.</p>
+        <p>Log into Letterboxd in your browser, grab the <code>Cookie</code> header from DevTools, and paste it into the account's <strong>Raw cookies</strong> field, with the same browser's User-Agent in <strong>User-Agent</strong>. The plugin will use the official API first and only fall back to scraping when needed.</p>
       </div>
     </div>
   </section>
@@ -873,6 +874,9 @@ const infraCards = [
   .install-card .steps { margin-top: 18px; font-size: 1rem; }
   .install-card .steps li { margin-bottom: 12px; }
   .install-card .text-link { font-size: 15px; margin-top: 18px; }
+  .install-note { margin-top: 18px; font-size: 14px; color: var(--text-dim); line-height: 1.55; }
+  .install-note p { margin: 0; }
+  .install-note .install-pill { margin: 8px 0; }
   .install-badge { top: 20px; right: 20px; font-size: 11px; padding: 5px 12px; }
 
   @media (max-width: 640px) {
@@ -882,6 +886,7 @@ const infraCards = [
     .install-card .steps { margin-top: 8px; font-size: 0.825rem; padding-left: 1.2em; }
     .install-card .steps li { margin-bottom: 6px; line-height: 1.5; }
     .install-card .text-link { font-size: 13px; margin-top: 10px; }
+    .install-note { margin-top: 10px; font-size: 12px; }
     .install-badge { top: 12px; right: 12px; font-size: 10px; padding: 3px 8px; }
     .reqs { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 20px; }
     .req { padding: 10px 12px; }

@@ -94,6 +94,12 @@ public class SerializdAccount
     public bool BackfillAvailableRequests { get; set; }
 
     /// <summary>
+    /// When true, <see cref="AutoRequestWatchlist"/> also requests seasons this user has already
+    /// watched. Off by default (issue #165). Mirrors <see cref="Account.RequestWatchedTitles"/>.
+    /// </summary>
+    public bool RequestWatchedTitles { get; set; }
+
+    /// <summary>
     /// Mirror this account's Serializd watchlist into the Jellyseerr user's own watchlist
     /// (as TV). Mirrors <see cref="Account.MirrorJellyseerrWatchlist"/>.
     /// </summary>

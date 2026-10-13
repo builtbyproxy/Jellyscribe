@@ -128,6 +128,13 @@ public class Account
     /// </summary>
     public bool BackfillAvailableRequests { get; set; }
 
+    /// <summary>
+    /// When true, <see cref="AutoRequestWatchlist"/> also requests watchlisted films this user has
+    /// already watched (logged to the diary, or imported from it). Off by default: once a cleanup
+    /// tool deletes a watched film, requesting it again only downloads it again (issue #165).
+    /// </summary>
+    public bool RequestWatchedTitles { get; set; }
+
     public bool MirrorJellyseerrWatchlist { get; set; }
 
     public bool SkipPreviouslySynced { get; set; } = true;

@@ -307,6 +307,9 @@ public class SerializdWatchlistSyncRunner
                 }
             }
 
+            if (!account.RequestWatchedTitles)
+                requests = await DropWatchedSeasonsAsync(seerr, user, account, requests).ConfigureAwait(false);
+
             int requested = 0, existing = 0, failed = 0;
             foreach (var (tmdb, seasons) in requests)
             {
@@ -372,6 +375,56 @@ public class SerializdWatchlistSyncRunner
             if (failed > 0)
                 TelemetryService.RecordError(TelemetryService.CatJellyseerr);
         }
+    }
+
+    /// <summary>
+    /// Removes the seasons this user has already watched from each candidate request, so a show
+    /// that was watched and then deleted by a cleanup tool is not downloaded again (issue #165).
+    /// A season counts as watched once any of its episodes was logged to Serializd for this
+    /// account; an abandoned season is left alone too, since that is what a cleanup tool deletes.
+    /// A whole-show request (no seasons named) for a show with watch history is narrowed to the
+    /// seasons Seerr lists that were never watched, so a new season still gets requested; when
+    /// Seerr's season list can't be read, the show is skipped rather than requested whole.
+    /// </summary>
+    private async Task<List<(int Tmdb, IReadOnlyList<int> Seasons)>> DropWatchedSeasonsAsync(SeerrClient seerr,
+        User user, SerializdAccount account, List<(int Tmdb, IReadOnlyList<int> Seasons)> requests)
+    {
+        var watchedByShow = SerializdSyncHistory.WatchedSeasonsByShow(user.Id.ToString("N"), account.Email);
+        if (watchedByShow.Count == 0) return requests;
+
+        var kept = new List<(int Tmdb, IReadOnlyList<int> Seasons)>();
+        foreach (var (tmdb, seasons) in requests)
+        {
+            if (!watchedByShow.TryGetValue(tmdb, out var watched))
+            {
+                kept.Add((tmdb, seasons));
+                continue;
+            }
+
+            IReadOnlyList<int>? candidates = seasons;
+            if (seasons.Count == 0)
+            {
+                candidates = await seerr.GetSeriesSeasonNumbersAsync(tmdb).ConfigureAwait(false);
+                if (candidates == null)
+                {
+                    _logger.LogInformation("Serializd watchlist for {Username}: skipping TMDb {TmdbId}, already watched and its season list could not be read",
+                        user.Username, tmdb);
+                    continue;
+                }
+            }
+
+            var unwatched = candidates.Where(s => !watched.Contains(s)).ToList();
+            if (unwatched.Count == 0)
+            {
+                _logger.LogInformation("Serializd watchlist for {Username}: skipping TMDb {TmdbId}, every season it would request was already watched",
+                    user.Username, tmdb);
+                continue;
+            }
+
+            kept.Add((tmdb, unwatched));
+        }
+
+        return kept;
     }
 
     /// <summary>

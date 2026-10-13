@@ -15,13 +15,40 @@ name: Release
 #                                              then write the manifest entry
 #   - neither                                -> normal release
 #
-# Two jobs, so the write token never shares a job with build or test code:
-#   build   (contents: read)  checks out with no stored credentials, builds,
-#                             tests, packages, prepares the release notes, and
-#                             uploads them as an artifact.
-#   publish (contents: write) runs no repository build code: it creates or
-#                             repairs the GitHub release and commits the
-#                             manifest entry.
+# Three jobs, so the write token never shares a job with build or test code:
+#   build      (contents: read)  checks out with no stored credentials, builds,
+#                                tests, packages, prepares the release notes,
+#                                and uploads them as an artifact.
+#   live-check (contents: read)  runs the live Letterboxd suite (live-tests.yml)
+#                                against the exact commit build packaged. A new
+#                                release is never published unless it passes.
+#   publish    (contents: write) runs no repository build code: it creates or
+#                                repairs the GitHub release and commits the
+#                                manifest entry.
+#
+# Why live-check runs here instead of waiting for integration.yml: the commit's
+# own Integration run would have to be found and polled, it may not exist (paths
+# filter, collapsed queued runs), and a pending run in integration.yml's shared
+# concurrency group is cancelled when a newer PR run queues behind it. Running
+# the suite in this workflow is deterministic. It deliberately does NOT join the
+# letterboxd-test-account group for the same reason (a cancelled live-check
+# would silently skip the release); integration.yml no longer runs on pushes to
+# main, so it never tests the same commit at the same time. A PR run can still
+# overlap and make a write test flaky: use "Re-run failed jobs", which reruns
+# live-check and then publish.
+#
+# Skip-if-no-secret: when the test credentials are not configured (a fork),
+# live-check passes with a notice. When only LETTERBOXD_TEST_RAW_COOKIES is
+# missing, the scraping tests skip and the run summary says so.
+#
+# Repair mode skips live-check: the tag it repairs was created by a publish job
+# that already needed a passing live-check, and a repair only adds the asset or
+# the manifest entry for a release that is already public.
+#
+# Escape hatch: when letterboxd.com is down, or Letterboxd has revoked the
+# bundled API key (runbook in SECURITY.md), the live suite cannot pass and would
+# block every release. Setting the repository variable RELEASE_LIVE_CHECK to
+# "off" skips live-check and publishes with a warning. Delete it afterwards.
 #
 # Version bumps happen in regular PRs (gated by version-gate.yml). This
 # workflow doesn't decide the version; it just ships whatever the project
@@ -53,7 +80,7 @@ jobs:
       sha: ${{ steps.ref.outputs.sha }}
       abi: ${{ steps.ref.outputs.abi }}
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -148,84 +175,32 @@ jobs:
         run: |
           set -e
           mkdir -p dist
-          # Repair: the release may already carry the notes it shipped with.
+          # Repair: the release already carries the notes it shipped with. They
+          # may have been edited on GitHub since, so they are cleaned and capped
+          # again before they reach manifest.json.
           if [ "${{ steps.check.outputs.mode }}" = "repair" ] \
-             && gh release view "$TAG" --json body --jq .body > /tmp/raw-notes.txt 2>/dev/null \
-             && [ -s /tmp/raw-notes.txt ]; then
+             && gh release view "$TAG" --json body --jq .body > /tmp/existing-body.txt 2>/dev/null \
+             && [ -s /tmp/existing-body.txt ]; then
             echo "Using the existing release body for $TAG"
-            printf '%s' "$(git log -1 --format=%s HEAD)" > /tmp/subject.txt
+            # Repair has the tag checked out, which may predate the script, so
+            # run main's copy.
+            git show origin/main:.github/scripts/release_notes.py > /tmp/release_notes.py
+            python3 /tmp/release_notes.py --clean /tmp/existing-body.txt dist/release-body.txt
           else
-            # The PR that bumped the version owns the notes. Normally that is
-            # this push's squash commit, but when queued runs collapse (a later
-            # push supersedes a pending one), HEAD can be a later, unrelated
-            # merge, so find the commit that last changed AssemblyVersion.
-            BUMP=$(git log -1 --format=%H -G'<AssemblyVersion>' HEAD -- Directory.Build.props)
-            SUBJECT=$(git log -1 --format=%s "${BUMP:-HEAD}")
-            printf '%s' "$SUBJECT" > /tmp/subject.txt
-            echo "Version bump commit: ${BUMP:-HEAD} ($SUBJECT)"
-            # GitHub keeps only one pending run per concurrency group, so if two
-            # version bumps queue behind a running release, the older one is
-            # cancelled. Say so loudly rather than let that version vanish.
-            if [ -n "$BUMP" ] && git cat-file -e "$BUMP^" 2>/dev/null; then
-              PREV=$(git show "$BUMP^:Directory.Build.props" | grep -oE '<AssemblyVersion>[^<]+' | head -1 | sed 's/<AssemblyVersion>//')
-              if [ -n "$PREV" ] && ! git show origin/main:manifest.json \
-                   | jq -e --arg v "$PREV" '.[0].versions | any(.version == $v)' > /dev/null; then
-                echo "::warning::The previous version $PREV is not in manifest.json either. Its release run was probably superseded; re-run that run from the Actions tab to ship it."
-              fi
-            fi
-            PR=$(printf '%s' "$SUBJECT" | grep -oE '\(#[0-9]+\)$' | tr -d '(#)' || true)
-            if [ -z "$PR" ]; then
-              echo "::warning::No PR number in the version bump commit subject; using the subject as changelog."
-              : > /tmp/raw-notes.txt
-            else
-              echo "Fetching PR body for PR #$PR"
-              gh pr view "$PR" --json body --jq .body > /tmp/pr-body.txt
-              python3 << 'PY'
-          import re
-          body = open('/tmp/pr-body.txt').read()
-          m = re.search(
-              r'^##\s+Release notes\s*$(.*?)(?=^##\s|\Z)',
-              body, re.MULTILINE | re.DOTALL)
-          open('/tmp/raw-notes.txt', 'w').write(m.group(1) if m else '')
-          PY
-            fi
+            # Every version bump above the newest shipped version contributes its
+            # PR's "## Release notes", oldest first. Usually that is one PR; a
+            # gh stack merge can bring several in one push, and only the newest
+            # version is released (see .github/scripts/release_notes.py).
+            git show origin/main:manifest.json > /tmp/manifest-main.json
+            python3 .github/scripts/release_notes.py /tmp/manifest-main.json dist/release-body.txt
           fi
-          # Clean and cap the notes before they reach manifest.json, the GitHub
-          # Release, and every user's plugin catalog. The PR body can be edited
-          # after review, so: plain text only (template comments and HTML tags
-          # stripped, even across lines, then any stray '<' dropped so nothing
-          # can open a tag) and a hard length cap.
-          python3 << 'PY'
-          import re, sys
-          MAX = 4000
-          notes = open('/tmp/raw-notes.txt').read()
-          notes = re.sub(r'<!--.*?(-->|\Z)', '', notes, flags=re.DOTALL)
-          notes = re.sub(r'</?[A-Za-z!][^>]*>', '', notes)
-          notes = notes.replace('<', '')
-          notes = re.sub(r'[ \t]{2,}', ' ', notes)
-          notes = re.sub(r'\n{3,}', '\n\n', notes).strip()
-          if not notes:
-              subj = open('/tmp/subject.txt').read().split('\n', 1)[0]
-              notes = re.sub(r' \(#\d+\)$', '', subj).strip()
-              sys.stderr.write(
-                  "::warning::No '## Release notes' text found; falling back to "
-                  "the PR title. Add the section to keep the manifest changelog "
-                  "consistent with the older releases.\n")
-          if len(notes) > MAX:
-              cut = notes.rfind(' ', 0, MAX - 3)
-              notes = notes[:cut if cut > 0 else MAX - 3].rstrip() + '...'
-              sys.stderr.write(
-                  f"::warning::Release notes were longer than {MAX} characters "
-                  "and have been truncated.\n")
-          open('dist/release-body.txt', 'w').write(notes + '\n')
-          PY
           echo "--- release body preview ---"
           head -c 800 dist/release-body.txt
           echo
 
       - name: Setup .NET
         if: steps.check.outputs.build == 'true'
-        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '9.0.x'
 
@@ -251,17 +226,45 @@ jobs:
 
       - name: Upload release files
         if: steps.check.outputs.mode != 'skip'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release
           path: dist/
           if-no-files-found: error
           retention-days: 7
 
-  publish:
+  live-check:
     needs: build
-    if: needs.build.outputs.mode != 'skip'
+    if: needs.build.outputs.mode == 'release' && vars.RELEASE_LIVE_CHECK != 'off'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/live-tests.yml
+    with:
+      ref: ${{ needs.build.outputs.sha }}
+    secrets:
+      LETTERBOXD_TEST_USERNAME: ${{ secrets.LETTERBOXD_TEST_USERNAME }}
+      LETTERBOXD_TEST_PASSWORD: ${{ secrets.LETTERBOXD_TEST_PASSWORD }}
+      LETTERBOXD_TEST_RAW_COOKIES: ${{ secrets.LETTERBOXD_TEST_RAW_COOKIES }}
+      LETTERBOXD_TEST_USER_AGENT: ${{ secrets.LETTERBOXD_TEST_USER_AGENT }}
+
+  publish:
+    needs: [build, live-check]
+    # A new release needs a passing live-check; it may go ahead with live-check
+    # skipped only for a repair or with the RELEASE_LIVE_CHECK=off escape hatch.
+    # !cancelled() lets this job evaluate when live-check is skipped.
+    if: >-
+      !cancelled()
+      && needs.build.result == 'success'
+      && (
+        (needs.build.outputs.mode == 'release'
+          && (needs.live-check.result == 'success'
+            || (needs.live-check.result == 'skipped' && vars.RELEASE_LIVE_CHECK == 'off')))
+        || (needs.build.outputs.mode == 'repair' && needs.live-check.result == 'skipped')
+      )
     runs-on: ubuntu-latest
+    # The release environment holds RELEASE_DEPLOY_KEY and only deploys from main,
+    # so no job on another branch can read the key.
+    environment: release
     permissions:
       contents: write
     env:
@@ -272,15 +275,28 @@ jobs:
       BUILT_SHA: ${{ needs.build.outputs.sha }}
       ABI: ${{ needs.build.outputs.abi }}
     steps:
+      - name: Warn when the live check was bypassed
+        if: needs.build.outputs.mode == 'release' && needs.live-check.result == 'skipped'
+        run: echo "::warning::RELEASE_LIVE_CHECK is off, so $TAG is published without the live Letterboxd tests. Delete the repository variable once Letterboxd is reachable again."
+
+      - name: Warn when the live check had no credentials
+        if: needs.live-check.result == 'success' && needs.live-check.outputs.ran != 'true'
+        run: echo "::warning::The Letterboxd test secrets are not configured, so live-check passed without running anything and $TAG is published untested against letterboxd.com."
+
       # This job never runs dotnet, npm, or any script from the repository. It
-      # checks out main only to edit manifest.json and push it.
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      # checks out main only to edit manifest.json and push it. The push goes over
+      # SSH as the release deploy key, the only actor the main ruleset lets push
+      # without a pull request (see CLAUDE.md, "Merge gates on main"). Unlike a
+      # GITHUB_TOKEN push, it starts workflows: this one again (it sees the version
+      # in manifest.json and stops), ci.yml, and deploy-docs.yml.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
 
       - name: Download release files
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release
           path: /tmp/release

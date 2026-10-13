@@ -74,6 +74,7 @@ public class SerializdController : JellyfinUserApiController
         public bool EnableDiaryImport { get; set; }
         public bool AutoRequestWatchlist { get; set; }
         public bool BackfillAvailableRequests { get; set; }
+        public bool RequestWatchedTitles { get; set; }
         public bool MirrorJellyseerrWatchlist { get; set; }
         public string? WatchlistName { get; set; }
         public System.Collections.Generic.List<string>? ExcludedLibraryIds { get; set; }
@@ -112,6 +113,7 @@ public class SerializdController : JellyfinUserApiController
                 enableDiaryImport = a.EnableDiaryImport,
                 autoRequestWatchlist = a.AutoRequestWatchlist,
                 backfillAvailableRequests = a.BackfillAvailableRequests,
+                requestWatchedTitles = a.RequestWatchedTitles,
                 mirrorJellyseerrWatchlist = a.MirrorJellyseerrWatchlist,
                 watchlistName = a.WatchlistName,
                 excludedLibraryIds = a.ExcludedLibraryIds,
@@ -168,6 +170,7 @@ public class SerializdController : JellyfinUserApiController
                 EnableDiaryImport = req.EnableDiaryImport,
                 AutoRequestWatchlist = req.AutoRequestWatchlist,
                 BackfillAvailableRequests = req.BackfillAvailableRequests,
+                RequestWatchedTitles = req.RequestWatchedTitles,
                 MirrorJellyseerrWatchlist = req.MirrorJellyseerrWatchlist,
                 WatchlistName = canName
                     ? (string.IsNullOrWhiteSpace(req.WatchlistName) ? null : req.WatchlistName.Trim())

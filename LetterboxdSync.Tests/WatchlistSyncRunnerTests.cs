@@ -765,6 +765,97 @@ public class WatchlistSyncRunnerTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task TryRunForUserAsync_AutoRequest_SkipsFilmsAlreadyWatched(bool backfill, bool requestWatched)
+    {
+        // Issue #165: a watched film that a cleanup tool deleted is still on the watchlist and
+        // missing from the library. It must not be requested again; an unwatched one still is.
+        // An account that opts in to re-requesting watched titles gets every one requested.
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+        Plugin.Instance!.Configuration.Accounts[0].BackfillAvailableRequests = backfill;
+        Plugin.Instance!.Configuration.Accounts[0].RequestWatchedTitles = requestWatched;
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        const int watchedFilm = 1233413, diaryImportedFilm = 550, unwatchedFilm = 27205;
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = "Sinners",
+            TmdbId = watchedFilm,
+            Username = user.Username!,
+            Account = "lb-user",
+            Timestamp = DateTime.UtcNow.AddDays(-30),
+            ViewingDate = DateTime.UtcNow.AddDays(-30),
+            Status = SyncStatus.Success,
+        });
+        SyncHistory.Record(new SyncEvent
+        {
+            FilmTitle = "Fight Club",
+            TmdbId = diaryImportedFilm,
+            Username = user.Username!,
+            Timestamp = DateTime.UtcNow.AddDays(-20),
+            Status = SyncStatus.Success,
+            Source = SyncEventSources.DiaryImport,
+        });
+
+        var service = Substitute.For<ILetterboxdService>();
+        service.GetWatchlistTmdbIdsAsync(Arg.Any<string>()).Returns(new List<int> { watchedFilm, diaryImportedFilm, unwatchedFilm });
+        LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var posted = new List<string>();
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent(
+                        "{\"results\":[{\"id\":7,\"jellyfinUserId\":\"" + user.Id.ToString("N") + "\"}]}")
+                };
+            if (req.Method == HttpMethod.Get && path.Contains("/api/v1/movie/"))
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new System.Net.Http.StringContent("{}")
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+            {
+                posted.Add(req.Content!.ReadAsStringAsync().Result);
+                return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Created);
+            }
+            return new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        WatchlistSyncRunner.JellyseerrClientFactoryOverride = (url, key, log) =>
+            new SeerrClient(url, key, log, handler);
+        try
+        {
+            await _runner.TryRunForUserAsync(userId, "test", new Progress<double>(), CancellationToken.None);
+
+            if (requestWatched)
+            {
+                Assert.Equal(3, posted.Count);
+            }
+            else
+            {
+                var body = Assert.Single(posted);
+                Assert.Contains($"\"mediaId\":{unwatchedFilm}", body);
+            }
+        }
+        finally
+        {
+            WatchlistSyncRunner.JellyseerrClientFactoryOverride = null;
+            Plugin.Instance!.Configuration.JellyseerrUrl = null;
+            Plugin.Instance!.Configuration.JellyseerrApiKey = null;
+        }
+    }
+
     [Fact]
     public async Task TryRunForUserAsync_AutoRequest_TalliesAlreadyExistsFailedAndErrored()
     {

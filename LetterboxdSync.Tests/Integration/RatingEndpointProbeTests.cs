@@ -142,8 +142,9 @@ public class RatingEndpointProbeTests
     /// <summary>
     /// Task 1.2 of the stream-ratings change: the shipped scraping-path SetFilmRatingAsync
     /// (site rate action) against letterboxd.com, read back and restored through the official
-    /// API. CI cannot pass Cloudflare on the scraping sign-in, so this skips there; run it locally
-    /// with LETTERBOXD_TEST_RAW_COOKIES and a matching LETTERBOXD_TEST_USER_AGENT.
+    /// API. Cloudflare refuses the scraping sign-in from CI without browser cookies, so on GitHub
+    /// Actions this skips unless LETTERBOXD_TEST_RAW_COOKIES (and a matching
+    /// LETTERBOXD_TEST_USER_AGENT) is set.
     /// </summary>
     [SkippableFact]
     public async Task Scraping_SetFilmRating_LandsOnTheFilmRelationship()
@@ -152,6 +153,7 @@ public class RatingEndpointProbeTests
         var pass = Environment.GetEnvironmentVariable("LETTERBOXD_TEST_PASSWORD");
         Skip.If(string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass),
             "Skipping live probe: set LETTERBOXD_TEST_USERNAME and LETTERBOXD_TEST_PASSWORD to run.");
+        var cookies = ScrapingLiveTest.RawCookiesOrSkipInCi();
 
         using var http = new HttpClient();
         http.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -168,7 +170,7 @@ public class RatingEndpointProbeTests
             Environment.GetEnvironmentVariable("LETTERBOXD_TEST_USER_AGENT"));
         try
         {
-            await scraping.AuthenticateAsync(user!, pass!, Environment.GetEnvironmentVariable("LETTERBOXD_TEST_RAW_COOKIES"));
+            await scraping.AuthenticateAsync(user!, pass!, cookies);
         }
         catch (Exception ex)
         {

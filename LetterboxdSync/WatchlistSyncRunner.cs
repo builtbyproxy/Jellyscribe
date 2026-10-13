@@ -315,9 +315,18 @@ public class WatchlistSyncRunner
             // Default: only films missing from the library. Backfill mode: the whole watchlist,
             // so already-available films also get an attributed request (per-user dedup happens
             // inside RequestMovieAsync, which skips titles this user already requested).
-            var requestIds = account.BackfillAvailableRequests
+            // Either way, a film this user has already watched is not requested unless the account
+            // opts in: once a cleanup tool deletes it, requesting it again only downloads it again
+            // (issue #165).
+            var candidates = account.BackfillAvailableRequests
                 ? tmdbIds
                 : tmdbIds.Where(id => !matchedTmdbIds.Contains(id)).ToList();
+            var requestIds = candidates
+                .Where(id => account.RequestWatchedTitles || !SyncHistory.HasWatched(user.Username!, id, account.LetterboxdUsername))
+                .ToList();
+            if (requestIds.Count < candidates.Count)
+                _logger.LogInformation("Seerr auto-request for {Username}: skipping {Count} watchlisted films already watched",
+                    user.Username, candidates.Count - requestIds.Count);
 
             SyncProgress.SetPhase(SyncProgress.TrackLetterboxd, $"Requesting {(account.BackfillAvailableRequests ? "watchlist" : "missing")} films via Seerr");
             if (requestIds.Count == 0) return;

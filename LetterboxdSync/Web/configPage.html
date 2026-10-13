@@ -376,6 +376,15 @@
                             if (at >= 0) next[at] = item; else next.push(item);
                             return next;
                         },
+                        // The stored copy of orig with the form's values laid over it, so an account field this
+                        // form does not edit keeps its stored value instead of being dropped by the save. So the
+                        // form must send every field it edits, cleared ones as [], null or false, never omitted.
+                        // The stored Has* flags ride along harmlessly: the server computes them, a posted one is ignored.
+                        overStored: function (svc, list, orig, item) {
+                            var self = this, stored = null;
+                            if (orig && self.editing && self.editing.svc === svc) (list || []).some(function (x) { if (self.sameAccount(svc, x, orig)) { stored = x; return true; } return false; });
+                            return stored ? Object.assign({}, stored, item) : item;
+                        },
 
                         /* Re-reads the stored config right before saving and applies only edit(copy) to it, so
                            whatever changed since this page loaded (users adding or editing their own accounts,
@@ -508,6 +517,7 @@
                                 ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.SyncWatchlist : !!a.EnableWatchlistSync, this.watchDesc(svc)],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.AutoRequestWatchlist, 'Watchlisted but missing from the library → request via Seerr.'],
                                 ['Backfill Seerr requests', 'chkBackfill', !!a.BackfillAvailableRequests, 'Also attribute a Seerr request for already-available titles (requester trail).'],
+                                ['Re-request watched titles', 'chkRerequest', !!a.RequestWatchedTitles, 'Also request titles already watched, e.g. after a cleanup tool deletes them.'],
                                 ['Mirror watchlist to Seerr', 'chkMirror', !!a.MirrorJellyseerrWatchlist, 'Push this watchlist into the Seerr user\'s own watchlist (primary account only).'],
                                 ['Skip already-synced', 'chkSkip', a.SkipPreviouslySynced !== false, 'Use local history to avoid re-logging.'],
                                 ['Stop on first failure', 'chkStop', !!a.StopOnFailure, 'Halt this account on the first error.'],
@@ -559,16 +569,16 @@
                             if (m.svc === 'serializd') {
                                 // Original* names the login this edit started from, so the server carries its saved
                                 // password across a changed email or a move to another Jellyfin user.
-                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalEmail: orig ? orig.Email : null, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
+                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalEmail: orig ? orig.Email : null, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, RequestWatchedTitles: m.rereq, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
                             } else {
-                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalLetterboxdUsername: orig ? orig.LetterboxdUsername : null, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, ClearRawCookies: !m.cookies && m.clearCookies, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
+                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalLetterboxdUsername: orig ? orig.LetterboxdUsername : null, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, ClearRawCookies: !m.cookies && m.clearCookies, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, RequestWatchedTitles: m.rereq, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
                             }
                             var key = m.svc === 'serializd' ? 'SerializdAccounts' : 'Accounts';
                             if (self.modalBusy) return;
                             byId('mStatus').textContent = 'Saving…';
                             self.setModalBusy(true);
                             self.saveConfig(function (c) {
-                                c[key] = self.withAccount(m.svc, c[key], orig, item);
+                                c[key] = self.withAccount(m.svc, c[key], orig, self.overStored(m.svc, c[key], orig, item));
                             }).then(function () {
                                 self.setModalBusy(false);
                                 self.closeModal('acctModal');

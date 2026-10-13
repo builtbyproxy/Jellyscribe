@@ -21,7 +21,7 @@ AI writes the code; these gates decide whether it ships:
 - **Live integration tests** hit the real Letterboxd site, so "the AI's fixture was wrong" gets caught before release (a lesson learned, see the v1.18.4 release notes).
 - **Every merge ships a release**, so mistakes are small, attributable, and quickly reverted. Incidents and their prevention are documented in the repo's `CLAUDE.md`.
 
-Bugs still happen, the [issue tracker](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/issues) and [release history](https://jellyscribe.dev/releases/) don't hide them.
+Bugs still happen, the [issue tracker](https://github.com/builtbyproxy/Jellyscribe/issues) and [release history](https://jellyscribe.dev/releases/) don't hide them.
 
 ## The scale of it
 
@@ -33,8 +33,8 @@ Rather than abstract token counts (tried it, the numbers were noise), here is th
 - **~18,000 lines of C#** including **~590 tests**
 - Plus the [jellyscribe.dev](https://jellyscribe.dev/) website, the telemetry worker, and the CI/release automation
 
-All of it AI-written in roughly three months of evenings, by one person who reviews everything and writes almost none of it by hand. The [commit history](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/commits/main) and [merged PRs](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/pulls?q=is%3Apr+is%3Amerged) are the receipts.
+All of it AI-written in roughly three months of evenings, by one person who reviews everything and writes almost none of it by hand. The [commit history](https://github.com/builtbyproxy/Jellyscribe/commits/main) and [merged PRs](https://github.com/builtbyproxy/Jellyscribe/pulls?q=is%3Apr+is%3Amerged) are the receipts.
 
 ## Questions
 
-If anything here seems incomplete or misleading, [open an issue](https://github.com/builtbyproxy/jellyfin-plugin-letterboxd/issues), the point of this page is that you shouldn't have to guess.
+If anything here seems incomplete or misleading, [open an issue](https://github.com/builtbyproxy/Jellyscribe/issues), the point of this page is that you shouldn't have to guess.

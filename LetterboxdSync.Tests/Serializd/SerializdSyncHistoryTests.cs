@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using LetterboxdSync.Serializd;
 using Xunit;
 
@@ -112,5 +113,40 @@ public class SerializdSyncHistoryTests : IDisposable
         SerializdSyncHistory.Record("user1", Acct1, 77236, 1, 8);
         var lines = File.ReadAllLines(_file);
         Assert.Contains("user1|" + Acct1 + "|77236|1|8", lines);
+    }
+
+    [Fact]
+    public void WatchedSeasonsByShow_CountsWatchedLoggedAndImportedEpisodes_ForThisUserAndAccount()
+    {
+        File.WriteAllLines(_file, new[]
+        {
+            "user1|" + Acct1 + "|100|1|3",                // watched
+            "user1|" + Acct1 + "|100|2|0|log",            // dated log
+            "user1|" + Acct1 + "|200|4|2|imported",       // diary import
+            "user1|300|5|1",                               // pre-account-scoping watched row
+            "user1|300|6|1|log",                           // pre-account-scoping log row
+            "user1|" + Acct1 + "|100|0|0|showmeta",       // show-level rating: not a watch
+            "user1|" + Acct1 + "|100|0|4",                // a special: never requested
+            "user1|" + Acct2 + "|400|1|1",                // another account
+            "user2|" + Acct1 + "|500|1|1",                // another user
+        });
+        SerializdSyncHistory.ResetForTesting();
+
+        var watched = SerializdSyncHistory.WatchedSeasonsByShow("user1", Acct1);
+
+        Assert.Equal(new[] { 100, 200, 300 }, watched.Keys.OrderBy(k => k));
+        Assert.Equal(new[] { 1, 2 }, watched[100].OrderBy(s => s));
+        Assert.Equal(new[] { 4 }, watched[200]);
+        Assert.Equal(new[] { 5, 6 }, watched[300].OrderBy(s => s));
+    }
+
+    [Fact]
+    public void WatchedSeasonsByShow_MatchesTheAccountEmailWhateverItsCase()
+    {
+        SerializdSyncHistory.Record("user1", "TvFan@Example.com", 100, 1, 1);
+
+        var watched = SerializdSyncHistory.WatchedSeasonsByShow("user1", "tvfan@example.com");
+
+        Assert.Equal(new[] { 1 }, watched[100]);
     }
 }

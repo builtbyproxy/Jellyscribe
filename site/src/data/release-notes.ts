@@ -10,6 +10,52 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.13.1',
+    headline: 'Signing in through the Letterboxd website works again',
+    summary:
+      'When the official sign-in does not work for an account, Jellyscribe signs in through the Letterboxd website instead. Letterboxd changed its sign-in page, and since then that fallback has failed every time with "The form on this page had expired", so those accounts could not sync at all. Jellyscribe now reads the sign-in page the way it works today, and the fallback signs in, logs films and saves ratings again. Accounts that sign in the official way were never affected.',
+    highlights: {
+      fixes: [
+        'The website sign-in fallback no longer fails with "The form on this page had expired".',
+        'Ratings changed in Jellyfin reach Letterboxd for accounts that sign in through the website, confirmed against letterboxd.com.',
+      ],
+    },
+  },
+  {
+    version: '2.13.0',
+    headline: 'Choose whether watched titles are requested again',
+    summary:
+      'Each linked diary has a new option, "Re-request watched titles", next to the other Seerr settings on both the admin page and your own page. Auto-request now skips films and seasons you have already watched (see below), so a cleanup tool deleting them does not download them again. If you want the old behaviour, for example because you rewatch and like the library to keep everything on your watchlist, turn this on for that account. It is off by default, so nothing changes unless you choose it.',
+    highlights: {
+      new: [
+        'A per-account "Re-request watched titles" option brings back requesting films and seasons you have already watched once they leave the library.',
+      ],
+    },
+  },
+  {
+    version: '2.12.4',
+    headline: 'Shows and films you have already watched are not requested again',
+    summary:
+      'With Seerr auto-request on, a watchlisted title that a cleanup tool deleted after you watched it no longer comes back. Before, Jellyscribe saw it missing from the library and filed a new Seerr request under your name, so a show you had finished could download again every time it was cleared out. Now anything Jellyscribe has logged for you is left alone. For TV this works season by season: a season you have watched any of is skipped, and a season you have not started, such as a new one, is still requested. Films and shows you have never watched are requested exactly as before.',
+    highlights: {
+      fixes: [
+        'A watchlisted show or film you already watched is not requested again through Seerr after a cleanup tool deletes it.',
+        'For TV, only the seasons you have never watched are requested, so a new season of a show you finished still arrives.',
+      ],
+    },
+  },
+  {
+    version: '2.12.3',
+    headline: 'Editing an account keeps every setting it already has',
+    summary:
+      'When an admin edits a linked diary on the Jellyscribe settings page, the save now starts from the account as it is stored and changes only what the form shows. Before, the page rebuilt the account from scratch, so any account setting the form did not list would have been reset to its default on the next edit. Nothing is lost today, because every current setting is on the form, but future settings are now safe from the moment they ship.',
+    highlights: {
+      fixes: [
+        'Editing an account on the admin settings page keeps every stored setting the form does not show, instead of resetting it.',
+      ],
+    },
+  },
+  {
     version: '2.12.2',
     headline: 'Smaller settings pages that update themselves after an upgrade',
     summary:
@@ -658,7 +704,7 @@ export const releaseNotes: ReleaseNotes[] = [
     highlights: {
       new: [
         'Active installs are now counted from ordinary catalog update checks and release downloads served through an edge mirror of the official manifest. GitHub download totals were useless for this (re-downloads and auto-updates inflate them), and the opt-in telemetry only sees servers that enabled it.',
-        'Uniqueness is approximated with a weekly-rotating anonymous fingerprint: your IP address is used transiently at the edge to compute it and is never stored, and counts cannot be linked across weeks. Unlike the opt-in telemetry, this counting is always on; it carries no other information about you, your server, or your library.',
+        'Uniqueness is approximated with a weekly-rotating pseudonymous fingerprint: your IP address is used transiently at the edge to compute it and is never stored in the counts. (Corrected later: the fingerprint uses a fixed secret salt, so whoever holds that salt could link a known IP\'s rows across weeks.) Unlike the opt-in telemetry, this counting is always on; it carries no other information about you, your server, or your library.',
       ],
       improvements: [
         'Release downloads in the plugin catalog now redirect through the mirror to the identical GitHub release file. Checksums are unchanged, so Jellyfin\'s integrity check on install and update passes exactly as before.',

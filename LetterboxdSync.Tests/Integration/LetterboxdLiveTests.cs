@@ -122,6 +122,19 @@ public class LetterboxdLiveTests
             client.AuthenticateAsync(noSuchUser, "irrelevant"));
     }
 
+    /// <summary>
+    /// Early warning for a revoked or rotated Letterboxd API key (see SECURITY.md). Signs in on
+    /// the API path directly, so a key Letterboxd stops accepting fails here instead of hiding
+    /// behind the factory's website-login fallback (the test above) or the write tests' skip.
+    /// </summary>
+    [SkippableFact]
+    public async Task ApiClient_ValidCredentials_AuthenticatesWithTheBundledKey()
+    {
+        var (user, pass, _, _) = RequireCreds();
+        using var client = new LetterboxdApiClient(_logger);
+        await client.AuthenticateAsync(user, pass).ConfigureAwait(false);
+    }
+
     [SkippableFact]
     public async Task LookupFilmByTmdbId_KnownFilm_ReturnsSlug()
     {
@@ -250,7 +263,8 @@ public class LetterboxdLiveTests
     [SkippableFact]
     public async Task Scraping_LookupFilmByTmdbId_ResolvesIdentifiersFromLiveMarkup()
     {
-        var (user, pass, cookies, ua) = RequireCreds();
+        var (user, pass, _, ua) = RequireCreds();
+        var cookies = ScrapingLiveTest.RawCookiesOrSkipInCi();
         using var service = new ScrapingLetterboxdService(_logger, ua);
         try
         {

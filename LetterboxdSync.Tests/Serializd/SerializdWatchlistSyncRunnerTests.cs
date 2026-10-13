@@ -59,6 +59,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
         SyncHistory.DataPathOverride = Path.Combine(_tempDir, "sync-history.jsonl");
         SyncHistory.ResetForTesting();
         SyncHistory.SetLogger(NullLogger.Instance);
+        SerializdSyncHistory.DataPathOverride = Path.Combine(_tempDir, "serializd-sync-history.jsonl");
+        SerializdSyncHistory.ResetForTesting();
 
         _userManager = Substitute.For<IUserManager>();
         _libraryManager = Substitute.For<ILibraryManager>();
@@ -75,6 +77,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
         Plugin.Instance!.Configuration.JellyseerrApiKey = null;
         SyncHistory.DataPathOverride = null;
         SyncHistory.ResetForTesting();
+        SerializdSyncHistory.DataPathOverride = null;
+        SerializdSyncHistory.ResetForTesting();
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
     }
 
@@ -550,5 +554,139 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
 
         Assert.True(ok);
         await _collectionManager.DidNotReceive().RemoveFromCollectionAsync(Arg.Any<Guid>(), Arg.Any<IEnumerable<Guid>>());
+    }
+
+    // ----- Already-watched shows are not requested again (issue #165) -----
+
+    /// <summary>
+    /// Runs an auto-request sync for one whole-show or season-specific watchlist entry absent from
+    /// the library, with Seerr listing seasons 1-3 (null = the season lookup fails), and returns
+    /// the bodies of every request POSTed.
+    /// </summary>
+    private async Task<List<string>> RunAutoRequestAsync(User user, string userId,
+        SerializdWatchlistEntry entry, string? seasonsJson = "[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2},{\"seasonNumber\":3}]")
+    {
+        _userManager.GetUsers().Returns(new[] { user });
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry> { entry });
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var posted = new List<string>();
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return UserMapResponse(userId);
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/" + entry.ShowTmdbId))
+                return seasonsJson == null
+                    ? new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+                    : new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                    {
+                        Content = new StringContent("{\"name\":\"Severance\",\"seasons\":" + seasonsJson + "}"),
+                    };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+            {
+                posted.Add(req.Content!.ReadAsStringAsync().Result);
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Created) { Content = new StringContent("{}") };
+            }
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = (url, key, log) => new SeerrClient(url, key, log, handler);
+
+        Assert.True(await _runner.TryRunForUserAsync(userId, CancellationToken.None));
+        return posted;
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowEveryListedSeasonWatched_IsNotRequested()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        foreach (var season in new[] { 1, 2, 3 })
+            SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, season, 1);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        Assert.Empty(posted);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowPartlyWatched_RequestsOnlyTheUnwatchedSeasons()
+    {
+        // The reported loop: episodes of season 1 were logged, the show was deleted, and it came
+        // back as a whole-show request. Now only the seasons never watched are asked for.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        for (var ep = 1; ep <= 7; ep++)
+            SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 1, ep);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 2, 0, SerializdSyncHistory.KindLog);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[3]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WatchedShowWhoseSeasonsCannotBeRead_IsSkipped()
+    {
+        // Without Seerr's season list there is no way to request only the unwatched seasons, and
+        // requesting the whole show again is the loop this guards against.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 1, 1);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()), seasonsJson: null);
+
+        Assert.Empty(posted);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WatchlistedSeasons_DropsTheWatchedOnes()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 1, 4, SerializdDiaryImportRunner.KindImported);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1, 2 }));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[2]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_AccountOptedInToWatchedTitles_RequestsTheWholeShowAsBefore()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        Plugin.Instance!.Configuration.SerializdAccounts[0].RequestWatchedTitles = true;
+        foreach (var season in new[] { 1, 2, 3 })
+            SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, season, 1);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":\"all\"", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_UnwatchedShow_IsStillRequestedWhole()
+    {
+        // History for other shows, other accounts and show-level ratings must not hold back a
+        // show this account never watched.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 1396, 1, 1);
+        SerializdSyncHistory.Record(userId, "other@example.com", 95396, 1, 1);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 0, 0, SerializdSyncHistory.KindShowMeta);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":\"all\"", body);
     }
 }
