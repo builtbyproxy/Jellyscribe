@@ -593,9 +593,12 @@ public class LetterboxdSyncRunner
         SyncProgress.Complete(SyncProgress.TrackLetterboxd);
     }
 
-    /// <summary>The 3-5 s pause between films' Letterboxd requests. A test hook replaces it.</summary>
-    internal static Func<CancellationToken, Task> FilmPause { get; set; }
+    /// <summary>The real 3-5 s pause between films' Letterboxd requests; tests restore <see cref="FilmPause"/> to this.</summary>
+    internal static readonly Func<CancellationToken, Task> DefaultFilmPause
         = ct => Task.Delay(3000 + Random.Shared.Next(2000), ct);
+
+    /// <summary>The pause between films' Letterboxd requests. A test hook replaces it.</summary>
+    internal static Func<CancellationToken, Task> FilmPause { get; set; } = DefaultFilmPause;
 
     /// <summary>
     /// Looks the film up and paces the film's requests. On the website the lookup itself requests

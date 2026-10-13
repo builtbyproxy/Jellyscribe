@@ -33,7 +33,6 @@ public class FilmLookupCacheTests : IDisposable
 {
     private static readonly ILogger Log = NullLoggerFactory.Instance.CreateLogger("test");
 
-    private static readonly Func<CancellationToken, Task> DefaultPause = LetterboxdSyncRunner.FilmPause;
 
     private readonly string _tempDir;
 
@@ -50,7 +49,7 @@ public class FilmLookupCacheTests : IDisposable
     public void Dispose()
     {
         LetterboxdServiceFactory.OverrideForTesting = null;
-        LetterboxdSyncRunner.FilmPause = DefaultPause;
+        LetterboxdSyncRunner.FilmPause = LetterboxdSyncRunner.DefaultFilmPause;
         SyncHistory.DataPathOverride = null;
         SyncHistory.ResetForTesting();
         try { Directory.Delete(_tempDir, true); } catch { }
