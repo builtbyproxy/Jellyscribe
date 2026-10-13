@@ -28,7 +28,6 @@ namespace LetterboxdSync.Tests;
 [Collection("Plugin")]
 public class SyncReliabilityTests : IDisposable
 {
-    private static readonly Func<CancellationToken, Task> DefaultPause = LetterboxdSyncRunner.FilmPause;
 
     private readonly string _tempDir;
     private readonly IUserManager _userManager = Substitute.For<IUserManager>();
@@ -62,7 +61,7 @@ public class SyncReliabilityTests : IDisposable
 
     public void Dispose()
     {
-        LetterboxdSyncRunner.FilmPause = DefaultPause;
+        LetterboxdSyncRunner.FilmPause = LetterboxdSyncRunner.DefaultFilmPause;
         LetterboxdServiceFactory.OverrideForTesting = null;
         SyncHistory.DataPathOverride = null;
         SyncHistory.ResetForTesting();

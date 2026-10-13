@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.13.2',
+    headline: 'An updated page-reading library',
+    summary:
+      'Jellyscribe updates the library it uses to read Letterboxd web pages, which it relies on when an account signs in through the website and when it finds films on letterboxd.com. Nothing changes in how syncing works: the website sign-in, film lookups, diary entries and ratings were all checked against letterboxd.com with the new version.',
+    highlights: {
+      improvements: [
+        'The library Jellyscribe uses to read Letterboxd pages is updated to its current release.',
+      ],
+    },
+  },
+  {
     version: '2.13.1',
     headline: 'Signing in through the Letterboxd website works again',
     summary:
