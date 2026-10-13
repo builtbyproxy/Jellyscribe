@@ -13,7 +13,7 @@ export const releaseNotes: ReleaseNotes[] = [
     version: '2.13.0',
     headline: 'Choose whether watched titles are requested again',
     summary:
-      'Each linked diary has a new option, "Re-request watched titles", next to the other Seerr settings on both the admin page and your own page. Since 2.12.4, auto-request skips films and seasons you have already watched, so a cleanup tool deleting them does not download them again. If you want the old behaviour, for example because you rewatch and like the library to keep everything on your watchlist, turn this on for that account. It is off by default, so nothing changes unless you choose it.',
+      'Each linked diary has a new option, "Re-request watched titles", next to the other Seerr settings on both the admin page and your own page. Auto-request now skips films and seasons you have already watched (see below), so a cleanup tool deleting them does not download them again. If you want the old behaviour, for example because you rewatch and like the library to keep everything on your watchlist, turn this on for that account. It is off by default, so nothing changes unless you choose it.',
     highlights: {
       new: [
         'A per-account "Re-request watched titles" option brings back requesting films and seasons you have already watched once they leave the library.',
