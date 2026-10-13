@@ -106,8 +106,21 @@ public class LetterboxdAuth
 
         signInRes.EnsureSuccessStatusCode();
         var html = await signInRes.Content.ReadAsStringAsync().ConfigureAwait(false);
-        return LetterboxdHttpClient.ExtractHiddenInput(html, "__csrf")
-            ?? throw new Exception("Could not find __csrf on /sign-in/.");
+        return SignInCsrf(html) ?? throw new Exception("Could not find __csrf on /sign-in/.");
+    }
+
+    /// <summary>
+    /// The CSRF token for the login POST: the sign-in form's hidden __csrf field, or the
+    /// com.xk72.webparts.csrf cookie the page sets. Letterboxd dropped the hidden field
+    /// in 2026, and a login posted without the cookie's token fails with "The form on this
+    /// page had expired" (issue #140).
+    /// </summary>
+    private string? SignInCsrf(string html)
+    {
+        var token = LetterboxdHttpClient.ExtractHiddenInput(html, "__csrf");
+        if (string.IsNullOrEmpty(token))
+            token = _http.GetCsrfFromCookie();
+        return string.IsNullOrEmpty(token) ? null : token;
     }
 
     private async Task<string> HandleCloudflareSignInAsync()
@@ -131,7 +144,7 @@ public class LetterboxdAuth
             throw new Exception("Letterboxd returned 403 even with Cloudflare cookies. Try refreshing your raw cookies.");
 
         var retryHtml = await retryRes.Content.ReadAsStringAsync().ConfigureAwait(false);
-        return LetterboxdHttpClient.ExtractHiddenInput(retryHtml, "__csrf")
+        return SignInCsrf(retryHtml)
             ?? throw new Exception("Could not find __csrf on /sign-in/ after Cloudflare retry.");
     }
 

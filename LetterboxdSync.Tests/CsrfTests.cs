@@ -50,4 +50,14 @@ public class CsrfTests
         var result = LetterboxdHttpClient.ExtractHiddenInput(html, "__csrf");
         Assert.Equal("a&b<c", result);
     }
+
+    [Fact]
+    public void ExtractHiddenInput_MatchesTheWholeFieldName()
+    {
+        // Letterboxd's sign-in form (2026) has no __csrf field, only fields like this one.
+        var html = @"<input type=""hidden"" name=""authenticationCode"" value="""" />
+            <input type=""text"" name=""username"" value="""" />";
+
+        Assert.Null(LetterboxdHttpClient.ExtractHiddenInput(html, "__csrf"));
+    }
 }

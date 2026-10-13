@@ -159,7 +159,7 @@ public class LetterboxdHttpClient : IDisposable
 
     internal static string? ExtractHiddenInput(string html, string name)
     {
-        var pattern = $@"<input[^>]*\bname\s*=\s*[""{Regex.Escape(name)}""][^>]*\bvalue\s*=\s*[""']([^""']*)[""'][^>]*>";
+        var pattern = $@"<input[^>]*\bname\s*=\s*[""']{Regex.Escape(name)}[""'][^>]*\bvalue\s*=\s*[""']([^""']*)[""'][^>]*>";
         var m = Regex.Match(html, pattern, RegexOptions.IgnoreCase);
         return m.Success ? WebUtility.HtmlDecode(m.Groups[1].Value) : null;
     }
