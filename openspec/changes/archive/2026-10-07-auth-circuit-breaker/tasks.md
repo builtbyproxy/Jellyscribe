@@ -17,7 +17,7 @@
 - [x] 3.1 `LetterboxdController`: `Reset` on `PUT Account` and `PUT Accounts` when credentials are persisted; `GET Accounts` gains `authPaused`/`authPausedSince`
 - [x] 3.2 Controller tests: re-save resets an open breaker; accounts payload carries paused fields
 - [x] 3.3 Paused badge in `configPage.html` + `userPage.html` account rows
-- [ ] 3.4 NOT DONE at archive (2026-10-07): no live run is on record. Manual verification on live Jellyfin: force-open a breaker (bad password), observe skip + activity entry, re-save credentials, observe recovery. Covered in tests by `AuthBreakerRunnerTests`, `AuthBreakerPlaybackTests` and `AuthBreakerControllerTests`; the live check is tracked in #143
+- [x] 3.4 Manual verification on live Jellyfin. Done 2026-10-13 on the throwaway test server (Jellyfin 10.11.11, Jellyscribe 2.13.0, account lbstest, one unsynced film): with a wrong password saved, three scheduled syncs failed to log in and the third opened the breaker (`AuthBreakers` listed lbstest, which drives the admin dashboard's "Login failing · sync paused" badge) and wrote the activity entry "Jellyscribe: Letterboxd login for lbstest is failing; sync paused"; a fourth sync skipped the account with no login attempt and recorded "Account lbstest paused". Re-saving the correct password through the admin configuration save cleared the breaker, and the next sync logged in through the API and logged the film. Closes #143
 
 ## 4. Release plumbing
 
