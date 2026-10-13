@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.13.1',
+    headline: 'Signing in through the Letterboxd website works again',
+    summary:
+      'When the official sign-in does not work for an account, Jellyscribe signs in through the Letterboxd website instead. Letterboxd changed its sign-in page, and since then that fallback has failed every time with "The form on this page had expired", so those accounts could not sync at all. Jellyscribe now reads the sign-in page the way it works today, and the fallback signs in, logs films and saves ratings again. Accounts that sign in the official way were never affected.',
+    highlights: {
+      fixes: [
+        'The website sign-in fallback no longer fails with "The form on this page had expired".',
+        'Ratings changed in Jellyfin reach Letterboxd for accounts that sign in through the website, confirmed against letterboxd.com.',
+      ],
+    },
+  },
+  {
     version: '2.13.0',
     headline: 'Choose whether watched titles are requested again',
     summary:
