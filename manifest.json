@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.13.2.0",
+        "changelog": "Jellyscribe updates the library it uses to read Letterboxd web pages, which it relies on when an account signs in through the website and when it finds films on letterboxd.com. Nothing changes in how syncing works. The website sign-in, film lookups, diary entries and ratings were all checked against letterboxd.com with the new version.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.13.2/jellyfin-plugin-letterboxd-v2.13.2.zip",
+        "checksum": "383406805ccb73a522d1be77f260cd1d",
+        "timestamp": "2026-10-13T04:31:04Z"
+      },
+      {
         "version": "2.13.1.0",
         "changelog": "When the official sign-in does not work for an account, Jellyscribe signs in through the Letterboxd website instead. Since Letterboxd changed its sign-in page, that fallback has failed every time with \"The form on this page had expired\", so those accounts could not sync at all. Jellyscribe now handles the new sign-in page, so these accounts sign in, log films and save ratings again. Accounts that use the official sign-in were never affected.",
         "targetAbi": "10.11.9.0",
