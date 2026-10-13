@@ -43,7 +43,7 @@ jobs:
         uses: withastro/action@3eafd002e65cc31b4f0eae0bb05450d521562247 # v6.1.3
         with:
           path: ./site
-          node-version: 20
+          node-version: 22
 
   deploy:
     needs: build
