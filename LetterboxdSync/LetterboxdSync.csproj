@@ -24,8 +24,6 @@
          need a newer API - never via a routine dependency bump. CI enforces the match. -->
     <PackageReference Include="Jellyfin.Controller" Version="10.11.9" />
     <PackageReference Include="Jellyfin.Model" Version="10.11.9" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.22" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.22" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <!-- Encrypts stored secrets (Letterboxd password/cookies, Seerr API key) at rest.
          See LetterboxdSync/Security/SecretProtector.cs for the threat model. -->
