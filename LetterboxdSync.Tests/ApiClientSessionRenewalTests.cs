@@ -27,6 +27,7 @@ public class ApiClientSessionRenewalTests
     {
         public int FirstLifetime = 3600;
         public bool RefuseRefresh;
+        public bool RateLimitRefresh;
         public Func<string, bool> Accepted = _ => true;
         public readonly ConcurrentQueue<string> Grants = new();
         public readonly ConcurrentQueue<string> BearersSeen = new();
@@ -43,6 +44,12 @@ public class ApiClientSessionRenewalTests
                 if (body.Contains("grant_type=refresh_token", StringComparison.Ordinal))
                 {
                     Grants.Enqueue("refresh");
+                    if (RateLimitRefresh)
+                    {
+                        var limited = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+                        limited.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(30));
+                        return limited;
+                    }
                     if (RefuseRefresh)
                         return new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("{\"error\":\"invalid_grant\"}") };
                     var n = Interlocked.Increment(ref _refreshes);
@@ -138,6 +145,44 @@ public class ApiClientSessionRenewalTests
     }
 
     [Fact]
+    public async Task CancelledDuringARateLimitedRenewal_StopsWaitingWithoutRetryingTheRefresh()
+    {
+        // A 429 means the refresh token was not spent, so cancelling the wait is safe: shutdown
+        // must not sit out the Retry-After.
+        var api = new Api { FirstLifetime = 60, RateLimitRefresh = true };
+        using var client = new LetterboxdApiClient(NullLogger.Instance, api);
+        await client.AuthenticateAsync(NewUser(), "pass");
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        var started = DateTime.UtcNow;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => client.GetDiaryInfoAsync("lid", "demo-cinephile", cts.Token));
+
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(10));
+        Assert.Equal(1, api.Grants.Count(g => g == "refresh"));
+        Assert.Empty(api.BearersSeen);
+    }
+
+    [Fact]
+    public async Task SignInWithAnExpiredCachedToken_AdoptsTheTokenARunJustRenewed()
+    {
+        // A second sign-in (a playback event) while a run of the same account holds a renewed
+        // token: it takes that token instead of spending the refresh token again.
+        var api = new Api { FirstLifetime = 60 };
+        var user = NewUser();
+        using var run = new LetterboxdApiClient(NullLogger.Instance, api);
+        await run.AuthenticateAsync(user, "pass");
+        await run.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        using var playback = new LetterboxdApiClient(NullLogger.Instance, api);
+        await playback.AuthenticateAsync(user, "pass");
+        await playback.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        Assert.Equal(new[] { "password", "refresh" }, api.Grants.ToArray());
+        Assert.Equal(new[] { "new-1", "new-1" }, api.BearersSeen.ToArray());
+    }
+
+    [Fact]
     public async Task UnexpectedUnauthorized_RenewsAndResendsTheWriteOnce()
     {
         var api = new Api { Accepted = bearer => bearer != "old" };
@@ -228,7 +273,9 @@ public class ApiClientSessionRenewalTests
         await first.GetDiaryInfoAsync("lid", "demo-cinephile");
         await second.GetDiaryInfoAsync("lid", "demo-cinephile");
 
+        // The second client takes the renewed token from the cache before sending, so it never
+        // sends the old one to be refused.
         Assert.Equal(1, api.Grants.Count(g => g == "refresh"));
-        Assert.Equal(new[] { "old", "new-1", "old", "new-1" }, api.BearersSeen.ToArray());
+        Assert.Equal(new[] { "old", "new-1", "new-1" }, api.BearersSeen.ToArray());
     }
 }

@@ -69,19 +69,20 @@ internal static class TelemetryService
             || Contains(m, "Auth failed") || Contains(m, "session may be permanently invalid")
             || Contains(m, "token expired")
             // The API client's own phrasing for a session it no longer has, and the status
-            // name the API paths print ("Failed to log film: Unauthorized ...").
+            // name the API paths print ("Failed to log film: Unauthorized ..."). Status names are
+            // matched after ": " only, so a film slug such as "forbidden-planet" cannot match.
             || Contains(m, "Not authenticated") || Contains(m, "without a member id")
-            || Contains(m, "Unauthorized"))
+            || Contains(m, ": Unauthorized"))
             return CatAuth;
 
         if (Contains(m, "Seerr"))
             return CatJellyseerr;
 
-        if (Contains(m, "429") || Contains(m, "Too Many Requests") || Contains(m, "TooManyRequests")
+        if (Contains(m, "429") || Contains(m, "Too Many Requests") || Contains(m, ": TooManyRequests")
             || Contains(m, "rate limit"))
             return CatRateLimit;
 
-        if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403") || Contains(m, "Forbidden"))
+        if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403") || Contains(m, ": Forbidden"))
             return CatCloudflare;
 
         // The service failed or did not answer. "returned 5xx" is Letterboxd's phrasing;
@@ -94,8 +95,8 @@ internal static class TelemetryService
             || Contains(m, "(500)") || Contains(m, "(502)")
             || Contains(m, "(503)") || Contains(m, "(504)")
             || Contains(m, "does not indicate success: 5")
-            || Contains(m, "InternalServerError") || Contains(m, "BadGateway")
-            || Contains(m, "ServiceUnavailable") || Contains(m, "GatewayTimeout")
+            || Contains(m, ": InternalServerError") || Contains(m, ": BadGateway")
+            || Contains(m, ": ServiceUnavailable") || Contains(m, ": GatewayTimeout")
             || Contains(m, "timed out") || Contains(m, "HttpClient.Timeout")
             || Contains(m, "Connection refused") || Contains(m, "No such host")
             || Contains(m, "Name or service not known") || Contains(m, "nodename nor servname")

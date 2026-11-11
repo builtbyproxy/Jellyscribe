@@ -155,7 +155,7 @@ public class SyncReliabilityTests : IDisposable
         Assert.Equal(2, events.Count(e => e.Status == SyncStatus.Success));
         Assert.Equal(LetterboxdSyncRunner.MaxConsecutiveBlocks, events.Count(e => e.Status == SyncStatus.Failed));
         var pause = Assert.Single(events, e => e.Status == SyncStatus.Skipped);
-        Assert.Contains("3 films", pause.Error, StringComparison.Ordinal);
+        Assert.Contains($"{8 - 2 - LetterboxdSyncRunner.MaxConsecutiveBlocks} films", pause.Error, StringComparison.Ordinal);
         Assert.Contains("sign-in that expired", pause.Error, StringComparison.Ordinal);
     }
 

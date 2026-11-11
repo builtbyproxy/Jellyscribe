@@ -77,7 +77,9 @@ public class LetterboxdSyncRunner
     /// <summary>
     /// After this many films in a row are refused with a block (a Cloudflare 403 or challenge, or
     /// an API session that expired and could not be renewed), the rest of the account's run waits
-    /// for the next one. Going on would hold the sync for hours and fail every film.
+    /// for the next one. A Cloudflare block already costs about a minute of backoff per film, and
+    /// an expired session fails every later request, so going on would hold the sync for hours
+    /// and fail every film.
     /// </summary>
     internal const int MaxConsecutiveBlocks = 3;
 

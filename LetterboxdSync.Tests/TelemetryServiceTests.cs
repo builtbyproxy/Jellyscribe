@@ -93,6 +93,9 @@ public class TelemetryServiceTests : IDisposable
     [InlineData("Failed to rate some-film: BadRequest", TelemetryService.CatWriteFailure)]
     // Auth is checked before the write bucket, so a refused write reads as a sign-in problem.
     [InlineData("Failed to rate some-film: Unauthorized", TelemetryService.CatAuth)]
+    // A film slug that happens to spell a status name is not a status.
+    [InlineData("Failed to rate forbidden-planet: BadRequest", TelemetryService.CatWriteFailure)]
+    [InlineData("Failed to log the-unauthorized-biography after 4 retries.", TelemetryService.CatWriteFailure)]
     // .NET's EnsureSuccessStatusCode wording, and a service that never answered.
     [InlineData("Response status code does not indicate success: 503 (Service Unavailable).", TelemetryService.CatServerError)]
     [InlineData("Response status code does not indicate success: 401 (Unauthorized).", TelemetryService.CatAuth)]
