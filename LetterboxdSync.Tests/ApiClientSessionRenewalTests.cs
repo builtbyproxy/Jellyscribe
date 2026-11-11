@@ -30,6 +30,8 @@ public class ApiClientSessionRenewalTests
         public Func<string, bool> Accepted = _ => true;
         public readonly ConcurrentQueue<string> Grants = new();
         public readonly ConcurrentQueue<string> BearersSeen = new();
+        public readonly ConcurrentQueue<string> DiaryQueries = new();
+        public int MeCalls;
         private int _refreshes;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -52,10 +54,15 @@ public class ApiClientSessionRenewalTests
             }
 
             if (path.EndsWith("/me", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref MeCalls);
                 return Json("{\"member\":{\"id\":\"m-1\",\"username\":\"demo-cinephile\"}}");
+            }
 
             if (path.EndsWith("/log-entries", StringComparison.Ordinal))
             {
+                if (request.Method == HttpMethod.Get)
+                    DiaryQueries.Enqueue(request.RequestUri.Query);
                 var bearer = request.Headers.Authorization?.Parameter ?? string.Empty;
                 BearersSeen.Enqueue(bearer);
                 if (!Accepted(bearer))
@@ -86,6 +93,51 @@ public class ApiClientSessionRenewalTests
     }
 
     [Fact]
+    public async Task AfterARenewal_LaterRequestsUseTheNewTokenWithoutRenewingAgain()
+    {
+        var api = new Api { FirstLifetime = 60 };
+        using var client = new LetterboxdApiClient(NullLogger.Instance, api);
+        await client.AuthenticateAsync(NewUser(), "pass");
+
+        await client.GetDiaryInfoAsync("lid", "demo-cinephile");
+        await client.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        Assert.Equal(1, api.Grants.Count(g => g == "refresh"));
+        Assert.Equal(new[] { "new-1", "new-1" }, api.BearersSeen.ToArray());
+    }
+
+    [Fact]
+    public async Task Renewal_KeepsTheMemberIdWithoutAskingAgain()
+    {
+        // An account's member id never changes. Asking /me again during a renewal could only
+        // fail, leaving a token with no member id, so the renewal keeps the one it has.
+        var api = new Api { FirstLifetime = 60 };
+        using var client = new LetterboxdApiClient(NullLogger.Instance, api);
+        await client.AuthenticateAsync(NewUser(), "pass");
+
+        await client.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        Assert.Equal(1, api.MeCalls);
+        Assert.Contains("member=m-1", Assert.Single(api.DiaryQueries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CancelledBeforeRenewing_ThrowsWithoutSpendingTheRefreshToken()
+    {
+        var api = new Api { FirstLifetime = 60 };
+        using var client = new LetterboxdApiClient(NullLogger.Instance, api);
+        await client.AuthenticateAsync(NewUser(), "pass");
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => client.GetDiaryInfoAsync("lid", "demo-cinephile", cts.Token));
+
+        Assert.DoesNotContain("refresh", api.Grants);
+        Assert.Empty(api.BearersSeen);
+    }
+
+    [Fact]
     public async Task UnexpectedUnauthorized_RenewsAndResendsTheWriteOnce()
     {
         var api = new Api { Accepted = bearer => bearer != "old" };
@@ -111,8 +163,26 @@ public class ApiClientSessionRenewalTests
         Assert.Equal(TelemetryService.CatAuth, TelemetryService.Classify(ex.Message));
 
         var sent = api.BearersSeen.Count;
+        var grants = api.Grants.Count;
         await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(() => client.GetDiaryInfoAsync("lid", "demo-cinephile"));
         Assert.Equal(sent, api.BearersSeen.Count);
+        Assert.Equal(grants, api.Grants.Count);
+    }
+
+    [Fact]
+    public async Task ExpiredSessionNearItsEnd_FailsLaterCallsWithoutAnotherRefreshRequest()
+    {
+        // A token inside the renewal window must not send another refresh request once the
+        // session is known to be over.
+        var api = new Api { FirstLifetime = 60, Accepted = _ => false, RefuseRefresh = true };
+        using var client = new LetterboxdApiClient(NullLogger.Instance, api);
+        await client.AuthenticateAsync(NewUser(), "pass");
+        await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(() => client.GetDiaryInfoAsync("lid", "demo-cinephile"));
+
+        var grants = api.Grants.Count;
+        await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(() => client.GetDiaryInfoAsync("lid", "demo-cinephile"));
+
+        Assert.Equal(grants, api.Grants.Count);
     }
 
     [Fact]
