@@ -779,7 +779,8 @@ public class LetterboxdApiClient : ILetterboxdService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Could not renew the Letterboxd API session: {Message}", ex.Message);
+            // Sanitized like every sign-in error: a token reply must never reach the log.
+            _logger.LogWarning("Could not renew the Letterboxd API session: {Message}", AuthBreaker.Sanitize(ex.Message));
             return false;
         }
         finally
@@ -930,6 +931,7 @@ public class LetterboxdApiClient : ILetterboxdService
         else
             _logger.LogWarning("Letterboxd API session expired and could not be renewed");
         _accessToken = string.Empty;
+        _refreshToken = string.Empty;
         _sessionExpired = true;
     }
 
