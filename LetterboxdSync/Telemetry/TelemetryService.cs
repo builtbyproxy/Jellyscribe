@@ -67,24 +67,39 @@ internal static class TelemetryService
 
         if (Contains(m, "login error") || Contains(m, "401") || Contains(m, "reCAPTCHA")
             || Contains(m, "Auth failed") || Contains(m, "session may be permanently invalid")
-            || Contains(m, "token expired"))
+            || Contains(m, "token expired")
+            // The API client's own phrasing for a session it no longer has, and the status
+            // name the API paths print ("Failed to log film: Unauthorized ...").
+            || Contains(m, "Not authenticated") || Contains(m, "without a member id")
+            || Contains(m, "Unauthorized"))
             return CatAuth;
 
         if (Contains(m, "Seerr"))
             return CatJellyseerr;
 
-        if (Contains(m, "429") || Contains(m, "Too Many Requests") || Contains(m, "rate limit"))
+        if (Contains(m, "429") || Contains(m, "Too Many Requests") || Contains(m, "TooManyRequests")
+            || Contains(m, "rate limit"))
             return CatRateLimit;
 
-        if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403"))
+        if (Contains(m, "Cloudflare") || Contains(m, "anti-bot") || Contains(m, "403") || Contains(m, "Forbidden"))
             return CatCloudflare;
 
-        // "returned 5xx" is Letterboxd's phrasing; Serializd's SerializdApiClient says
-        // "failed (5xx):" instead, same status codes, different wording.
+        // The service failed or did not answer. "returned 5xx" is Letterboxd's phrasing;
+        // Serializd's SerializdApiClient says "failed (5xx):"; the official API paths print the
+        // status name ("InternalServerError"); .NET's EnsureSuccessStatusCode says "does not
+        // indicate success: 5xx". Timeouts and unreachable hosts count here too: like a 5xx,
+        // the service did not answer, and nothing about the item was wrong.
         if (Contains(m, "returned 500") || Contains(m, "returned 502")
             || Contains(m, "returned 503") || Contains(m, "returned 504")
             || Contains(m, "(500)") || Contains(m, "(502)")
-            || Contains(m, "(503)") || Contains(m, "(504)"))
+            || Contains(m, "(503)") || Contains(m, "(504)")
+            || Contains(m, "does not indicate success: 5")
+            || Contains(m, "InternalServerError") || Contains(m, "BadGateway")
+            || Contains(m, "ServiceUnavailable") || Contains(m, "GatewayTimeout")
+            || Contains(m, "timed out") || Contains(m, "HttpClient.Timeout")
+            || Contains(m, "Connection refused") || Contains(m, "No such host")
+            || Contains(m, "Name or service not known") || Contains(m, "nodename nor servname")
+            || Contains(m, "error occurred while sending the request"))
             return CatServerError;
 
         if (Contains(m, "not found on Letterboxd") || Contains(m, "TMDb lookup") || Contains(m, "TMDb ID"))
@@ -94,7 +109,9 @@ internal static class TelemetryService
             || Contains(m, "data-film-id") || Contains(m, "non-film URL"))
             return CatParse;
 
-        if (Contains(m, "Failed to log") || Contains(m, "Failed to post"))
+        if (Contains(m, "Failed to log") || Contains(m, "Failed to post") || Contains(m, "Failed to rate")
+            || Contains(m, "Failed to add the review") || Contains(m, "rejected rating")
+            || Contains(m, "did not confirm rating") || Contains(m, "refused the review update"))
             return CatWriteFailure;
 
         return CatOther;

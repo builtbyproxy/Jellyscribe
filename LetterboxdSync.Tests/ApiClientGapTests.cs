@@ -64,7 +64,7 @@ public class ApiClientGapTests
         using var client = new LetterboxdApiClient(TestLogger, handler);
         await client.AuthenticateAsync("user", "pass");
 
-        var ex = await Assert.ThrowsAsync<Exception>(() =>
+        var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(() =>
             client.MarkAsWatchedAsync("film", "lid", DateTime.Now, liked: false));
         Assert.Contains("token expired", ex.Message);
     }

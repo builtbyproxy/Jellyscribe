@@ -134,6 +134,31 @@ public class SyncReliabilityTests : IDisposable
         Assert.All(events.Where(e => e.Status == SyncStatus.Failed), e => Assert.True(e.Outage));
     }
 
+    [Fact]
+    public async Task SessionExpiresMidRun_PausesAfterAFewInsteadOfFailingEveryFilm()
+    {
+        // The first films sync, then the API session expires and cannot be renewed: every later
+        // request would be refused, so the runner stops after a few instead of failing the rest.
+        var user = MakeUser();
+        var movies = Enumerable.Range(1, 8).Select(i => MakeMovie(2000 + i, "Film " + i)).ToArray();
+        Setup(user, movies);
+        var service = Service();
+        var checks = 0;
+        service.GetDiaryInfoAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(_ =>
+            ++checks <= 2
+                ? Task.FromResult(new DiaryInfo(null, false))
+                : Task.FromException<DiaryInfo>(new LetterboxdSessionExpiredException()));
+
+        await RunAsync(user);
+
+        var events = SyncHistory.GetRecent(50, "demo-user");
+        Assert.Equal(2, events.Count(e => e.Status == SyncStatus.Success));
+        Assert.Equal(LetterboxdSyncRunner.MaxConsecutiveBlocks, events.Count(e => e.Status == SyncStatus.Failed));
+        var pause = Assert.Single(events, e => e.Status == SyncStatus.Skipped);
+        Assert.Contains("3 films", pause.Error, StringComparison.Ordinal);
+        Assert.Contains("sign-in that expired", pause.Error, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, true)]
     // A 429 reaches the runner only when its Retry-After is longer than the client waits.

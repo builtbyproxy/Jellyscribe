@@ -47,6 +47,21 @@ public sealed class LetterboxdBlockedException : Exception
 }
 
 /// <summary>
+/// The official API session expired during a run and renewing it failed (the refresh token was
+/// refused, or the renewed token was refused too). Every later API call in the run would be
+/// refused the same way, so the runner counts it as a block and pauses the account; the next
+/// run signs in again from scratch. The message keeps "token expired", which telemetry files
+/// under auth_failure.
+/// </summary>
+public sealed class LetterboxdSessionExpiredException : Exception
+{
+    public LetterboxdSessionExpiredException()
+        : base("Letterboxd API token expired and could not be renewed. Will sign in again on the next sync.")
+    {
+    }
+}
+
+/// <summary>
 /// The official API's token endpoint answered the login with an error status. The message is the
 /// same text callers have always logged.
 /// </summary>
@@ -79,12 +94,13 @@ public static class SyncErrors
 {
     /// <summary>
     /// True when the failure was Letterboxd refusing the request (a 403, a Cloudflare challenge,
-    /// or a 429 whose Retry-After is longer than the clients wait) rather than anything about the
-    /// film. Every later request in the run would be refused the same way.
+    /// a 429 whose Retry-After is longer than the clients wait, or an API session that expired and
+    /// could not be renewed) rather than anything about the film. Every later request in the run would be refused the same way.
     /// </summary>
     public static bool IsBlock(Exception ex) => ex switch
     {
         LetterboxdBlockedException => true,
+        LetterboxdSessionExpiredException => true,
         DiaryCheckFailedException d => d.Blocked,
         System.Net.Http.HttpRequestException h => h.StatusCode
             is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests,
