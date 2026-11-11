@@ -170,6 +170,22 @@ public class ApiClientSessionRenewalTests
     }
 
     [Fact]
+    public async Task RenewalAheadRefused_DoesNotRetryOnEveryRequestWhileTheTokenStillWorks()
+    {
+        // The token has a few minutes left and the refresh is refused: each film must not send
+        // another refused refresh (60-100 of them at the runner's pace). The token keeps working.
+        var api = new Api { FirstLifetime = 60, RefuseRefresh = true };
+        using var client = new LetterboxdApiClient(NullLogger.Instance, api);
+        await client.AuthenticateAsync(NewUser(), "pass");
+
+        for (var i = 0; i < 5; i++)
+            await client.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        Assert.Equal(1, api.Grants.Count(g => g == "refresh"));
+        Assert.All(api.BearersSeen, b => Assert.Equal("old", b));
+    }
+
+    [Fact]
     public async Task ExpiredSessionNearItsEnd_FailsLaterCallsWithoutAnotherRefreshRequest()
     {
         // A token inside the renewal window must not send another refresh request once the

@@ -29,6 +29,11 @@ public class LetterboxdApiClient : ILetterboxdService
     // with the same block, instead of a generic "not authenticated" the runner can't recognise.
     private bool _sessionExpired;
 
+    // Set when a renewal ahead of expiry failed. The token still works until it expires, so the
+    // client stops renewing ahead (each film would otherwise send another refused refresh) and
+    // leaves the last attempt to the 401 path: at most two refresh requests per session.
+    private bool _renewAheadFailed;
+
     /// <summary>
     /// A token this close to expiry is renewed before it is used. A run that paces its films
     /// (3-5 s each, plus the requests) outlasts the hour a token lives once it has a few hundred
@@ -705,8 +710,9 @@ public class LetterboxdApiClient : ILetterboxdService
         var renew = authenticated && renewSession;
         if (renew && _sessionExpired)
             throw new LetterboxdSessionExpiredException();
-        if (renew && _expiresAtUtc <= Now + RenewBefore)
-            await TryRenewSessionAsync(_accessToken, cancellationToken).ConfigureAwait(false);
+        if (renew && !_renewAheadFailed && _expiresAtUtc <= Now + RenewBefore
+            && !await TryRenewSessionAsync(_accessToken, cancellationToken).ConfigureAwait(false))
+            _renewAheadFailed = true;
 
         var response = await SendWithRateLimitRetryAsync(method, path, body, contentType, queryParams, authenticated,
             cancellationToken).ConfigureAwait(false);
@@ -789,6 +795,7 @@ public class LetterboxdApiClient : ILetterboxdService
         _expiresAtUtc = cached.ExpiresAtUtc;
         _memberId = cached.MemberId;
         _sessionExpired = false;
+        _renewAheadFailed = false;
     }
 
     private async Task<HttpResponseMessage> SendWithRateLimitRetryAsync(HttpMethod method, string path,
@@ -870,6 +877,7 @@ public class LetterboxdApiClient : ILetterboxdService
         _refreshToken = refreshToken;
         _expiresAtUtc = Now.AddSeconds(expiresIn);
         _sessionExpired = false;
+        _renewAheadFailed = false;
         if (!string.IsNullOrEmpty(knownMemberId))
         {
             _memberId = knownMemberId;
