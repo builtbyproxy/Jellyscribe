@@ -12,7 +12,8 @@
  * post(path, body) (a promise of { ok, status, json() } for any HTTP reply, rejected only when the server
  * could not be reached); noActivityText, overviewWhat, retryable, modalIds and historyBodies; and the
  * page-specific actions it wires up (runSync, runWatchlist, saveAccount, deleteAccount, verifyAccount,
- * populateReviewAccountDropdown, and onSection(sec) when a nav section needs loading).
+ * populateReviewAccountDropdown, onSection(sec) when a nav section needs loading, and afterOverview(fs, ts)
+ * when the page wants the film and TV stats each time the overview loads).
  */
 (function () {
     var registry = window.JellyscribeShared = window.JellyscribeShared || {};
@@ -208,6 +209,7 @@
                         self.renderOverview();
                         self.renderSparks();
                         self.renderMore();
+                        if (self.afterOverview) self.afterOverview(fs, ts);
                     }).catch(function () {
                         if (gen !== self.histGen) return;
                         byId('historyBody').innerHTML = self.errorRow(self.overviewWhat, 'loadOverview');
