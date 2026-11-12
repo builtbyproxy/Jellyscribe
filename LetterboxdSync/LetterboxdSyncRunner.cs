@@ -466,7 +466,6 @@ public class LetterboxdSyncRunner
                         Source = source
                     });
                     skipped++;
-                    blocksInARow = 0;
                     SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
                     continue;
                 }
@@ -494,7 +493,6 @@ public class LetterboxdSyncRunner
                         Source = source
                     });
                     skipped++;
-                    blocksInARow = 0;
                     SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
                     continue;
                 }
@@ -523,9 +521,10 @@ public class LetterboxdSyncRunner
                     Source = source
                 });
                 synced++;
-                // Reset only once the film is done, never after the diary check alone: on the
-                // website path the check reads a public page that still answers when the session
-                // has gone, so a reset there would hide every refused write from the breaker.
+                // Reset only after a write Letterboxd accepted, never after the diary check alone
+                // (a duplicate skip is decided by that check): on the website path the check reads
+                // a public page that still answers when the session has gone, so a reset there
+                // would hide every refused write from the breaker.
                 blocksInARow = 0;
                 SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
             }

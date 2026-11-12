@@ -174,6 +174,7 @@ public class SetFilmRatingTests
     public async Task Site_401WithReauthSpent_ThrowsSessionExpiredBlock()
     {
         // The website path's counterpart of Api_Unauthorized_RenewsOnceThenThrows (issue #188).
+        var posts = 0;
         var handler = new DiaryMockHandler((request, http) =>
         {
             var p = request.RequestUri?.PathAndQuery ?? "";
@@ -182,9 +183,10 @@ public class SetFilmRatingTests
                 http.CookieContainer.Add(BaseUri, new Cookie("com.xk72.webparts.csrf", "csrf-token"));
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }
-            return request.Method == HttpMethod.Post
-                ? new HttpResponseMessage(HttpStatusCode.Unauthorized)
-                : new HttpResponseMessage(HttpStatusCode.NotFound);
+            if (request.Method != HttpMethod.Post)
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            posts++;
+            return new HttpResponseMessage(HttpStatusCode.Unauthorized);
         });
         var (http, auth, _, diary) = handler.CreateClients(TestLogger);
         using var _ = http;
@@ -195,6 +197,7 @@ public class SetFilmRatingTests
 
         Assert.True(SyncErrors.IsBlock(ex));
         Assert.Equal(TelemetryService.CatAuth, TelemetryService.Classify(ex.Message));
+        Assert.Equal(1, posts);
     }
 
     [Fact]

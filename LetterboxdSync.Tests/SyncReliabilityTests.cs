@@ -208,6 +208,34 @@ public class SyncReliabilityTests : IDisposable
         Assert.Single(SyncHistory.GetRecent(50, "demo-user"), e => e.Status == SyncStatus.Skipped);
     }
 
+    [Fact]
+    public async Task DuplicatesBetweenRefusedWrites_DoNotResetTheCount()
+    {
+        // Films already on the diary need no write, so skipping one says nothing about whether the
+        // session still works: refused writes on either side of it still count as in a row.
+        var user = MakeUser();
+        var movies = Enumerable.Range(1, 8).Select(i => MakeMovie(2300 + i, "Film " + i)).ToArray();
+        Setup(user, movies);
+        var service = Service();
+        var checks = 0;
+        var watched = LetterboxdSyncRunner.ViewingDateFor(DateTime.UtcNow.AddHours(-1));
+        service.GetDiaryInfoAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(_ =>
+            ++checks % 2 == 0
+                ? new DiaryInfo(watched, false)
+                : new DiaryInfo(null, false));
+        service.MarkAsWatchedAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
+                Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new LetterboxdSessionExpiredException(
+                "Letterboxd returned 401 for film after re-authentication. Session may be permanently invalid."));
+
+        await RunAsync(user);
+
+        await service.Received(LetterboxdSyncRunner.MaxConsecutiveBlocks).MarkAsWatchedAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
+            Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>(), Arg.Any<CancellationToken>());
+        Assert.Single(SyncHistory.GetRecent(50, "demo-user"), e => e.Status == SyncStatus.Skipped && e.FilmTitle.Contains("paused"));
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, true)]
     // A 429 reaches the runner only when its Retry-After is longer than the client waits.

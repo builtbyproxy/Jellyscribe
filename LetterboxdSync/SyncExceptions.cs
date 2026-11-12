@@ -51,8 +51,8 @@ public sealed class LetterboxdBlockedException : Exception
 /// renewal failed (the refresh token was refused, or the renewed token was refused too); on the
 /// website a fresh sign-in did not stop the 401s. Every later request in the run would be refused
 /// the same way, so the runner counts it as a block and pauses the account; the next run signs in
-/// again from scratch. Each message keeps "token expired" or "401", which telemetry files under
-/// auth_failure.
+/// again from scratch. Telemetry classifies by message, so every message must keep "token expired"
+/// or "401" to be filed under auth_failure; the message constructor is internal for that reason.
 /// </summary>
 public sealed class LetterboxdSessionExpiredException : Exception
 {
@@ -61,7 +61,7 @@ public sealed class LetterboxdSessionExpiredException : Exception
     {
     }
 
-    public LetterboxdSessionExpiredException(string message) : base(message)
+    internal LetterboxdSessionExpiredException(string message) : base(message)
     {
     }
 }
