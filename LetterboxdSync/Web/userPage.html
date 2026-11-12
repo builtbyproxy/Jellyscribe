@@ -14,6 +14,12 @@
                 #letterboxdUserPage .ws-back { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ws-faint); font-weight: 500; font-size: 13px; text-decoration: none; cursor: pointer; transition: .13s; }
                 #letterboxdUserPage .ws-back:hover { background: var(--ws-surface-2); color: var(--ws-text); }
                 #letterboxdUserPage .ws-back svg { width: 15px; height: 15px; flex: none; }
+                /* First-run card: no diary linked yet, or linked with nothing logged yet. */
+                #letterboxdUserPage .ws-firstrun { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 20px; margin-bottom: 18px; border-left: 3px solid var(--ws-primary); }
+                #letterboxdUserPage .ws-firstrun[hidden], #letterboxdUserPage .ws-btn[hidden] { display: none; }
+                #letterboxdUserPage .ws-firstrun > div { min-width: 0; flex: 1 1 280px; }
+                #letterboxdUserPage .ws-firstrun b { display: block; font-size: 15px; margin-bottom: 4px; }
+                #letterboxdUserPage .ws-firstrun p { margin: 0; font-size: 13px; line-height: 1.5; }
                 </style>
 
                 <div class="ws">
@@ -32,6 +38,10 @@
                         <section class="ws-view show" data-sec="overview">
                             <div class="ws-head"><div><h1>Your diaries</h1><p>What we've logged from your watching, across both accounts.</p></div>
                                 <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="runWatchlistBtn">Sync all watchlists</button><button type="button" class="ws-btn primary" id="runSyncBtn">Sync all now</button></div></div>
+                            <div class="ws-panel ws-firstrun" id="firstRun" role="region" aria-labelledby="firstRunTitle" hidden>
+                                <div><b id="firstRunTitle"></b><p class="ws-muted" id="firstRunText"></p></div>
+                                <button type="button" class="ws-btn primary" id="firstRunBtn"></button>
+                            </div>
                             <div class="ws-filters" id="ovFilters">
                                 <button type="button" class="ws-chip on" data-f="all">All</button>
                                 <button type="button" class="ws-chip" data-f="letterboxd"><span class="ws-dot film"></span>Film</button>
@@ -218,6 +228,37 @@
                                 if (res.some(function (x) { return x.ok; })) self.startWatcher(label); else self.setSyncBusy(false);
                             });
                         },
+                        // First run: no diary linked yet, or linked with nothing logged yet. Shown only once both
+                        // the accounts and the activity have loaded, so a slow or failed load never shows it.
+                        afterOverview: function () { this.overviewReady = true; this.renderFirstRun(); },
+                        renderFirstRun: function () {
+                            var self = this, box = byId('firstRun');
+                            if (!box || !self.acctsReady || !self.overviewReady) return;
+                            var linked = self.lb.length + self.sz.length, mode = !linked ? 'link' : (self.merged.length ? '' : 'sync');
+                            box.hidden = !mode;
+                            // With nothing linked, the sync buttons can only fail, so the card is the one action.
+                            byId('runSyncBtn').hidden = byId('runWatchlistBtn').hidden = mode === 'link';
+                            if (!mode) return;
+                            var btn = byId('firstRunBtn');
+                            if (mode === 'link') {
+                                byId('firstRunTitle').textContent = 'Link a diary to get started';
+                                byId('firstRunText').textContent = 'Connect your Letterboxd account for films or your Serializd account for TV. After that, everything you finish watching here is logged to it.';
+                                btn.textContent = 'Link a diary';
+                                btn.onclick = function () { self.openAccount(null); };
+                            } else {
+                                byId('firstRunTitle').textContent = 'Nothing logged yet';
+                                byId('firstRunText').textContent = 'Your account is linked. Jellyscribe logs a film or episode when you finish watching it, and the scheduled sync catches up on what you watched recently. Run the first sync now to see it work.';
+                                btn.textContent = 'Sync now';
+                                btn.onclick = function () { self.runFirstSync(); };
+                            }
+                        },
+                        // Only the services this user has linked, so a missing account is not reported as an error.
+                        runFirstSync: function () {
+                            var jobs = [];
+                            if (this.sz.length) jobs.push({ name: 'Serializd', path: 'Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow' });
+                            if (this.lb.length) jobs.push({ name: 'Letterboxd', path: 'Jellyfin.Plugin.LetterboxdSync/Sync' });
+                            this.startJobs('Sync', jobs);
+                        },
                         /* ===== Accounts ===== */
                         loadAccounts: function () {
                             var self = this;
@@ -228,6 +269,8 @@
                                     // Watchlist collections and playlists are named by an admin; the server keeps the stored name for anyone else.
                                     self.canSetWatchlistName = !!((res[0] && res[0].canSetWatchlistName) || (res[1] && res[1].canSetWatchlistName));
                                     self.renderAccounts();
+                                    self.acctsReady = true;
+                                    self.renderFirstRun();
                                 })
                                 // Never render the add card on a failed load: saving from an empty list would overwrite the stored accounts.
                                 .catch(function () { byId('acctGrid').innerHTML = '<div class="ws-panel" style="padding:2em;text-align:center;">' + self.errorHtml('your accounts', 'loadAccounts') + '</div>'; });

@@ -12,7 +12,8 @@
  * post(path, body) (a promise of { ok, status, json() } for any HTTP reply, rejected only when the server
  * could not be reached); noActivityText, overviewWhat, retryable, modalIds and historyBodies; and the
  * page-specific actions it wires up (runSync, runWatchlist, saveAccount, deleteAccount, verifyAccount,
- * populateReviewAccountDropdown, and onSection(sec) when a nav section needs loading).
+ * populateReviewAccountDropdown, onSection(sec) when a nav section needs loading, and afterOverview()
+ * when the page wants to know the overview loaded).
  */
 (function () {
     var registry = window.JellyscribeShared = window.JellyscribeShared || {};
@@ -208,6 +209,7 @@
                         self.renderOverview();
                         self.renderSparks();
                         self.renderMore();
+                        if (self.afterOverview) self.afterOverview();
                     }).catch(function () {
                         if (gen !== self.histGen) return;
                         byId('historyBody').innerHTML = self.errorRow(self.overviewWhat, 'loadOverview');
@@ -398,7 +400,7 @@
                 byId('runSyncBtn').textContent = f === 'all' ? 'Sync all now' : 'Sync ' + svc + ' now';
                 byId('runWatchlistBtn').textContent = f === 'all' ? 'Sync all watchlists' : 'Sync ' + svc + ' watchlist';
             },
-            setSyncBusy: function (busy) { byId('runSyncBtn').disabled = busy; byId('runWatchlistBtn').disabled = busy; },
+            setSyncBusy: function (busy) { byId('runSyncBtn').disabled = busy; byId('runWatchlistBtn').disabled = busy; var fr = byId('firstRunBtn'); if (fr) fr.disabled = busy; },
             getProgress: function () { return this.getJson('Jellyfin.Plugin.LetterboxdSync/Progress').catch(function () { return null; }); },
             startWatcher: function (label) {
                 var self = this, w = self.watcher || (self.watcher = {});

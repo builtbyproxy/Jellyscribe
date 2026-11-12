@@ -189,6 +189,25 @@ public class DashboardMarkupTests
         Assert.Contains("outline: 2px solid var(--ws-focus);", Rule(Style(file), root + " :focus-visible"), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void UserPage_FirstRunCard_StartsHidden_AndWaitsForBothLoads()
+    {
+        var page = Read("userPage.html");
+        Assert.Contains("<div class=\"ws-panel ws-firstrun\" id=\"firstRun\" role=\"region\" aria-labelledby=\"firstRunTitle\" hidden>", page, StringComparison.Ordinal);
+        Assert.Contains("<button type=\"button\" class=\"ws-btn primary\" id=\"firstRunBtn\"></button>", page, StringComparison.Ordinal);
+        // Hidden must win over the card's flex layout, or the card shows on every load.
+        Assert.Contains("display: none;", Rule(PageStyle(page), "#letterboxdUserPage .ws-firstrun[hidden]"), StringComparison.Ordinal);
+        // Never shown off one load alone: a failed account load must not say "Link a diary" to someone who has one.
+        Assert.Contains("if (!box || !self.acctsReady || !self.overviewReady) return;", page, StringComparison.Ordinal);
+
+        // The shared overview reports a successful load only; its failure path shows the retry row instead.
+        var shared = Read("jellyscribe.js");
+        var load = shared.Substring(shared.IndexOf("loadOverview: function", StringComparison.Ordinal));
+        load = load.Substring(0, load.IndexOf("histChunk:", StringComparison.Ordinal));
+        var hook = load.IndexOf("if (self.afterOverview) self.afterOverview();", StringComparison.Ordinal);
+        Assert.True(hook > 0 && hook < load.IndexOf(".catch(", StringComparison.Ordinal));
+    }
+
     [Theory]
     [MemberData(nameof(Files))]
     public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file)
