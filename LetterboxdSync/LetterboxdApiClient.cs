@@ -49,9 +49,13 @@ public class LetterboxdApiClient : ILetterboxdService
     /// <summary>
     /// How long a sign-in waits for a renewal of the same account already in progress. A run's
     /// renewal can sit out up to a minute of Retry-After under the lock, and a playback event or
-    /// a review submit must not hang behind it; after this wait the sign-in uses a password grant.
+    /// a review submit must not hang behind it. After this wait the sign-in takes the cached token
+    /// if it has at least <see cref="MinAdoptLife"/> left (no request at all, while Letterboxd is
+    /// rate limiting the account), and only otherwise uses a password grant.
     /// </summary>
     internal static readonly TimeSpan SignInLockWait = TimeSpan.FromSeconds(5);
+
+    internal static readonly TimeSpan MinAdoptLife = TimeSpan.FromSeconds(30);
 
 
     // Keyed by Helpers.TokenCacheKey (username + password hash): a caller that only knows the
@@ -139,6 +143,19 @@ public class LetterboxdApiClient : ILetterboxdService
             && await TryRenewSessionAsync(cached.AccessToken, CancellationToken.None, SignInLockWait).ConfigureAwait(false))
         {
             _logger.LogDebug("Refreshed API token for {Username}", username);
+            return;
+        }
+
+        // The renewal could not be done now (another one is sitting out a rate limit, or the
+        // refresh token was refused) but the cached token still works for a while: use it rather
+        // than send a password grant, which would likely meet the same rate limit. It is not
+        // renewed ahead of expiry again; a 401 still renews once.
+        if (TokenCache.TryGetValue(_cacheKey, out var current) && !string.IsNullOrEmpty(current.MemberId)
+            && current.ExpiresAtUtc > DateTime.UtcNow + MinAdoptLife)
+        {
+            Adopt(current);
+            _renewAheadFailed = true;
+            _logger.LogDebug("Using the cached API token for {Username} until it runs out", username);
             return;
         }
 
@@ -754,7 +771,7 @@ public class LetterboxdApiClient : ILetterboxdService
     /// token, so its reply is always read rather than dropped.
     /// The password is not kept, so a refused refresh token is not followed by a full sign-in;
     /// the next run signs in again, through the auth breaker like any sign-in. A refresh token
-    /// Letterboxd refuses is dropped from the shared cache, so other clients of the account do not
+    /// Letterboxd refuses (400 or 401) is dropped from the shared cache, so other clients of the account do not
     /// send it again. <paramref name="lockWait"/> bounds the wait for the lock (a sign-in passes
     /// <see cref="SignInLockWait"/>); when it runs out, this returns false.
     /// </summary>
@@ -805,8 +822,9 @@ public class LetterboxdApiClient : ILetterboxdService
         {
             // Sanitized like every sign-in error: a token reply must never reach the log.
             _logger.LogWarning("Could not renew the Letterboxd API session: {Message}", AuthBreaker.Sanitize(ex.Message));
-            if (ex is HttpRequestException { StatusCode: { } status } && (int)status is >= 400 and < 500
-                && status != HttpStatusCode.TooManyRequests)
+            // Only a refused grant (400 invalid_grant, or 401) says the refresh token is dead; a 403
+            // is a block in front of the API, and a 429 means the token was not spent.
+            if (ex is HttpRequestException { StatusCode: HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized })
                 ForgetRefusedRefreshToken(cached);
             return false;
         }

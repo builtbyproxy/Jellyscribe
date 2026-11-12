@@ -27,6 +27,7 @@ public class ApiClientSessionRenewalTests
     {
         public int FirstLifetime = 3600;
         public bool RefuseRefresh;
+        public HttpStatusCode RefuseWith = HttpStatusCode.BadRequest;
         public bool RateLimitRefresh;
         public Func<string, bool> Accepted = _ => true;
         public Action? OnRateLimited;
@@ -53,7 +54,7 @@ public class ApiClientSessionRenewalTests
                         return limited;
                     }
                     if (RefuseRefresh)
-                        return new HttpResponseMessage(HttpStatusCode.BadRequest) { Content = new StringContent("{\"error\":\"invalid_grant\"}") };
+                        return new HttpResponseMessage(RefuseWith) { Content = new StringContent("{\"error\":\"invalid_grant\"}") };
                     var n = Interlocked.Increment(ref _refreshes);
                     return Json($"{{\"access_token\":\"new-{n}\",\"expires_in\":3600,\"refresh_token\":\"r-{n}\"}}");
                 }
@@ -209,10 +210,12 @@ public class ApiClientSessionRenewalTests
     }
 
     [Fact]
-    public async Task SignInWhileARenewalWaitsOutARateLimit_UsesThePasswordInsteadOfHanging()
+    public async Task SignInWhileARenewalWaitsOutARateLimit_UsesTheCachedTokenInsteadOfHanging()
     {
         // A run's renewal sits out a 30 s Retry-After under the account's lock. A sign-in (a
-        // review submit, a playback event) gives up on the lock after SignInLockWait.
+        // review submit, a playback event) gives up on the lock after SignInLockWait and uses the
+        // cached token, which still has a minute left, sending nothing to the rate-limited API.
+        // Costs SignInLockWait (5 s) of real time.
         var api = new Api { FirstLifetime = 60, RateLimitRefresh = true };
         var user = NewUser();
         using var run = new LetterboxdApiClient(NullLogger.Instance, api);
@@ -231,15 +234,18 @@ public class ApiClientSessionRenewalTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => renewing);
 
         Assert.True(waited < TimeSpan.FromSeconds(20), $"sign-in waited {waited}");
-        Assert.Equal(new[] { "password", "refresh", "password" }, api.Grants.ToArray());
+        Assert.Equal(new[] { "password", "refresh" }, api.Grants.ToArray());
+        await playback.MarkAsWatchedAsync("film", "lid", DateTime.Today, liked: false);
+        Assert.Equal("old", api.BearersSeen.Last());
     }
 
     [Fact]
     public async Task RefreshTokenRefused_IsNotSentAgainByTheNextSignIn()
     {
         // Letterboxd refused the account's refresh token. A new client of the account (each
-        // playback event builds one) must not send the same refused token again.
-        var api = new Api { FirstLifetime = 60, RefuseRefresh = true };
+        // playback event builds one) must not send the same refused token again. The token here
+        // has under MinAdoptLife left, so the sign-in uses the password.
+        var api = new Api { FirstLifetime = 20, RefuseRefresh = true };
         var user = NewUser();
         using var run = new LetterboxdApiClient(NullLogger.Instance, api);
         await run.AuthenticateAsync(user, "pass");
@@ -249,6 +255,23 @@ public class ApiClientSessionRenewalTests
         await playback.AuthenticateAsync(user, "pass");
 
         Assert.Equal(new[] { "password", "refresh", "password" }, api.Grants.ToArray());
+    }
+
+    [Fact]
+    public async Task RefreshBlockedWithA403_KeepsTheRefreshTokenForLater()
+    {
+        // A 403 is a block in front of the API, not a verdict on the refresh token: once the
+        // block clears, the account can still renew without the password.
+        var api = new Api { FirstLifetime = 20, RefuseRefresh = true, RefuseWith = HttpStatusCode.Forbidden };
+        var user = NewUser();
+        using var run = new LetterboxdApiClient(NullLogger.Instance, api);
+        await run.AuthenticateAsync(user, "pass");
+        await run.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        using var playback = new LetterboxdApiClient(NullLogger.Instance, api);
+        await playback.AuthenticateAsync(user, "pass");
+
+        Assert.Equal(new[] { "password", "refresh", "refresh", "password" }, api.Grants.ToArray());
     }
 
     [Fact]
