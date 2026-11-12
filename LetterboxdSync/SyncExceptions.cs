@@ -95,7 +95,8 @@ public static class SyncErrors
     /// <summary>
     /// True when the failure was Letterboxd refusing the request (a 403, a Cloudflare challenge,
     /// a 429 whose Retry-After is longer than the clients wait, or an API session that expired and
-    /// could not be renewed) rather than anything about the film. Every later request in the run would be refused the same way.
+    /// could not be renewed) rather than anything about the film. Every later request in the run
+    /// would be refused the same way.
     /// </summary>
     public static bool IsBlock(Exception ex) => ex switch
     {

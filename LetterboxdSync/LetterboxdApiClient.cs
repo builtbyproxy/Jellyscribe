@@ -43,7 +43,15 @@ public class LetterboxdApiClient : ILetterboxdService
 
     // One renewal at a time per account: a refresh token may be single-use, so two clients
     // refreshing it at once could leave one of them with a refused refresh.
+    // One entry per account and password, never pruned: bounded like TokenCache, which holds the same keys.
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> RenewLocks = new();
+
+    /// <summary>
+    /// How long a sign-in waits for a renewal of the same account already in progress. A run's
+    /// renewal can sit out up to a minute of Retry-After under the lock, and a playback event or
+    /// a review submit must not hang behind it; after this wait the sign-in uses a password grant.
+    /// </summary>
+    internal static readonly TimeSpan SignInLockWait = TimeSpan.FromSeconds(5);
 
 
     // Keyed by Helpers.TokenCacheKey (username + password hash): a caller that only knows the
@@ -112,11 +120,13 @@ public class LetterboxdApiClient : ILetterboxdService
     public async Task AuthenticateAsync(string username, string password, string? rawCookies = null)
     {
         _cacheKey = Helpers.TokenCacheKey(username, password);
+        // Start clean: nothing from an earlier sign-in of this client (possibly another account)
+        // may survive into this one, least of all a member id.
+        _accessToken = _refreshToken = _memberId = string.Empty;
+        _expiresAtUtc = DateTime.MinValue;
+        _sessionExpired = _renewAheadFailed = false;
 
-        // Check token cache first. An entry is only ever stored with its member id, but one without
-        // it is never reused: every member-scoped call would send "member=" and get a 404.
-        if (TokenCache.TryGetValue(_cacheKey, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow + RenewBefore
-            && !string.IsNullOrEmpty(cached.MemberId))
+        if (TokenCache.TryGetValue(_cacheKey, out var cached) && IsUsable(cached))
         {
             Adopt(cached);
             _logger.LogDebug("Reusing cached API token for {Username}", username);
@@ -126,7 +136,7 @@ public class LetterboxdApiClient : ILetterboxdService
         // Try the refresh token, under the same per-account lock as a mid-run renewal: a refresh
         // token may be single-use, and a sync run of this account may be renewing right now.
         if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken)
-            && await TryRenewSessionAsync(cached.AccessToken, CancellationToken.None).ConfigureAwait(false))
+            && await TryRenewSessionAsync(cached.AccessToken, CancellationToken.None, SignInLockWait).ConfigureAwait(false))
         {
             _logger.LogDebug("Refreshed API token for {Username}", username);
             return;
@@ -707,8 +717,7 @@ public class LetterboxdApiClient : ILetterboxdService
             throw new LetterboxdSessionExpiredException();
         // Another client of this account already renewed: take its token instead of sending a
         // request with this one that would only be refused.
-        if (renew && TokenCache.TryGetValue(_cacheKey, out var newer) && newer.AccessToken != _accessToken
-            && newer.ExpiresAtUtc > DateTime.UtcNow + RenewBefore && !string.IsNullOrEmpty(newer.MemberId))
+        if (renew && TokenCache.TryGetValue(_cacheKey, out var newer) && newer.AccessToken != _accessToken && IsUsable(newer))
             Adopt(newer);
         if (renew && !_renewAheadFailed && _expiresAtUtc <= DateTime.UtcNow + RenewBefore
             && !await TryRenewSessionAsync(_accessToken, cancellationToken).ConfigureAwait(false))
@@ -744,33 +753,47 @@ public class LetterboxdApiClient : ILetterboxdService
     /// request already sent is never cancelled, since Letterboxd may have spent the old refresh
     /// token, so its reply is always read rather than dropped.
     /// The password is not kept, so a refused refresh token is not followed by a full sign-in;
-    /// the next run signs in again, through the auth breaker like any sign-in.
+    /// the next run signs in again, through the auth breaker like any sign-in. A refresh token
+    /// Letterboxd refuses is dropped from the shared cache, so other clients of the account do not
+    /// send it again. <paramref name="lockWait"/> bounds the wait for the lock (a sign-in passes
+    /// <see cref="SignInLockWait"/>); when it runs out, this returns false.
     /// </summary>
-    private async Task<bool> TryRenewSessionAsync(string staleToken, CancellationToken cancellationToken)
+    private async Task<bool> TryRenewSessionAsync(string staleToken, CancellationToken cancellationToken,
+        TimeSpan? lockWait = null)
     {
         if (string.IsNullOrEmpty(_cacheKey))
             return false;
 
         var gate = RenewLocks.GetOrAdd(_cacheKey, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (!await gate.WaitAsync(lockWait ?? Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogDebug("Another renewal of this Letterboxd account is still running; signing in with the password");
+            return false;
+        }
+
+        TokenInfo? cached = null;
         try
         {
-            TokenCache.TryGetValue(_cacheKey, out var cached);
-            if (cached != null && cached.AccessToken != staleToken && cached.ExpiresAtUtc > DateTime.UtcNow + RenewBefore
-                && !string.IsNullOrEmpty(cached.MemberId))
+            TokenCache.TryGetValue(_cacheKey, out cached);
+            if (cached != null && cached.AccessToken != staleToken && IsUsable(cached))
             {
                 Adopt(cached);
                 return true;
             }
 
-            var refreshToken = !string.IsNullOrEmpty(cached?.RefreshToken) ? cached!.RefreshToken : _refreshToken;
+            // The refresh token and the member id come from the same place, so a renewal can
+            // never pair one account's token with another's member id. A cached entry always
+            // carries its member id. The member id of an account never changes, so a renewal keeps
+            // it instead of asking /me again: one request fewer, and no way to end up with a token
+            // but no member id.
+            var fromCache = !string.IsNullOrEmpty(cached?.RefreshToken);
+            var refreshToken = fromCache ? cached!.RefreshToken : _refreshToken;
+            var memberId = fromCache ? cached!.MemberId : _memberId;
             if (string.IsNullOrEmpty(refreshToken))
                 return false;
 
             cancellationToken.ThrowIfCancellationRequested();
-            // The member id of an account never changes, so a renewal keeps it instead of asking
-            // /me again: one request fewer, and no way to end up with a token but no member id.
-            await RefreshTokenAsync(refreshToken, _memberId, cancellationToken).ConfigureAwait(false);
+            await RefreshTokenAsync(refreshToken, memberId, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Renewed the Letterboxd API session");
             return true;
         }
@@ -782,6 +805,9 @@ public class LetterboxdApiClient : ILetterboxdService
         {
             // Sanitized like every sign-in error: a token reply must never reach the log.
             _logger.LogWarning("Could not renew the Letterboxd API session: {Message}", AuthBreaker.Sanitize(ex.Message));
+            if (ex is HttpRequestException { StatusCode: { } status } && (int)status is >= 400 and < 500
+                && status != HttpStatusCode.TooManyRequests)
+                ForgetRefusedRefreshToken(cached);
             return false;
         }
         finally
@@ -789,6 +815,24 @@ public class LetterboxdApiClient : ILetterboxdService
             gate.Release();
         }
     }
+
+    /// <summary>
+    /// Letterboxd refused the refresh token: keep the cached access token (it works until it
+    /// runs out) but drop the refresh token from the cache and this client, so neither this client
+    /// nor a new sign-in of the account sends it again. Never touches a newer entry another
+    /// client cached in the meantime.
+    /// </summary>
+    private void ForgetRefusedRefreshToken(TokenInfo? cached)
+    {
+        _refreshToken = string.Empty;
+        if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken))
+            TokenCache.TryUpdate(_cacheKey, cached with { RefreshToken = string.Empty }, cached);
+    }
+
+    // An entry is only ever stored with its member id, but one without it is never used: every
+    // member-scoped call would send "member=" and get a 404.
+    private static bool IsUsable(TokenInfo t)
+        => t.ExpiresAtUtc > DateTime.UtcNow + RenewBefore && !string.IsNullOrEmpty(t.MemberId);
 
     private void Adopt(TokenInfo cached)
     {

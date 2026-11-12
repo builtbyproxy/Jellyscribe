@@ -68,10 +68,11 @@ internal static class TelemetryService
         if (Contains(m, "login error") || Contains(m, "401") || Contains(m, "reCAPTCHA")
             || Contains(m, "Auth failed") || Contains(m, "session may be permanently invalid")
             || Contains(m, "token expired")
-            // The API client's own phrasing for a session it no longer has, and the status
-            // name the API paths print ("Failed to log film: Unauthorized ..."). Status names are
-            // matched after ": " only, so a film slug such as "forbidden-planet" cannot match.
-            || Contains(m, "Not authenticated") || Contains(m, "without a member id")
+            // The status name the API paths print ("Failed to log film: Unauthorized ..."). Status
+            // names are matched after ": " only, so a film slug such as "forbidden-planet" cannot
+            // match. An expired session says "token expired"; the client's "Not authenticated" and
+            // "without a member id" now only mean a bug (a call before signing in), so they stay
+            // "other" rather than inflating auth_failure.
             || Contains(m, ": Unauthorized"))
             return CatAuth;
 
@@ -89,7 +90,9 @@ internal static class TelemetryService
         // Serializd's SerializdApiClient says "failed (5xx):"; the official API paths print the
         // status name ("InternalServerError"); .NET's EnsureSuccessStatusCode says "does not
         // indicate success: 5xx". Timeouts and unreachable hosts count here too: like a 5xx,
-        // the service did not answer, and nothing about the item was wrong.
+        // the service did not answer, and nothing about the item was wrong. That covers any
+        // service whose message names no category above (Seerr's does): a TMDb timeout says only
+        // "HttpClient.Timeout", so it lands here too.
         if (Contains(m, "returned 500") || Contains(m, "returned 502")
             || Contains(m, "returned 503") || Contains(m, "returned 504")
             || Contains(m, "(500)") || Contains(m, "(502)")

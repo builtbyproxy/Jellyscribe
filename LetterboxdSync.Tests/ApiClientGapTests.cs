@@ -44,7 +44,7 @@ public class ApiClientGapTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         // A failed check is unknown, not "never logged": reading it as empty would post a
         // duplicate of a film already on the diary.
         await Assert.ThrowsAsync<DiaryCheckFailedException>(() => client.GetDiaryInfoAsync("2a9q", "user"));
@@ -62,7 +62,7 @@ public class ApiClientGapTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(() =>
             client.MarkAsWatchedAsync("film", "lid", DateTime.Now, liked: false));
@@ -84,7 +84,7 @@ public class ApiClientGapTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<Exception>(() =>
             client.MarkAsWatchedAsync("film", "lid", DateTime.Now, liked: false));
@@ -199,7 +199,7 @@ public class ApiClientGapTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.DeleteAllLogEntriesForFilmAsync("lid-1");
 
         Assert.Equal(new[] { "e1", "e2" }, deleted);
@@ -231,7 +231,7 @@ public class ApiClientGapTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var result = await client.LookupFilmByTmdbIdAsync(1091);
 
         Assert.Equal("xyz1", result.FilmId);

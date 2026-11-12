@@ -83,7 +83,8 @@ public class TelemetryServiceTests : IDisposable
     [InlineData("data-film-id attribute empty on /film/some-film/", TelemetryService.CatParse)]
     [InlineData("Letterboxd API token expired. Will re-authenticate on next sync.", TelemetryService.CatAuth)]
     [InlineData("Letterboxd API token expired and could not be renewed. Will sign in again on the next sync.", TelemetryService.CatAuth)]
-    [InlineData("Not authenticated. Call AuthenticateAsync first.", TelemetryService.CatAuth)]
+    [InlineData("Not authenticated. Call AuthenticateAsync first.", TelemetryService.CatOther)]
+    [InlineData("Signed in to Letterboxd without a member id. Call AuthenticateAsync again.", TelemetryService.CatOther)]
     // The official API paths print the status name, not the number.
     [InlineData("Failed to log film: InternalServerError {}", TelemetryService.CatServerError)]
     [InlineData("Failed to log film: ServiceUnavailable", TelemetryService.CatServerError)]

@@ -29,6 +29,7 @@ public class ApiClientSessionRenewalTests
         public bool RefuseRefresh;
         public bool RateLimitRefresh;
         public Func<string, bool> Accepted = _ => true;
+        public Action? OnRateLimited;
         public readonly ConcurrentQueue<string> Grants = new();
         public readonly ConcurrentQueue<string> BearersSeen = new();
         public readonly ConcurrentQueue<string> DiaryQueries = new();
@@ -48,6 +49,7 @@ public class ApiClientSessionRenewalTests
                     {
                         var limited = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
                         limited.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(30));
+                        OnRateLimited?.Invoke();
                         return limited;
                     }
                     if (RefuseRefresh)
@@ -152,7 +154,10 @@ public class ApiClientSessionRenewalTests
         var api = new Api { FirstLifetime = 60, RateLimitRefresh = true };
         using var client = new LetterboxdApiClient(NullLogger.Instance, api);
         await client.AuthenticateAsync(NewUser(), "pass");
-        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+        using var cts = new CancellationTokenSource();
+        // Cancelled as the 429 comes back, so the cancellation always lands in the Retry-After
+        // wait, never before the refresh is sent.
+        api.OnRateLimited = cts.Cancel;
 
         var started = DateTime.UtcNow;
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -164,7 +169,7 @@ public class ApiClientSessionRenewalTests
     }
 
     [Fact]
-    public async Task SignInWithAnExpiredCachedToken_AdoptsTheTokenARunJustRenewed()
+    public async Task SignInAfterARunRenewed_ReusesTheRenewedTokenWithoutAnotherGrant()
     {
         // A second sign-in (a playback event) while a run of the same account holds a renewed
         // token: it takes that token instead of spending the refresh token again.
@@ -180,6 +185,70 @@ public class ApiClientSessionRenewalTests
 
         Assert.Equal(new[] { "password", "refresh" }, api.Grants.ToArray());
         Assert.Equal(new[] { "new-1", "new-1" }, api.BearersSeen.ToArray());
+    }
+
+    [Fact]
+    public async Task SignInNearExpiry_RenewsWithTheCachedMemberIdInsteadOfAPasswordGrant()
+    {
+        // A playback event signs in while the run's cached token is inside the renewal window:
+        // it spends the refresh token once, keeps the cached member id (no /me), and never falls
+        // back to the password.
+        var api = new Api { FirstLifetime = 60 };
+        var user = NewUser();
+        using var run = new LetterboxdApiClient(NullLogger.Instance, api);
+        await run.AuthenticateAsync(user, "pass");
+
+        using var playback = new LetterboxdApiClient(NullLogger.Instance, api);
+        await playback.AuthenticateAsync(user, "pass");
+        await playback.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        Assert.Equal(new[] { "password", "refresh" }, api.Grants.ToArray());
+        Assert.Equal(1, api.MeCalls);
+        Assert.Equal(new[] { "new-1" }, api.BearersSeen.ToArray());
+        Assert.Contains("member=m-1", Assert.Single(api.DiaryQueries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SignInWhileARenewalWaitsOutARateLimit_UsesThePasswordInsteadOfHanging()
+    {
+        // A run's renewal sits out a 30 s Retry-After under the account's lock. A sign-in (a
+        // review submit, a playback event) gives up on the lock after SignInLockWait.
+        var api = new Api { FirstLifetime = 60, RateLimitRefresh = true };
+        var user = NewUser();
+        using var run = new LetterboxdApiClient(NullLogger.Instance, api);
+        await run.AuthenticateAsync(user, "pass");
+        using var cts = new CancellationTokenSource();
+        var limited = new TaskCompletionSource();
+        api.OnRateLimited = () => limited.TrySetResult();
+        var renewing = run.GetDiaryInfoAsync("lid", "demo-cinephile", cts.Token);
+        await limited.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+        var started = DateTime.UtcNow;
+        using var playback = new LetterboxdApiClient(NullLogger.Instance, api);
+        await playback.AuthenticateAsync(user, "pass");
+        var waited = DateTime.UtcNow - started;
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => renewing);
+
+        Assert.True(waited < TimeSpan.FromSeconds(20), $"sign-in waited {waited}");
+        Assert.Equal(new[] { "password", "refresh", "password" }, api.Grants.ToArray());
+    }
+
+    [Fact]
+    public async Task RefreshTokenRefused_IsNotSentAgainByTheNextSignIn()
+    {
+        // Letterboxd refused the account's refresh token. A new client of the account (each
+        // playback event builds one) must not send the same refused token again.
+        var api = new Api { FirstLifetime = 60, RefuseRefresh = true };
+        var user = NewUser();
+        using var run = new LetterboxdApiClient(NullLogger.Instance, api);
+        await run.AuthenticateAsync(user, "pass");
+        await run.GetDiaryInfoAsync("lid", "demo-cinephile");
+
+        using var playback = new LetterboxdApiClient(NullLogger.Instance, api);
+        await playback.AuthenticateAsync(user, "pass");
+
+        Assert.Equal(new[] { "password", "refresh", "password" }, api.Grants.ToArray());
     }
 
     [Fact]

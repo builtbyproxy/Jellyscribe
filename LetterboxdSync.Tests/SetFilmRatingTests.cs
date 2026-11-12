@@ -38,7 +38,7 @@ public class SetFilmRatingTests
             return response;
         });
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.SetFilmRatingAsync("sinners-2025", "KQMM", rating);
         return (method, path, body);
     }
@@ -90,7 +90,7 @@ public class SetFilmRatingTests
             return new HttpResponseMessage(HttpStatusCode.Unauthorized);
         });
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(
             () => client.SetFilmRatingAsync("sinners-2025", "KQMM", 3.5));

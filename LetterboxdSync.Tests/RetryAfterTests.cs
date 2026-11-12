@@ -104,7 +104,7 @@ public class ApiClientRetryAfterTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var film = await client.LookupFilmByTmdbIdAsync(TmdbId);
 
         Assert.Equal("abc", film.FilmId);
@@ -125,7 +125,7 @@ public class ApiClientRetryAfterTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var clock = Stopwatch.StartNew();
         var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.LookupFilmByTmdbIdAsync(TmdbId));
 
@@ -141,7 +141,7 @@ public class ApiClientRetryAfterTests
             request.RequestUri?.AbsolutePath.EndsWith("/log-entries") == true ? RateLimited(TimeSpan.FromMinutes(10)) : null);
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<DiaryCheckFailedException>(() => client.GetDiaryInfoAsync("abc", "user"));
 
@@ -163,7 +163,7 @@ public class ApiClientRetryAfterTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         // A write: its send is never cut off, so the cancellation can only land on the wait. An
         // uncancellable wait would sit out the 50 s and post again.
