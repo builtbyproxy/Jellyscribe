@@ -120,6 +120,42 @@ public class DiaryOperationTests
     }
 
     [Fact]
+    public async Task MarkAsWatched_401WithReauthSpent_ThrowsSessionExpiredBlock()
+    {
+        // A fresh sign-in earlier in the run did not stop the 401s, so the guard is spent and every
+        // later film lands here. It must be a block, so the runner pauses the account (issue #188).
+        var posts = 0;
+        var handler = new DiaryMockHandler((request, http) =>
+        {
+            var path = request.RequestUri?.PathAndQuery ?? "";
+            if (request.Method == HttpMethod.Get && path == "/")
+            {
+                http.CookieContainer.Add(BaseUri, new Cookie("com.xk72.webparts.csrf", "csrf"));
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            if (request.Method == HttpMethod.Post)
+            {
+                posts++;
+                return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var (http, auth, _, diary) = handler.CreateClients(TestLogger);
+        using var _ = http;
+        http.Csrf = "csrf";
+        Assert.True(auth.ShouldReauthenticate());
+
+        var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(
+            () => diary.MarkAsWatchedAsync("test-film", "123", DateTime.Now, false, "PROD1"));
+
+        Assert.True(SyncErrors.IsBlock(ex));
+        Assert.Equal(TelemetryService.CatAuth, TelemetryService.Classify(ex.Message));
+        Assert.Contains("test-film", ex.Message);
+        Assert.Equal(1, posts);
+    }
+
+    [Fact]
     public async Task MarkAsWatched_BothEndpoints404_ThrowsAfterRetries()
     {
         var handler = new DiaryMockHandler((request, http) =>

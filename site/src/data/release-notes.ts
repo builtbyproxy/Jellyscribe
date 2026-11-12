@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.14.1',
+    headline: 'Website sign-ins pause instead of failing every film',
+    summary:
+      'Some accounts sign in through the Letterboxd website instead of the official way. If Letterboxd ended that sign-in part way through a sync and signing in again did not bring it back, every remaining film in the sync failed, and each failure counted toward Jellyscribe giving up on that film. The sync now pauses that account after a few films, as the official sign-in has done since 2.13.3, and the rest wait for the next sync. The same goes for a sync where Letterboxd keeps refusing to save diary entries while still answering diary checks.',
+    highlights: {
+      fixes: [
+        'A website sign-in that ends mid-sync and cannot be restored pauses the account after a few films instead of failing the rest of the list.',
+        'A sync where Letterboxd refuses every diary entry it is sent now pauses too, even while diary checks still work.',
+      ],
+    },
+  },
+  {
     version: '2.14.0',
     headline: 'A clear first step on a new install',
     summary:
