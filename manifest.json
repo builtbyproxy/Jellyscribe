@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.13.3.0",
+        "changelog": "Letterboxd signs Jellyscribe in for about an hour at a time. A large sync, such as the first one on a new server, can take longer than that, and once the hour was up every remaining film failed, sometimes hundreds of them, until the next scheduled sync logged them. Jellyscribe now renews the sign-in before it runs out, so a long sync finishes in one go. If Letterboxd refuses to renew it, the sync pauses after a few films and picks up on the next run instead of marking the whole list as failed. Accounts that sign in through the Letterboxd website were not affected. For those who opted in to anonymous telemetry, more errors are now sorted into the right category, such as a Letterboxd outage or a timeout, instead of \"other\".",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.13.3/jellyfin-plugin-letterboxd-v2.13.3.zip",
+        "checksum": "8acde97fb7158dfba13f54761879716b",
+        "timestamp": "2026-11-12T00:27:43Z"
+      },
+      {
         "version": "2.13.2.0",
         "changelog": "Jellyscribe updates the library it uses to read Letterboxd web pages, which it relies on when an account signs in through the website and when it finds films on letterboxd.com. Nothing changes in how syncing works. The website sign-in, film lookups, diary entries and ratings were all checked against letterboxd.com with the new version.",
         "targetAbi": "10.11.9.0",
