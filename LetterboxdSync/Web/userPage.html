@@ -17,7 +17,7 @@
                 /* First-run card: no diary linked yet, or linked with nothing logged yet. */
                 #letterboxdUserPage .ws-firstrun { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 20px; margin-bottom: 18px; border-left: 3px solid var(--ws-primary); }
                 #letterboxdUserPage .ws-firstrun[hidden], #letterboxdUserPage .ws-btn[hidden] { display: none; }
-                #letterboxdUserPage .ws-firstrun > div { min-width: 0; flex: 1 1 280px; }
+                #letterboxdUserPage .ws-firstrun > div:first-child { min-width: 0; flex: 1 1 280px; }
                 #letterboxdUserPage .ws-firstrun b { display: block; font-size: 15px; margin-bottom: 4px; }
                 #letterboxdUserPage .ws-firstrun p { margin: 0; font-size: 13px; line-height: 1.5; }
                 </style>
@@ -40,7 +40,7 @@
                                 <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="runWatchlistBtn">Sync all watchlists</button><button type="button" class="ws-btn primary" id="runSyncBtn">Sync all now</button></div></div>
                             <div class="ws-panel ws-firstrun" id="firstRun" role="region" aria-labelledby="firstRunTitle" hidden>
                                 <div><b id="firstRunTitle"></b><p class="ws-muted" id="firstRunText"></p></div>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;"><button type="button" class="ws-btn" id="firstRunAlt" hidden></button><button type="button" class="ws-btn primary" id="firstRunBtn"></button></div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;flex:none;"><button type="button" class="ws-btn" id="firstRunAlt" hidden></button><button type="button" class="ws-btn primary" id="firstRunBtn"></button></div>
                             </div>
                             <div class="ws-filters" id="ovFilters">
                                 <button type="button" class="ws-chip on" data-f="all">All</button>
