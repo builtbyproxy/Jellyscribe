@@ -448,7 +448,6 @@ public class LetterboxdSyncRunner
                 // Throws when the check itself fails, which lands in the catch below as a
                 // retryable failure: an unanswered check must never be read as "not logged".
                 var diaryInfo = await service.GetDiaryInfoAsync(film.FilmId, lbAccount, cancellationToken).ConfigureAwait(false);
-                blocksInARow = 0;
                 if (Helpers.IsDuplicate(diaryInfo.LastDate, viewingDate))
                 {
                     _logger.LogInformation("Skipping {Title} (TMDb:{TmdbId}): already on Letterboxd diary for {Date}",
@@ -522,6 +521,11 @@ public class LetterboxdSyncRunner
                     Source = source
                 });
                 synced++;
+                // Reset only after a write Letterboxd accepted, never after the diary check alone
+                // (a duplicate skip is decided by that check): on the website path the check reads
+                // a public page that still answers when the session has gone, so a reset there
+                // would hide every refused write from the breaker.
+                blocksInARow = 0;
                 SyncProgress.IncrementProcessed(SyncProgress.TrackLetterboxd);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

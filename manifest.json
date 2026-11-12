@@ -8,6 +8,22 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.14.1.0",
+        "changelog": "Some accounts sign in through the Letterboxd website instead of the official way. If Letterboxd ended that sign-in part way through a sync and signing in again did not bring it back, every remaining film in the sync failed, and each failure counted toward Jellyscribe giving up on that film. The sync now pauses that account after a few films, as the official sign-in has done since 2.13.3, and the rest wait for the next sync. The same goes for a sync where Letterboxd keeps refusing to save diary entries while it still answers diary checks.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.14.1/jellyfin-plugin-letterboxd-v2.14.1.zip",
+        "checksum": "c4f5fea87ba490d848f501373af5c07d",
+        "timestamp": "2026-11-12T05:39:12Z"
+      },
+      {
+        "version": "2.14.0.0",
+        "changelog": "Opening Jellyscribe before linking an account used to show an empty dashboard of zeros, with sync buttons that could only fail. The overview now starts with one card that says what to do next. With no account linked, it offers to link Letterboxd or Serializd, and the sync buttons stay out of the way until there is something to sync. Once an account is linked but nothing has been logged yet, it explains what the first sync will send, including whether it sends everything you have already played or only recent watches and what happens to films and episodes already in your diary, and offers to run it for the services you linked. A user whose accounts are all paused is told so. The card goes away once your first film or episode is logged. \"Sync all now\" also stops reporting an error for a service you never linked.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.14.0/jellyfin-plugin-letterboxd-v2.14.0.zip",
+        "checksum": "86acc83b81333648ca07089d44fa9205",
+        "timestamp": "2026-11-12T05:29:47Z"
+      },
+      {
         "version": "2.13.3.0",
         "changelog": "Letterboxd signs Jellyscribe in for about an hour at a time. A large sync, such as the first one on a new server, can take longer than that, and once the hour was up every remaining film failed, sometimes hundreds of them, until the next scheduled sync logged them. Jellyscribe now renews the sign-in before it runs out, so a long sync finishes in one go. If Letterboxd refuses to renew it, the sync pauses after a few films and picks up on the next run instead of marking the whole list as failed. Accounts that sign in through the Letterboxd website were not affected. For those who opted in to anonymous telemetry, more errors are now sorted into the right category, such as a Letterboxd outage or a timeout, instead of \"other\".",
         "targetAbi": "10.11.9.0",

@@ -189,6 +189,27 @@ public class DashboardMarkupTests
         Assert.Contains("outline: 2px solid var(--ws-focus);", Rule(Style(file), root + " :focus-visible"), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void UserPage_FirstRunCard_StartsHidden_AndHiddenBeatsEveryLayout()
+    {
+        var page = Read("userPage.html");
+        var card = Regex.Match(page, "<div [^>]*id=\"firstRun\"[^>]*>").Value;
+        Assert.Contains(" hidden", card, StringComparison.Ordinal);
+        Assert.Contains("aria-labelledby=\"firstRunTitle\"", card, StringComparison.Ordinal);
+        // The card, and the header sync buttons it hides while nothing is linked, set their own display;
+        // without these rules the hidden attribute does nothing and they show on every load.
+        var style = PageStyle(page);
+        Assert.Contains("display: none;", Rule(style, "#letterboxdUserPage .ws-firstrun[hidden]"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", Rule(style, "#letterboxdUserPage .ws-btn[hidden]"), StringComparison.Ordinal);
+
+        // The shared overview hands the page its stats on a successful load only; a failed load shows the retry row.
+        var shared = Read("jellyscribe.js");
+        var load = shared.Substring(shared.IndexOf("loadOverview: function", StringComparison.Ordinal));
+        load = load.Substring(0, load.IndexOf("histChunk:", StringComparison.Ordinal));
+        var hook = load.IndexOf("self.afterOverview(fs, ts)", StringComparison.Ordinal);
+        Assert.InRange(hook, 0, load.LastIndexOf(".catch(", StringComparison.Ordinal));
+    }
+
     [Theory]
     [MemberData(nameof(Files))]
     public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file)
