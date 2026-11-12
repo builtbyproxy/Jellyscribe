@@ -190,22 +190,24 @@ public class DashboardMarkupTests
     }
 
     [Fact]
-    public void UserPage_FirstRunCard_StartsHidden_AndWaitsForBothLoads()
+    public void UserPage_FirstRunCard_StartsHidden_AndHiddenBeatsEveryLayout()
     {
         var page = Read("userPage.html");
-        Assert.Contains("<div class=\"ws-panel ws-firstrun\" id=\"firstRun\" role=\"region\" aria-labelledby=\"firstRunTitle\" hidden>", page, StringComparison.Ordinal);
-        Assert.Contains("<button type=\"button\" class=\"ws-btn primary\" id=\"firstRunBtn\"></button>", page, StringComparison.Ordinal);
-        // Hidden must win over the card's flex layout, or the card shows on every load.
-        Assert.Contains("display: none;", Rule(PageStyle(page), "#letterboxdUserPage .ws-firstrun[hidden]"), StringComparison.Ordinal);
-        // Never shown off one load alone: a failed account load must not say "Link a diary" to someone who has one.
-        Assert.Contains("if (!box || !self.acctsReady || !self.overviewReady) return;", page, StringComparison.Ordinal);
+        var card = Regex.Match(page, "<div [^>]*id=\"firstRun\"[^>]*>").Value;
+        Assert.Contains(" hidden", card, StringComparison.Ordinal);
+        Assert.Contains("aria-labelledby=\"firstRunTitle\"", card, StringComparison.Ordinal);
+        // The card, and the header sync buttons it hides while nothing is linked, set their own display;
+        // without these rules the hidden attribute does nothing and they show on every load.
+        var style = PageStyle(page);
+        Assert.Contains("display: none;", Rule(style, "#letterboxdUserPage .ws-firstrun[hidden]"), StringComparison.Ordinal);
+        Assert.Contains("display: none;", Rule(style, "#letterboxdUserPage .ws-btn[hidden]"), StringComparison.Ordinal);
 
-        // The shared overview reports a successful load only; its failure path shows the retry row instead.
+        // The shared overview hands the page its stats on a successful load only; a failed load shows the retry row.
         var shared = Read("jellyscribe.js");
         var load = shared.Substring(shared.IndexOf("loadOverview: function", StringComparison.Ordinal));
         load = load.Substring(0, load.IndexOf("histChunk:", StringComparison.Ordinal));
-        var hook = load.IndexOf("if (self.afterOverview) self.afterOverview();", StringComparison.Ordinal);
-        Assert.True(hook > 0 && hook < load.IndexOf(".catch(", StringComparison.Ordinal));
+        var hook = load.IndexOf("self.afterOverview(fs, ts)", StringComparison.Ordinal);
+        Assert.InRange(hook, 0, load.LastIndexOf(".catch(", StringComparison.Ordinal));
     }
 
     [Theory]

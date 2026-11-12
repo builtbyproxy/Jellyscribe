@@ -13,13 +13,13 @@ export const releaseNotes: ReleaseNotes[] = [
     version: '2.14.0',
     headline: 'A clear first step on a new install',
     summary:
-      'Opening Jellyscribe before linking an account used to show an empty dashboard of zeros, with sync buttons that could only fail. The overview now starts with one card that says what to do next. With no account linked, it offers to link Letterboxd or Serializd, and the sync buttons stay out of the way until there is something to sync. Once an account is linked but nothing has been logged yet, it explains how logging works and offers to run the first sync for the services you linked. The card goes away as soon as your first film or episode is logged.',
+      'Opening Jellyscribe before linking an account used to show an empty dashboard of zeros, with sync buttons that could only fail. The overview now starts with one card that says what to do next. With no account linked, it offers to link Letterboxd or Serializd, and the sync buttons stay out of the way until there is something to sync. Once an account is linked but nothing has been logged yet, it explains what the first sync will send, including whether it logs everything you have already played or only recent watches, and offers to run it for the services you linked. A user whose accounts are all paused is told so. The card goes away once your first film or episode is logged.',
     highlights: {
       new: [
         'A getting-started card on the overview links your first diary, then runs your first sync.',
       ],
       improvements: [
-        'The sync buttons are hidden until an account is linked, so they no longer fail on a new install.',
+        'The sync buttons are hidden until an account is linked, and "Sync all now" only syncs the services you have linked, so it no longer reports an error for the other one.',
       ],
     },
   },
