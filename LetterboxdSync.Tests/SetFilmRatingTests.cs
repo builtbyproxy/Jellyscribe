@@ -171,6 +171,33 @@ public class SetFilmRatingTests
     }
 
     [Fact]
+    public async Task Site_401WithReauthSpent_ThrowsSessionExpiredBlock()
+    {
+        // The website path's counterpart of Api_Unauthorized_RenewsOnceThenThrows (issue #188).
+        var handler = new DiaryMockHandler((request, http) =>
+        {
+            var p = request.RequestUri?.PathAndQuery ?? "";
+            if (request.Method == HttpMethod.Get && p == "/")
+            {
+                http.CookieContainer.Add(BaseUri, new Cookie("com.xk72.webparts.csrf", "csrf-token"));
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            return request.Method == HttpMethod.Post
+                ? new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                : new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+        var (http, auth, _, diary) = handler.CreateClients(TestLogger);
+        using var _ = http;
+        Assert.True(auth.ShouldReauthenticate());
+
+        var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(
+            () => diary.SetFilmRatingAsync("sinners-2025", "51561", 3.5));
+
+        Assert.True(SyncErrors.IsBlock(ex));
+        Assert.Equal(TelemetryService.CatAuth, TelemetryService.Classify(ex.Message));
+    }
+
+    [Fact]
     public async Task Site_ServerError_Throws()
     {
         await Assert.ThrowsAsync<Exception>(() => CaptureSitePost(3.5, new HttpResponseMessage(HttpStatusCode.InternalServerError)));

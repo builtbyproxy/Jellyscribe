@@ -159,6 +159,55 @@ public class SyncReliabilityTests : IDisposable
         Assert.Contains("sign-in that expired", pause.Error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task WebsiteSessionExpiresMidRun_PausesLikeTheApiPath()
+    {
+        // The website sign-in path: the first films log, then a fresh sign-in no longer stops the
+        // 401s on the diary write (issue #188). Same outcome as the API path above: three failures,
+        // then a pause, and the films after those wait for the next run.
+        var user = MakeUser();
+        var movies = Enumerable.Range(1, 8).Select(i => MakeMovie(2100 + i, "Film " + i)).ToArray();
+        Setup(user, movies);
+        var service = Service();
+        var writes = 0;
+        service.MarkAsWatchedAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
+                Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>(), Arg.Any<CancellationToken>())
+            .Returns(call => ++writes <= 2
+                ? Task.CompletedTask
+                : Task.FromException(new LetterboxdSessionExpiredException(
+                    $"Letterboxd returned 401 for {call.ArgAt<string>(0)} after re-authentication. Session may be permanently invalid.")));
+
+        await RunAsync(user);
+
+        Assert.Equal(2 + LetterboxdSyncRunner.MaxConsecutiveBlocks, writes);
+        var events = SyncHistory.GetRecent(50, "demo-user");
+        Assert.Equal(2, events.Count(e => e.Status == SyncStatus.Success));
+        Assert.Equal(LetterboxdSyncRunner.MaxConsecutiveBlocks, events.Count(e => e.Status == SyncStatus.Failed));
+        var pause = Assert.Single(events, e => e.Status == SyncStatus.Skipped);
+        Assert.Contains($"{8 - 2 - LetterboxdSyncRunner.MaxConsecutiveBlocks} films", pause.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WritesBlockedAfterDiaryChecksAnswer_StillPause()
+    {
+        // The diary check answers but every write is refused (a 403 on the website's diary POST):
+        // the check answering must not reset the count, or the breaker never trips.
+        var user = MakeUser();
+        var movies = Enumerable.Range(1, 6).Select(i => MakeMovie(2200 + i, "Film " + i)).ToArray();
+        Setup(user, movies);
+        var service = Service();
+        service.MarkAsWatchedAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
+                Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new LetterboxdBlockedException("Letterboxd returned 403 for film. Likely anti-bot."));
+
+        await RunAsync(user);
+
+        await service.Received(LetterboxdSyncRunner.MaxConsecutiveBlocks).MarkAsWatchedAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),
+            Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<double?>(), Arg.Any<CancellationToken>());
+        Assert.Single(SyncHistory.GetRecent(50, "demo-user"), e => e.Status == SyncStatus.Skipped);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Forbidden, true)]
     // A 429 reaches the runner only when its Retry-After is longer than the client waits.
