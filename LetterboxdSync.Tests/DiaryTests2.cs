@@ -16,8 +16,9 @@ public class DiaryOperationTests
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
 
     [Fact]
-    public async Task MarkAsWatched_ProductionEndpointSuccess_Returns()
+    public async Task MarkAsWatched_WithAProductionId_PostsItToTheProductionEndpoint()
     {
+        string? capturedPath = null, capturedBody = null;
         var handler = new DiaryMockHandler((request, http) =>
         {
             var path = request.RequestUri?.PathAndQuery ?? "";
@@ -28,8 +29,10 @@ public class DiaryOperationTests
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }
 
-            if (request.Method == HttpMethod.Post && path.Contains("production-log-entries"))
+            if (request.Method == HttpMethod.Post)
             {
+                capturedPath = path;
+                capturedBody = request.Content?.ReadAsStringAsync().Result;
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent("{\"result\":\"success\"}")
@@ -43,8 +46,19 @@ public class DiaryOperationTests
         using var _ = http;
         http.Csrf = "csrf";
 
-        await diary.MarkAsWatchedAsync("test-film", "123", DateTime.Now, false, "PROD1");
-        // No exception = success
+        await diary.MarkAsWatchedAsync("test-film", "123", new DateTime(2026, 3, 24, 23, 30, 0), true, "PROD1");
+
+        Assert.NotNull(capturedPath);
+        Assert.Contains("production-log-entries", capturedPath!, StringComparison.Ordinal);
+        using var body = System.Text.Json.JsonDocument.Parse(capturedBody!);
+        var root = body.RootElement;
+        // The production entry names the production, never the film id, which identifies a different thing there.
+        Assert.Equal("PROD1", root.GetProperty("productionId").GetString());
+        Assert.False(root.TryGetProperty("filmId", out var filmId));
+        Assert.Equal("2026-03-24", root.GetProperty("diaryDetails").GetProperty("diaryDate").GetString());
+        Assert.False(root.GetProperty("diaryDetails").GetProperty("rewatch").GetBoolean());
+        Assert.True(root.GetProperty("like").GetBoolean());
+        Assert.False(root.TryGetProperty("rating", out var rating));
     }
 
     [Fact]
