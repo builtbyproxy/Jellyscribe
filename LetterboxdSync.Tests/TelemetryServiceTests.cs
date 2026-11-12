@@ -82,6 +82,27 @@ public class TelemetryServiceTests : IDisposable
     [InlineData("Could not resolve film identifiers for /film/some-film/", TelemetryService.CatParse)]
     [InlineData("data-film-id attribute empty on /film/some-film/", TelemetryService.CatParse)]
     [InlineData("Letterboxd API token expired. Will re-authenticate on next sync.", TelemetryService.CatAuth)]
+    [InlineData("Letterboxd API token expired and could not be renewed. Will sign in again on the next sync.", TelemetryService.CatAuth)]
+    [InlineData("Not authenticated. Call AuthenticateAsync first.", TelemetryService.CatOther)]
+    [InlineData("Signed in to Letterboxd without a member id. Call AuthenticateAsync again.", TelemetryService.CatOther)]
+    // The official API paths print the status name, not the number.
+    [InlineData("Failed to log film: InternalServerError {}", TelemetryService.CatServerError)]
+    [InlineData("Failed to log film: ServiceUnavailable", TelemetryService.CatServerError)]
+    [InlineData("Failed to log film: Forbidden", TelemetryService.CatCloudflare)]
+    [InlineData("Failed to log film: TooManyRequests", TelemetryService.CatRateLimit)]
+    [InlineData("Failed to log film: BadRequest {\"messages\":[]}", TelemetryService.CatWriteFailure)]
+    [InlineData("Failed to rate some-film: BadRequest", TelemetryService.CatWriteFailure)]
+    // Auth is checked before the write bucket, so a refused write reads as a sign-in problem.
+    [InlineData("Failed to rate some-film: Unauthorized", TelemetryService.CatAuth)]
+    // A film slug that happens to spell a status name is not a status.
+    [InlineData("Failed to rate forbidden-planet: BadRequest", TelemetryService.CatWriteFailure)]
+    [InlineData("Failed to log the-unauthorized-biography after 4 retries.", TelemetryService.CatWriteFailure)]
+    // .NET's EnsureSuccessStatusCode wording, and a service that never answered.
+    [InlineData("Response status code does not indicate success: 503 (Service Unavailable).", TelemetryService.CatServerError)]
+    [InlineData("Response status code does not indicate success: 401 (Unauthorized).", TelemetryService.CatAuth)]
+    [InlineData("The request was canceled due to the configured HttpClient.Timeout of 100 seconds elapsing.", TelemetryService.CatServerError)]
+    [InlineData("Connection refused (api.letterboxd.com:443)", TelemetryService.CatServerError)]
+    [InlineData("Response status code does not indicate success: 404 (Not Found).", TelemetryService.CatOther)]
     [InlineData("something exploded", TelemetryService.CatOther)]
     [InlineData(null, TelemetryService.CatOther)]
     // Serializd's SerializdApiClient phrases failures as "failed (5xx):", not Letterboxd's

@@ -22,6 +22,41 @@ public class LetterboxdApiClient : ILetterboxdService
     private string _cacheKey = string.Empty;
     private string _memberId = string.Empty;
     private string _accessToken = string.Empty;
+    private string _refreshToken = string.Empty;
+    private DateTime _expiresAtUtc = DateTime.MinValue;
+
+    // Set when the session expired and could not be renewed; every later call then fails fast
+    // with the same block, instead of a generic "not authenticated" the runner can't recognise.
+    private bool _sessionExpired;
+
+    // Set when a renewal ahead of expiry failed. The token still works until it expires, so the
+    // client stops renewing ahead (each film would otherwise send another refused refresh) and
+    // leaves the last attempt to the 401 path: at most two refresh requests per session.
+    private bool _renewAheadFailed;
+
+    /// <summary>
+    /// A token this close to expiry is renewed before it is used. A run that paces its films
+    /// (3-5 s each, plus the requests) outlasts the hour a token lives once it has a few hundred
+    /// films to send, and every request after expiry would otherwise be refused with a 401.
+    /// </summary>
+    internal static readonly TimeSpan RenewBefore = TimeSpan.FromMinutes(5);
+
+    // One renewal at a time per account: a refresh token may be single-use, so two clients
+    // refreshing it at once could leave one of them with a refused refresh.
+    // One entry per account and password, never pruned: bounded like TokenCache, which holds the same keys.
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> RenewLocks = new();
+
+    /// <summary>
+    /// How long a sign-in waits for a renewal of the same account already in progress. A run's
+    /// renewal can sit out up to a minute of Retry-After under the lock, and a playback event or
+    /// a review submit must not hang behind it. After this wait the sign-in takes the cached token
+    /// if it has at least <see cref="MinAdoptLife"/> left (no request at all, while Letterboxd is
+    /// rate limiting the account), and only otherwise uses a password grant.
+    /// </summary>
+    internal static readonly TimeSpan SignInLockWait = TimeSpan.FromSeconds(5);
+
+    internal static readonly TimeSpan MinAdoptLife = TimeSpan.FromSeconds(30);
+
 
     // Keyed by Helpers.TokenCacheKey (username + password hash): a caller that only knows the
     // username must never get, or refresh, another account's token.
@@ -89,31 +124,39 @@ public class LetterboxdApiClient : ILetterboxdService
     public async Task AuthenticateAsync(string username, string password, string? rawCookies = null)
     {
         _cacheKey = Helpers.TokenCacheKey(username, password);
+        // Start clean: nothing from an earlier sign-in of this client (possibly another account)
+        // may survive into this one, least of all a member id.
+        _accessToken = _refreshToken = _memberId = string.Empty;
+        _expiresAtUtc = DateTime.MinValue;
+        _sessionExpired = _renewAheadFailed = false;
 
-        // Check token cache first. An entry is only ever stored with its member id, but one without
-        // it is never reused: every member-scoped call would send "member=" and get a 404.
-        if (TokenCache.TryGetValue(_cacheKey, out var cached) && cached.ExpiresAtUtc > DateTime.UtcNow.AddMinutes(5)
-            && !string.IsNullOrEmpty(cached.MemberId))
+        if (TokenCache.TryGetValue(_cacheKey, out var cached) && IsUsable(cached))
         {
-            _accessToken = cached.AccessToken;
-            _memberId = cached.MemberId;
+            Adopt(cached);
             _logger.LogDebug("Reusing cached API token for {Username}", username);
             return;
         }
 
-        // Try refresh if we have a refresh token
-        if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken))
+        // Try the refresh token, under the same per-account lock as a mid-run renewal: a refresh
+        // token may be single-use, and a sync run of this account may be renewing right now.
+        if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken)
+            && await TryRenewSessionAsync(cached.AccessToken, CancellationToken.None, SignInLockWait).ConfigureAwait(false))
         {
-            try
-            {
-                await RefreshTokenAsync(cached.RefreshToken).ConfigureAwait(false);
-                _logger.LogDebug("Refreshed API token for {Username}", username);
-                return;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug("Token refresh failed for {Username}, doing full auth: {Message}", username, ex.Message);
-            }
+            _logger.LogDebug("Refreshed API token for {Username}", username);
+            return;
+        }
+
+        // The renewal could not be done now (another one is sitting out a rate limit, or the
+        // refresh token was refused) but the cached token still works for a while: use it rather
+        // than send a password grant, which would likely meet the same rate limit. It is not
+        // renewed ahead of expiry again; a 401 still renews once.
+        if (TokenCache.TryGetValue(_cacheKey, out var current) && !string.IsNullOrEmpty(current.MemberId)
+            && current.ExpiresAtUtc > DateTime.UtcNow + MinAdoptLife)
+        {
+            Adopt(current);
+            _renewAheadFailed = true;
+            _logger.LogDebug("Using the cached API token for {Username} until it runs out", username);
+            return;
         }
 
         // Full password auth
@@ -220,12 +263,6 @@ public class LetterboxdApiClient : ILetterboxdService
         var response = await SendSignedAsync(HttpMethod.Post, "/log-entries", body, "application/json", authenticated: true,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            ClearCachedToken();
-            throw new Exception("Letterboxd API token expired. Will re-authenticate on next sync.");
-        }
-
         if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NoContent)
         {
             var errorBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -323,12 +360,6 @@ public class LetterboxdApiClient : ILetterboxdService
         var response = await SendSignedAsync(HttpMethod.Patch, $"/log-entry/{Uri.EscapeDataString(target.Id)}",
             JsonSerializer.Serialize(bodyObj), "application/json", authenticated: true).ConfigureAwait(false);
 
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            ClearCachedToken();
-            throw new Exception("Letterboxd API token expired. Will re-authenticate on next sync.");
-        }
-
         // A failed reply can echo the review in whatever escaping Letterboxd chose, so the error
         // carries only the status.
         if (!response.IsSuccessStatusCode)
@@ -395,12 +426,6 @@ public class LetterboxdApiClient : ILetterboxdService
         var body = JsonSerializer.Serialize(new Dictionary<string, object> { ["rating"] = rating });
         var response = await SendSignedAsync(HttpMethod.Patch, $"/film/{Uri.EscapeDataString(filmId)}/me", body, "application/json", authenticated: true,
             cancellationToken: cancellationToken).ConfigureAwait(false);
-
-        if (response.StatusCode == HttpStatusCode.Unauthorized)
-        {
-            ClearCachedToken();
-            throw new Exception("Letterboxd API token expired. Will re-authenticate on next sync.");
-        }
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
@@ -693,10 +718,152 @@ public class LetterboxdApiClient : ILetterboxdService
     /// item). The retry is signed afresh, since the signature covers the nonce and timestamp.
     /// <paramref name="cancellationToken"/> cancels that wait and a read in flight, never a write
     /// already sent, which may have landed.
+    /// An authenticated request renews the session first when the token is within
+    /// <see cref="RenewBefore"/> of expiry, and renews and resends once when refused with a 401.
+    /// A 401 that renewal cannot fix ends the session for this client:
+    /// <see cref="LetterboxdSessionExpiredException"/>, now and on every later call.
     /// </summary>
     private async Task<HttpResponseMessage> SendSignedAsync(HttpMethod method, string path,
         string? body = null, string? contentType = null, string? queryParams = null, bool authenticated = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool renewSession = true)
+    {
+        var renew = authenticated && renewSession;
+        // Checked here as well as in EnsureAuthenticated: a method can pass that check and then
+        // make several requests (paged reads, the review lookup), and the session can end between them.
+        if (renew && _sessionExpired)
+            throw new LetterboxdSessionExpiredException();
+        // Another client of this account already renewed: take its token instead of sending a
+        // request with this one that would only be refused.
+        if (renew && TokenCache.TryGetValue(_cacheKey, out var newer) && newer.AccessToken != _accessToken && IsUsable(newer))
+            Adopt(newer);
+        if (renew && !_renewAheadFailed && _expiresAtUtc <= DateTime.UtcNow + RenewBefore
+            && !await TryRenewSessionAsync(_accessToken, cancellationToken).ConfigureAwait(false))
+            _renewAheadFailed = true;
+
+        var response = await SendWithRateLimitRetryAsync(method, path, body, contentType, queryParams, authenticated,
+            cancellationToken).ConfigureAwait(false);
+        if (!renew || response.StatusCode != HttpStatusCode.Unauthorized)
+            return response;
+
+        // Refused although the token looked current (revoked early, or the clock is off). A 401
+        // means Letterboxd did not act on the request, so sending it again cannot duplicate a write.
+        response.Dispose();
+        if (await TryRenewSessionAsync(_accessToken, cancellationToken).ConfigureAwait(false))
+        {
+            response = await SendWithRateLimitRetryAsync(method, path, body, contentType, queryParams, authenticated,
+                cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+                return response;
+            response.Dispose();
+        }
+
+        ExpireSession();
+        throw new LetterboxdSessionExpiredException();
+    }
+
+    /// <summary>
+    /// Renews the session with the refresh token, or adopts a token another client of the same
+    /// account renewed while this one waited for the lock. Returns false on failure, leaving the
+    /// client's state as it was: the caller sends with the token it has, and a 401 then ends in
+    /// <see cref="LetterboxdSessionExpiredException"/>. Only cancellation throws: of the lock wait,
+    /// or of a 429's Retry-After wait (a 429 means the refresh token was not spent). A refresh
+    /// request already sent is never cancelled, since Letterboxd may have spent the old refresh
+    /// token, so its reply is always read rather than dropped.
+    /// The password is not kept, so a refused refresh token is not followed by a full sign-in;
+    /// the next run signs in again, through the auth breaker like any sign-in. A refresh token
+    /// Letterboxd refuses (400 or 401) is dropped from the shared cache, so other clients of the account do not
+    /// send it again. <paramref name="lockWait"/> bounds the wait for the lock (a sign-in passes
+    /// <see cref="SignInLockWait"/>); when it runs out, this returns false.
+    /// </summary>
+    private async Task<bool> TryRenewSessionAsync(string staleToken, CancellationToken cancellationToken,
+        TimeSpan? lockWait = null)
+    {
+        if (string.IsNullOrEmpty(_cacheKey))
+            return false;
+
+        var gate = RenewLocks.GetOrAdd(_cacheKey, _ => new SemaphoreSlim(1, 1));
+        if (!await gate.WaitAsync(lockWait ?? Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false))
+        {
+            _logger.LogDebug("Another renewal of this Letterboxd account is still running; signing in with the password");
+            return false;
+        }
+
+        TokenInfo? cached = null;
+        try
+        {
+            TokenCache.TryGetValue(_cacheKey, out cached);
+            if (cached != null && cached.AccessToken != staleToken && IsUsable(cached))
+            {
+                Adopt(cached);
+                return true;
+            }
+
+            // The refresh token and the member id come from the same place, so a renewal can
+            // never pair one account's token with another's member id. A cached entry always
+            // carries its member id. The member id of an account never changes, so a renewal keeps
+            // it instead of asking /me again: one request fewer, and no way to end up with a token
+            // but no member id.
+            var fromCache = !string.IsNullOrEmpty(cached?.RefreshToken);
+            var refreshToken = fromCache ? cached!.RefreshToken : _refreshToken;
+            var memberId = fromCache ? cached!.MemberId : _memberId;
+            if (string.IsNullOrEmpty(refreshToken))
+                return false;
+
+            cancellationToken.ThrowIfCancellationRequested();
+            await RefreshTokenAsync(refreshToken, memberId, cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Renewed the Letterboxd API session");
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Sanitized like every sign-in error: a token reply must never reach the log.
+            _logger.LogWarning("Could not renew the Letterboxd API session: {Message}", AuthBreaker.Sanitize(ex.Message));
+            // Only a refused grant (400 invalid_grant, or 401) says the refresh token is dead; a 403
+            // is a block in front of the API, and a 429 means the token was not spent.
+            if (ex is HttpRequestException { StatusCode: HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized })
+                ForgetRefusedRefreshToken(cached);
+            return false;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Letterboxd refused the refresh token: keep the cached access token (it works until it
+    /// runs out) but drop the refresh token from the cache and this client, so neither this client
+    /// nor a new sign-in of the account sends it again. Never touches a newer entry another
+    /// client cached in the meantime.
+    /// </summary>
+    private void ForgetRefusedRefreshToken(TokenInfo? cached)
+    {
+        _refreshToken = string.Empty;
+        if (cached != null && !string.IsNullOrEmpty(cached.RefreshToken))
+            TokenCache.TryUpdate(_cacheKey, cached with { RefreshToken = string.Empty }, cached);
+    }
+
+    // An entry is only ever stored with its member id, but one without it is never used: every
+    // member-scoped call would send "member=" and get a 404.
+    private static bool IsUsable(TokenInfo t)
+        => t.ExpiresAtUtc > DateTime.UtcNow + RenewBefore && !string.IsNullOrEmpty(t.MemberId);
+
+    private void Adopt(TokenInfo cached)
+    {
+        _accessToken = cached.AccessToken;
+        _refreshToken = cached.RefreshToken;
+        _expiresAtUtc = cached.ExpiresAtUtc;
+        _memberId = cached.MemberId;
+        _sessionExpired = false;
+        _renewAheadFailed = false;
+    }
+
+    private async Task<HttpResponseMessage> SendWithRateLimitRetryAsync(HttpMethod method, string path,
+        string? body, string? contentType, string? queryParams, bool authenticated, CancellationToken cancellationToken)
     {
         var sendToken = method == HttpMethod.Get ? cancellationToken : CancellationToken.None;
         var response = await SendSignedOnceAsync(method, path, body, contentType, queryParams, authenticated, sendToken)
@@ -759,7 +926,7 @@ public class LetterboxdApiClient : ILetterboxdService
     /// which another sign-in of the same account reused it with no member id, so its diary reads
     /// sent "member=" and Letterboxd answered 404.
     /// </summary>
-    private async Task CompleteSignInAsync(string tokenJson)
+    private async Task CompleteSignInAsync(string tokenJson, string? knownMemberId = null)
     {
         string refreshToken;
         int expiresIn;
@@ -771,26 +938,41 @@ public class LetterboxdApiClient : ILetterboxdService
             expiresIn = root.TryGetProperty("expires_in", out var ei) ? ei.GetInt32() : 3600;
         }
 
-        _memberId = string.Empty;
-        await FetchMemberIdAsync().ConfigureAwait(false);
+        _refreshToken = refreshToken;
+        _expiresAtUtc = DateTime.UtcNow.AddSeconds(expiresIn);
+        _sessionExpired = false;
+        _renewAheadFailed = false;
+        if (!string.IsNullOrEmpty(knownMemberId))
+        {
+            _memberId = knownMemberId;
+        }
+        else
+        {
+            _memberId = string.Empty;
+            await FetchMemberIdAsync().ConfigureAwait(false);
+        }
 
-        TokenCache[_cacheKey] = new TokenInfo(_accessToken, refreshToken, DateTime.UtcNow.AddSeconds(expiresIn), _memberId);
+        TokenCache[_cacheKey] = new TokenInfo(_accessToken, refreshToken, _expiresAtUtc, _memberId);
     }
 
-    private async Task RefreshTokenAsync(string refreshToken)
+    private async Task RefreshTokenAsync(string refreshToken, string? knownMemberId = null,
+        CancellationToken cancellationToken = default)
     {
         var body = $"grant_type=refresh_token&refresh_token={Uri.EscapeDataString(refreshToken)}";
-        var response = await SendSignedAsync(HttpMethod.Post, "/auth/token", body, "application/x-www-form-urlencoded")
-            .ConfigureAwait(false);
+        // A POST: the token cancels only a 429 wait, never the request itself.
+        var response = await SendSignedAsync(HttpMethod.Post, "/auth/token", body, "application/x-www-form-urlencoded",
+            cancellationToken: cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-        await CompleteSignInAsync(json).ConfigureAwait(false);
+        await CompleteSignInAsync(json, knownMemberId).ConfigureAwait(false);
     }
 
     private async Task FetchMemberIdAsync()
     {
-        var response = await SendSignedAsync(HttpMethod.Get, "/me", authenticated: true).ConfigureAwait(false);
+        // Part of a sign-in already: a 401 here must fail it, not start a renewal.
+        var response = await SendSignedAsync(HttpMethod.Get, "/me", authenticated: true, renewSession: false)
+            .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
@@ -801,15 +983,27 @@ public class LetterboxdApiClient : ILetterboxdService
         _memberId = memberId;
     }
 
-    private void ClearCachedToken()
+    /// <summary>
+    /// Ends this client's session after a 401 that renewal could not fix: drops its token from
+    /// the shared cache (never a newer one another client cached) so the next run signs in
+    /// afresh, and makes every later call throw <see cref="LetterboxdSessionExpiredException"/>.
+    /// </summary>
+    private void ExpireSession()
     {
-        TokenCache.TryRemove(_cacheKey, out _);
+        if (TokenCache.TryGetValue(_cacheKey, out var cached) && cached.AccessToken == _accessToken
+            && TokenCache.TryRemove(new KeyValuePair<string, TokenInfo>(_cacheKey, cached)))
+            _logger.LogWarning("Letterboxd API session expired and could not be renewed; dropped the cached token");
+        else
+            _logger.LogWarning("Letterboxd API session expired and could not be renewed");
         _accessToken = string.Empty;
-        _logger.LogWarning("API token expired, cleared cache");
+        _refreshToken = string.Empty;
+        _sessionExpired = true;
     }
 
     private void EnsureAuthenticated()
     {
+        if (_sessionExpired)
+            throw new LetterboxdSessionExpiredException();
         if (string.IsNullOrEmpty(_accessToken))
             throw new InvalidOperationException("Not authenticated. Call AuthenticateAsync first.");
         // Every member-scoped call needs it; without it Letterboxd answers "member=" with a 404.

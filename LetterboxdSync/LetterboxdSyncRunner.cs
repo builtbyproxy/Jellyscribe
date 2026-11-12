@@ -75,9 +75,11 @@ public class LetterboxdSyncRunner
     internal const int OutageMinAttempts = 2;
 
     /// <summary>
-    /// After this many films in a row are refused with a block (a Cloudflare 403 or challenge),
-    /// the rest of the account's run waits for the next one. Each blocked film already costs
-    /// about a minute of backoff, so going on would hold the sync for hours and fail every film.
+    /// After this many films in a row are refused with a block (a Cloudflare 403 or challenge, or
+    /// an API session that expired and could not be renewed), the rest of the account's run waits
+    /// for the next one. A Cloudflare block already costs about a minute of backoff per film, and
+    /// an expired session fails every later request, so going on would hold the sync for hours
+    /// and fail every film.
     /// </summary>
     internal const int MaxConsecutiveBlocks = 3;
 
@@ -570,7 +572,7 @@ public class LetterboxdSyncRunner
                         Account = lbAccount,
                         Timestamp = DateTime.UtcNow,
                         Status = SyncStatus.Skipped,
-                        Error = $"Letterboxd blocked {blocksInARow} requests in a row (usually Cloudflare, or a long rate limit); the other {remaining} films wait for the next sync",
+                        Error = $"Letterboxd blocked {blocksInARow} requests in a row (usually Cloudflare, a long rate limit, or a sign-in that expired); the other {remaining} films wait for the next sync",
                         Source = source
                     });
                     break;

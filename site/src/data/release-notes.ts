@@ -10,6 +10,21 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.13.3',
+    headline: 'Long syncs keep going after the first hour',
+    summary:
+      'Letterboxd signs Jellyscribe in for about an hour at a time. A large sync, such as the first one on a new server, can take longer than that, and once the hour was up every remaining film failed, sometimes hundreds of them, until the next scheduled sync logged them. Jellyscribe now renews the sign-in before it runs out, so a long sync finishes in one go. If Letterboxd refuses to renew it, the sync pauses after a few films and picks up on the next run instead of marking the whole list as failed. Accounts that sign in through the Letterboxd website were not affected.',
+    highlights: {
+      fixes: [
+        'A sync that runs longer than an hour no longer fails every film after the first hour.',
+        'If Letterboxd will not renew the sign-in, the sync pauses after a few films instead of failing the rest of the list.',
+      ],
+      improvements: [
+        'Anonymous telemetry, for those who opted in, now sorts more errors into the right category, such as a Letterboxd outage or a timeout, instead of "other".',
+      ],
+    },
+  },
+  {
     version: '2.13.2',
     headline: 'An updated page-reading library',
     summary:

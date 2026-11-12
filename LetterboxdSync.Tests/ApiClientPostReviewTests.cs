@@ -49,7 +49,7 @@ public class ApiClientPostReviewTests
     {
         var handler = ApiTestHelpers.CreateAuthenticatedHandler();
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<Exception>(() =>
             client.PostReviewAsync("sinners-2025", "review", tmdbId: null));
@@ -62,7 +62,7 @@ public class ApiClientPostReviewTests
     {
         var handler = ApiTestHelpers.CreateAuthenticatedHandler();
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<Exception>(() =>
             client.PostReviewAsync("sinners-2025", "review", tmdbId: 0));
@@ -89,7 +89,7 @@ public class ApiClientPostReviewTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.PostReviewAsync("sinners-2025", "great", rating: 4.5, tmdbId: 1233413);
 
         Assert.NotNull(capturedBody);
@@ -120,7 +120,7 @@ public class ApiClientPostReviewTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.PostReviewAsync("sinners-2025", reviewText: null, isRewatch: true,
             date: "2026-04-29", tmdbId: 1233413);
 
@@ -151,7 +151,7 @@ public class ApiClientPostReviewTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.PostReviewAsync("sinners-2025", "spoilers", containsSpoilers: true, tmdbId: 1233413);
 
         Assert.NotNull(capturedBody);
@@ -176,7 +176,7 @@ public class ApiClientPostReviewTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ex = await Assert.ThrowsAsync<Exception>(() =>
             client.PostReviewAsync("sinners-2025", "review", tmdbId: 1233413));
 
@@ -203,7 +203,7 @@ public class ApiClientPostReviewTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.PostReviewAsync("sinners-2025", "x", date: null, tmdbId: 1233413);
 
         Assert.NotNull(capturedBody);

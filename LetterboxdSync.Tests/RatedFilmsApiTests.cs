@@ -276,7 +276,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var entries = await client.GetDiaryFilmEntriesAsync("user");
 
         // The /films endpoint must be called with the Watched relationship and
@@ -342,7 +342,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: CursorPagedList("/films", 250, queries));
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var entries = await client.GetDiaryFilmEntriesAsync("user");
 
         Assert.Equal(250, entries.Count);
@@ -372,7 +372,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var entries = await client.GetDiaryFilmEntriesAsync("user");
 
         Assert.Empty(entries);
@@ -388,7 +388,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: CursorPagedList("/watchlist", 1011, queries));
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
         Assert.Equal(1011, ids.Count);
@@ -409,7 +409,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: CursorPagedList("/watchlist", 40, queries));
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
         Assert.Equal(40, ids.Count);
@@ -434,7 +434,7 @@ public class GetDiaryFilmEntriesIntegrationTests
     {
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: ScriptedWatchlist(bodyFor, queries));
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         return await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetWatchlistTmdbIdsAsync("user"));
     }
 
@@ -449,7 +449,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         var handler = ApiTestHelpers.CreateAuthenticatedHandler(
             extraHandler: CursorPagedList("/watchlist", 1011, queries, honourCursor: false));
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetWatchlistTmdbIdsAsync("user"));
 
@@ -534,7 +534,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
         Assert.Empty(ids);
@@ -562,7 +562,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ids = await client.GetWatchlistTmdbIdsAsync("user");
 
         Assert.Equal(new[] { 550 }, ids.ToArray());
@@ -584,7 +584,7 @@ public class GetDiaryFilmEntriesIntegrationTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ids = await client.GetDiaryTmdbIdsAsync("user");
 
         // Same dedup behaviour as the entries call, just stripped to ids.
