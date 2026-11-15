@@ -102,9 +102,10 @@ public class Account
     public bool SyncFavorites { get; set; }
 
     /// <summary>
-    /// When true, a rating changed in Jellyfin after (or without) a watch is pushed to this
-    /// account's Letterboxd film rating by <see cref="RatingSyncHandler"/>. Defaults on, which is
-    /// also what configs saved before this setting existed deserialize to.
+    /// When true, a rating changed in Jellyfin on a film the user has played is pushed to this
+    /// account's Letterboxd film rating by <see cref="RatingSyncHandler"/> (never on an unplayed
+    /// film, which Letterboxd would count as watched: issue #193). Defaults on, which is also what
+    /// configs saved before this setting existed deserialize to.
     /// </summary>
     public bool SyncRatings { get; set; } = true;
 
@@ -136,10 +137,6 @@ public class Account
     public bool RequestWatchedTitles { get; set; }
 
     public bool MirrorJellyseerrWatchlist { get; set; }
-
-    public bool SkipPreviouslySynced { get; set; } = true;
-
-    public bool StopOnFailure { get; set; }
 
     /// <summary>
     /// When a Jellyfin user has multiple Letterboxd accounts, the primary one is used to:

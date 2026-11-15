@@ -321,6 +321,22 @@ public class LetterboxdControllerTests
         Assert.Equal(admin, Prop<bool>(ok, "canSetWatchlistName"));
     }
 
+    // The page hides the Seerr options until Seerr has both a URL and an API key.
+    [Theory]
+    [InlineData(null, null, false)]
+    [InlineData("http://seerr.local:5055", null, false)]
+    [InlineData("http://seerr.local:5055", "key", true)]
+    public void GetAccounts_TellsThePageWhetherSeerrIsSetUp(string? url, string? key, bool expected)
+    {
+        using var h = new ControllerTestHarness(currentUserId: UserId);
+        h.AddAccount(UserId, "mine");
+        h.Config.JellyseerrUrl = url;
+        h.Config.JellyseerrApiKey = key;
+
+        var ok = Assert.IsType<OkObjectResult>(h.Controller.GetAccounts());
+        Assert.Equal(expected, Prop<bool>(ok, "seerrConfigured"));
+    }
+
     [Fact]
     public void GetAccounts_OrdersPrimaryFirst()
     {

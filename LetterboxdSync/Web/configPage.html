@@ -511,19 +511,30 @@
                                 ['Mark favourites as liked', 'chkFav', !!a.SyncFavorites, 'Favourite in Jellyfin → hearted on the diary.']
                             // Always rendered; onSvcChange shows it only for Letterboxd, so switching the
                             // service on a new account reveals it without re-rendering the other boxes.
-                            ].concat([['Sync ratings to Letterboxd', 'chkRatings', a.SyncRatings !== false, 'Rate in Jellyfin after watching → the Letterboxd film rating.']]).concat([
+                            ].concat([['Sync ratings to Letterboxd', 'chkRatings', a.SyncRatings !== false, 'Rate a film the user has played → the Letterboxd film rating.']]).concat([
+                                // syncVisibility hides Primary, the Seerr rows and the two request options when they can do nothing.
                                 ['Only sync recently played', 'chkDate', !!a.EnableDateFilter, 'Limit the catch-up to the last N days.'],
-                                ['Primary account', 'chkPrimary', !!a.IsPrimary, 'Wins on tie-breaks when a user has several.'],
                                 ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.SyncWatchlist : !!a.EnableWatchlistSync, this.watchDesc(svc)],
+                                ['Import diary as watched', 'chkImport', !!a.EnableDiaryImport, 'Reverse: mark Jellyfin played from the diary.'],
+                                ['Primary account', 'chkPrimary', !!a.IsPrimary, 'Wins on tie-breaks when a user has several.'],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.AutoRequestWatchlist, 'Watchlisted but missing from the library → request via Seerr.'],
-                                ['Backfill Seerr requests', 'chkBackfill', !!a.BackfillAvailableRequests, 'Also attribute a Seerr request for already-available titles (requester trail).'],
-                                ['Re-request watched titles', 'chkRerequest', !!a.RequestWatchedTitles, 'Also request titles already watched, e.g. after a cleanup tool deletes them.'],
-                                ['Mirror watchlist to Seerr', 'chkMirror', !!a.MirrorJellyseerrWatchlist, 'Push this watchlist into the Seerr user\'s own watchlist (primary account only).'],
-                                ['Skip already-synced', 'chkSkip', a.SkipPreviouslySynced !== false, 'Use local history to avoid re-logging.'],
-                                ['Stop on first failure', 'chkStop', !!a.StopOnFailure, 'Halt this account on the first error.'],
-                                ['Import diary as watched', 'chkImport', !!a.EnableDiaryImport, 'Reverse: mark Jellyfin played from the diary.']
+                                ['Backfill Seerr requests', 'chkBackfill', !!a.BackfillAvailableRequests, 'Also attribute a Seerr request for already-available titles (requester trail).', true],
+                                ['Re-request watched titles', 'chkRerequest', !!a.RequestWatchedTitles, 'Also request titles already watched, e.g. after a cleanup tool deletes them.', true],
+                                ['Mirror watchlist to Seerr', 'chkMirror', !!a.MirrorJellyseerrWatchlist, 'Push this watchlist into the Seerr user\'s own watchlist (primary account only).']
                             ]);
                             return this.checksHtml(rows, a.EnableDateFilter, a.DateFilterDays);
+                        },
+                        // Seerr as the settings below the accounts stand now, saved or still being typed.
+                        seerrConfigured: function () {
+                            return !!byId('jellyseerrUrl').value.trim() && !!((this.config.HasJellyseerrApiKey && !byId('jellyseerrApiKeyClear').checked) || byId('jellyseerrApiKey').value.trim());
+                        },
+                        // The picked user's accounts of this service once the dialog is saved: an edit that keeps
+                        // its owner keeps the count, a new link or a move to another user adds one.
+                        accountsOfService: function (svc) {
+                            var userId = byId('mUser').value, orig = this.editing && this.editing.original;
+                            var list = (svc === 'serializd' ? this.config.SerializdAccounts : this.config.Accounts) || [];
+                            var n = list.filter(function (x) { return x.UserJellyfinId === userId; }).length;
+                            return orig && orig.UserJellyfinId === userId ? n : n + 1;
                         },
                         libsFor: function (a) { return this.libsHtml((a && a.ExcludedLibraryIds) || []); },
                         // The one toggle whose wording depends on the service; onSvcChange keeps it in step.
@@ -569,9 +580,9 @@
                             if (m.svc === 'serializd') {
                                 // Original* names the login this edit started from, so the server carries its saved
                                 // password across a changed email or a move to another Jellyfin user.
-                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalEmail: orig ? orig.Email : null, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, RequestWatchedTitles: m.rereq, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
+                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalEmail: orig ? orig.Email : null, Email: m.username, Password: m.password, Enabled: m.enabled, SyncFavorites: m.fav, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, SyncWatchlist: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, RequestWatchedTitles: m.rereq, MirrorJellyseerrWatchlist: m.mirror, WatchlistName: m.watchName || null, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
                             } else {
-                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalLetterboxdUsername: orig ? orig.LetterboxdUsername : null, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, ClearRawCookies: !m.cookies && m.clearCookies, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, RequestWatchedTitles: m.rereq, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, SkipPreviouslySynced: m.skip, StopOnFailure: m.stop, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
+                                item = { UserJellyfinId: m.userId, OriginalUserJellyfinId: orig ? orig.UserJellyfinId : null, OriginalLetterboxdUsername: orig ? orig.LetterboxdUsername : null, LetterboxdUsername: m.username, LetterboxdPassword: m.password, RawCookies: m.cookies || null, ClearRawCookies: !m.cookies && m.clearCookies, UserAgent: m.userAgent || null, Enabled: m.enabled, SyncFavorites: m.fav, SyncRatings: m.ratings, EnableDateFilter: m.date, DateFilterDays: m.days, IsPrimary: m.primary, EnableWatchlistSync: m.watch, AutoRequestWatchlist: m.seerr, BackfillAvailableRequests: m.backfill, RequestWatchedTitles: m.rereq, MirrorJellyseerrWatchlist: m.mirror, PlaylistName: m.watchName || null, EnableDiaryImport: m.imp, ExcludedLibraryIds: excludedLibs };
                             }
                             var key = m.svc === 'serializd' ? 'SerializdAccounts' : 'Accounts';
                             if (self.modalBusy) return;

@@ -69,8 +69,6 @@ public class SerializdController : JellyfinUserApiController
         public int DateFilterDays { get; set; } = 7;
         public bool IsPrimary { get; set; }
         public bool SyncWatchlist { get; set; }
-        public bool SkipPreviouslySynced { get; set; } = true;
-        public bool StopOnFailure { get; set; }
         public bool EnableDiaryImport { get; set; }
         public bool AutoRequestWatchlist { get; set; }
         public bool BackfillAvailableRequests { get; set; }
@@ -108,8 +106,6 @@ public class SerializdController : JellyfinUserApiController
                 dateFilterDays = a.DateFilterDays,
                 isPrimary = a.IsPrimary,
                 syncWatchlist = a.SyncWatchlist,
-                skipPreviouslySynced = a.SkipPreviouslySynced,
-                stopOnFailure = a.StopOnFailure,
                 enableDiaryImport = a.EnableDiaryImport,
                 autoRequestWatchlist = a.AutoRequestWatchlist,
                 backfillAvailableRequests = a.BackfillAvailableRequests,
@@ -120,8 +116,10 @@ public class SerializdController : JellyfinUserApiController
             })
             .ToList();
 
-        // The collection is visible server-wide, so only an admin may name it.
-        return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator() });
+        // The collection is visible server-wide, so only an admin may name it. The page hides the Seerr
+        // options until an admin has set Seerr up.
+        var cfg = Plugin.Instance!.Configuration;
+        return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator(), seerrConfigured = SeerrClient.IsConfigured(cfg.JellyseerrUrl, cfg.JellyseerrApiKey) });
     }
 
     /// <summary>
@@ -165,8 +163,6 @@ public class SerializdController : JellyfinUserApiController
                 DateFilterDays = req.DateFilterDays,
                 IsPrimary = req.IsPrimary,
                 SyncWatchlist = req.SyncWatchlist,
-                SkipPreviouslySynced = req.SkipPreviouslySynced,
-                StopOnFailure = req.StopOnFailure,
                 EnableDiaryImport = req.EnableDiaryImport,
                 AutoRequestWatchlist = req.AutoRequestWatchlist,
                 BackfillAvailableRequests = req.BackfillAvailableRequests,

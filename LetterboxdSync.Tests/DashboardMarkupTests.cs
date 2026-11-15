@@ -211,6 +211,26 @@ public class DashboardMarkupTests
     }
 
     [Theory]
+    [MemberData(nameof(Pages))]
+    public void AccountDialog_KeepsEveryToggleRendered_AndIndentsTheRequestOptions(string file, string root)
+    {
+        var page = Code(file);
+        // "Skip already-synced" and "Stop on first failure" are gone from both services.
+        Assert.DoesNotContain("chkSkip", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("chkStop", page, StringComparison.Ordinal);
+
+        // Every toggle is still rendered, so saving keeps a hidden one's stored value. Which rows
+        // syncVisibility hides is checked only by the Playwright run (no JS test harness).
+        foreach (var id in new[] { "chkPrimary", "chkSeerr", "chkBackfill", "chkRerequest", "chkMirror" })
+            Assert.Contains("'" + id + "', !!a.", Read(file), StringComparison.Ordinal);
+
+        // The two request options sit indented under "Auto-request via Seerr".
+        Assert.Matches(@"'chkBackfill', [^\]]*, true\]", Read(file));
+        Assert.Matches(@"'chkRerequest', [^\]]*, true\]", Read(file));
+        Assert.Contains("margin-left:", Rule(Style(file), root + " .ws-checks label.sub"), StringComparison.Ordinal);
+    }
+
+    [Theory]
     [MemberData(nameof(Files))]
     public void ActivityList_CanBeSearched_AndPagedToItsEnd(string file)
     {

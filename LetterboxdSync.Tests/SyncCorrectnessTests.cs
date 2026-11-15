@@ -87,14 +87,13 @@ public class SyncCorrectnessTests : IDisposable
         return movie;
     }
 
-    private void AddAccount(User user, string lbUser, bool skipPreviouslySynced = true)
+    private void AddAccount(User user, string lbUser)
         => Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
             UserJellyfinId = user.Id.ToString("N"),
             LetterboxdUsername = lbUser,
             LetterboxdPassword = "secret",
-            Enabled = true,
-            SkipPreviouslySynced = skipPreviouslySynced
+            Enabled = true
         });
 
     private void Library(User user, params (Movie Movie, DateTime LastPlayedUtc)[] films)

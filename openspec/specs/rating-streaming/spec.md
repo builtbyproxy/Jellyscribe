@@ -4,7 +4,7 @@
 Sends a film's rating to the member's Letterboxd film rating whenever it changes in Jellyfin (the web UI has no rating control, so in practice from clients, the API, or Jellyfin Enhanced's review mirror), not only inside a new diary entry, so a rating given after the watch was logged still reaches Letterboxd. Only real changes are sent, the plugin's own rating writes never echo back, and failures never affect diary sync. Added in 2.7.0 (#135); the website-login path's live check is #140.
 ## Requirements
 ### Requirement: Rating changes stream to Letterboxd automatically
-When a Jellyfin user's rating on a movie changes through a save with reason UpdateUserData or UpdateUserRating, the plugin SHALL push the mapped half-star value to Letterboxd as the member's film rating for every enabled account of that user whose rating-sync toggle is on, without any user interaction. The film SHALL be resolved by TMDb id; items without one are skipped with a log line.
+When a Jellyfin user's rating on a movie they have played changes through a save with reason UpdateUserData or UpdateUserRating, the plugin SHALL push the mapped half-star value to Letterboxd as the member's film rating for every enabled account of that user whose rating-sync toggle is on, without any user interaction. The film SHALL be resolved by TMDb id; items without one are skipped with a log line.
 
 #### Scenario: Rate after watching in a client app
 - **WHEN** a user finishes a film (already synced to the diary) and later rates it 7/10 in a Jellyfin client that saves ratings through the user-data API
@@ -15,8 +15,8 @@ When a Jellyfin user's rating on a movie changes through a save with reason Upda
 - **THEN** the Jellyfin rating becomes 8/10 and the user's Letterboxd film rating becomes 4 stars
 
 #### Scenario: Rating without a watch
-- **WHEN** a user rates a library film they never played
-- **THEN** the rating is still pushed as the film rating; no diary entry is created, and Letterboxd marks the film watched
+- **WHEN** a library film the user never played gets a rating, whether the user rated it or a watchlist plugin set a Like (which Jellyfin stores as 10/10)
+- **THEN** nothing is pushed, because Letterboxd would mark the film watched; the diary sync carries the rating (a Like included, as 5 stars) once the film is played, and the review modal can still rate it on purpose (issue #193, 2.15.0)
 
 #### Scenario: Toggle off
 - **WHEN** an account's rating-sync toggle is off and the user rates a film

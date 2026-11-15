@@ -287,6 +287,7 @@
                                     self.lb = (res[0] && res[0].accounts) || []; self.sz = (res[1] && res[1].accounts) || [];
                                     // Watchlist collections and playlists are named by an admin; the server keeps the stored name for anyone else.
                                     self.canSetWatchlistName = !!((res[0] && res[0].canSetWatchlistName) || (res[1] && res[1].canSetWatchlistName));
+                                    self.seerrReady = !!((res[0] && res[0].seerrConfigured) || (res[1] && res[1].seerrConfigured));
                                     self.renderAccounts();
                                     self.acctsReady = true;
                                     self.renderFirstRun();
@@ -316,19 +317,21 @@
                                 ['Mark favourites as liked', 'chkFav', !!a.syncFavorites, 'Favourite in Jellyfin → hearted on the diary.']]
                                 // Always rendered; onSvcChange shows it only for Letterboxd, so switching the
                                 // service on a new account reveals it without re-rendering the other boxes.
-                                .concat([['Sync ratings to Letterboxd', 'chkRatings', a.syncRatings !== false, 'Rate in Jellyfin after watching → your Letterboxd film rating.']])
+                                .concat([['Sync ratings to Letterboxd', 'chkRatings', a.syncRatings !== false, 'Rate a film you\'ve played → your Letterboxd film rating.']])
+                                // syncVisibility hides Primary, the Seerr rows and the two request options when they can do nothing.
                                 .concat([['Only sync recently played', 'chkDate', !!a.enableDateFilter, 'Limit the catch-up to the last N days.'],
-                                ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
                                 ['Sync watchlist to library', 'chkWatch', svc === 'serializd' ? !!a.syncWatchlist : !!a.enableWatchlistSync, this.watchDesc(svc)],
+                                ['Import diary as watched', 'chkImport', !!a.enableDiaryImport, 'Mark Jellyfin played from the diary.'],
+                                ['Primary account', 'chkPrimary', !!a.isPrimary, 'Wins on tie-breaks when you have several.'],
                                 ['Auto-request via Seerr', 'chkSeerr', !!a.autoRequestWatchlist, 'Missing from the library → request via Seerr.'],
-                                ['Backfill Seerr requests', 'chkBackfill', !!a.backfillAvailableRequests, 'Also attribute a Seerr request for already-available titles.'],
-                                ['Re-request watched titles', 'chkRerequest', !!a.requestWatchedTitles, 'Also request titles you already watched, e.g. after a cleanup tool deletes them.'],
-                                ['Mirror watchlist to Seerr', 'chkMirror', !!a.mirrorJellyseerrWatchlist, 'Push this watchlist into your Seerr watchlist (primary account only).'],
-                                ['Skip already-synced', 'chkSkip', a.skipPreviouslySynced !== false, 'Avoid re-logging via local history.'],
-                                ['Stop on first failure', 'chkStop', !!a.stopOnFailure, 'Halt on the first error.'],
-                                ['Import diary as watched', 'chkImport', !!a.enableDiaryImport, 'Mark Jellyfin played from the diary.']]);
+                                ['Backfill Seerr requests', 'chkBackfill', !!a.backfillAvailableRequests, 'Also attribute a Seerr request for already-available titles.', true],
+                                ['Re-request watched titles', 'chkRerequest', !!a.requestWatchedTitles, 'Also request titles you already watched, e.g. after a cleanup tool deletes them.', true],
+                                ['Mirror watchlist to Seerr', 'chkMirror', !!a.mirrorJellyseerrWatchlist, 'Push this watchlist into your Seerr watchlist (primary account only).']]);
                             return this.checksHtml(rows, a.enableDateFilter, a.dateFilterDays);
                         },
+                        seerrConfigured: function () { return !!this.seerrReady; },
+                        // Accounts of this service once the dialog is saved: an edit keeps the count, a new link adds one.
+                        accountsOfService: function (svc) { return ((svc === 'serializd' ? this.sz : this.lb) || []).length + (this.editing ? 0 : 1); },
                         // The one toggle whose wording depends on the service; onSvcChange keeps it in step.
                         watchDesc: function (svc) { return 'Watchlist → Jellyfin ' + (svc === 'serializd' ? 'collection + playlist. Everyone who can see those shows can see the collection.' : 'playlist.'); },
                         openAccount: function (ref) {
@@ -367,11 +370,11 @@
                             var excludedLibs = self.mergeExcluded((orig && orig.excludedLibraryIds) || [], m.libs);
                             if (m.svc === 'serializd') {
                                 // original* names the login this edit started from, so its saved password follows a changed email.
-                                var item = { email: m.username, originalEmail: orig ? orig.email : null, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, requestWatchedTitles: m.rereq, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
+                                var item = { email: m.username, originalEmail: orig ? orig.email : null, password: m.password, enabled: m.enabled, syncFavorites: m.fav, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, syncWatchlist: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, requestWatchedTitles: m.rereq, mirrorJellyseerrWatchlist: m.mirror, watchlistName: m.watchName || null, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) list[self.editing.i] = item; else list.push(item);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Serializd/Accounts', { accounts: list }).then(self.ok).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
                             } else {
-                                var itemL = { letterboxdUsername: m.username, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null, letterboxdPassword: m.password, rawCookies: m.cookies || null, clearRawCookies: !m.cookies && m.clearCookies, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, requestWatchedTitles: m.rereq, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, skipPreviouslySynced: m.skip, stopOnFailure: m.stop, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
+                                var itemL = { letterboxdUsername: m.username, originalLetterboxdUsername: orig ? orig.letterboxdUsername : null, letterboxdPassword: m.password, rawCookies: m.cookies || null, clearRawCookies: !m.cookies && m.clearCookies, userAgent: m.userAgent || null, enabled: m.enabled, syncFavorites: m.fav, syncRatings: m.ratings, enableDateFilter: m.date, dateFilterDays: m.days, isPrimary: m.primary, enableWatchlistSync: m.watch, autoRequestWatchlist: m.seerr, backfillAvailableRequests: m.backfill, requestWatchedTitles: m.rereq, mirrorJellyseerrWatchlist: m.mirror, playlistName: m.watchName || null, enableDiaryImport: m.imp, excludedLibraryIds: excludedLibs };
                                 if (self.editing) list[self.editing.i] = itemL; else list.push(itemL);
                                 self.put('Jellyfin.Plugin.LetterboxdSync/Accounts', { accounts: list }).then(self.ok).then(function () { self.afterSave(); }, function (err) { self.afterSave(err); });
                             }

@@ -66,6 +66,8 @@ public class RatingSyncHandlerTests : IDisposable
         _movie.SetProviderId(MetadataProvider.Tmdb, TmdbId.ToString());
         _userManager.GetUserById(_user.Id).Returns(_user);
         _libraryManager.GetItemById(_movie.Id).Returns(_movie);
+        // Every film has been played unless a test says otherwise: only played films are pushed.
+        _userDataManager.GetUserData(Arg.Any<User>(), Arg.Any<BaseItem>()).Returns(new UserItemData { Key = "k", Played = true });
 
         LetterboxdServiceFactory.OverrideForTesting = (username, _, _, _, _) =>
         {
@@ -290,6 +292,40 @@ public class RatingSyncHandlerTests : IDisposable
         Assert.Equal(SyncEventSources.Rating, evt.Source);
         Assert.Equal("Sinners · Rated 3.5 stars", evt.FilmTitle);
         Assert.Null(evt.ViewingDate);
+    }
+
+    // Issue #193: Jellyfin stores a Like as a 10/10 rating, and watchlist plugins set Likes on films
+    // nobody has watched. Letterboxd counts a rating as a watch, so an unplayed film is never pushed.
+    [Fact]
+    public async Task UnplayedFilm_IsNeverPushed_NorRetried()
+    {
+        AddAccount();
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 10, Played = false });
+
+        Save(10, UserDataSaveReason.UpdateUserRating);
+        await DrainAfterWindow();
+
+        Assert.Empty(_pushes);
+        Assert.Equal(0, _factoryCalls);
+        Assert.Null(RatingPushStore.GetLastPushed(UserId, "lb-user", TmdbId));
+        Assert.Empty(SyncHistory.GetPage(0, 10, "lachlan").Events);
+        Assert.Equal(0, _handler.PendingCount);
+    }
+
+    [Fact]
+    public async Task FilmRatedBeforePlaying_IsPushedOnTheNextChangeAfterPlaying()
+    {
+        AddAccount();
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 10, Played = false });
+        Save(10, UserDataSaveReason.UpdateUserRating);
+        await DrainAfterWindow();
+
+        _userDataManager.GetUserData(_user, _movie).Returns(new UserItemData { Key = "k", Rating = 8, Played = true });
+        Save(8);
+        await DrainAfterWindow();
+
+        var push = Assert.Single(_pushes);
+        Assert.Equal(4, push.Rating);
     }
 
     [Fact]

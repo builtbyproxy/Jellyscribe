@@ -88,7 +88,6 @@ public class SyncReliabilityTests : IDisposable
             LetterboxdUsername = "demo-cinephile",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = true,
         });
         _userManager.GetUsers().Returns(new[] { user });
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(movies.Cast<BaseItem>().ToList());

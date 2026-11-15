@@ -10,6 +10,22 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.15.0',
+    headline: 'Fewer settings, and no ratings for films you have not watched',
+    summary:
+      'Letterboxd counts a rating as a watch, and Jellyfin stores a "Like" as a 10/10 rating. Watchlist features in other plugins set Likes on films nobody has played, so Jellyscribe was rating them 5 stars and Letterboxd showed them as watched. Ratings are now only sent for films you have played, so a Like no longer marks a film watched; use Review to rate a film you saw somewhere else. A Liked film you then watch is still logged with 5 stars, because Jellyfin cannot tell a Like from a 10/10 rating. Each account also has fewer settings. "Skip already-synced" is now always on, because turning it off made Serializd log every episode again on every sync. A film or episode Jellyscribe already logged is not logged again, even if you delete it on Letterboxd or Serializd. "Stop on first failure" is gone, because Jellyscribe already pauses an account when Letterboxd blocks it. "Primary account" only appears once you link a second account on the same service, and the Seerr settings only appear once an admin has set Seerr up, with the two request options tucked under "Auto-request via Seerr".',
+    highlights: {
+      fixes: [
+        'A film you have not played is never rated on Letterboxd automatically, so a watchlist Like no longer marks it as watched.',
+        'Serializd can no longer log the same episodes again on every sync: skipping what is already logged is always on.',
+      ],
+      improvements: [
+        'The account settings only show what can do something: Primary account once you have two accounts on a service, and the Seerr settings once Seerr is set up.',
+        '"Skip already-synced" and "Stop on first failure" are removed. Accounts that had Stop on first failure on now carry on past a failed title, and still pause if Letterboxd blocks them.',
+      ],
+    },
+  },
+  {
     version: '2.14.1',
     headline: 'Website sign-ins pause instead of failing every film',
     summary:

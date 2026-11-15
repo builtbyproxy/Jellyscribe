@@ -399,13 +399,13 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
         Assert.Equal(1, logged[0].Episode);
     }
 
-    // ===== SkipPreviouslySynced =====
+    // ===== Local history: the only duplicate check =====
 
     [Fact]
-    public async Task Run_SkipPreviouslySyncedFalse_ReSendsAlreadyLoggedEpisode()
+    public async Task Run_AlreadyLoggedEpisode_IsNeverSentAgain()
     {
+        // Serializd's diary is never read, so local history is all that stops a re-log.
         var (user, idHex) = AddUserWithAccount();
-        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).SkipPreviouslySynced = false;
 
         var ep = MakeEpisode(1, 3);
         LibraryHas(ep);
@@ -417,7 +417,7 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
 
         await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None);
 
-        Assert.Single(logged); // re-sent despite already being recorded
+        Assert.Empty(logged);
     }
 
     // ===== Season resolution failure =====
@@ -440,36 +440,12 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
             Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
     }
 
-    // ===== StopOnFailure =====
+    // ===== One failure does not stop the run =====
 
     [Fact]
-    public async Task Run_StopOnFailureTrue_StopsAfterFirstLogFailure()
+    public async Task Run_LogFailure_ContinuesWithTheNextEpisode()
     {
-        var (user, idHex) = AddUserWithAccount();
-        Plugin.Instance!.Configuration.SerializdAccounts.Single(a => a.UserJellyfinId == idHex).StopOnFailure = true;
-
-        var epA = MakeEpisode(1, 1);
-        var epB = MakeEpisode(1, 2);
-        LibraryHas(epA, epB);
-        _userDataManager.GetUserData(user, epA).Returns(MakeUserData(new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc)));
-        _userDataManager.GetUserData(user, epB).Returns(MakeUserData(new DateTime(2026, 6, 2, 0, 0, 0, DateTimeKind.Utc)));
-
-        var service = Substitute.For<ISerializdService>();
-        service.ResolveSeasonIdAsync(Arg.Any<int>(), Arg.Any<int>()).Returns(ci => 500 + (int)ci[1]);
-        service.CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>())
-            .Returns<Task>(_ => throw new Exception("Serializd 500"));
-        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
-
-        await _runner.RunForAllAsync(new Progress<double>(), "test", CancellationToken.None); // must not throw
-
-        await service.Received(1).CreateEpisodeLogAsync(
-            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>());
-    }
-
-    [Fact]
-    public async Task Run_StopOnFailureFalse_ContinuesAfterLogFailure()
-    {
-        var (user, _) = AddUserWithAccount(); // StopOnFailure defaults to false
+        var (user, _) = AddUserWithAccount();
 
         var epA = MakeEpisode(1, 1);
         var epB = MakeEpisode(1, 2);
