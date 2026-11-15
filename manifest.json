@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.15.0.0",
+        "changelog": "Letterboxd counts any rating as a watch, and Jellyfin stores a \"Like\" as a 10/10 rating. Watchlist features in other plugins set Likes on films nobody has played, so Jellyscribe was rating those films 5 stars and they showed up on Letterboxd as watched. Ratings are now only sent for films you have played, so a Like no longer marks a film watched; to rate a film you saw somewhere else, use Review. A Liked film you then watch is still logged with 5 stars, because Jellyfin cannot tell a Like from a 10/10 rating. Each account also has fewer settings. \"Skip already-synced\" is now always on, because turning it off made Serializd log every episode again on every sync. A film or episode Jellyscribe already logged is not logged again, even if you delete it on Letterboxd or Serializd. \"Stop on first failure\" is gone, because Jellyscribe already pauses an account when Letterboxd blocks it. \"Primary account\" only appears once you link a second account on the same service, and the Seerr settings only appear once an admin has set Seerr up, with the two request options tucked under \"Auto-request via Seerr\".",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.15.0/jellyfin-plugin-letterboxd-v2.15.0.zip",
+        "checksum": "2cefc5e2fac9f30bbaea75f488e72e64",
+        "timestamp": "2026-11-15T10:36:18Z"
+      },
+      {
         "version": "2.14.1.0",
         "changelog": "Some accounts sign in through the Letterboxd website instead of the official way. If Letterboxd ended that sign-in part way through a sync and signing in again did not bring it back, every remaining film in the sync failed, and each failure counted toward Jellyscribe giving up on that film. The sync now pauses that account after a few films, as the official sign-in has done since 2.13.3, and the rest wait for the next sync. The same goes for a sync where Letterboxd keeps refusing to save diary entries while it still answers diary checks.",
         "targetAbi": "10.11.9.0",
