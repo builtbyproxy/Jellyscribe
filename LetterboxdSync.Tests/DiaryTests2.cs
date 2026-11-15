@@ -16,8 +16,9 @@ public class DiaryOperationTests
     private static readonly ILogger TestLogger = NullLoggerFactory.Instance.CreateLogger("test");
 
     [Fact]
-    public async Task MarkAsWatched_ProductionEndpointSuccess_Returns()
+    public async Task MarkAsWatched_WithAProductionId_PostsItToTheProductionEndpoint()
     {
+        string? capturedPath = null, capturedBody = null;
         var handler = new DiaryMockHandler((request, http) =>
         {
             var path = request.RequestUri?.PathAndQuery ?? "";
@@ -28,8 +29,10 @@ public class DiaryOperationTests
                 return new HttpResponseMessage(HttpStatusCode.OK);
             }
 
-            if (request.Method == HttpMethod.Post && path.Contains("production-log-entries"))
+            if (request.Method == HttpMethod.Post)
             {
+                capturedPath = path;
+                capturedBody = request.Content?.ReadAsStringAsync().Result;
                 return new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent("{\"result\":\"success\"}")
@@ -43,8 +46,19 @@ public class DiaryOperationTests
         using var _ = http;
         http.Csrf = "csrf";
 
-        await diary.MarkAsWatchedAsync("test-film", "123", DateTime.Now, false, "PROD1");
-        // No exception = success
+        await diary.MarkAsWatchedAsync("test-film", "123", new DateTime(2026, 3, 24, 23, 30, 0), true, "PROD1");
+
+        Assert.NotNull(capturedPath);
+        Assert.Contains("production-log-entries", capturedPath!, StringComparison.Ordinal);
+        using var body = System.Text.Json.JsonDocument.Parse(capturedBody!);
+        var root = body.RootElement;
+        // The production entry names the production, never the film id, which identifies a different thing there.
+        Assert.Equal("PROD1", root.GetProperty("productionId").GetString());
+        Assert.False(root.TryGetProperty("filmId", out var filmId));
+        Assert.Equal("2026-03-24", root.GetProperty("diaryDetails").GetProperty("diaryDate").GetString());
+        Assert.False(root.GetProperty("diaryDetails").GetProperty("rewatch").GetBoolean());
+        Assert.True(root.GetProperty("like").GetBoolean());
+        Assert.False(root.TryGetProperty("rating", out var rating));
     }
 
     [Fact]
@@ -117,6 +131,42 @@ public class DiaryOperationTests
             () => diary.MarkAsWatchedAsync("test-film", "123", DateTime.Now, false, "PROD1"));
 
         Assert.Contains("403", ex.Message);
+    }
+
+    [Fact]
+    public async Task MarkAsWatched_401WithReauthSpent_ThrowsSessionExpiredBlock()
+    {
+        // A fresh sign-in earlier in the run did not stop the 401s, so the guard is spent and every
+        // later film lands here. It must be a block, so the runner pauses the account (issue #188).
+        var posts = 0;
+        var handler = new DiaryMockHandler((request, http) =>
+        {
+            var path = request.RequestUri?.PathAndQuery ?? "";
+            if (request.Method == HttpMethod.Get && path == "/")
+            {
+                http.CookieContainer.Add(BaseUri, new Cookie("com.xk72.webparts.csrf", "csrf"));
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            if (request.Method == HttpMethod.Post)
+            {
+                posts++;
+                return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+            }
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var (http, auth, _, diary) = handler.CreateClients(TestLogger);
+        using var _ = http;
+        http.Csrf = "csrf";
+        Assert.True(auth.ShouldReauthenticate());
+
+        var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(
+            () => diary.MarkAsWatchedAsync("test-film", "123", DateTime.Now, false, "PROD1"));
+
+        Assert.True(SyncErrors.IsBlock(ex));
+        Assert.Equal(TelemetryService.CatAuth, TelemetryService.Classify(ex.Message));
+        Assert.Contains("test-film", ex.Message);
+        Assert.Equal(1, posts);
     }
 
     [Fact]

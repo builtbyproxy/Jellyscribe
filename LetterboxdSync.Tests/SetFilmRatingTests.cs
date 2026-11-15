@@ -38,7 +38,7 @@ public class SetFilmRatingTests
             return response;
         });
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.SetFilmRatingAsync("sinners-2025", "KQMM", rating);
         return (method, path, body);
     }
@@ -77,10 +77,25 @@ public class SetFilmRatingTests
     }
 
     [Fact]
-    public async Task Api_Unauthorized_Throws()
+    public async Task Api_Unauthorized_RenewsOnceThenThrows()
     {
-        var ex = await Assert.ThrowsAsync<Exception>(() => CaptureApiPatch(3.5, new HttpResponseMessage(HttpStatusCode.Unauthorized)));
+        // A fresh 401 per request, as a real server sends: the client renews the session and
+        // resends once, and a second refusal ends the run's use of the session.
+        var patches = 0;
+        var handler = ApiTestHelpers.CreateAuthenticatedHandler(extraHandler: request =>
+        {
+            var p = request.RequestUri?.AbsolutePath ?? "";
+            if (request.Method != HttpMethod.Patch || !p.Contains("/film/")) return null;
+            patches++;
+            return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+        });
+        using var client = new LetterboxdApiClient(TestLogger, handler);
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
+
+        var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(
+            () => client.SetFilmRatingAsync("sinners-2025", "KQMM", 3.5));
         Assert.Contains("token expired", ex.Message);
+        Assert.Equal(2, patches);
     }
 
     [Fact]
@@ -153,6 +168,36 @@ public class SetFilmRatingTests
         var ex = await Assert.ThrowsAsync<Exception>(() => CaptureSitePost(3.5,
             new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"result\":false,\"messages\":[\"Please sign in\"]}") }));
         Assert.Contains("Please sign in", ex.Message);
+    }
+
+    [Fact]
+    public async Task Site_401WithReauthSpent_ThrowsSessionExpiredBlock()
+    {
+        // The website path's counterpart of Api_Unauthorized_RenewsOnceThenThrows (issue #188).
+        var posts = 0;
+        var handler = new DiaryMockHandler((request, http) =>
+        {
+            var p = request.RequestUri?.PathAndQuery ?? "";
+            if (request.Method == HttpMethod.Get && p == "/")
+            {
+                http.CookieContainer.Add(BaseUri, new Cookie("com.xk72.webparts.csrf", "csrf-token"));
+                return new HttpResponseMessage(HttpStatusCode.OK);
+            }
+            if (request.Method != HttpMethod.Post)
+                return new HttpResponseMessage(HttpStatusCode.NotFound);
+            posts++;
+            return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+        });
+        var (http, auth, _, diary) = handler.CreateClients(TestLogger);
+        using var _ = http;
+        Assert.True(auth.ShouldReauthenticate());
+
+        var ex = await Assert.ThrowsAsync<LetterboxdSessionExpiredException>(
+            () => diary.SetFilmRatingAsync("sinners-2025", "51561", 3.5));
+
+        Assert.True(SyncErrors.IsBlock(ex));
+        Assert.Equal(TelemetryService.CatAuth, TelemetryService.Classify(ex.Message));
+        Assert.Equal(1, posts);
     }
 
     [Fact]

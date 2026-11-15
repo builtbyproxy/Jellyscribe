@@ -388,14 +388,11 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task RunForAllAsync_ReportsProgress100AtCompletion()
     {
         _userManager.GetUsers().Returns(new List<User>());
-        var captured = new List<double>();
-        var progress = new Progress<double>(v => captured.Add(v));
+        var progress = new RecordingProgress();
 
         await _runner.RunForAllAsync(progress, "scheduled", CancellationToken.None);
 
-        // Allow the Progress callback to fire on the synchronization context.
-        await Task.Delay(50);
-        Assert.Contains(100.0, captured);
+        Assert.Contains(100.0, progress.Values);
     }
 
     [Fact]

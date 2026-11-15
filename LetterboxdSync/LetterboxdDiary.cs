@@ -61,7 +61,7 @@ public class LetterboxdDiary
                         await _auth.ForceReauthenticateAsync().ConfigureAwait(false);
                         continue;
                     }
-                    throw new Exception($"Letterboxd returned 401 for {filmSlug} after re-authentication. Session may be permanently invalid.");
+                    throw new LetterboxdSessionExpiredException($"Letterboxd returned 401 for {filmSlug} after re-authentication. Session may be permanently invalid.");
 
                 case MarkResult.TransientError:
                     var delayMs = (attempt + 1) * 5000 + Random.Shared.Next(3000);
@@ -287,7 +287,7 @@ public class LetterboxdDiary
                     await _auth.ForceReauthenticateAsync().ConfigureAwait(false);
                     continue;
                 }
-                throw new Exception($"Letterboxd returned 401 rating {filmSlug} after re-authentication. Session may be permanently invalid.");
+                throw new LetterboxdSessionExpiredException($"Letterboxd returned 401 rating {filmSlug} after re-authentication. Session may be permanently invalid.");
             }
 
             if (res.StatusCode == HttpStatusCode.Forbidden && attempt < LetterboxdHttpClient.MaxRetries - 1)

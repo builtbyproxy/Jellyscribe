@@ -47,6 +47,26 @@ public sealed class LetterboxdBlockedException : Exception
 }
 
 /// <summary>
+/// The Letterboxd session ended during a run and could not be restored: on the official API the
+/// renewal failed (the refresh token was refused, or the renewed token was refused too); on the
+/// website a fresh sign-in did not stop the 401s. Every later request in the run would be refused
+/// the same way, so the runner counts it as a block and pauses the account; the next run signs in
+/// again from scratch. Telemetry classifies by message, so every message must keep "token expired"
+/// or "401" to be filed under auth_failure; the message constructor is internal for that reason.
+/// </summary>
+public sealed class LetterboxdSessionExpiredException : Exception
+{
+    public LetterboxdSessionExpiredException()
+        : base("Letterboxd API token expired and could not be renewed. Will sign in again on the next sync.")
+    {
+    }
+
+    internal LetterboxdSessionExpiredException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>
 /// The official API's token endpoint answered the login with an error status. The message is the
 /// same text callers have always logged.
 /// </summary>
@@ -79,12 +99,14 @@ public static class SyncErrors
 {
     /// <summary>
     /// True when the failure was Letterboxd refusing the request (a 403, a Cloudflare challenge,
-    /// or a 429 whose Retry-After is longer than the clients wait) rather than anything about the
-    /// film. Every later request in the run would be refused the same way.
+    /// a 429 whose Retry-After is longer than the clients wait, or a session that expired and
+    /// could not be restored) rather than anything about the film. Every later request in the run
+    /// would be refused the same way.
     /// </summary>
     public static bool IsBlock(Exception ex) => ex switch
     {
         LetterboxdBlockedException => true,
+        LetterboxdSessionExpiredException => true,
         DiaryCheckFailedException d => d.Blocked,
         System.Net.Http.HttpRequestException h => h.StatusCode
             is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests,

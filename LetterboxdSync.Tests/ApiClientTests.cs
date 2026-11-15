@@ -318,7 +318,7 @@ public class ApiClientFilmLookupTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var result = await client.LookupFilmByTmdbIdAsync(550);
 
         Assert.Equal("2a9q", result.FilmId);
@@ -343,7 +343,7 @@ public class ApiClientFilmLookupTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var ex = await Assert.ThrowsAsync<FilmNotFoundException>(() => client.LookupFilmByTmdbIdAsync(99999999));
         Assert.Contains("not found", ex.Message);
     }
@@ -375,7 +375,7 @@ public class ApiClientDiaryTests
         {
             System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo(culture);
             using var client = new LetterboxdApiClient(TestLogger, handler);
-            await client.AuthenticateAsync("user", "pass");
+            await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
             await client.MarkAsWatchedAsync("fight-club", "2a9q", new DateTime(2026, 10, 6), liked: false);
         }
         finally
@@ -405,7 +405,7 @@ public class ApiClientDiaryTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.MarkAsWatchedAsync("fight-club", "2a9q", new DateTime(2026, 4, 7), liked: true, rating: 4.5);
 
         Assert.NotNull(capturedBody);
@@ -436,7 +436,7 @@ public class ApiClientDiaryTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         await client.MarkAsWatchedAsync("film", "lid", DateTime.Now, liked: false, rewatch: true);
 
         Assert.NotNull(capturedBody);
@@ -471,7 +471,7 @@ public class ApiClientDiaryTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var info = await client.GetDiaryInfoAsync("2a9q", "user");
 
         Assert.True(info.HasAnyEntry);
@@ -496,7 +496,7 @@ public class ApiClientDiaryTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var info = await client.GetDiaryInfoAsync("2a9q", "user");
 
         Assert.False(info.HasAnyEntry);
@@ -540,7 +540,7 @@ public class ApiClientRateLimitTests
         });
 
         using var client = new LetterboxdApiClient(TestLogger, handler);
-        await client.AuthenticateAsync("user", "pass");
+        await client.AuthenticateAsync("user-" + Guid.NewGuid().ToString("N"), "pass");
         var result = await client.LookupFilmByTmdbIdAsync(123);
 
         Assert.Equal(2, callCount);
