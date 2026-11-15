@@ -14,6 +14,12 @@
                 #letterboxdUserPage .ws-back { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; color: var(--ws-faint); font-weight: 500; font-size: 13px; text-decoration: none; cursor: pointer; transition: .13s; }
                 #letterboxdUserPage .ws-back:hover { background: var(--ws-surface-2); color: var(--ws-text); }
                 #letterboxdUserPage .ws-back svg { width: 15px; height: 15px; flex: none; }
+                /* First-run card: no diary linked yet, or linked with nothing logged yet. */
+                #letterboxdUserPage .ws-firstrun { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 18px 20px; margin-bottom: 18px; border-left: 3px solid var(--ws-primary); }
+                #letterboxdUserPage .ws-firstrun[hidden], #letterboxdUserPage .ws-btn[hidden] { display: none; }
+                #letterboxdUserPage .ws-firstrun > div:first-child { min-width: 0; flex: 1 1 280px; }
+                #letterboxdUserPage .ws-firstrun b { display: block; font-size: 15px; margin-bottom: 4px; }
+                #letterboxdUserPage .ws-firstrun p { margin: 0; font-size: 13px; line-height: 1.5; }
                 </style>
 
                 <div class="ws">
@@ -32,6 +38,10 @@
                         <section class="ws-view show" data-sec="overview">
                             <div class="ws-head"><div><h1>Your diaries</h1><p>What we've logged from your watching, across both accounts.</p></div>
                                 <div style="display:flex;gap:8px;"><button type="button" class="ws-btn" id="runWatchlistBtn">Sync all watchlists</button><button type="button" class="ws-btn primary" id="runSyncBtn">Sync all now</button></div></div>
+                            <div class="ws-panel ws-firstrun" id="firstRun" role="region" aria-labelledby="firstRunTitle" hidden>
+                                <div><b id="firstRunTitle"></b><p class="ws-muted" id="firstRunText"></p></div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;flex:none;"><button type="button" class="ws-btn" id="firstRunAlt" hidden></button><button type="button" class="ws-btn primary" id="firstRunBtn"></button></div>
+                            </div>
                             <div class="ws-filters" id="ovFilters">
                                 <button type="button" class="ws-chip on" data-f="all">All</button>
                                 <button type="button" class="ws-chip" data-f="letterboxd"><span class="ws-dot film"></span>Film</button>
@@ -188,22 +198,22 @@
                         json: function (r) { if (!r.ok) throw r; return r.json(); },
                         // For writes: success is the status alone, so a reply without a JSON body still counts as saved.
                         ok: function (r) { if (!r.ok) throw r; return r; },
-                        runSync: function () {
-                            var f = this.ovFilter, jobs = [];
-                            if (f === 'all' || f === 'serializd') jobs.push({ name: 'Serializd', path: 'Jellyfin.Plugin.LetterboxdSync/Serializd/SyncNow' });
-                            if (f === 'all' || f === 'letterboxd') jobs.push({ name: 'Letterboxd', path: 'Jellyfin.Plugin.LetterboxdSync/Sync' });
-                            this.startJobs('Sync', jobs);
+                        // The services filter f asks for, narrowed to those this user has an enabled account on,
+                        // so a service you never linked is not reported as an error. Until the accounts list has
+                        // loaded, every service is asked and the server's reply explains any refusal.
+                        syncJobs: function (f, paths) {
+                            var self = this, on = function (list) { return !self.acctsReady || list.some(function (a) { return a.enabled !== false; }); }, jobs = [];
+                            if ((f === 'all' || f === 'serializd') && on(this.sz)) jobs.push({ name: 'Serializd', path: 'Jellyfin.Plugin.LetterboxdSync/' + paths[0] });
+                            if ((f === 'all' || f === 'letterboxd') && on(this.lb)) jobs.push({ name: 'Letterboxd', path: 'Jellyfin.Plugin.LetterboxdSync/' + paths[1] });
+                            return jobs;
                         },
-                        runWatchlist: function () {
-                            var f = this.ovFilter, jobs = [];
-                            if (f === 'all' || f === 'serializd') jobs.push({ name: 'Serializd', path: 'Jellyfin.Plugin.LetterboxdSync/Serializd/SyncWatchlistNow' });
-                            if (f === 'all' || f === 'letterboxd') jobs.push({ name: 'Letterboxd', path: 'Jellyfin.Plugin.LetterboxdSync/SyncWatchlist' });
-                            this.startJobs('Watchlist sync', jobs);
-                        },
+                        runSync: function () { this.startJobs('Sync', this.syncJobs(this.ovFilter, ['Serializd/SyncNow', 'Sync'])); },
+                        runWatchlist: function () { this.startJobs('Watchlist sync', this.syncJobs(this.ovFilter, ['Serializd/SyncWatchlistNow', 'SyncWatchlist'])); },
                         // Starts each job, shows the server's reason for any it refused (no account, already
                         // running), and watches progress only when at least one was accepted (202).
                         startJobs: function (label, jobs) {
                             var self = this, st = byId('syncStatus');
+                            if (!jobs.length) { st.innerHTML = '<span class="ws-red">No enabled account to sync. Link one, or resume a paused one, under My accounts.</span>'; return; }
                             st.textContent = 'Starting…';
                             self.setSyncBusy(true);
                             Promise.all(jobs.map(function (j) {
@@ -218,6 +228,56 @@
                                 if (res.some(function (x) { return x.ok; })) self.startWatcher(label); else self.setSyncBusy(false);
                             });
                         },
+                        // First run: nothing linked, everything paused, or linked with nothing logged yet. Shown
+                        // only while both the accounts and the overview stats are loaded, so a slow or failed load
+                        // never tells someone who has an account to link one.
+                        afterOverview: function (fs, ts) {
+                            // Skipped counts too: a first sync that found everything already in the diary has still run.
+                            this.logged = ['success', 'rewatches', 'skipped'].reduce(function (n, k) { return n + (fs[k] || 0) + (ts[k] || 0); }, 0);
+                            this.overviewReady = true; this.renderFirstRun();
+                        },
+                        setSyncBusy: function (busy) { byId('runSyncBtn').disabled = busy; byId('runWatchlistBtn').disabled = busy; byId('firstRunBtn').disabled = busy; },
+                        renderFirstRun: function () {
+                            var self = this, box = byId('firstRun');
+                            // An account whose sign-in keeps failing is paused by the server too, so it can't start syncing.
+                            var all = self.lb.concat(self.sz), enabled = all.filter(function (a) { return a.enabled !== false && !a.authPaused; });
+                            var mode = !(self.acctsReady && self.overviewReady) ? '' : !all.length ? 'link' : !enabled.length ? 'paused' : self.logged ? '' : 'sync';
+                            box.hidden = !mode;
+                            // With nothing linked, the sync buttons can only fail, so the card is the one action.
+                            byId('runSyncBtn').hidden = byId('runWatchlistBtn').hidden = mode === 'link';
+                            var title = byId('firstRunTitle'), text = byId('firstRunText'), btn = byId('firstRunBtn'), alt = byId('firstRunAlt');
+                            alt.hidden = true;
+                            var edit = function (a) { return function () { self.openAccount({ svc: self.sz.indexOf(a) >= 0 ? 'serializd' : 'letterboxd', i: self.sz.indexOf(a) >= 0 ? self.sz.indexOf(a) : self.lb.indexOf(a) }); }; };
+                            if (mode === 'link') {
+                                title.textContent = 'Link a diary to get started';
+                                text.textContent = 'Connect your Letterboxd account for films or your Serializd account for TV. After that, everything you finish watching here is logged to it.';
+                                btn.textContent = 'Link a diary';
+                                btn.onclick = function () { self.openAccount(null); };
+                            } else if (mode === 'paused') {
+                                title.textContent = 'Your account is paused';
+                                text.textContent = 'Nothing is logged while every linked account is paused or failing to sign in. Open it to turn it back on, or save its password again.';
+                                btn.textContent = 'Open account';
+                                btn.onclick = edit(all[0]);
+                            } else if (mode === 'sync') {
+                                // Without "Only sync recently played", the first sync sends every played film or episode
+                                // to the public diary, so say so before the button rather than after.
+                                var whole = enabled.filter(function (a) { return !a.enableDateFilter; });
+                                var tv = function (a) { return self.sz.indexOf(a) >= 0; };
+                                // Each runner's own window: Letterboxd uses the stored days as is, Serializd at least 1.
+                                var days = Math.max.apply(null, enabled.map(function (a) { return tv(a) ? Math.max(1, a.dateFilterDays || 0) : (a.dateFilterDays || 0); }));
+                                var catchUp = whole.length
+                                    ? 'The first sync also sends everything you have already played here, each on the day you watched it.'
+                                        + (whole.some(function (a) { return !tv(a); }) ? ' Letterboxd skips a film already in your diary on that day, but a film you logged on another day is added again as a rewatch.' : '')
+                                        + (whole.some(tv) ? ' Serializd gets every played episode, including ones you logged there yourself.' : '')
+                                        + ' To send only recent watches, turn on "Only sync recently played" first.'
+                                    : 'The first sync also sends what you played ' + (days === 0 ? 'today.' : days === 1 ? 'in the last day.' : 'in the last ' + days + ' days.');
+                                title.textContent = 'Nothing logged yet';
+                                text.textContent = 'Your account is linked, and whatever you finish watching from now on is logged as you watch it. ' + catchUp;
+                                btn.textContent = 'Sync now';
+                                btn.onclick = function () { self.startJobs('Sync', self.syncJobs('all', ['Serializd/SyncNow', 'Sync'])); };
+                                if (whole.length) { alt.hidden = false; alt.textContent = 'Account settings'; alt.onclick = edit(whole[0]); }
+                            }
+                        },
                         /* ===== Accounts ===== */
                         loadAccounts: function () {
                             var self = this;
@@ -228,9 +288,11 @@
                                     // Watchlist collections and playlists are named by an admin; the server keeps the stored name for anyone else.
                                     self.canSetWatchlistName = !!((res[0] && res[0].canSetWatchlistName) || (res[1] && res[1].canSetWatchlistName));
                                     self.renderAccounts();
+                                    self.acctsReady = true;
+                                    self.renderFirstRun();
                                 })
                                 // Never render the add card on a failed load: saving from an empty list would overwrite the stored accounts.
-                                .catch(function () { byId('acctGrid').innerHTML = '<div class="ws-panel" style="padding:2em;text-align:center;">' + self.errorHtml('your accounts', 'loadAccounts') + '</div>'; });
+                                .catch(function () { self.acctsReady = false; self.renderFirstRun(); byId('acctGrid').innerHTML = '<div class="ws-panel" style="padding:2em;text-align:center;">' + self.errorHtml('your accounts', 'loadAccounts') + '</div>'; });
                         },
                         renderAccounts: function () {
                             var self = this, cards = '';

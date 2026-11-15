@@ -54,20 +54,11 @@ public class SidebarInjectionTaskTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_FileTransformationNotPresent_CompletesWithoutThrowing()
+    public async Task ExecuteAsync_ReportsProgressTo100()
     {
         // Test environment doesn't load File Transformation, so the registration
         // logic falls into the early-exit "plugin not installed" debug-log path
         // and ExecuteAsync completes cleanly with progress 100.
-        var task = new SidebarInjectionTask(NullLogger<SidebarInjectionTask>.Instance);
-
-        await task.ExecuteAsync(new Progress<double>(), CancellationToken.None);
-        // No exception = pass.
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_ReportsProgressTo100()
-    {
         var task = new SidebarInjectionTask(NullLogger<SidebarInjectionTask>.Instance);
         // Use a custom IProgress<T> impl that records synchronously instead of
         // Progress<T> which dispatches via SynchronizationContext (flaky under parallel test).

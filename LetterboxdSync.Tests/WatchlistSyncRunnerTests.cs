@@ -325,13 +325,11 @@ public class WatchlistSyncRunnerTests : IDisposable
     public async Task RunForAllAsync_ReportsProgressTo100()
     {
         _userManager.GetUsers().Returns(new List<User>());
-        var captured = new List<double>();
-        var progress = new Progress<double>(v => captured.Add(v));
+        var progress = new RecordingProgress();
 
         await _runner.RunForAllAsync(progress, "scheduled", CancellationToken.None);
 
-        await Task.Delay(50);
-        Assert.Contains(100.0, captured);
+        Assert.Contains(100.0, progress.Values);
     }
 
     [Fact]
@@ -373,17 +371,29 @@ public class WatchlistSyncRunnerTests : IDisposable
 
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
 
-        var ok = await _runner.TryRunForUserAsync(userId, "test",
-            new Progress<double>(), CancellationToken.None);
+        // Seerr is not configured, so no client may be built: the factory must never run.
+        var clientsBuilt = 0;
+        WatchlistSyncRunner.JellyseerrClientFactoryOverride = (_, _, _) => { clientsBuilt++; return null; };
+        try
+        {
+            var ok = await _runner.TryRunForUserAsync(userId, "test",
+                new Progress<double>(), CancellationToken.None);
 
-        Assert.True(ok);
+            Assert.True(ok);
+            Assert.Equal(0, clientsBuilt);
+            Assert.Empty(SyncHistory.GetRecent(10, "lachlan"));
+        }
+        finally
+        {
+            WatchlistSyncRunner.JellyseerrClientFactoryOverride = null;
+        }
     }
 
     [Fact]
     public async Task TryRunForUserAsync_ExistingPlaylistMatches_NoCreateCall()
     {
-        // Library has the watchlisted film and there's already a playlist named
-        // "Letterboxd Watchlist" with the right items → no Create or update needed.
+        // Library has the watchlisted film and the account's playlist (found by the name the
+        // runner gives it) already holds it → no create, add or remove.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
@@ -393,13 +403,22 @@ public class WatchlistSyncRunnerTests : IDisposable
         LetterboxdServiceFactory.OverrideForTesting = (_, _, _, _, _) => Task.FromResult(service);
 
         var movie = MakeMovie(1233413);
+        movie.Id = Guid.NewGuid();
+        var playlist = new Playlist
+        {
+            Id = Guid.NewGuid(),
+            Name = "Letterboxd Watchlist (lb-user)",
+            LinkedChildren = new[] { new LinkedChild { ItemId = movie.Id } }
+        };
+        // First query: the library's films. Second: the user's playlists.
         _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>())
-            .Returns(new List<BaseItem> { movie }, new List<BaseItem>());
+            .Returns(new List<BaseItem> { movie }, new List<BaseItem> { playlist });
 
         var ok = await _runner.TryRunForUserAsync(userId, "test",
             new Progress<double>(), CancellationToken.None);
 
         Assert.True(ok);
+        Assert.Empty(_playlistManager.ReceivedCalls());
     }
 
     // ----- Mirror to Seerr watchlist -----

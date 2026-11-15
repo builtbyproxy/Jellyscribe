@@ -49,14 +49,6 @@ public class ScheduledTaskTests : IDisposable
         try { if (Directory.Exists(_tempDir)) Directory.Delete(_tempDir, true); } catch { }
     }
 
-    // Progress<T> posts to the sync context asynchronously; this records inline so
-    // the assertions see every report before ExecuteAsync returns.
-    private sealed class RecordingProgress : IProgress<double>
-    {
-        public List<double> Values { get; } = new();
-        public void Report(double value) => Values.Add(value);
-    }
-
     private LetterboxdSyncRunner MakeSyncRunner(IUserManager um, ILibraryManager lm, IUserDataManager udm)
         => new(NullLoggerFactory.Instance, lm, um, udm);
 
