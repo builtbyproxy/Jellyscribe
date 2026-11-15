@@ -526,7 +526,7 @@
                         },
                         // Seerr as the settings below the accounts stand now, saved or still being typed.
                         seerrConfigured: function () {
-                            return !!byId('jellyseerrUrl').value.trim() && !!(this.config.HasJellyseerrApiKey || byId('jellyseerrApiKey').value.trim());
+                            return !!byId('jellyseerrUrl').value.trim() && !!((this.config.HasJellyseerrApiKey && !byId('jellyseerrApiKeyClear').checked) || byId('jellyseerrApiKey').value.trim());
                         },
                         // The picked user's accounts of this service once the dialog is saved: an edit that keeps
                         // its owner keeps the count, a new link or a move to another user adds one.

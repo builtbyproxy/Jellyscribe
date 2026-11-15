@@ -404,8 +404,7 @@ public class SerializdSyncRunnerCatchUpTests : IDisposable
     [Fact]
     public async Task Run_AlreadyLoggedEpisode_IsNeverSentAgain()
     {
-        // Serializd's diary is never read, so local history is all that stops a re-log. The old
-        // "Skip already-synced" setting could turn it off and re-log every episode on every run.
+        // Serializd's diary is never read, so local history is all that stops a re-log.
         var (user, idHex) = AddUserWithAccount();
 
         var ep = MakeEpisode(1, 3);

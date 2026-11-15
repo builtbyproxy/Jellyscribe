@@ -894,7 +894,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
     public async Task TryRunForUserAsync_FailedFilm_StillTriesTheNextOne()
     {
         // Two films, both lookups fail with an ordinary error (not a block): the runner moves
-        // on to the second film. Only blocks pause an account ("Stop on first failure" is gone).
+        // on to the second film. Only blocks pause an account.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
@@ -937,7 +937,8 @@ public class LetterboxdSyncRunnerTests : IDisposable
         // Letterboxd's own duplicate check comes back empty (null lastDate, e.g. a
         // Cloudflare 403), but our append-only history shows a successful sync for this
         // film on the same viewing date. The backstop must suppress the re-post rather
-        // than risk a duplicate diary entry.
+        // than risk a duplicate diary entry. The row lands after the queue was built (the
+        // real-time path logging the film mid-run), so the queue filter cannot catch it.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         AddAccount(userId);
@@ -952,22 +953,24 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LastPlayedDate = viewing
         });
 
-        // Prior successful sync on the same viewing date → not a rewatch → suppress.
-        SyncHistory.Record(new SyncEvent
-        {
-            FilmTitle = "Sinners",
-            FilmSlug = "sinners-2025",
-            TmdbId = 1233413,
-            Username = "lachlan",
-            Timestamp = DateTime.UtcNow.AddHours(-1),
-            ViewingDate = viewing.Date,
-            Status = SyncStatus.Success,
-            Source = "test"
-        });
-
         var service = Substitute.For<ILetterboxdService>();
         service.LookupFilmByTmdbIdAsync(Arg.Any<int>())
-            .Returns(new FilmResult("sinners-2025", "KQMM", "PROD-1"));
+            .Returns(_ =>
+            {
+                // A successful sync on the same viewing date, recorded once the run is under way.
+                SyncHistory.Record(new SyncEvent
+                {
+                    FilmTitle = "Sinners",
+                    FilmSlug = "sinners-2025",
+                    TmdbId = 1233413,
+                    Username = "lachlan",
+                    Timestamp = DateTime.UtcNow,
+                    ViewingDate = viewing.Date,
+                    Status = SyncStatus.Success,
+                    Source = "test"
+                });
+                return Task.FromResult(new FilmResult("sinners-2025", "KQMM", "PROD-1"));
+            });
         // Null diary date → Letterboxd-side IsDuplicate is false, forcing the local backstop.
         service.GetDiaryInfoAsync(Arg.Any<string>(), Arg.Any<string>())
             .Returns(new DiaryInfo(null, false));
@@ -977,6 +980,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
             new Progress<double>(), CancellationToken.None);
 
         Assert.True(ok);
+        await service.Received(1).LookupFilmByTmdbIdAsync(Arg.Any<int>());
         // Backstop fired: the film is never marked as watched on Letterboxd.
         await service.DidNotReceive().MarkAsWatchedAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime?>(), Arg.Any<bool>(),

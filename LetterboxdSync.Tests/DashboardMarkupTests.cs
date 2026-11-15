@@ -212,22 +212,17 @@ public class DashboardMarkupTests
 
     [Theory]
     [MemberData(nameof(Pages))]
-    public void AccountDialog_HidesTogglesThatCannotApply_ButStillRendersThem(string file, string root)
+    public void AccountDialog_KeepsEveryToggleRendered_AndIndentsTheRequestOptions(string file, string root)
     {
         var page = Code(file);
         // "Skip already-synced" and "Stop on first failure" are gone from both services.
         Assert.DoesNotContain("chkSkip", page, StringComparison.Ordinal);
         Assert.DoesNotContain("chkStop", page, StringComparison.Ordinal);
 
-        // Every toggle is still rendered, so saving keeps a hidden one's stored value; syncVisibility
-        // only hides rows, using the two facts each page supplies.
+        // Every toggle is still rendered, so saving keeps a hidden one's stored value. Which rows
+        // syncVisibility hides is checked only by the Playwright run (no JS test harness).
         foreach (var id in new[] { "chkPrimary", "chkSeerr", "chkBackfill", "chkRerequest", "chkMirror" })
             Assert.Contains("'" + id + "', !!a.", Read(file), StringComparison.Ordinal);
-        Assert.Contains("seerrConfigured: function", Read(file), StringComparison.Ordinal);
-        Assert.Contains("accountsOfService: function", Read(file), StringComparison.Ordinal);
-        Assert.Contains("show('chkPrimary', this.accountsOfService(svc) >= 2);", page, StringComparison.Ordinal);
-        Assert.Contains("show('chkBackfill', seerr && !!auto && auto.checked);", page, StringComparison.Ordinal);
-        Assert.Contains("if (e.target.id === 'chkSeerr') self.syncVisibility();", page, StringComparison.Ordinal);
 
         // The two request options sit indented under "Auto-request via Seerr".
         Assert.Matches(@"'chkBackfill', [^\]]*, true\]", Read(file));
