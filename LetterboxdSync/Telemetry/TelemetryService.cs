@@ -365,8 +365,6 @@ internal static class TelemetryService
                 auto_request = enabled.Any(a => a.AutoRequestWatchlist),
                 backfill_requests = enabled.Any(a => a.BackfillAvailableRequests),
                 mirror_jellyseerr = enabled.Any(a => a.MirrorJellyseerrWatchlist),
-                skip_previously_synced = enabled.Any(a => a.SkipPreviouslySynced),
-                stop_on_failure = enabled.Any(a => a.StopOnFailure),
                 raw_cookies = enabled.Any(a => !string.IsNullOrEmpty(a.RawCookies)),
                 jellyseerr_configured = !string.IsNullOrEmpty(cfg?.JellyseerrUrl),
                 tv_configured = tvEnabled.Count > 0,
@@ -377,9 +375,7 @@ internal static class TelemetryService
                 tv_diary_import = tvEnabled.Any(a => a.EnableDiaryImport),
                 tv_auto_request = tvEnabled.Any(a => a.AutoRequestWatchlist),
                 tv_backfill_requests = tvEnabled.Any(a => a.BackfillAvailableRequests),
-                tv_mirror_jellyseerr = tvEnabled.Any(a => a.MirrorJellyseerrWatchlist),
-                tv_skip_previously_synced = tvEnabled.Any(a => a.SkipPreviouslySynced),
-                tv_stop_on_failure = tvEnabled.Any(a => a.StopOnFailure)
+                tv_mirror_jellyseerr = tvEnabled.Any(a => a.MirrorJellyseerrWatchlist)
             },
             buckets = new
             {

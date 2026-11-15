@@ -901,4 +901,17 @@ public class SerializdControllerTests : IDisposable
 
         Assert.Equal(admin, Prop<bool>(_controller.GetAccounts(), "canSetWatchlistName"));
     }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("key", true)]
+    public void GetAccounts_TellsThePageWhetherSeerrIsSetUp(string? key, bool expected)
+    {
+        var (_, idHex) = AddUserWithAccount();
+        Authenticate(idHex, false);
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://seerr.local:5055";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = key;
+
+        Assert.Equal(expected, Prop<bool>(_controller.GetAccounts(), "seerrConfigured"));
+    }
 }

@@ -413,16 +413,15 @@ public class LetterboxdController : JellyfinUserApiController
                 backfillAvailableRequests = a.BackfillAvailableRequests,
                 requestWatchedTitles = a.RequestWatchedTitles,
                 mirrorJellyseerrWatchlist = a.MirrorJellyseerrWatchlist,
-                skipPreviouslySynced = a.SkipPreviouslySynced,
-                stopOnFailure = a.StopOnFailure,
                 isPrimary = a.IsPrimary,
                 playlistName = a.PlaylistName,
                 excludedLibraryIds = a.ExcludedLibraryIds
             })
             .ToList();
 
-        // Naming is admin-only (see PutAccounts); the page hides the field for everyone else.
-        return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator() });
+        // Naming is admin-only (see PutAccounts); the page hides the field for everyone else. It also
+        // hides the Seerr options until an admin has set Seerr up.
+        return Ok(new { accounts, canSetWatchlistName = CallerIsAdministrator(), seerrConfigured = SeerrClient.IsConfigured(Config.JellyseerrUrl, Config.JellyseerrApiKey) });
     }
 
     /// <summary>
@@ -486,8 +485,6 @@ public class LetterboxdController : JellyfinUserApiController
                 BackfillAvailableRequests = req.BackfillAvailableRequests,
                 RequestWatchedTitles = req.RequestWatchedTitles,
                 MirrorJellyseerrWatchlist = req.MirrorJellyseerrWatchlist,
-                SkipPreviouslySynced = req.SkipPreviouslySynced,
-                StopOnFailure = req.StopOnFailure,
                 IsPrimary = req.IsPrimary,
                 // Admin-only, like the Serializd watchlist name: the playlist is found by name among the
                 // playlists this user can see, which can include ones shared with them, so a chosen

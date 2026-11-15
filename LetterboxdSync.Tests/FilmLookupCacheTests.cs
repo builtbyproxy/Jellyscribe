@@ -166,7 +166,6 @@ public class FilmLookupCacheTests : IDisposable
             LetterboxdUsername = "demo-cinephile",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = false,
         });
 
         var movie = new Movie { Name = "Arrival" };

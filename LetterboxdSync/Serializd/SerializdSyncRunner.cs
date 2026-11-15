@@ -269,12 +269,12 @@ public class SerializdSyncRunner
             return excluded;
         }
 
-        // "Skip previously synced" (default on) short-circuits via the local dedup history.
-        // When off, everything is re-sent (which re-logs, i.e. can create duplicate diary rows).
+        // The local dedup history is the only duplicate check: Serializd's diary is never read, so
+        // re-sending an episode logs it again.
         bool AlreadyWatched(int s, int se, int e) =>
-            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, account.Email, s, se, e, SerializdSyncHistory.KindWatched);
+            SerializdSyncHistory.Has(userId, account.Email, s, se, e, SerializdSyncHistory.KindWatched);
         bool AlreadyLogged(EpisodePlay r) =>
-            account.SkipPreviouslySynced && SerializdSyncHistory.Has(userId, account.Email, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
+            SerializdSyncHistory.Has(userId, account.Email, r.Show, r.Season, r.Episode, SerializdSyncHistory.KindLog);
 
         var needsWatched = GroupNewEpisodes(records.Select(r => (r.Show, r.Season, r.Episode)), AlreadyWatched);
 
@@ -433,12 +433,6 @@ public class SerializdSyncRunner
                     Error = ex.Message,
                     Source = source,
                 });
-
-                if (account.StopOnFailure)
-                {
-                    _logger.LogWarning("Serializd catch-up: stopping on first failure for {Username} (StopOnFailure)", user.Username);
-                    break;
-                }
 
                 stopped = await FailedAsync(ex).ConfigureAwait(false);
                 if (stopped)

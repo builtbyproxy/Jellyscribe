@@ -86,7 +86,6 @@ public class AuthBreakerRunnerTests : IDisposable
             LetterboxdUsername = lbUsername,
             LetterboxdPassword = "pw",
             Enabled = true,
-            SkipPreviouslySynced = false
         });
 
         var movie = new Movie { Name = "Sinners", Id = Guid.NewGuid() };

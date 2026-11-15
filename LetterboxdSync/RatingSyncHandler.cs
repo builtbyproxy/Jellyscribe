@@ -404,6 +404,16 @@ public sealed class RatingSyncHandler : IHostedService, IDisposable
         if (user == null || item == null || !item.IsMovie())
             return false;
 
+        // Letterboxd counts any rating as a watch, so a rating on a film nobody has played would
+        // mark it watched. That happens without anyone rating: Jellyfin stores a Like as a 10/10
+        // rating, and watchlist plugins set Likes (issue #193). The diary sync carries the rating
+        // once the film is played, and the review modal rates anything on purpose.
+        if (_userDataManager.GetUserData(user, item)?.Played != true)
+        {
+            _logger.LogInformation("Not syncing the rating on {Title} to Letterboxd: it has not been played, and Letterboxd would count the rating as a watch", item.Name);
+            return false;
+        }
+
         if (!int.TryParse(item.GetProviderId(MetadataProvider.Tmdb), out var tmdbId))
         {
             _logger.LogInformation("Not syncing the rating on {Title} to Letterboxd: it has no TMDb ID", item.Name);

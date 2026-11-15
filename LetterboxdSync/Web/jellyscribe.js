@@ -13,7 +13,8 @@
  * could not be reached); noActivityText, overviewWhat, retryable, modalIds and historyBodies; and the
  * page-specific actions it wires up (runSync, runWatchlist, saveAccount, deleteAccount, verifyAccount,
  * populateReviewAccountDropdown, onSection(sec) when a nav section needs loading, and afterOverview(fs, ts)
- * when the page wants the film and TV stats each time the overview loads).
+ * when the page wants the film and TV stats each time the overview loads); and, for the account dialog,
+ * seerrConfigured() and accountsOfService(svc) (see syncVisibility).
  */
 (function () {
     var registry = window.JellyscribeShared = window.JellyscribeShared || {};
@@ -132,6 +133,9 @@
                 byId('mConfirmRemoveBtn').addEventListener('click', function () { self.deleteAccount(); });
                 byId('mVerifyBtn').addEventListener('click', function () { self.verifyAccount(); });
                 byId('mSvc').addEventListener('change', function () { self.onSvcChange(); });
+                // The toggle rows are re-rendered on every open, so one delegated listener follows them.
+                byId('mChecks').addEventListener('change', function (e) { if (e.target.id === 'chkSeerr') self.syncVisibility(); });
+                if (byId('mUser')) byId('mUser').addEventListener('change', function () { self.syncVisibility(); });
                 byId('reviewCancel').addEventListener('click', function () { self.closeModal('reviewModal'); });
                 byId('reviewSubmit').addEventListener('click', function () { self.submitReview(); });
                 byId('reviewRewatch').addEventListener('change', function () {
@@ -456,10 +460,11 @@
 
             /* ===== Account dialog ===== */
             feat: function (label, on) { return '<span class="ws-feat ' + (on ? 'on' : '') + '">' + label + '</span>'; },
-            // rows: [label, checkbox id, checked, description]. The days box under "Only sync recently played" follows them.
+            // rows: [label, checkbox id, checked, description, sub]. sub indents the row under the one above it.
+            // The days box under "Only sync recently played" follows them.
             checksHtml: function (rows, dateOn, days) {
                 return rows.map(function (r) {
-                    return '<label><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>';
+                    return '<label' + (r[4] ? ' class="sub"' : '') + '><input type="checkbox" id="' + r[1] + '"' + (r[2] ? ' checked' : '') + ' /><span>' + r[0] + '<span class="desc">' + r[3] + '</span></span></label>';
                 }).join('') +
                     '<div class="ws-row" id="dateDaysRow" style="display:' + (dateOn ? 'block' : 'none') + ';margin-top:4px;"><label class="ws-field" for="chkDateDays">Days to look back</label><input type="number" class="ws-input" id="chkDateDays" min="1" max="365" value="' + (days || 7) + '" /></div>';
             },
@@ -483,10 +488,24 @@
                 byId('mUserLabel').textContent = svc === 'serializd' ? 'Email or username' : 'Letterboxd username';
                 byId('mAuthBlobRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
                 byId('mUserAgentRow').style.display = svc === 'letterboxd' ? 'block' : 'none';
-                var ratingsBox = byId('chkRatings');
-                if (ratingsBox) ratingsBox.closest('label').style.display = svc === 'letterboxd' ? '' : 'none';
+                this.syncVisibility();
                 var uname = byId('mUsername').value.trim();
                 byId('mWatchName').placeholder = svc === 'serializd' ? 'Serializd Watchlist' : ('Letterboxd Watchlist' + (uname ? ' (' + uname + ')' : ''));
+            },
+            /* Toggles that cannot do anything are hidden, never removed, so saving the dialog keeps their
+               stored values: ratings outside Letterboxd, Primary while the user has one account of the
+               service, the Seerr rows until an admin sets Seerr up, and the two request options while
+               auto-request is off. Each page supplies seerrConfigured() and accountsOfService(svc), the
+               number of the user's accounts of that service once this dialog is saved. */
+            syncVisibility: function () {
+                var svc = byId('mSvc').value, seerr = !!this.seerrConfigured(), auto = byId('chkSeerr');
+                var show = function (id, on) { var box = byId(id); if (box) box.closest('label').style.display = on ? '' : 'none'; };
+                show('chkRatings', svc === 'letterboxd');
+                show('chkPrimary', this.accountsOfService(svc) >= 2);
+                show('chkSeerr', seerr);
+                show('chkMirror', seerr);
+                show('chkBackfill', seerr && !!auto && auto.checked);
+                show('chkRerequest', seerr && !!auto && auto.checked);
             },
             /* Saved secrets never come back from the server (only has* flags), so a secret field always
                starts empty: blank on save keeps the saved value, typing replaces it. */
@@ -506,7 +525,7 @@
                     userAgent: g('mUserAgent').value.trim(), watchName: g('mWatchName').value.trim(),
                     enabled: g('chkEnabled').checked, fav: g('chkFav').checked, ratings: g('chkRatings') ? g('chkRatings').checked : true, date: g('chkDate').checked, days: parseInt(g('chkDateDays').value, 10) || 7,
                     primary: g('chkPrimary').checked, watch: g('chkWatch').checked, seerr: g('chkSeerr').checked,
-                    backfill: g('chkBackfill').checked, rereq: g('chkRerequest').checked, mirror: g('chkMirror').checked, skip: g('chkSkip').checked, stop: g('chkStop').checked, imp: g('chkImport').checked,
+                    backfill: g('chkBackfill').checked, rereq: g('chkRerequest').checked, mirror: g('chkMirror').checked, imp: g('chkImport').checked,
                     libs: Array.prototype.map.call(root.querySelectorAll('#mLibs .mLibChk:checked'), function (x) { return x.getAttribute('data-id'); }) };
             },
             // The checks both pages make before saving an account; false when the form was refused.

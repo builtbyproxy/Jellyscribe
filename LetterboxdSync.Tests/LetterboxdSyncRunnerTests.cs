@@ -79,8 +79,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
         return movie;
     }
 
-    private void AddAccount(string userId, bool enabled = true,
-        bool skipPreviouslySynced = false, bool dateFilter = false)
+    private void AddAccount(string userId, bool enabled = true, bool dateFilter = false)
     {
         Plugin.Instance!.Configuration.Accounts.Add(new Account
         {
@@ -88,7 +87,6 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LetterboxdUsername = "lb-user",
             LetterboxdPassword = "secret",
             Enabled = enabled,
-            SkipPreviouslySynced = skipPreviouslySynced,
             EnableDateFilter = dateFilter,
             DateFilterDays = 7
         });
@@ -109,7 +107,6 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LetterboxdUsername = "lb-excludes",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = false,
             ExcludedLibraryIds = { AnimeLibraryId.ToString("N") }
         });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
@@ -118,7 +115,6 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LetterboxdUsername = "lb-keeps",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = false
         });
 
         var movie = MakeMovie(1233413, "Perfect Blue");
@@ -162,7 +158,6 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LetterboxdUsername = "lb-excludes",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = false,
             ExcludedLibraryIds = { AnimeLibraryId.ToString("N") }
         });
         var movie = MakeMovie(1233413, "Perfect Blue");
@@ -199,7 +194,6 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LetterboxdUsername = "lb-excludes",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = false,
             ExcludedLibraryIds = { AnimeLibraryId.ToString("N") }
         });
 
@@ -847,17 +841,17 @@ public class LetterboxdSyncRunnerTests : IDisposable
         _libraryManager.Received(1).GetItemList(Arg.Any<InternalItemsQuery>());
     }
 
-    // ----- SkipPreviouslySynced filtering -----
+    // ----- Local history filtering -----
 
     [Fact]
-    public async Task TryRunForUserAsync_SkipPreviouslySynced_FiltersAll_NoAuthAttempt()
+    public async Task TryRunForUserAsync_FilmAlreadySynced_FiltersAll_NoAuthAttempt()
     {
-        // Account skips films already in local history. The one library film was
+        // Films already in local history are always skipped. The one library film was
         // successfully synced for its viewing date, so BuildSyncQueue drops it and the
         // runner exits before authenticating.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
-        AddAccount(userId, skipPreviouslySynced: true);
+        AddAccount(userId);
 
         var viewing = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
         var movie = MakeMovie(1233413);
@@ -894,13 +888,13 @@ public class LetterboxdSyncRunnerTests : IDisposable
         Assert.False(factoryHit);
     }
 
-    // ----- StopOnFailure -----
+    // ----- One failure does not stop the run -----
 
     [Fact]
-    public async Task TryRunForUserAsync_StopOnFailure_HaltsAfterFirstFailure()
+    public async Task TryRunForUserAsync_FailedFilm_StillTriesTheNextOne()
     {
-        // Two films, both lookups throw, StopOnFailure on → the runner must break after
-        // the first failure rather than attempting the second.
+        // Two films, both lookups fail with an ordinary error (not a block): the runner moves
+        // on to the second film. Only blocks pause an account ("Stop on first failure" is gone).
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.Accounts.Add(new Account
@@ -909,8 +903,6 @@ public class LetterboxdSyncRunnerTests : IDisposable
             LetterboxdUsername = "lb-user",
             LetterboxdPassword = "secret",
             Enabled = true,
-            SkipPreviouslySynced = false,
-            StopOnFailure = true
         });
 
         var m1 = MakeMovie(1233413, "Sinners");
@@ -933,8 +925,8 @@ public class LetterboxdSyncRunnerTests : IDisposable
             new Progress<double>(), CancellationToken.None);
 
         Assert.True(ok);
-        // Only the first film was attempted; the break stopped the second.
-        await service.Received(1).LookupFilmByTmdbIdAsync(Arg.Any<int>());
+        // Both films were attempted.
+        await service.Received(2).LookupFilmByTmdbIdAsync(Arg.Any<int>());
     }
 
     // ----- Local-history duplicate backstop -----
@@ -948,7 +940,7 @@ public class LetterboxdSyncRunnerTests : IDisposable
         // than risk a duplicate diary entry.
         var (user, userId) = MakeUser("lachlan");
         _userManager.GetUsers().Returns(new[] { user });
-        AddAccount(userId); // SkipPreviouslySynced defaults to false here
+        AddAccount(userId);
 
         var viewing = DateTime.UtcNow;
         var movie = MakeMovie(1233413);
