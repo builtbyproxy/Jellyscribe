@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.15.1.0",
+        "changelog": "With Seerr auto-request on for a Serializd watchlist, a TV show could come back after a cleanup tool deleted it: Seerr had already fetched it, the tool removed it, and because it was still on the watchlist the next sync asked for it again. Seasons Seerr already fetched for you and that were deleted afterwards are now left alone, unless \"Re-request watched titles\" is on. The activity list also showed a show as \"Requested\" on every sync while Seerr already had an open request for it, although nothing new was requested; those rows are no longer recorded.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.15.1/jellyfin-plugin-letterboxd-v2.15.1.zip",
+        "checksum": "cd66a46545cd6e7772af230626a3a052",
+        "timestamp": "2026-11-16T01:37:16Z"
+      },
+      {
         "version": "2.15.0.0",
         "changelog": "Letterboxd counts any rating as a watch, and Jellyfin stores a \"Like\" as a 10/10 rating. Watchlist features in other plugins set Likes on films nobody has played, so Jellyscribe was rating those films 5 stars and they showed up on Letterboxd as watched. Ratings are now only sent for films you have played, so a Like no longer marks a film watched; to rate a film you saw somewhere else, use Review. A Liked film you then watch is still logged with 5 stars, because Jellyfin cannot tell a Like from a 10/10 rating. Each account also has fewer settings. \"Skip already-synced\" is now always on, because turning it off made Serializd log every episode again on every sync. A film or episode Jellyscribe already logged is not logged again, even if you delete it on Letterboxd or Serializd. \"Stop on first failure\" is gone, because Jellyscribe already pauses an account when Letterboxd blocks it. \"Primary account\" only appears once you link a second account on the same service, and the Seerr settings only appear once an admin has set Seerr up, with the two request options tucked under \"Auto-request via Seerr\".",
         "targetAbi": "10.11.9.0",
