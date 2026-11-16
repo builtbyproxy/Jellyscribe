@@ -128,7 +128,7 @@ The version-bump magnitude is the canonical signal, not a `!` in the PR title. G
 
 ## OpenSpec
 
-Spec-driven workflow lives under `openspec/` (`changes/`, `specs/`, `config.yaml`). Use the `/opsx:propose`, `/opsx:apply`, `/opsx:archive`, `/opsx:explore` skills for non-trivial changes when the user requests them.
+Spec-driven workflow lives under `openspec/` (`changes/`, `specs/`, `config.yaml`). **Every change to plugin code goes through OpenSpec, bug fixes and small changes included** (Lachlan's rule, 2026-11-16). Open the change with `/opsx:propose` before the first code edit, implement from its tasks with `/opsx:apply`, and archive it once it ships (below); `/opsx:explore` is for thinking a problem through first. A bug fix gets a small change whose delta spec adds or corrects the scenario the bug broke (example: `stop-seerr-rerequest-loop`, #195). Work that touches no plugin code (an investigation, docs, CI, the site) does not need one.
 
 **Always archive once a change ships** (Lachlan's rule, 2026-10-06). `openspec/changes/` holds only work that has not shipped. When the PR implementing a change has merged and released, without being asked:
 
