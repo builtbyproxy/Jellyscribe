@@ -564,7 +564,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     /// the bodies of every request POSTed.
     /// </summary>
     private async Task<List<string>> RunAutoRequestAsync(User user, string userId,
-        SerializdWatchlistEntry entry, string? seasonsJson = "[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2},{\"seasonNumber\":3}]")
+        SerializdWatchlistEntry entry, string? seasonsJson = "[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2},{\"seasonNumber\":3}]",
+        string? mediaInfoJson = null)
     {
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
@@ -586,7 +587,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
                     ? new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
                     : new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                     {
-                        Content = new StringContent("{\"name\":\"Severance\",\"seasons\":" + seasonsJson + "}"),
+                        Content = new StringContent("{\"name\":\"Severance\",\"seasons\":" + seasonsJson
+                            + (mediaInfoJson == null ? "" : ",\"mediaInfo\":" + mediaInfoJson) + "}"),
                     };
             if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
             {
@@ -688,5 +690,99 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
 
         var body = Assert.Single(posted);
         Assert.Contains("\"seasons\":\"all\"", body);
+    }
+
+    // ----- Seasons Seerr fetched for the user and that were deleted afterwards -----
+    // The Seerr user in these tests is 7 (UserMapResponse). Media status 7 = deleted,
+    // request status 5 = completed, 2 = approved (still open).
+
+    private static string MediaInfo(string seasonStatuses, string requests)
+        => "{\"status\":1,\"seasons\":" + seasonStatuses + ",\"requests\":" + requests + "}";
+
+    private static string Request(int status, int userId, params int[] seasons)
+        => "{\"status\":" + status + ",\"is4k\":false,\"requestedBy\":{\"id\":" + userId + "},\"seasons\":["
+           + string.Join(",", seasons.Select(n => "{\"seasonNumber\":" + n + ",\"status\":" + status + "}")) + "]}";
+
+    [Fact]
+    public async Task AutoRequest_SeasonFetchedThenDeleted_IsNotRequestedAgain()
+    {
+        // The loop seen on a live server: a cleanup tool deleted the show, Seerr closed the
+        // request as completed, and the next sync asked for the same season again.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        Assert.Empty(posted);
+        Assert.DoesNotContain(SyncHistory.GetRecent(50), e => e.TmdbId == 95396);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowWithOneSeasonRemoved_RequestsTheOthers()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[2,3]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowEverySeasonRemoved_IsNotRequested()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()),
+            mediaInfoJson: MediaInfo(
+                "[{\"seasonNumber\":1,\"status\":7},{\"seasonNumber\":2,\"status\":7},{\"seasonNumber\":3,\"status\":7}]",
+                "[" + Request(5, 7, 1, 2) + "," + Request(5, 7, 3) + "]"));
+
+        Assert.Empty(posted);
+    }
+
+    [Theory]
+    [InlineData(5, 8)] // someone else's completed request
+    [InlineData(2, 7)] // this user's request, still open
+    public async Task AutoRequest_DeletedSeasonWithoutTheUsersCompletedRequest_IsStillRequested(int requestStatus, int requester)
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(requestStatus, requester, 1) + "]"));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[1]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_SeerrStateCannotBeRead_RequestGoesAhead()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }), seasonsJson: null);
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[1]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_AccountOptedInToWatchedTitles_RequestsARemovedSeason()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        Plugin.Instance!.Configuration.SerializdAccounts[0].RequestWatchedTitles = true;
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[1]", body);
     }
 }

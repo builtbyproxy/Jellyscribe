@@ -308,7 +308,10 @@ public class SerializdWatchlistSyncRunner
             }
 
             if (!account.RequestWatchedTitles)
+            {
                 requests = await DropWatchedSeasonsAsync(seerr, user, account, requests).ConfigureAwait(false);
+                requests = await DropRemovedSeasonsAsync(seerr, user, seerrUserId.Value, requests).ConfigureAwait(false);
+            }
 
             int requested = 0, existing = 0, failed = 0;
             foreach (var (tmdb, seasons) in requests)
@@ -422,6 +425,42 @@ public class SerializdWatchlistSyncRunner
             }
 
             kept.Add((tmdb, unwatched));
+        }
+
+        return kept;
+    }
+
+    /// <summary>
+    /// Removes the seasons Seerr already fetched for this user and that were deleted afterwards
+    /// (<see cref="SeerrClient.GetRemovedSeasonsAsync"/>), the case the watched check above misses
+    /// when the plays never reached Serializd: a cleanup tool deletes the show, it is still on the
+    /// watchlist, and it would be downloaded again after every deletion. A whole-show request is
+    /// narrowed to the seasons Seerr lists that were not removed. When Seerr's answer can't be
+    /// read the request goes ahead unchanged, since nothing says the show was ever fetched.
+    /// </summary>
+    private async Task<List<(int Tmdb, IReadOnlyList<int> Seasons)>> DropRemovedSeasonsAsync(SeerrClient seerr,
+        User user, int seerrUserId, List<(int Tmdb, IReadOnlyList<int> Seasons)> requests)
+    {
+        var kept = new List<(int Tmdb, IReadOnlyList<int> Seasons)>();
+        foreach (var (tmdb, seasons) in requests)
+        {
+            var state = await seerr.GetRemovedSeasonsAsync(tmdb, seerrUserId).ConfigureAwait(false);
+            if (state == null || state.Removed.Count == 0)
+            {
+                kept.Add((tmdb, seasons));
+                continue;
+            }
+
+            var candidates = seasons.Count > 0 ? seasons : state.SeasonNumbers;
+            var remaining = candidates?.Where(s => !state.Removed.Contains(s)).ToList();
+            if (remaining == null || remaining.Count == 0)
+            {
+                _logger.LogInformation("Serializd watchlist for {Username}: skipping TMDb {TmdbId}, Seerr already fetched it for this user and it was deleted afterwards (turn on \"Re-request watched titles\" to request it again)",
+                    user.Username, tmdb);
+                continue;
+            }
+
+            kept.Add((tmdb, remaining));
         }
 
         return kept;
