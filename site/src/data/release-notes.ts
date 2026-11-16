@@ -10,6 +10,18 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.15.1',
+    headline: 'TV shows are no longer requested again after a cleanup',
+    summary:
+      'With Seerr auto-request on for a Serializd watchlist, a show could come back after a cleanup tool deleted it. Seerr had already fetched the show, the tool removed it, and because it was still on the watchlist the next sync asked for it again, so it was downloaded again and again. The existing check for watched shows only covers episodes Jellyscribe logged to Serializd, so it missed shows watched before Serializd was linked. Seasons Seerr already fetched for you and that were deleted afterwards are now left alone; turn on "Re-request watched titles" if you want them back, or request them in Seerr. The activity list also showed a show as "Requested" on every sync while Seerr already had an open request for it, although nothing new was requested. Those rows are no longer recorded.',
+    highlights: {
+      fixes: [
+        'A TV season Seerr already fetched for you and that was deleted afterwards is not auto-requested again, unless "Re-request watched titles" is on.',
+        'A show Seerr already has an open request for no longer appears as "Requested" in the activity list on every sync.',
+      ],
+    },
+  },
+  {
     version: '2.15.0',
     headline: 'Fewer settings, and no ratings for films you have not watched',
     summary:
