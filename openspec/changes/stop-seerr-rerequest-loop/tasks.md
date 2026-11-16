@@ -23,4 +23,4 @@
 ## 4. Release plumbing
 
 - [x] 4.1 Bump `AssemblyVersion`/`FileVersion` (patch) in `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`
-- [ ] 4.2 PR with a `fix:` title, `## Release notes` paragraph and a `site/src/data/release-notes.ts` entry
+- [x] 4.2 PR with a `fix:` title, `## Release notes` paragraph and a `site/src/data/release-notes.ts` entry (2026-11-16: #195)
