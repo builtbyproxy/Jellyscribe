@@ -27,7 +27,7 @@ A Serializd watchlist sync with Seerr auto-request on showed the same show as "R
 
 - `LetterboxdSync/SeerrClient.cs`: 202 handling in `RequestSeriesAsync`; new `GetRemovedSeasonsAsync`.
 - `LetterboxdSync/Serializd/SerializdWatchlistSyncRunner.cs`: new filter after the watched check.
-- One more `GET /api/v1/tv/{id}` per candidate show per run. Candidates are only shows missing or incomplete in the library.
+- No extra Seerr traffic: the lookup reuses the `GET /api/v1/tv/{id}` answer the title lookup already reads, now kept once per show per run.
 - Tests in `SeerrClientTests` and `SerializdWatchlistSyncRunnerTests`.
 - Ships a patch release: version bump, `## Release notes`, `release-notes.ts` entry.
 

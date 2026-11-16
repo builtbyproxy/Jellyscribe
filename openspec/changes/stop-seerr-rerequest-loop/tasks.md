@@ -12,9 +12,12 @@
 - [x] 2.3 `SerializdWatchlistSyncRunner`: drop removed seasons after the watched check, behind `RequestWatchedTitles`; narrow whole-show requests; let the request through when the lookup fails
 - [x] 2.4 Runner tests for each scenario in `specs/seerr-auto-request/spec.md`
 
+- [x] 2.5 `SeerrClient`: read `/api/v1/tv/{id}` once per show per client and share it between the title, season-list and removed-season lookups; test that one show costs one read
+- [x] 2.6 Runner test: a 202 answer records no `SyncEvent` and makes no approval call
+
 ## 3. Verification
 
-- [x] 3.1 Full unit suite (2026-11-16: 1503 passed; an earlier run had one unrelated failure, `PostReview_SuccessfulFlow_ReturnsOkAndCallsService`, which passed alone and on the rerun)
+- [x] 3.1 Full unit suite (2026-11-16: 1506 passed after the review fixes; an earlier run had one unrelated failure, `PostReview_SuccessfulFlow_ReturnsOkAndCallsService`, which passed alone and on the rerun)
 - [ ] 3.2 After release, on the server where it was seen: the next sync logs the skip and records no `Requested` row for the affected show
 
 ## 4. Release plumbing

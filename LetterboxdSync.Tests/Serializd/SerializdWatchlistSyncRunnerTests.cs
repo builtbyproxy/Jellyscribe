@@ -383,6 +383,51 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_SeerrAnswers202_RecordsNoSyncEventAndApprovesNothing()
+    {
+        // Seerr's answer when every requested season already has an open request: nothing was
+        // created, so there is nothing to show as "Requested" and nothing to approve.
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry> { new(1396, new[] { 1 }) });
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var otherCalls = new List<string>();
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return UserMapResponse(user.Id.ToString("N"));
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/1396"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"name\":\"Breaking Bad\"}"),
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Accepted)
+                {
+                    Content = new StringContent("{\"message\":\"No seasons available to request\"}"),
+                };
+            otherCalls.Add(req.Method + " " + path);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = (url, key, log) => new SeerrClient(url, key, log, handler);
+
+        await _runner.TryRunForUserAsync(userId, CancellationToken.None);
+
+        var (_, total) = SyncHistory.GetPage(0, 10, user.Username);
+        Assert.Equal(0, total);
+        Assert.Empty(otherCalls);
+    }
+
+    [Fact]
     public async Task TryRunForUserAsync_JellyseerrUserMapErrors_SkipsAutoRequestGracefully()
     {
         // The Seerr user-map fetch fails (500). The runner must log and bail out of
@@ -563,6 +608,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     /// the library, with Seerr listing seasons 1-3 (null = the season lookup fails), and returns
     /// the bodies of every request POSTed.
     /// </summary>
+    private int _tvDetailReads;
+
     private async Task<List<string>> RunAutoRequestAsync(User user, string userId,
         SerializdWatchlistEntry entry, string? seasonsJson = "[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2},{\"seasonNumber\":3}]",
         string? mediaInfoJson = null)
@@ -582,6 +629,8 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
             var path = req.RequestUri!.AbsolutePath;
             if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
                 return UserMapResponse(userId);
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/" + entry.ShowTmdbId))
+                _tvDetailReads++;
             if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/" + entry.ShowTmdbId))
                 return seasonsJson == null
                     ? new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
@@ -716,6 +765,35 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
 
         Assert.Empty(posted);
         Assert.DoesNotContain(SyncHistory.GetRecent(50), e => e.TmdbId == 95396);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowWithARemovedSeasonAndNoSeasonList_IsSkipped()
+    {
+        // Seerr says season 1 was fetched and removed but lists no seasons to narrow against.
+        // Asking for "all" would request season 1 again, so nothing is asked for.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()),
+            seasonsJson: "null",
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        Assert.Empty(posted);
+    }
+
+    [Fact]
+    public async Task AutoRequest_OneShow_ReadsItsSeerrDetailsOnce()
+    {
+        // Title, season list and removed seasons all come from the same Seerr answer.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 1, 1);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        Assert.Single(posted);
+        Assert.Equal(1, _tvDetailReads);
     }
 
     [Fact]

@@ -38,6 +38,11 @@ public class SeerrClient : IDisposable
 
     private Dictionary<string, int>? _jellyfinIdToJellyseerrId;
 
+    // /api/v1/tv/{id} answers already read by this client. One watchlist run asks for a show's
+    // title, its season list and its removed seasons, all from the same answer; a client lives
+    // for one run, so the answer is read once per show.
+    private readonly Dictionary<int, string> _tvDetails = new();
+
     public SeerrClient(string baseUrl, string apiKey, ILogger logger, HttpMessageHandler? handler = null,
         bool autoApprove = true)
     {
@@ -206,6 +211,28 @@ public class SeerrClient : IDisposable
     }
 
     /// <summary>
+    /// The body of <c>GET /api/v1/tv/{id}</c>, read once per show per client. Null on a
+    /// non-success answer, which is not remembered, so a later call asks again. Throws what the
+    /// request throws; every caller catches.
+    /// </summary>
+    private async Task<string?> GetTvDetailsAsync(int tmdbId)
+    {
+        if (_tvDetails.TryGetValue(tmdbId, out var cached)) return cached;
+
+        using var response = await GetAsync($"{_baseUrl}/api/v1/tv/{tmdbId}").ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogDebug("Seerr TV lookup non-success for TMDb {TmdbId}: {Status}",
+                tmdbId, (int)response.StatusCode);
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        _tvDetails[tmdbId] = json;
+        return json;
+    }
+
+    /// <summary>
     /// Single TV show lookup returning just the show's title (TMDb TV objects use "name",
     /// not "title"). Best-effort like <see cref="GetMovieInfoAsync"/>: returns null on any
     /// non-success response or error, never throws. Unlike the movie path,
@@ -214,18 +241,11 @@ public class SeerrClient : IDisposable
     /// </summary>
     private async Task<string?> GetSeriesInfoAsync(int tmdbId)
     {
-        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
         try
         {
-            using var response = await GetAsync(url).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Seerr TV lookup non-success for TMDb {TmdbId}: {Status}",
-                    tmdbId, (int)response.StatusCode);
-                return null;
-            }
+            var json = await GetTvDetailsAsync(tmdbId).ConfigureAwait(false);
+            if (json == null) return null;
 
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.TryGetProperty("name", out var nameEl) &&
                 nameEl.ValueKind == JsonValueKind.String)
@@ -248,18 +268,11 @@ public class SeerrClient : IDisposable
     /// </summary>
     public async Task<List<int>?> GetSeriesSeasonNumbersAsync(int tmdbId)
     {
-        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
         try
         {
-            using var response = await GetAsync(url).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Seerr TV season lookup non-success for TMDb {TmdbId}: {Status}",
-                    tmdbId, (int)response.StatusCode);
-                return null;
-            }
+            var json = await GetTvDetailsAsync(tmdbId).ConfigureAwait(false);
+            if (json == null) return null;
 
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             if (!doc.RootElement.TryGetProperty("seasons", out var seasons) || seasons.ValueKind != JsonValueKind.Array)
                 return null;
@@ -294,18 +307,11 @@ public class SeerrClient : IDisposable
     /// </summary>
     public async Task<SeerrRemovedSeasons?> GetRemovedSeasonsAsync(int tmdbId, int jellyseerrUserId)
     {
-        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
         try
         {
-            using var response = await GetAsync(url).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Seerr TV removed-season lookup non-success for TMDb {TmdbId}: {Status}",
-                    tmdbId, (int)response.StatusCode);
-                return null;
-            }
+            var json = await GetTvDetailsAsync(tmdbId).ConfigureAwait(false);
+            if (json == null) return null;
 
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object) return null;

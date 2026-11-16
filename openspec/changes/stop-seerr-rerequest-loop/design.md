@@ -14,6 +14,8 @@
 - **A failed lookup lets the request through.** Unlike the watched check, there is no local evidence the show was ever fetched, and blocking on a Seerr hiccup would hold back first requests.
 - **Whole-show requests are narrowed** to Seerr's regular season list minus the removed seasons, the same way the watched check narrows them. With no season list to narrow against, the show is skipped: removed seasons are known to exist and "all" would request them.
 
+- **One read of `/api/v1/tv/{id}` per show per run.** The title lookup, the watched check's season list and the removed-season lookup all parse the same answer, so the client keeps each successful answer for its lifetime (one run for one account). A failed read is not kept.
+
 ## Risks
 
 - A user who puts a show back on the watchlist to get it again after a cleanup is now ignored until they turn on "Re-request watched titles" or request it in Seerr. The skip is logged at Information with that hint. This is the same trade as #165.
