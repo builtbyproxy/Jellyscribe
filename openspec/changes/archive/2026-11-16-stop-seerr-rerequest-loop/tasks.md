@@ -18,7 +18,7 @@
 ## 3. Verification
 
 - [x] 3.1 Full unit suite (2026-11-16: 1506 passed after the review fixes; an earlier run had one unrelated failure, `PostReview_SuccessfulFlow_ReturnsOkAndCallsService`, which passed alone and on the rerun)
-- [ ] 3.2 After release, on the server where it was seen: the next sync logs the skip and records no `Requested` row for the affected show (not done at archive time, 2026-11-16: the server had not yet updated to 2.15.1; tracked in #196)
+- [x] 3.2 After release, on the server where it was seen: the next sync logs the skip and records no `Requested` row for the affected show. Done 2026-11-16 on 2.15.1: a Serializd watchlist sync logged the skip for the affected show ("Seerr already fetched it for this user and it was deleted afterwards"), Seerr created no request, and the count of auto-request activity rows did not change. Closes #196
 
 ## 4. Release plumbing
 

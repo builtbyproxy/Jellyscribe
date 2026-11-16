@@ -45,6 +45,7 @@ internal sealed class ControllerTestHarness : IDisposable
     public string LogDir { get; }
 
     private static readonly object _pluginLock = new();
+    private readonly string? _previousHistoryPath;
 
     public ControllerTestHarness(string? currentUserId = null)
     {
@@ -52,6 +53,14 @@ internal sealed class ControllerTestHarness : IDisposable
         Directory.CreateDirectory(TempDir);
         LogDir = Path.Combine(TempDir, "log");
         Directory.CreateDirectory(LogDir);
+
+        // SyncHistory is static and, with no override, writes sync-history.jsonl beside the test
+        // assembly, a file that outlives the run. A review test then read the row its own
+        // previous run left there and, on the first run of a new day, posted on yesterday's date.
+        // Every harness gets its own file and an empty in-memory list.
+        _previousHistoryPath = SyncHistory.DataPathOverride;
+        SyncHistory.DataPathOverride = Path.Combine(TempDir, "sync-history.jsonl");
+        SyncHistory.ResetForTesting();
 
         // IApplicationPaths is required by both Plugin (for config persistence) and
         // the controller (for log file lookup). Point everything at the harness's
@@ -187,6 +196,9 @@ internal sealed class ControllerTestHarness : IDisposable
             Controller.LastBackgroundSync?.Wait(TimeSpan.FromSeconds(30));
         }
         catch { /* the task logs its own errors; never fail teardown */ }
+
+        SyncHistory.DataPathOverride = _previousHistoryPath;
+        SyncHistory.ResetForTesting();
 
         try
         {
