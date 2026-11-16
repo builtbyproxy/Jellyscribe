@@ -383,6 +383,51 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task TryRunForUserAsync_AutoRequest_SeerrAnswers202_RecordsNoSyncEventAndApprovesNothing()
+    {
+        // Seerr's answer when every requested season already has an open request: nothing was
+        // created, so there is nothing to show as "Requested" and nothing to approve.
+        var (user, userId) = MakeUser("lachlan");
+        _userManager.GetUsers().Returns(new[] { user });
+        AddAccount(userId, autoRequest: true);
+
+        Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
+        Plugin.Instance!.Configuration.JellyseerrApiKey = "key";
+
+        var service = Substitute.For<ISerializdService>();
+        service.GetWatchlistAsync().Returns(new List<SerializdWatchlistEntry> { new(1396, new[] { 1 }) });
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(service);
+        _libraryManager.GetItemList(Arg.Any<InternalItemsQuery>()).Returns(new List<BaseItem>());
+
+        var otherCalls = new List<string>();
+        var handler = new JellyseerrHandler(req =>
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
+                return UserMapResponse(user.Id.ToString("N"));
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/1396"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"name\":\"Breaking Bad\"}"),
+                };
+            if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
+                return new HttpResponseMessage(System.Net.HttpStatusCode.Accepted)
+                {
+                    Content = new StringContent("{\"message\":\"No seasons available to request\"}"),
+                };
+            otherCalls.Add(req.Method + " " + path);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.NotFound);
+        });
+        SerializdWatchlistSyncRunner.SeerrClientFactoryOverride = (url, key, log) => new SeerrClient(url, key, log, handler);
+
+        await _runner.TryRunForUserAsync(userId, CancellationToken.None);
+
+        var (_, total) = SyncHistory.GetPage(0, 10, user.Username);
+        Assert.Equal(0, total);
+        Assert.Empty(otherCalls);
+    }
+
+    [Fact]
     public async Task TryRunForUserAsync_JellyseerrUserMapErrors_SkipsAutoRequestGracefully()
     {
         // The Seerr user-map fetch fails (500). The runner must log and bail out of
@@ -563,8 +608,11 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
     /// the library, with Seerr listing seasons 1-3 (null = the season lookup fails), and returns
     /// the bodies of every request POSTed.
     /// </summary>
+    private int _tvDetailReads;
+
     private async Task<List<string>> RunAutoRequestAsync(User user, string userId,
-        SerializdWatchlistEntry entry, string? seasonsJson = "[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2},{\"seasonNumber\":3}]")
+        SerializdWatchlistEntry entry, string? seasonsJson = "[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2},{\"seasonNumber\":3}]",
+        string? mediaInfoJson = null)
     {
         _userManager.GetUsers().Returns(new[] { user });
         Plugin.Instance!.Configuration.JellyseerrUrl = "http://jellyseerr.test";
@@ -582,11 +630,14 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
             if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/user"))
                 return UserMapResponse(userId);
             if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/" + entry.ShowTmdbId))
+                _tvDetailReads++;
+            if (req.Method == HttpMethod.Get && path.EndsWith("/api/v1/tv/" + entry.ShowTmdbId))
                 return seasonsJson == null
                     ? new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
                     : new HttpResponseMessage(System.Net.HttpStatusCode.OK)
                     {
-                        Content = new StringContent("{\"name\":\"Severance\",\"seasons\":" + seasonsJson + "}"),
+                        Content = new StringContent("{\"name\":\"Severance\",\"seasons\":" + seasonsJson
+                            + (mediaInfoJson == null ? "" : ",\"mediaInfo\":" + mediaInfoJson) + "}"),
                     };
             if (req.Method == HttpMethod.Post && path.EndsWith("/api/v1/request"))
             {
@@ -688,5 +739,128 @@ public class SerializdWatchlistSyncRunnerTests : IDisposable
 
         var body = Assert.Single(posted);
         Assert.Contains("\"seasons\":\"all\"", body);
+    }
+
+    // ----- Seasons Seerr fetched for the user and that were deleted afterwards -----
+    // The Seerr user in these tests is 7 (UserMapResponse). Media status 7 = deleted,
+    // request status 5 = completed, 2 = approved (still open).
+
+    private static string MediaInfo(string seasonStatuses, string requests)
+        => "{\"status\":1,\"seasons\":" + seasonStatuses + ",\"requests\":" + requests + "}";
+
+    private static string Request(int status, int userId, params int[] seasons)
+        => "{\"status\":" + status + ",\"is4k\":false,\"requestedBy\":{\"id\":" + userId + "},\"seasons\":["
+           + string.Join(",", seasons.Select(n => "{\"seasonNumber\":" + n + ",\"status\":" + status + "}")) + "]}";
+
+    [Fact]
+    public async Task AutoRequest_SeasonFetchedThenDeleted_IsNotRequestedAgain()
+    {
+        // The loop seen on a live server: a cleanup tool deleted the show, Seerr closed the
+        // request as completed, and the next sync asked for the same season again.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        Assert.Empty(posted);
+        Assert.DoesNotContain(SyncHistory.GetRecent(50), e => e.TmdbId == 95396);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowWithARemovedSeasonAndNoSeasonList_IsSkipped()
+    {
+        // Seerr says season 1 was fetched and removed but lists no seasons to narrow against.
+        // Asking for "all" would request season 1 again, so nothing is asked for.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()),
+            seasonsJson: "null",
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        Assert.Empty(posted);
+    }
+
+    [Fact]
+    public async Task AutoRequest_OneShow_ReadsItsSeerrDetailsOnce()
+    {
+        // Title, season list and removed seasons all come from the same Seerr answer.
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        SerializdSyncHistory.Record(userId, "sz-user@example.com", 95396, 1, 1);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()));
+
+        Assert.Single(posted);
+        Assert.Equal(1, _tvDetailReads);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowWithOneSeasonRemoved_RequestsTheOthers()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[2,3]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_WholeShowEverySeasonRemoved_IsNotRequested()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, Array.Empty<int>()),
+            mediaInfoJson: MediaInfo(
+                "[{\"seasonNumber\":1,\"status\":7},{\"seasonNumber\":2,\"status\":7},{\"seasonNumber\":3,\"status\":7}]",
+                "[" + Request(5, 7, 1, 2) + "," + Request(5, 7, 3) + "]"));
+
+        Assert.Empty(posted);
+    }
+
+    [Theory]
+    [InlineData(5, 8)] // someone else's completed request
+    [InlineData(2, 7)] // this user's request, still open
+    public async Task AutoRequest_DeletedSeasonWithoutTheUsersCompletedRequest_IsStillRequested(int requestStatus, int requester)
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(requestStatus, requester, 1) + "]"));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[1]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_SeerrStateCannotBeRead_RequestGoesAhead()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }), seasonsJson: null);
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[1]", body);
+    }
+
+    [Fact]
+    public async Task AutoRequest_AccountOptedInToWatchedTitles_RequestsARemovedSeason()
+    {
+        var (user, userId) = MakeUser("lachlan");
+        AddAccount(userId, autoRequest: true);
+        Plugin.Instance!.Configuration.SerializdAccounts[0].RequestWatchedTitles = true;
+
+        var posted = await RunAutoRequestAsync(user, userId, new SerializdWatchlistEntry(95396, new[] { 1 }),
+            mediaInfoJson: MediaInfo("[{\"seasonNumber\":1,\"status\":7}]", "[" + Request(5, 7, 1) + "]"));
+
+        var body = Assert.Single(posted);
+        Assert.Contains("\"seasons\":[1]", body);
     }
 }

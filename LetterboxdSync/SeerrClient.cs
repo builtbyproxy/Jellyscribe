@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -36,6 +37,11 @@ public class SeerrClient : IDisposable
     private readonly bool _autoApprove;
 
     private Dictionary<string, int>? _jellyfinIdToJellyseerrId;
+
+    // /api/v1/tv/{id} answers already read by this client. One watchlist run asks for a show's
+    // title, its season list and its removed seasons, all from the same answer; a client lives
+    // for one run, so the answer is read once per show.
+    private readonly Dictionary<int, string> _tvDetails = new();
 
     public SeerrClient(string baseUrl, string apiKey, ILogger logger, HttpMessageHandler? handler = null,
         bool autoApprove = true)
@@ -205,6 +211,28 @@ public class SeerrClient : IDisposable
     }
 
     /// <summary>
+    /// The body of <c>GET /api/v1/tv/{id}</c>, read once per show per client. Null on a
+    /// non-success answer, which is not remembered, so a later call asks again. Throws what the
+    /// request throws; every caller catches.
+    /// </summary>
+    private async Task<string?> GetTvDetailsAsync(int tmdbId)
+    {
+        if (_tvDetails.TryGetValue(tmdbId, out var cached)) return cached;
+
+        using var response = await GetAsync($"{_baseUrl}/api/v1/tv/{tmdbId}").ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogDebug("Seerr TV lookup non-success for TMDb {TmdbId}: {Status}",
+                tmdbId, (int)response.StatusCode);
+            return null;
+        }
+
+        var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        _tvDetails[tmdbId] = json;
+        return json;
+    }
+
+    /// <summary>
     /// Single TV show lookup returning just the show's title (TMDb TV objects use "name",
     /// not "title"). Best-effort like <see cref="GetMovieInfoAsync"/>: returns null on any
     /// non-success response or error, never throws. Unlike the movie path,
@@ -213,18 +241,11 @@ public class SeerrClient : IDisposable
     /// </summary>
     private async Task<string?> GetSeriesInfoAsync(int tmdbId)
     {
-        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
         try
         {
-            using var response = await GetAsync(url).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Seerr TV lookup non-success for TMDb {TmdbId}: {Status}",
-                    tmdbId, (int)response.StatusCode);
-                return null;
-            }
+            var json = await GetTvDetailsAsync(tmdbId).ConfigureAwait(false);
+            if (json == null) return null;
 
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.TryGetProperty("name", out var nameEl) &&
                 nameEl.ValueKind == JsonValueKind.String)
@@ -247,18 +268,11 @@ public class SeerrClient : IDisposable
     /// </summary>
     public async Task<List<int>?> GetSeriesSeasonNumbersAsync(int tmdbId)
     {
-        var url = $"{_baseUrl}/api/v1/tv/{tmdbId}";
         try
         {
-            using var response = await GetAsync(url).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogDebug("Seerr TV season lookup non-success for TMDb {TmdbId}: {Status}",
-                    tmdbId, (int)response.StatusCode);
-                return null;
-            }
+            var json = await GetTvDetailsAsync(tmdbId).ConfigureAwait(false);
+            if (json == null) return null;
 
-            var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             using var doc = JsonDocument.Parse(json);
             if (!doc.RootElement.TryGetProperty("seasons", out var seasons) || seasons.ValueKind != JsonValueKind.Array)
                 return null;
@@ -278,6 +292,79 @@ public class SeerrClient : IDisposable
             _logger.LogDebug("Seerr TV season lookup errored for TMDb {TmdbId}: {Message}",
                 tmdbId, ex.Message);
             return null;
+        }
+    }
+
+    /// <summary>
+    /// The seasons of a TV show that were fetched for this Seerr user and have since been removed:
+    /// Seerr marks the season DELETED (media status 7) and one of the user's own non-4K requests
+    /// naming it is COMPLETED (request status 5). That is what a cleanup tool leaves behind, and
+    /// requesting such a season again starts a download and delete loop. A season that is DELETED
+    /// with no completed request from this user is not included (someone else asked for it, or it
+    /// never came through Seerr). <see cref="SeerrRemovedSeasons.SeasonNumbers"/> is the show's
+    /// regular season list from the same answer, null when it carries none. Returns null when the
+    /// lookup fails, so the caller can tell "nothing removed" from "could not find out".
+    /// </summary>
+    public async Task<SeerrRemovedSeasons?> GetRemovedSeasonsAsync(int tmdbId, int jellyseerrUserId)
+    {
+        try
+        {
+            var json = await GetTvDetailsAsync(tmdbId).ConfigureAwait(false);
+            if (json == null) return null;
+
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+
+            List<int>? seasonNumbers = null;
+            if (root.TryGetProperty("seasons", out var allSeasons) && allSeasons.ValueKind == JsonValueKind.Array)
+                seasonNumbers = ReadSeasonNumbers(allSeasons, _ => true).Where(n => n > 0).ToList();
+
+            var removed = new HashSet<int>();
+            if (!root.TryGetProperty("mediaInfo", out var mediaInfo) || mediaInfo.ValueKind != JsonValueKind.Object)
+                return new SeerrRemovedSeasons(seasonNumbers, removed);
+
+            var deleted = new HashSet<int>();
+            if (mediaInfo.TryGetProperty("seasons", out var mediaSeasons) && mediaSeasons.ValueKind == JsonValueKind.Array)
+                deleted.UnionWith(ReadSeasonNumbers(mediaSeasons, s => HasNumber(s, "status", 7)));
+
+            if (deleted.Count > 0 &&
+                mediaInfo.TryGetProperty("requests", out var requests) && requests.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var req in requests.EnumerateArray())
+                {
+                    if (req.ValueKind != JsonValueKind.Object || !HasNumber(req, "status", 5)) continue;
+                    if (req.TryGetProperty("is4k", out var is4k) && is4k.ValueKind == JsonValueKind.True) continue;
+                    if (!req.TryGetProperty("requestedBy", out var by) || by.ValueKind != JsonValueKind.Object
+                        || !HasNumber(by, "id", jellyseerrUserId)) continue;
+                    if (!req.TryGetProperty("seasons", out var reqSeasons) || reqSeasons.ValueKind != JsonValueKind.Array) continue;
+
+                    removed.UnionWith(ReadSeasonNumbers(reqSeasons, _ => true).Where(deleted.Contains));
+                }
+            }
+
+            return new SeerrRemovedSeasons(seasonNumbers, removed);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Seerr TV removed-season lookup errored for TMDb {TmdbId}: {Message}",
+                tmdbId, ex.Message);
+            return null;
+        }
+    }
+
+    private static bool HasNumber(JsonElement obj, string property, int value)
+        => obj.TryGetProperty(property, out var el) && el.ValueKind == JsonValueKind.Number
+           && el.TryGetInt32(out var n) && n == value;
+
+    private static IEnumerable<int> ReadSeasonNumbers(JsonElement seasons, Func<JsonElement, bool> include)
+    {
+        foreach (var s in seasons.EnumerateArray())
+        {
+            if (s.ValueKind == JsonValueKind.Object && include(s)
+                && s.TryGetProperty("seasonNumber", out var sn) && sn.ValueKind == JsonValueKind.Number
+                && sn.TryGetInt32(out var n))
+                yield return n;
         }
     }
 
@@ -386,6 +473,16 @@ public class SeerrClient : IDisposable
         using var response = await PostRequestAsUserAsync(body, jellyseerrUserId).ConfigureAwait(false);
         var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         var seasonsLabel = seasonNumbers.Count > 0 ? string.Join(",", seasonNumbers) : "all";
+
+        // 202 is Seerr's NoSeasonsAvailableError: every requested season already has an active
+        // request, so nothing was created. It carries only a message, which the body check
+        // below would read as a real request.
+        if (response.StatusCode == HttpStatusCode.Accepted)
+        {
+            _logger.LogInformation("Seerr TV request TMDb {TmdbId} S[{Seasons}] → already requested (HTTP 202): {Body}",
+                tmdbId, seasonsLabel, Truncate(responseBody, 200));
+            return (RequestResult.AlreadyExists, title);
+        }
 
         if (response.IsSuccessStatusCode)
         {
@@ -868,3 +965,10 @@ public class SeerrClient : IDisposable
             _http.Dispose();
     }
 }
+
+/// <summary>
+/// What <see cref="SeerrClient.GetRemovedSeasonsAsync"/> read for one show:
+/// <see cref="SeasonNumbers"/> is its regular season list (null when Seerr's answer had none),
+/// <see cref="Removed"/> the seasons fetched for the user and deleted afterwards.
+/// </summary>
+public sealed record SeerrRemovedSeasons(IReadOnlyList<int>? SeasonNumbers, IReadOnlySet<int> Removed);

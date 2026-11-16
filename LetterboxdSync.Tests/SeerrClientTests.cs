@@ -838,6 +838,68 @@ public class SeerrClientTests
         Assert.Null(await client.GetMovieMediaStatusAsync(100));
     }
 
+    // ----- TV seasons fetched for a user and deleted afterwards -----
+    // Shape checked against a live Seerr on 2026-11-16: mediaInfo.seasons[].status is the media
+    // status (7 = deleted), mediaInfo.requests[].status the request status (5 = completed).
+
+    private const string TwoSeasons = "\"seasons\":[{\"seasonNumber\":0},{\"seasonNumber\":1},{\"seasonNumber\":2}]";
+
+    [Theory]
+    // This user's completed request for a deleted season.
+    [InlineData("[{\"seasonNumber\":1,\"status\":7}]", "[{\"status\":5,\"is4k\":false,\"requestedBy\":{\"id\":7},\"seasons\":[{\"seasonNumber\":1,\"status\":5}]}]", "1")]
+    // A request covering two seasons, only one of them deleted.
+    [InlineData("[{\"seasonNumber\":1,\"status\":7},{\"seasonNumber\":2,\"status\":5}]", "[{\"status\":5,\"is4k\":false,\"requestedBy\":{\"id\":7},\"seasons\":[{\"seasonNumber\":1},{\"seasonNumber\":2}]}]", "1")]
+    // Another user's completed request.
+    [InlineData("[{\"seasonNumber\":1,\"status\":7}]", "[{\"status\":5,\"is4k\":false,\"requestedBy\":{\"id\":8},\"seasons\":[{\"seasonNumber\":1}]}]", "")]
+    // Still open, declined, or 4K.
+    [InlineData("[{\"seasonNumber\":1,\"status\":7}]", "[{\"status\":2,\"is4k\":false,\"requestedBy\":{\"id\":7},\"seasons\":[{\"seasonNumber\":1}]}]", "")]
+    [InlineData("[{\"seasonNumber\":1,\"status\":7}]", "[{\"status\":3,\"is4k\":false,\"requestedBy\":{\"id\":7},\"seasons\":[{\"seasonNumber\":1}]}]", "")]
+    [InlineData("[{\"seasonNumber\":1,\"status\":7}]", "[{\"status\":5,\"is4k\":true,\"requestedBy\":{\"id\":7},\"seasons\":[{\"seasonNumber\":1}]}]", "")]
+    // Completed, but the season is still there (partially available).
+    [InlineData("[{\"seasonNumber\":1,\"status\":4}]", "[{\"status\":5,\"is4k\":false,\"requestedBy\":{\"id\":7},\"seasons\":[{\"seasonNumber\":1}]}]", "")]
+    // Deleted with no requests at all.
+    [InlineData("[{\"seasonNumber\":1,\"status\":7}]", "[]", "")]
+    public async Task GetRemovedSeasonsAsync_CountsOnlyTheUsersCompletedRequestsForDeletedSeasons(
+        string seasonStatuses, string requests, string expectedRemoved)
+    {
+        var body = "{\"name\":\"Severance\"," + TwoSeasons + ",\"mediaInfo\":{\"status\":1,\"seasons\":"
+                   + seasonStatuses + ",\"requests\":" + requests + "}}";
+        var handler = new SeerrHandler(req => req.RequestUri!.AbsolutePath.EndsWith("/api/v1/tv/95396")
+            ? JsonResponse(body)
+            : new HttpResponseMessage(HttpStatusCode.NotFound));
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+
+        var state = await client.GetRemovedSeasonsAsync(95396, 7);
+
+        Assert.NotNull(state);
+        Assert.Equal("1,2", string.Join(",", state!.SeasonNumbers!));
+        Assert.Equal(expectedRemoved, string.Join(",", state.Removed.OrderBy(n => n)));
+    }
+
+    [Fact]
+    public async Task GetRemovedSeasonsAsync_ShowSeerrHasNoRecordOf_HasNothingRemoved()
+    {
+        var handler = new SeerrHandler(_ => JsonResponse("{\"name\":\"Severance\"," + TwoSeasons + "}"));
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+
+        var state = await client.GetRemovedSeasonsAsync(95396, 7);
+
+        Assert.NotNull(state);
+        Assert.Empty(state!.Removed);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError, "{}")]
+    [InlineData(HttpStatusCode.OK, "not json")]
+    [InlineData(HttpStatusCode.OK, "[]")]
+    public async Task GetRemovedSeasonsAsync_UnreadableAnswer_ReturnsNull(HttpStatusCode status, string body)
+    {
+        var handler = new SeerrHandler(_ => new HttpResponseMessage(status) { Content = new StringContent(body) });
+        using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
+
+        Assert.Null(await client.GetRemovedSeasonsAsync(95396, 7));
+    }
+
     private static HttpResponseMessage JsonResponse(string body)
         => new(HttpStatusCode.OK) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
 
@@ -866,6 +928,20 @@ public class SeerrClientTests
         using var client = new SeerrClient(BaseUrl, ApiKey, NullLogger.Instance, handler);
         var (result, _) = await client.RequestSeriesAsync(500, 7, seasons);
         return (result, postedBody);
+    }
+
+    // Seerr answers 202 with only a message when every requested season already has an
+    // active request (NoSeasonsAvailableError in server/routes/request.ts): nothing was
+    // created. Seen on a live server on 2026-11-15, where it was recorded as a new request
+    // on every sync.
+    [Fact]
+    public async Task RequestSeries_202NoSeasonsAvailable_IsAlreadyExists()
+    {
+        var (result, _) = await RunSeriesRequest(
+            "{\"message\":\"No seasons available to request\"}",
+            HttpStatusCode.Accepted, new[] { 1 });
+
+        Assert.Equal(SeerrClient.RequestResult.AlreadyExists, result);
     }
 
     [Fact]
