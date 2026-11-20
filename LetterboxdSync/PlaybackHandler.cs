@@ -321,6 +321,20 @@ public class PlaybackHandler : IHostedService, IDisposable
                     continue;
                 }
 
+                // Jellyfin can report one finish twice, a second apart (#200). Handle one event
+                // per episode, user and account at a time, and drop a repeat of a finish just logged
+                // so it is not sent again as a rewatch.
+                var finishKey = EpisodeFinishGuard.Key(user.Id.ToString("N"), account.Email,
+                    epRef.ShowTmdbId, epRef.SeasonNumber, epRef.EpisodeNumbers[0], epRef.EpisodeNumbers[^1]);
+                using var finishLock = await EpisodeFinishGuard.AcquireAsync(finishKey).ConfigureAwait(false);
+                if (EpisodeFinishGuard.IsRecentFinish(finishKey))
+                {
+                    _logger.LogInformation(
+                        "Ignoring a repeated playback-stopped event for {Series} S{Season}E{Episode} for {Account}: this finish was just logged to Serializd",
+                        episode.SeriesName ?? episode.Name, epRef.SeasonNumber, episode.IndexNumber, LogRedaction.AccountTag(account.Email));
+                    continue;
+                }
+
                 try
                 {
                     using var service = await SerializdServiceFactory
@@ -376,6 +390,7 @@ public class PlaybackHandler : IHostedService, IDisposable
                             .ConfigureAwait(false);
                         SerializdSyncHistory.Record(
                             userId, account.Email, epRef.ShowTmdbId, epRef.SeasonNumber, n, SerializdSyncHistory.KindLog);
+                        EpisodeFinishGuard.MarkLogged(finishKey);
 
                         SerializdActivity.Record(new SyncEvent
                         {
