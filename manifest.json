@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "2.15.2.0",
+        "changelog": "On some servers Jellyfin reports the end of a TV episode twice, a second apart, and Jellyscribe logged both to Serializd: a first watch appeared twice in the diary, the second time marked as a rewatch. A repeat that arrives within a few minutes of a logged finish is now ignored, so each watch is logged once, while watching an episode again later is still logged as a rewatch. Entries already duplicated on Serializd are not removed.",
+        "targetAbi": "10.11.9.0",
+        "sourceUrl": "https://lbsync-telemetry.lachlanbyoung.workers.dev/dl/v2.15.2/jellyfin-plugin-letterboxd-v2.15.2.zip",
+        "checksum": "5abbf056470c7ab45d01cc65b200e5ab",
+        "timestamp": "2026-11-20T05:22:49Z"
+      },
+      {
         "version": "2.15.1.0",
         "changelog": "With Seerr auto-request on for a Serializd watchlist, a TV show could come back after a cleanup tool deleted it: Seerr had already fetched it, the tool removed it, and because it was still on the watchlist the next sync asked for it again. Seasons Seerr already fetched for you and that were deleted afterwards are now left alone, unless \"Re-request watched titles\" is on. The activity list also showed a show as \"Requested\" on every sync while Seerr already had an open request for it, although nothing new was requested; those rows are no longer recorded.",
         "targetAbi": "10.11.9.0",
