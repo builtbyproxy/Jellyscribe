@@ -57,10 +57,14 @@ public class SerializdPlaybackTests : IDisposable
         SerializdSyncHistory.ResetForTesting();
         SerializdActivity.DataPathOverride = Path.Combine(_tempDir, "sz-activity.jsonl");
         SerializdActivity.ResetForTesting();
+        EpisodeFinishGuard.ResetForTesting();
+        EpisodeFinishGuard.UtcNow = () => DateTime.UtcNow;
     }
 
     public void Dispose()
     {
+        EpisodeFinishGuard.ResetForTesting();
+        EpisodeFinishGuard.UtcNow = () => DateTime.UtcNow;
         SerializdServiceFactory.OverrideForTesting = null;
         LetterboxdServiceFactory.OverrideForTesting = null;
         SerializdSyncHistory.DataPathOverride = null;
@@ -359,5 +363,116 @@ public class SerializdPlaybackTests : IDisposable
         Assert.Equal(new[] { "keeps@example.com" }, authedAs);
         await svc.Received(1).LogEpisodesAsync(1396, 3572,
             Arg.Is<IReadOnlyList<int>>(l => l.Count == 1 && l[0] == 4));
+    }
+
+    // ---- Repeated playback-stopped events for one finish (#200) ----
+
+    private ISerializdService StubSerializd()
+    {
+        PlaybackHandler.SeriesTmdbIdReader = _ => 1396;
+        var svc = Substitute.For<ISerializdService>();
+        svc.ResolveSeasonIdAsync(1396, 1).Returns(Task.FromResult<int?>(3572));
+        SerializdServiceFactory.OverrideForTesting = (_, _, _) => Task.FromResult(svc);
+        return svc;
+    }
+
+    private static PlaybackStopEventArgs Finished(User user, Episode episode) => new()
+    {
+        Item = episode,
+        PlayedToCompletion = true,
+        Users = new List<User> { user },
+    };
+
+    [Fact]
+    public async Task RepeatedStopEvent_ForOneFinish_LogsOnceAndNotAsARewatch()
+    {
+        var (user, idHex) = MakeUser();
+        AddSerializdAccount(idHex);
+        var svc = StubSerializd();
+        var episode = MakeEpisode(1, 4);
+
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+
+        await svc.Received(1).LogEpisodesAsync(1396, 3572, Arg.Any<IReadOnlyList<int>>());
+        await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+        await svc.DidNotReceive().CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), true);
+    }
+
+    [Fact]
+    public async Task ConcurrentStopEvents_ForOneFinish_LogOnce()
+    {
+        var (user, idHex) = MakeUser();
+        AddSerializdAccount(idHex);
+        var svc = StubSerializd();
+        var release = new TaskCompletionSource();
+        svc.LogEpisodesAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<IReadOnlyList<int>>())
+            .Returns(_ => release.Task);
+        var episode = MakeEpisode(1, 4);
+
+        var first = _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+        var second = _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+        release.SetResult();
+        await Task.WhenAll(first, second);
+
+        await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+        await svc.DidNotReceive().CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), true);
+    }
+
+    [Fact]
+    public async Task FinishAfterTheWindow_IsLoggedAsARewatch()
+    {
+        var (user, idHex) = MakeUser();
+        AddSerializdAccount(idHex);
+        var svc = StubSerializd();
+        var now = new DateTime(2026, 11, 20, 12, 0, 0, DateTimeKind.Utc);
+        EpisodeFinishGuard.UtcNow = () => now;
+        var episode = MakeEpisode(1, 4);
+
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+        now = now.Add(EpisodeFinishGuard.Window).AddSeconds(1);
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+
+        await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+        await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), true);
+    }
+
+    [Fact]
+    public async Task FailedFirstAttempt_LetsTheRepeatRetry_WithoutARewatchFlag()
+    {
+        var (user, idHex) = MakeUser();
+        AddSerializdAccount(idHex);
+        var svc = StubSerializd();
+        var calls = 0;
+        svc.CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), Arg.Any<bool>())
+            .Returns(_ => ++calls == 1 ? throw new Exception("Serializd is down") : Task.CompletedTask);
+        var episode = MakeEpisode(1, 4);
+
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, episode));
+
+        await svc.Received(2).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+        await svc.DidNotReceive().CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), true);
+    }
+
+    [Fact]
+    public async Task FinishWithinTheWindow_OfAnotherEpisodeOrUser_IsLoggedNormally()
+    {
+        var (user, idHex) = MakeUser();
+        var (other, otherHex) = MakeUser("other");
+        AddSerializdAccount(idHex);
+        AddSerializdAccount(otherHex);
+        var svc = StubSerializd();
+
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, MakeEpisode(1, 4)));
+        await _handler.HandlePlaybackStoppedAsync(Finished(user, MakeEpisode(1, 5)));
+        await _handler.HandlePlaybackStoppedAsync(Finished(other, MakeEpisode(1, 4)));
+
+        // Episode 4 once for each user, episode 5 once.
+        await svc.Received(2).CreateEpisodeLogAsync(1396, 3572, 4, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+        await svc.Received(1).CreateEpisodeLogAsync(1396, 3572, 5, Arg.Any<DateTime>(), Arg.Any<int?>(), false);
+        // The other user's history is separate, so their first watch is not a rewatch either.
+        await svc.DidNotReceive().CreateEpisodeLogAsync(Arg.Any<int>(), Arg.Any<int>(), Arg.Any<int>(), Arg.Any<DateTime>(), Arg.Any<int?>(), true);
+        await svc.Received(3).LogEpisodesAsync(1396, 3572, Arg.Any<IReadOnlyList<int>>());
     }
 }

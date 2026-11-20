@@ -10,6 +10,17 @@ export type ReleaseNotes = {
 
 export const releaseNotes: ReleaseNotes[] = [
   {
+    version: '2.15.2',
+    headline: 'Episodes are no longer logged twice as rewatches',
+    summary:
+      'On some servers Jellyfin reports the end of an episode twice, a second apart. Jellyscribe logged both to Serializd, so a first watch showed up twice in the diary, the second time as a rewatch. A repeat that arrives within a few minutes of a logged finish is now ignored, so each watch is logged once. Watching an episode again later is still logged as a rewatch. Entries already duplicated on Serializd are not removed.',
+    highlights: {
+      fixes: [
+        'Finishing a TV episode logs one Serializd diary entry, not a second one marked as a rewatch.',
+      ],
+    },
+  },
+  {
     version: '2.15.1',
     headline: 'TV shows are no longer requested again after a cleanup',
     summary:

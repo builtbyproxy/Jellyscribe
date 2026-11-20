@@ -26,9 +26,15 @@ internal static class FilmSyncLock
         get { lock (_entries) return _entries.Count; }
     }
 
-    public static async Task<IDisposable> AcquireAsync(string userId, string account, int tmdbId, CancellationToken cancellationToken = default)
+    public static Task<IDisposable> AcquireAsync(string userId, string account, int tmdbId, CancellationToken cancellationToken = default)
+        => AcquireAsync($"{userId}\n{account.ToLowerInvariant()}\n{tmdbId}", cancellationToken);
+
+    /// <summary>
+    /// Takes the lock for an arbitrary key. Callers other than the film overload prefix their
+    /// keys (for example "episode\n") so they never share a gate with a film.
+    /// </summary>
+    internal static async Task<IDisposable> AcquireAsync(string key, CancellationToken cancellationToken = default)
     {
-        var key = $"{userId}\n{account.ToLowerInvariant()}\n{tmdbId}";
         Entry entry;
         lock (_entries)
         {
