@@ -16,3 +16,7 @@
 
 - [x] 4.1 Bump to 2.15.2.0 in `Directory.Build.props` and `LetterboxdSync/LetterboxdSync.csproj`, add the `release-notes.ts` entry, and write the PR's `## Release notes` section
 - [x] 4.2 `dotnet build -c Release` and `dotnet test -c Release` pass
+
+## Evidence
+
+All tasks done 2026-11-20 in #203 (squash a8f4fea): `dotnet test -c Release` 1511 passed, 17 skipped; required CI green; Dependabot #202 closed as folded in; v2.15.2 released 2026-11-20 05:22 UTC.
