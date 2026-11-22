@@ -4,7 +4,7 @@ interface Props {
   description?: string;
 }
 
-const { title, description = "Jellyscribe writes what you finish watching in Jellyfin into the diaries you already keep, Letterboxd for film, Serializd for TV." } = Astro.props;
+const { title, description = "Jellyscribe is a Jellyfin plugin that logs the films you finish to Letterboxd and the episodes you finish to Serializd, in real time, for every user on your server." } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 const ogImage = new URL('/og-image.png', Astro.site).toString();
 ---
