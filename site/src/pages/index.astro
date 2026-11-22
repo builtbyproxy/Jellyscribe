@@ -16,26 +16,26 @@ const localReleasesUrl = `${base}/releases`;
 const latestReleaseAnchor = `${localReleasesUrl}#${latestRelease.anchor}`;
 
 const flowSteps = [
-  { title: 'Real-time', body: 'Logged when the film or episode finishes playing. Rewatches are marked automatically.' },
-  { title: 'Daily catch-up', body: 'A scheduled sweep mops up anything missed: an offline watch, a skipped episode, a restart mid-file.' },
-  { title: 'TMDb matching', body: 'Films and episodes are matched by TMDb ID, so foreign titles, unusual cuts and absolute-numbered anime all land on the right entry.' },
+  { title: 'Real-time', body: 'Jellyscribe logs the film or episode when it finishes playing. It marks rewatches automatically.' },
+  { title: 'Daily catch-up', body: 'A scheduled sweep catches anything missed: an offline watch, a skipped episode, a restart mid-file.' },
+  { title: 'TMDb matching', body: 'Jellyscribe matches films and episodes by TMDb ID, so foreign titles, unusual cuts and absolute-numbered anime land on the right entry.' },
 ];
 
 const travelRows = [
   { icon: 'star', title: 'Ratings, both ways', aside: '', stars: true, body: "Jellyfin's 0–10 becomes Letterboxd's half-stars or Serializd's 1–10 scale. It flows back too: rate something on either site and Jellyfin picks it up, even for titles you never logged a watch for." },
   { icon: 'heart', title: 'Favorites → likes', aside: 'no extra clicks', stars: false, body: "Heart it in Jellyfin and it's liked on Letterboxd or Serializd by the next sync." },
-  { icon: 'pencil', title: 'Written reviews', aside: '', stars: false, stamp: true, body: 'Compose from the Jellyfin dashboard with rating, spoiler tag, rewatch flag, even a specific episode, and it posts exactly as written.' },
+  { icon: 'pencil', title: 'Written reviews', aside: '', stars: false, stamp: true, body: 'Write a review in the Jellyfin dashboard with a rating, spoiler tag, rewatch flag, or even a specific episode. It posts as written.' },
   { icon: 'import', title: 'Watched status, too', aside: '', stars: false, body: "Already marked something watched on Letterboxd or Serializd? Jellyfin picks that up too, so there's no need to log it twice." },
-  { icon: 'list', title: 'Watchlist, mirrored', aside: '', stars: false, body: "Your watchlist becomes a Jellyfin playlist (shows from Serializd get a collection too), and can be mirrored one way into your Seerr watchlist. Anything missing gets requested through Seerr, attributed to you." },
+  { icon: 'list', title: 'Watchlist, mirrored', aside: '', stars: false, body: "Jellyscribe turns your watchlist into a Jellyfin playlist (shows from Serializd get a collection too) and can mirror it one way into your Seerr watchlist. It requests anything missing through Seerr, in your name." },
 ];
 
 const infraCards = [
-  { title: 'Multi-user, multi-account', body: "Every Jellyfin user links their own Letterboxd and Serializd logins from their own Jellyscribe page, with no admin access needed. A shared profile just means more than one diary gets the same entry." },
-  { title: 'Retries with judgment', body: 'A title that is already synced is never sent again. A rate limit is waited out once. A failed title gets three attempts, then waits for the next run instead of hammering forever.' },
+  { title: 'Multi-user, multi-account', body: "Every Jellyfin user links their own Letterboxd and Serializd logins from their own Jellyscribe page, with no admin access needed. A shared profile means more than one diary gets the same entry." },
+  { title: 'Retries with judgment', body: 'Jellyscribe never resends a synced title. It waits out a rate limit once. It tries a failed title three times, then holds it for the next run instead of retrying forever.' },
   { title: 'Self-healing auth', body: 'An expired session signs in again and retries on its own, on either service.' },
   { title: 'When Letterboxd blocks a login', body: "Letterboxd's Cloudflare check sometimes blocks sign-ins. Pasting a browser cookie into the account fixes it. Serializd has no such check." },
-  { title: 'Isolated by design', body: 'A Serializd hiccup never blocks the Letterboxd sync, or the other way round. The two run independently.' },
-  { title: 'Tells you what happened', body: "Every send, skip, and failure lands in the dashboard's searchable log, or one click ships it to the developer with a reference code.", ticker: true },
+  { title: 'Isolated by design', body: 'A Serializd failure never blocks the Letterboxd sync, or the other way round. The two run independently.' },
+  { title: 'Tells you what happened', body: "Every send, skip, and failure lands in the dashboard's searchable log. One click ships the log to the developer with a reference code.", ticker: true },
 ];
 ---
 
@@ -169,7 +169,7 @@ const infraCards = [
             <div class="head-copy">
               <div class="feat-eyebrow">How it works</div>
               <h3>One real-time engine, film and TV alike.</h3>
-              <p>Finish something in Jellyfin, and it's logged before you've picked what's next. One matching layer, one dedupe history, one daily sweep, Letterboxd and Serializd both run through it.</p>
+              <p>Finish something in Jellyfin and it's logged before you've picked what's next. Letterboxd and Serializd share one matching layer, one record of what's already synced, and one daily sweep.</p>
             </div>
             <span class="status-pill"><span class="dot"></span>Syncing live</span>
           </div>
@@ -230,7 +230,7 @@ const infraCards = [
             <div class="head-copy">
               <div class="feat-eyebrow">Why trust it unattended</div>
               <h3>It tells you when a sync fails.</h3>
-              <p>This thing runs for months without anyone watching it, so it has to tell you when something fails. It uses Letterboxd's JSON API first and falls back to signing in through the website when that stops working. Serializd's API needs no fallback.</p>
+              <p>Jellyscribe runs for months without anyone watching it, so it tells you when something fails. It uses Letterboxd's JSON API first and falls back to signing in through the website when that stops working. Serializd's API needs no fallback.</p>
             </div>
             <span class="status-pill"><span class="dot"></span>System healthy</span>
           </div>
@@ -258,7 +258,7 @@ const infraCards = [
     <div class="container">
       <div class="section-head">
         <h2>Install</h2>
-        <p>Two paths. Use the plugin repository for automatic updates, or install manually from a release.</p>
+        <p>Use the plugin repository for automatic updates, or install manually from a release.</p>
       </div>
 
       <div class="install-grid">
@@ -280,7 +280,7 @@ const infraCards = [
             <li>Restart Jellyfin, then hard-refresh the web UI (Ctrl/Cmd + Shift + R) so the Jellyscribe link appears in the sidebar (Jellyfin 10.11) or the profile menu (Jellyfin 12).</li>
           </ol>
           <div class="install-note">
-            <p>This URL is a mirror of the GitHub manifest that keeps an anonymous count of installs. Prefer the manifest not to be counted? Add the GitHub one instead. It serves the identical catalog:</p>
+            <p>This URL mirrors the GitHub manifest and keeps an anonymous count of installs. To avoid being counted, add the GitHub one instead. It serves the identical catalog:</p>
             <div class="install-pill install-pill-inline" data-pill>
               <code class="install-pill-url">{rawManifestUrl}</code>
               <button class="install-pill-btn" type="button" data-copy={rawManifestUrl} aria-label="Copy GitHub manifest URL">
@@ -288,7 +288,7 @@ const infraCards = [
                 <span class="copy-text">Copy</span>
               </button>
             </div>
-            <p>Plugin downloads still go through the mirror and are counted either way; a manual install from GitHub Releases avoids both.</p>
+            <p>Plugin downloads still go through the mirror and are counted either way. A manual install from GitHub Releases avoids both.</p>
           </div>
         </div>
 
@@ -324,33 +324,33 @@ const infraCards = [
           <div class="step-num">1</div>
           <div class="step-body">
             <h3>Open Jellyscribe</h3>
-            <p>Click <strong>Jellyscribe</strong> in the Jellyfin sidebar (Jellyfin 10.11) or the profile menu (Jellyfin 12), or bookmark <code>#/jellyscribe</code>, then open <strong>My accounts</strong>. Admins can instead go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong> and open <strong>Accounts</strong>.</p>
+            <p>Click <strong>Jellyscribe</strong> in the Jellyfin sidebar (Jellyfin 10.11) or the profile menu (Jellyfin 12), or bookmark <code>#/jellyscribe</code>. Then open <strong>My accounts</strong>. Admins can instead go to <strong>Dashboard &rarr; Plugins &rarr; Jellyscribe</strong> and open <strong>Accounts</strong>.</p>
           </div>
         </li>
         <li>
           <div class="step-num">2</div>
           <div class="step-body">
             <h3>Link a diary</h3>
-            <p>Click <strong>+ Link a diary</strong>, choose Letterboxd (film) or Serializd (TV), and enter your Letterboxd username (not your email) or Serializd email or username, and the password. Click <strong>Verify login</strong>, leave <strong>Enabled</strong> ticked, and <strong>Save</strong>.</p>
+            <p>Click <strong>+ Link a diary</strong> and choose Letterboxd (film) or Serializd (TV). Enter your Letterboxd username (not your email) or your Serializd email or username, plus the password. Click <strong>Verify login</strong>, leave <strong>Enabled</strong> ticked, and click <strong>Save</strong>.</p>
           </div>
         </li>
         <li>
           <div class="step-num">3</div>
           <div class="step-body">
             <h3>Watch something</h3>
-            <p>That's it. Finish a film or an episode in Jellyfin and check your diary. A daily scheduled sync catches anything missed, or press <strong>Sync all now</strong> on the Overview to catch up straight away.</p>
+            <p>That's it. Finish a film or an episode in Jellyfin and check your diary. A daily scheduled sync catches anything missed. To catch up now, press <strong>Sync all now</strong> on the Overview.</p>
           </div>
         </li>
       </ol>
 
       <div class="tip">
         <strong>Seeing Cloudflare 403s?</strong>
-        <p>Log into Letterboxd in your browser, grab the <code>Cookie</code> header from DevTools, and paste it into the account's <strong>Raw cookies</strong> field, with the same browser's User-Agent in <strong>User-Agent</strong>. The plugin uses Letterboxd's JSON API first, and only signs in through the website (where these cookies matter) when that fails.</p>
+        <p>Log into Letterboxd in your browser and copy the <code>Cookie</code> header from DevTools. Paste it into the account's <strong>Raw cookies</strong> field, and paste the same browser's User-Agent into <strong>User-Agent</strong>. The plugin uses Letterboxd's JSON API first. It signs in through the website, where these cookies matter, only when that fails.</p>
       </div>
 
       <div class="tip tip-built" id="how-its-built">
         <strong>How it's built</strong>
-        <p>I'm one person, and almost all of Jellyscribe's code is written by AI coding agents that I direct and review. Every change goes through a pull request and the full test suite, and no release is published until the live tests against the real Letterboxd site pass. <a href={aiUrl} rel="noopener">AI.md has the full account</a>, and the <a href={`${repoUrl}/issues`} rel="noopener">issue tracker</a> is where to tell me what's broken or missing.</p>
+        <p>I'm one person, and AI coding agents write almost all of Jellyscribe's code while I direct and review it. Every change goes through a pull request and the full test suite. No release goes out until the live tests against the real Letterboxd site pass. <a href={aiUrl} rel="noopener">AI.md has the full account</a>. Use the <a href={`${repoUrl}/issues`} rel="noopener">issue tracker</a> to tell me what's broken or missing.</p>
       </div>
     </div>
   </section>
